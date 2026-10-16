@@ -195,6 +195,7 @@ The administration footer shows the build version and links to README, the PDF m
 | [`vibedock-client/FLASHING.md`](vibedock-client/FLASHING.md) | Full backup, flashing and restore procedure |
 | [`VibeDock-Feasibility-Codex-Claude.md`](VibeDock-Feasibility-Codex-Claude.md) | Original feasibility assessment |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release notes per version, used for the GitHub releases |
+| [`RELEASING.md`](RELEASING.md) | Releases, Docker registries, secrets and repository settings |
 | [`AGENTS.md`](AGENTS.md) | IntelliJ setup and development rules |
 
 ## Background and credits
