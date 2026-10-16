@@ -2,7 +2,9 @@ services:
   vibedock:
     container_name: vibedock-server
     # Without a name Compose calls the built image <project>-<service> (vibedock-server-vibedock).
-    image: vibedock-server:latest
+    # VIBEDOCK_IMAGE=ghcr.io/mcfcologne/vibedock-server:latest in .env uses the published image instead:
+    # docker compose pull && docker compose up -d (without --build).
+    image: ${VIBEDOCK_IMAGE:-vibedock-server:latest}
     build:
       context: .
       # The image takes its version from the Git tag of these sources.

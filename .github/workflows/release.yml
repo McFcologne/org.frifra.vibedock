@@ -4,15 +4,24 @@ name: Release VibeDock
 #   (Docker images: docker load -i, Synology Container Manager > Image > Import) and the firmware of every board
 #   (vibedock-m1-<version>.bin, vibedock-<board>-<version>.bin). The job artifacts only carry the files to the release
 #   job and are deleted after a day.
+# The Docker image also goes to the GitHub Container Registry: ghcr.io/<owner>/vibedock-server:<version> for amd64 and
+# arm64, and :latest for a plain x.y.z version. Started by hand with a tag (Actions > Release VibeDock > Run workflow),
+# the run only publishes that tag's image and leaves its release alone, e.g. for a release that is already published.
 on:
   push:
     tags: ['v[0-9]*', '[0-9]*']
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing version tag whose image is published (e.g. v0.1.0)'
+        required: true
 permissions:
   contents: write
+  packages: write
 concurrency:
-  group: release-${{ github.ref_name }}
+  group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 jobs:
   version:
@@ -22,12 +31,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
       - id: version
         run: echo "version=$(vibedock-server/scripts/version.sh)" >> "$GITHUB_OUTPUT"
 
   server:
     needs: version
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -58,6 +69,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
@@ -65,10 +77,23 @@ jobs:
         working-directory: vibedock-server
         run: |
           v="${{ needs.version.outputs.version }}"
+          # The labels link the image to this repository on ghcr.io (also for tags built before they were added).
           docker buildx build --platform "linux/${{ matrix.arch }}" --build-context git=../.git \
+            --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --label "org.opencontainers.image.description=VibeDock server: AI usage on small desk displays" \
+            --label "org.opencontainers.image.licenses=Apache-2.0" --label "org.opencontainers.image.version=$v" \
             -t "vibedock-server:${{ matrix.arch }}" \
             --output "type=docker,dest=vibedock-server-$v-${{ matrix.arch }}.tar" .
+          docker load -i "vibedock-server-$v-${{ matrix.arch }}.tar"
           gzip -9 "vibedock-server-$v-${{ matrix.arch }}.tar"
+      - name: Push the ${{ matrix.arch }} image to ghcr.io
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          image="ghcr.io/$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')/vibedock-server"
+          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker tag "vibedock-server:${{ matrix.arch }}" "$image:${{ needs.version.outputs.version }}-${{ matrix.arch }}"
+          docker push "$image:${{ needs.version.outputs.version }}-${{ matrix.arch }}"
       - uses: actions/upload-artifact@v4
         with:
           name: image-${{ matrix.arch }}
@@ -76,8 +101,30 @@ jobs:
           path: vibedock-server/vibedock-server-*.tar.gz
           compression-level: 0
 
+  publish-image:
+    # One tag for both architectures; docker pull picks the one of the host.
+    needs: [version, image]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/setup-buildx-action@v3
+      - name: Tag the multi-architecture image
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="${{ needs.version.outputs.version }}"
+          image="ghcr.io/$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')/vibedock-server"
+          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          set -- -t "$image:$v"
+          case $v in *[!0-9.]*) ;; *) set -- "$@" -t "$image:latest";; esac  # latest only for a plain x.y.z version
+          docker buildx imagetools create "$@" \
+            --annotation "index:org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --annotation "index:org.opencontainers.image.description=VibeDock server: AI usage on small desk displays" \
+            --annotation "index:org.opencontainers.image.licenses=Apache-2.0" \
+            "$image:$v-amd64" "$image:$v-arm64"
+
   firmware:
     needs: version
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -102,6 +149,7 @@ jobs:
 
   release:
     needs: [version, server, image, firmware]
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

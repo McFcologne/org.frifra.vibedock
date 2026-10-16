@@ -244,6 +244,18 @@ docker compose up -d --build
 show **Update to …** on the overview, the device cards and the firmware page (see [Updates over
 Wi-Fi](#updates-over-wi-fi)).
 
+## Ready-made image from the registry
+
+Every release is also published to the GitHub Container Registry for amd64 and arm64; Docker picks the right one:
+
+```sh
+docker pull ghcr.io/mcfcologne/vibedock-server:latest     # or a version: ...:0.1.0
+```
+
+Use `ghcr.io/mcfcologne/vibedock-server:latest` as the image in the `docker run` command or the `compose.yaml` below
+instead of `vibedock-server:amd64`; to update, pull again and recreate the container. On a Synology, add
+`https://ghcr.io` under *Container Manager › Registry › Settings*, then search for `mcfcologne/vibedock-server`.
+
 ## Ready-made image from a release
 
 Every GitHub release of the repository carries the image as `vibedock-server-<version>-amd64.tar.gz` and
