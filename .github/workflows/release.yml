@@ -107,6 +107,7 @@ jobs:
     needs: [version, image]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
       - name: Tag the multi-architecture image
         env:
@@ -134,6 +135,23 @@ jobs:
             --annotation "index:org.opencontainers.image.description=VibeDock server: AI usage on small desk displays" \
             --annotation "index:org.opencontainers.image.licenses=Apache-2.0" \
             "$image:$v-amd64" "$image:$v-arm64"
+      - name: Docker Hub description from docs/DOCKERHUB.md
+        # Needs a token with Read, Write, Delete; a failure only warns, the images are published already.
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ] || { echo "No Docker Hub secrets"; exit 0; }
+          user=$(echo "$DOCKERHUB_USERNAME" | tr '[:upper:]' '[:lower:]')
+          jwt=$(jq -n --arg u "$DOCKERHUB_USERNAME" --arg p "$DOCKERHUB_TOKEN" '{username:$u,password:$p}' \
+            | curl -fsS -H 'Content-Type: application/json' -d @- https://hub.docker.com/v2/users/login | jq -r .token) \
+            || { echo "::warning::Docker Hub sign-in for the description failed"; exit 0; }
+          jq -n --rawfile full docs/DOCKERHUB.md \
+            --arg short "Self-hosted server that shows AI coding quota (Codex, Claude, ...) on small desk displays" \
+            '{description:$short,full_description:$full}' \
+            | curl -fsS -o /dev/null -X PATCH -H "Authorization: Bearer $jwt" -H 'Content-Type: application/json' -d @- \
+              "https://hub.docker.com/v2/repositories/$user/vibedock-server/" \
+            || echo "::warning::Docker Hub description not updated (the token needs Read, Write, Delete)"
 
   firmware:
     needs: version

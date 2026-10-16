@@ -14,6 +14,7 @@ are never written down here or anywhere in the repository.
 | Docker image on GitHub | `ghcr.io/mcfcologne/vibedock-server` – <https://github.com/McFcologne/org.frifra.vibedock/pkgs/container/vibedock-server> |
 | Docker image on Docker Hub | `mcfcologne/vibedock-server` – <https://hub.docker.com/r/mcfcologne/vibedock-server> |
 | Release notes | [`CHANGELOG.md`](CHANGELOG.md), the section `## <version>` |
+| Docker Hub description | [`docs/DOCKERHUB.md`](docs/DOCKERHUB.md), sent with every image publication |
 
 Both registries carry the same images: `<version>` and `latest` (only for a plain `x.y.z`) as one image for `amd64` and
 `arm64`. On ghcr.io the single-architecture stages `<version>-amd64` and `<version>-arm64` are visible as well.
@@ -26,7 +27,8 @@ git tag vX.Y.Z  ──push──▶  GitHub Actions: Release VibeDock (.github/w
                               ├─ image     → vibedock-server-<version>-<arch>.tar.gz
                               │              and ghcr.io/…/vibedock-server:<version>-<arch>
                               ├─ publish-image → ghcr.io/…:<version>, :latest
-                              │                  and Docker Hub …:<version>, :latest (with the secrets below)
+                              │                  and Docker Hub …:<version>, :latest and its description
+                              │                  from docs/DOCKERHUB.md (with the secrets below)
                               ├─ firmware  → vibedock-<board>-<version>.bin for every board
                               └─ release   → GitHub release (draft, files uploaded, then published)
 push / pull request  ──────▶  GitHub Actions: Verify VibeDock (.github/workflows/verify.yml), check server-and-browser
@@ -47,7 +49,7 @@ push / pull request  ──────▶  GitHub Actions: Verify VibeDock (.gi
 | --- | --- | --- | --- |
 | `GITHUB_TOKEN` | automatic, per run | release upload, `ghcr.io` login | nothing to do; rights from `permissions:` in the workflow |
 | `DOCKERHUB_USERNAME` | repository secret | Docker Hub login and image name | GitHub › Settings › Secrets and variables › Actions |
-| `DOCKERHUB_TOKEN` | repository secret | Docker Hub login | Docker Hub › Account settings › Personal access tokens (Read & Write) |
+| `DOCKERHUB_TOKEN` | repository secret | Docker Hub login and the repository description | Docker Hub › Account settings › Personal access tokens (Read, Write, Delete; Read & Write publishes the images but cannot change the description) |
 
 A Docker Hub token that expires or is revoked makes the next release fail in *publish-image*; create a new one and
 replace the secret.
