@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Display')}"></head>
+<body>
+<header th:replace="~{fragments :: appbar('design')}"></header>
+<main id="layout-editor">
+<div class="layout-heading page-heading"><div><h2>Display design</h2><p>One editor for the default and device-specific designs.</p></div>
+<label>Design for<select id="design-target" disabled><option value="default">All devices · default design</option></select></label></div>
+<p id="design-message" role="status" aria-live="polite">Loading designs…</p>
+<div id="design-switch" class="notice" role="alert" hidden><span></span> <button type="button" class="secondary small" data-switch="discard">Discard and switch</button> <button type="button" class="secondary small" data-switch="stay">Keep editing</button></div>
+<p id="design-error" class="notice error" role="alert" hidden></p>
+<div class="design-context"><span class="badge custom" id="design-title">Default design</span><span id="design-default-summary">Applies to devices using the default.</span>
+<div id="design-inheritance" class="design-inheritance" hidden><label><input id="design-override" type="checkbox"> Custom design</label><p id="inheritance-description"></p>
+  <label class="design-display" for="design-display">Display<select id="design-display"></select></label><p id="design-display-note" class="meta"></p></div>
+</div>
+<form id="design-form" autocomplete="off">
+<div class="layout-columns"><div>
+<fieldset id="design-controls" disabled>
+<section class="card"><div class="card-head"><span class="icon"><svg th:replace="~{fragments :: icon('bands')}"></svg></span><h3 class="grow">Band arrangement</h3><span class="meta">Use ↑ ↓ or drag to reorder</span></div>
+<div id="design-bands"></div>
+<div id="design-status-settings" hidden>
+<div id="design-mood-settings"><label for="design-mood-button">Mood</label><input id="layout-emoji" type="hidden"><button id="design-mood-button" type="button" class="emoji-button" data-emoji-open="layout-emoji" aria-label="Choose mood emoji" title="Choose mood emoji"></button><small>Choose an emoji or None.</small></div>
+<div id="design-weather-settings"><label for="design-weather">Weather location</label><input id="design-weather" maxlength="80" placeholder="City or latitude, longitude" aria-describedby="design-weather-help"><small id="design-weather-help">Used for the forecast, never shown on the display. Leave empty to disable weather.</small></div>
+</div>
+<p class="meta">Each usage band holds one full-width widget, two half-width widgets or one compact row (half the height, no reset times). The VibeTV M1 shows two full bands, one full and two compact ones, or four compact ones. Data sources are provided by the server.</p>
+</section>
+</fieldset>
+</div>
+<div class="design-side">
+<aside class="card design-preview"><h3 class="section-label"><svg th:replace="~{fragments :: icon('monitor')}"></svg>Preview</h3><figure class="screen"><div class="device"><div class="device-front"><div class="device-glass"><img id="design-preview-image" width="240" height="240" src="/admin/preview.png" alt="Design preview rendered by the device image renderer"></div></div></div><figcaption id="design-preview-caption">Same renderer and image format as your device.</figcaption></figure><p id="preview-status" class="meta" role="status" aria-live="polite"></p></aside>
+<fieldset id="design-style-controls" disabled><section class="card"><h3 class="section-label"><svg th:replace="~{fragments :: icon('palette')}"></svg>Appearance</h3><label for="design-scheme">Style / theme</label><select id="design-scheme"></select></section></fieldset>
+</div>
+</div>
+<div class="savebar"><span id="design-save-state">No unsaved changes</span><button id="design-discard" type="button" class="secondary">Discard</button><button id="design-save" type="submit" disabled>Save default design</button></div>
+</form>
+</main>
+<footer th:replace="~{fragments :: footer}"></footer>
+<dialog id="emoji-picker" class="emoji-picker" aria-label="Choose an emoji" data-catalog="/admin/emoji.json" data-images="/admin/twemoji/">
+<input type="search" data-emoji-search placeholder="Search, e.g. rocket, cat, heart" autocomplete="off" aria-label="Search emoji">
+<p class="meta" data-emoji-status>Loading…</p><h4 data-emoji-quick-title>Quick picks</h4><div class="emoji-grid" data-emoji-quick></div>
+<h4>All emoji</h4><div class="emoji-grid" data-emoji-all></div>
+<div class="emoji-actions"><button type="button" class="secondary" data-emoji="" data-emoji-default hidden>Use default</button><button type="button" class="secondary" data-emoji="-">None</button><button type="button" class="secondary" data-emoji-close>Close</button></div>
+</dialog>
+<script src="/emoji-picker.js"></script><script src="/layout-editor.js"></script>
+</body></html>

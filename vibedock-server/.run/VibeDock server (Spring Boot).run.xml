@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <!-- The server straight from the IDE, without Docker. It needs ADMIN_PASSWORD in the environment (Modify options >
+       Environment variables); the data lands in ./data. -->
+  <configuration default="false" name="VibeDock server (Spring Boot)" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <module name="vibedock-server" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="org.frifra.vibedock.server.Application" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

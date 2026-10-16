@@ -1,0 +1,10 @@
+.venv/
+firmware/.pio/
+firmware.bin
+*.log
+.DS_Store
+backups/
+
+# Share the client build configuration even if .run is globally ignored.
+!.run/
+!.run/*.run.xml

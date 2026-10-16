@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex"><meta name="referrer" content="no-referrer"><title th:text="${'VibeDock · ' + name}">VibeDock</title>
+<style>
+html,body{margin:0;height:100%;background:#000;overflow:hidden}
+body{background-position:center;background-size:contain;background-repeat:no-repeat;image-rendering:pixelated}
+.stale{position:fixed;right:12px;bottom:10px;font:12px system-ui,sans-serif;color:#fff;background:rgba(180,35,53,.85);padding:4px 9px;border-radius:99px;display:none}
+</style></head>
+<body th:attr="data-image=${image},data-reload=${reload}"><span class="stale" role="status"></span>
+<script>
+// Swaps the image only once the next one has loaded, so the screen never goes blank; keeps the last image offline.
+(() => {
+  const body = document.body, stale = document.querySelector('.stale'), every = Number(body.dataset.reload) * 1000;
+  let last = null;
+  const time = date => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  function load() {
+    const url = body.dataset.image + '?t=' + Date.now(), next = new Image();
+    next.onload = () => { body.style.backgroundImage = 'url("' + url + '")'; last = new Date(); stale.style.display = 'none'; };
+    next.onerror = () => { stale.textContent = last ? 'offline · last image ' + time(last) : 'offline'; stale.style.display = 'inline-block'; };
+    next.src = url;
+  }
+  load(); setInterval(load, every);
+})();
+</script>
+</body></html>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="case" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e6e7e2"/></linearGradient><linearGradient id="screen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14254d"/><stop offset="1" stop-color="#0a1633"/></linearGradient></defs>
+<rect x="5" y="5" width="54" height="56" rx="11" fill="#b9bcb4"/>
+<rect x="5" y="3" width="54" height="55" rx="11" fill="url(#case)" stroke="#b9bcb4" stroke-width="1.2"/>
+<rect x="11" y="9" width="42" height="35" rx="2.5" fill="url(#screen)"/>
+<polygon points="43.00,26.50 42.79,28.65 39.93,29.78 39.13,31.27 39.78,34.28 38.11,35.65 35.28,34.43 33.67,34.92 32.00,37.50 29.85,37.29 28.72,34.43 27.23,33.63 24.22,34.28 22.85,32.61 24.07,29.78 23.58,28.17 21.00,26.50 21.21,24.35 24.07,23.22 24.87,21.73 24.22,18.72 25.89,17.35 28.72,18.57 30.33,18.08 32.00,15.50 34.15,15.71 35.28,18.57 36.77,19.37 39.78,18.72 41.15,20.39 39.93,23.22 40.42,24.83" fill="#7fd6ff"/>
+<circle cx="32" cy="26.5" r="3.96" fill="#0f1d40"/>
+</svg>

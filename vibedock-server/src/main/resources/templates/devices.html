@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Devices')}"></head>
+<body>
+<header th:replace="~{fragments :: appbar('devices')}"></header>
+<main>
+<th:block th:replace="~{fragments :: notices}"></th:block>
+<div class="page-heading"><div><h2>Devices</h2><p>Manage paired displays and their design assignments.</p></div>
+  <div class="heading-actions">
+    <span data-live-page="update-all"><form th:if="${updatable > 1}" th:action="@{/admin/clients/all/update}" method="post"><button class="secondary" th:text="${'Update all (' + updatable + ')'}">Update all</button></form></span>
+    <a class="button secondary" th:href="@{/admin/firmware}">Firmware</a>
+    <button type="button" class="secondary" data-create-open="web" aria-controls="web" aria-expanded="false"><svg th:replace="~{fragments :: icon('globe')}"></svg>Add web display</button>
+    <button type="button" data-create-open="invite" aria-controls="invite" aria-expanded="false"><svg th:replace="~{fragments :: icon('plus')}"></svg>Pair device</button></div></div>
+<p class="notice" th:if="${clientMessage}" th:text="${clientMessage}"></p>
+<p class="notice warn" th:if="${clientWarning}" th:text="${clientWarning}" role="alert"></p>
+<p class="notice error" th:if="${deviceRemovalError}" th:text="${deviceRemovalError}" role="alert"></p>
+<section class="card create-panel" id="invite" data-create-panel th:attr="data-create-error=${pairingError != null}">
+  <div class="card-head"><h3>Pair device</h3></div>
+  <p class="notice error" th:if="${pairingError}" th:text="${pairingError}" role="alert"></p>
+  <p>Enter the IP address and 6-digit pairing code shown on your display.</p>
+  <form class="invite" th:action="@{/admin/clients/invite}" method="post" autocomplete="off">
+    <div class="grid-3">
+      <div><label for="invite-ip">Device IP</label><input id="invite-ip" name="ip" placeholder="192.168.1.50" required></div>
+      <div><label for="invite-code">Pairing code</label><input id="invite-code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="123456" required></div>
+      <div><label for="invite-name">Name (optional)</label><input id="invite-name" name="name" maxlength="40" placeholder="VibeDock Office"></div>
+    </div>
+    <div><label for="invite-board">Board</label><select id="invite-board" name="board">
+      <option th:each="b:${boards}" th:value="${b.id}" th:text="${b.label + ' · ' + b.chip}"></option></select>
+      <small class="meta">Current firmware names its board itself; this choice counts for firmware that does not report it.</small></div>
+    <details><summary>Device port</summary><label for="invite-port">HTTP port of the device</label><input id="invite-port" name="port" type="number" min="1" max="65535" value="80"></details>
+    <div class="form-actions"><button type="button" class="secondary" data-create-close="invite">Cancel</button><button>Pair device</button></div>
+  </form>
+  <p class="meta">Announced addresses: <th:block th:each="url,it:${announced}"><code th:text="${url}"></code><span th:if="${!it.last}"> → </span></th:block> · set under <a th:href="@{/admin/server}">Settings</a></p>
+</section>
+<section class="card create-panel" id="web" data-create-panel th:attr="data-create-error=${webError != null}">
+  <div class="card-head"><h3>Add web display</h3></div>
+  <p class="notice error" th:if="${webError}" th:text="${webError}" role="alert"></p>
+  <p>A browser, tablet or another program shows the image by itself. It gets a page and an image link; the secret in the links is the only access, so share them like a password.</p>
+  <form th:action="@{/admin/clients/web}" method="post" autocomplete="off">
+    <div class="grid-3">
+      <div><label for="web-name">Name</label><input id="web-name" name="name" maxlength="40" placeholder="Kitchen tablet" required></div>
+      <div><label for="web-display">Display type</label><select id="web-display" name="display">
+        <option th:each="type:${displayTypes}" th:value="${type.id}" th:text="${type.label}"></option></select></div>
+      <div><label for="web-reload">Reload every</label><select id="web-reload" name="reloadSeconds">
+        <option value="10">10 s</option><option value="30" selected>30 s</option><option value="60">1 min</option><option value="300">5 min</option></select></div>
+    </div>
+    <div class="form-actions"><button type="button" class="secondary" data-create-close="web">Cancel</button><button>Create links</button></div>
+  </form>
+</section>
+<p class="notice error" th:if="${internalLoopback}">The internal address points to this machine itself (localhost). Open the administration via the host's LAN address or set an internal address under <a th:href="@{/admin/server}">Settings</a>, otherwise devices cannot reach the server.</p>
+
+<p th:if="${#lists.isEmpty(clients)}"><em>No device paired yet.</em></p>
+<div class="grid-2" data-sortable="/admin/clients/order">
+<section class="card client-card" th:each="client:${clients}" th:id="${'device-'+client.identifier}"
+         th:attr="data-device=${client.identifier},data-firmware=${client.firmware},data-updating=${client.updating},data-sort-id=${client.identifier}">
+  <div class="card-head"><span class="card-grip" data-sort-grip role="button" tabindex="0" title="Drag the card to reorder it (or use the arrow keys here)" aria-label="Reorder">⠿</span><div class="grow rename" th:attr="data-rename=@{/admin/clients/{id}/rename(id=${client.identifier})},data-rename-max=40">
+    <h2 data-name th:text="${client.name}">VibeDock</h2><button type="button" class="icon-button rename-button" data-rename-start title="Rename" aria-label="Rename"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg></button></div>
+    <span class="badge web-badge" th:if="${client.web != null}">Web display</span>
+    <span class="badge" data-live="status" th:classappend="${client.status == 'Connected'} ? 'ok'" th:text="${client.status}"></span>
+    <form th:if="${client.web == null}" th:action="@{/admin/clients/{id}/refresh(id=${client.identifier})}" method="post"><button class="icon-button" title="Force refresh: redraw the whole screen now" aria-label="Force refresh">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4h-4"/></svg></button></form></div>
+  <div class="client-body">
+    <div class="device"><div class="device-front"><div class="device-glass"><img width="160" height="160" alt="Current status image for this device" data-client-preview
+         th:src="@{/admin/clients/{id}/preview.png(id=${client.identifier})}"></div></div></div>
+    <div th:if="${client.web != null}" th:with="base=${webBases[client.identifier]},page=${base + '/web/' + client.web.secret}">
+      <p class="meta" data-live="ip"><th:block th:if="${client.lastPullAt != null}">From <strong th:text="${client.ip}"></strong> · </th:block>every
+        <th:block th:text="${client.web.reloadSeconds + ' s'}"></th:block> · <th:block th:text="${#strings.arraySplit(client.display.label, '·')[0].trim()}"></th:block></p>
+      <div class="web-link"><span class="meta">Page</span><code th:text="${page}"></code>
+        <button type="button" class="icon-button" th:attr="data-copy=${page}" title="Copy link" aria-label="Copy page link"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg></button>
+        <a class="icon-button" th:href="${page}" target="_blank" rel="noopener noreferrer" title="Open page" aria-label="Open page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a></div>
+      <div class="web-link"><span class="meta">PNG</span><code th:text="${page + '/image.png'}"></code>
+        <button type="button" class="icon-button" th:attr="data-copy=${page + '/image.png'}" title="Copy link" aria-label="Copy image link"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg></button>
+        <a class="icon-button" th:href="${page + '/image.png'}" target="_blank" rel="noopener noreferrer" title="Open image" aria-label="Open image"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a></div>
+      <div class="web-options"><form class="web-external" th:action="@{/admin/clients/{id}/web/external(id=${client.identifier})}" method="post">
+        <label class="switch" th:title="${externalSet ? 'The links use the external server address' : 'Set an external address under Settings first'}">
+          <input type="checkbox" name="external" value="true" th:checked="${client.web.external and externalSet}" th:disabled="${!externalSet}" data-web-external>
+          <span>External address</span></label></form>
+      <span class="badge design-badge" th:classappend="${client.overridden} ? 'custom'" th:text="${client.overridden ? 'Custom design' : 'Uses default'}"></span></div>
+    </div>
+    <div th:if="${client.web == null}">
+      <p class="meta" data-live="ip">IP <strong th:text="${client.ip == '0.0.0.0' ? 'known after its first pull' : client.ip}"></strong></p>
+      <p class="meta device-identifier" th:text="${client.identifier + ' · ' + client.board.label}"></p>
+      <div class="meta firmware-line" data-live="firmware" th:with="firmwareVersion=${firmwareVersions.get(client.board.id)}"><span>Firmware <strong th:text="${client.firmware != null ? client.firmware : 'unknown'}"></strong></span>
+        <th:block th:if="${T(org.frifra.vibedock.server.FirmwareVersion).newer(firmwareVersion, client.firmware)}">
+          <span class="badge update" th:if="${client.updating}" th:text="${'Updating to ' + firmwareVersion + ' …'}">Updating</span>
+          <form class="inline-form" th:if="${client.ota and !client.updating}" th:action="@{/admin/clients/{id}/update(id=${client.identifier})}" method="post">
+            <button class="badge update" th:text="${'Update to ' + firmwareVersion}">Update</button></form>
+          <a class="badge update" th:if="${client.otaNeedsPairing}" th:href="@{/admin/firmware(board=${client.board.id})}"
+             title="The firmware can update over Wi-Fi, but the device was paired before this server sent it its signing key. Pair it again: over USB with 'Only pair' on the firmware page (keeps its design), or remove it here and invite it with its pairing code."
+             th:text="${'Pair again to update to ' + firmwareVersion + ' over Wi-Fi'}">Pair again</a>
+          <a class="badge update" th:unless="${client.ota or client.otaNeedsPairing}" th:href="@{/admin/firmware(board=${client.board.id})}"
+             title="This firmware cannot update over Wi-Fi: install the current one once over USB and pair it there"
+             th:text="${'Update ' + firmwareVersion + ' via USB'}">Update via USB</a></th:block>
+        <span class="badge ok" th:if="${firmwareVersion != null and client.firmware == firmwareVersion}">Latest version installed</span>
+        <p class="notice error" th:if="${client.updateError != null}" th:text="${'Last update failed: ' + client.updateError}"></p></div>
+      <p class="badge design-badge" th:classappend="${client.overridden} ? 'custom'" th:text="${client.overridden ? 'Custom design' : 'Uses default'}"></p>
+      <p class="notice error" th:if="${failedClient == client.identifier}" th:text="${failedClientMessage}"></p>
+    </div>
+  </div>
+  <div class="client-card-footer">
+    <div class="card-actions"><form th:if="${client.web != null}" th:action="@{/admin/clients/{id}/web/renew(id=${client.identifier})}" method="post">
+        <button class="secondary small-button" title="New secret: the old links stop working" data-confirm="Create new links? The old links stop working.">New links</button></form>
+      <a class="button secondary icon-label" th:href="@{/admin/design(device=${client.identifier})}"><svg th:replace="~{fragments :: icon('palette')}"></svg>Edit design</a>
+      <form th:action="@{/admin/clients/{id}/remove(id=${client.identifier})}" method="post"><button class="icon-button danger" title="Remove device" aria-label="Remove device"
+          th:attr="data-confirm=${client.web != null ? 'Remove this web display? Its links stop working.' : 'Remove this device? It returns to pairing mode.'}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 12.5h9l1-12.5M10 11v6M14 11v6"/></svg></button></form></div></div>
+</section>
+</div>
+<p class="meta" th:if="${!#lists.isEmpty(clients)}">Default and device designs use the same editor. Turn off a device's own design there to follow the default again.</p>
+</main>
+<footer th:replace="~{fragments :: footer}"></footer>
+<script src="../static/admin-state.js" th:src="@{/admin-state.js}"></script>
+<script src="../static/device-state.js" th:src="@{/device-state.js}"></script>
+<script src="../static/admin-login.js" th:src="@{/admin-login.js}"></script>
+</body></html>

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title th:text="${(status ?: 'Error') + ' · VibeDock'}">Error · VibeDock</title>
+<link rel="icon" href="/logo.svg" th:href="@{/logo.svg}" type="image/svg+xml">
+<link rel="stylesheet" href="../static/app.css" th:href="@{/app.css}">
+<script src="../static/theme.js" th:src="@{/theme.js}"></script>
+</head>
+<body>
+<!-- Instead of Spring's white error page: what happened and a way back, never stack traces or exception text. -->
+<main class="auth">
+<div class="auth-card">
+  <div class="brand">
+    <img class="logo" src="../static/logo.svg" th:src="@{/logo.svg}" alt="">
+    <h1 th:text="${status ?: 'Error'}">Error</h1>
+    <small th:text="${status == 403 ? 'Not allowed' : status == 404 ? 'Page not found' : 'Something went wrong'}">Something went wrong</small>
+  </div>
+  <p th:if="${status == 403}">This page needs a sign-in, or the form was sent with an expired session (for example after a server restart). Sign in again and repeat the step.</p>
+  <p th:if="${status == 404}">There is no page at this address.</p>
+  <p th:unless="${status == 403 or status == 404}">The server could not handle the request. The server log (<code>logs/vibedock.log</code> in the data directory) has the details.</p>
+  <p><a class="button" th:href="@{/admin}" href="/admin">Back to the administration</a></p>
+</div>
+</main>
+</body>
+</html>

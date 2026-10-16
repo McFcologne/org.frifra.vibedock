@@ -1,0 +1,16 @@
+{
+  "compiled": true,
+  "board": "esp12e, ESP8266 SmallTV ST7789",
+  "platform": "espressif8266@4.2.1",
+  "ram_bytes": 30920,
+  "ram_max_bytes": 81920,
+  "flash_program_bytes": 372299,
+  "flash_program_max_bytes": 1044464,
+  "firmware_binary_bytes": 376448,
+  "firmware_sha256": "71a5157e8bc828559532d4fc21964f99d2262767af7327bd8577410c46e78f6e",
+  "native_policy_test_passed": true,
+  "physical_wifi_tested": false,
+  "physical_display_tested": false,
+  "firmware_flashed": false,
+  "original_backup_sha256": "55447a9fd331784ea5447d110db7a0d644cf313884d31d53327150e5f1c6ccf0"
+}

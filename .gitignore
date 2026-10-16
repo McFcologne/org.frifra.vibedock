@@ -1,0 +1,13 @@
+.DS_Store
+.idea/
+
+# Exported Docker images
+*.tar
+*.tar.gz
+
+# Keep the test workflow despite machine-wide ignore rules.
+!.github/
+!.github/workflows/
+!.github/workflows/verify.yml
+!.github/workflows/release.yml
+docs/manual/*.pdf

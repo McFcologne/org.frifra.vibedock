@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Licenses')}"></head>
+<body>
+<header th:replace="~{fragments :: appbar('')}"></header>
+<main>
+<div class="page-heading"><div><h2>Licenses &amp; notices</h2><p>Components included in this VibeDock build.</p></div></div>
+<section class="card"><div class="card-head"><h3>VibeDock</h3></div>
+<p>Version <span th:text="${appVersion}"></span> · <a th:href="${readmeUrl}" target="_blank" rel="noopener noreferrer">Project README</a></p>
+<p>Licensed under the <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener noreferrer">Apache License 2.0</a>.</p>
+<p class="meta">Third-party components keep their own licenses, listed below.</p>
+</section>
+<section class="card"><div class="card-head"><h3>Java dependencies</h3></div>
+<p class="meta">Generated during the build from the resolved runtime dependencies, including transitive dependencies. Test dependencies are excluded. Missing declarations remain visible in the report.</p>
+<pre class="license-report" th:if="${javaNotices != null}" th:text="${javaNotices}"></pre>
+<p class="notice error" th:if="${javaNotices == null}">License report unavailable. Build the server with Maven to generate it.</p>
+</section>
+<section class="card"><div class="card-head"><h3>Container components &amp; artwork</h3></div>
+<p class="meta">Generated from installed package metadata and notice files when the Docker image is built. Open a component to read its bundled notices.</p>
+<p th:unless="${containerInventoryAvailable}">No container inventory is available in this local installation. The Docker build adds the installed login clients, Twemoji artwork, Java runtime and system package notices automatically.</p>
+<ul class="license-components" th:if="${containerInventoryAvailable}">
+<li th:each="notice,it:${containerNotices}"><div><strong th:text="${notice.name}"></strong> <span class="meta" th:text="${notice.version}"></span><p class="meta" th:text="${notice.license}"></p></div>
+<a th:href="@{/admin/licenses/components/{index}.txt(index=${it.index})}" target="_blank" rel="noopener noreferrer">Read notices</a></li>
+</ul>
+</section>
+</main>
+<footer th:replace="~{fragments :: footer}"></footer>
+</body></html>

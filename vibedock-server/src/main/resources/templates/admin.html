@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Overview')}"></head>
+<body>
+<header th:replace="~{fragments :: appbar('overview')}"></header>
+<main>
+<th:block th:replace="~{fragments :: notices}"></th:block>
+<div class="page-heading"><div><h2>Overview</h2><p>Usage, connections and your displays at a glance.</p></div>
+  <form th:action="@{/admin/refresh}" method="post"><button class="secondary"><svg th:replace="~{fragments :: icon('refresh')}"></svg>Refresh</button></form></div>
+<div class="overview-grid">
+<section class="card" id="status">
+  <div class="card-head"><span class="icon"><svg th:replace="~{fragments :: icon('activity')}"></svg></span><h3 class="grow">Data sources</h3><span class="meta" th:text="${snapshot.providers.size()} + ' accounts'"></span></div>
+  <ul class="status-list">
+    <li th:each="entry:${snapshot.providers}"><span th:replace="~{fragments :: sourceTile(${sourceTypes.get(entry.key)})}"></span><div class="source-summary"><strong th:text="${snapshot.label(entry.key)}"></strong><span class="meta" th:text="${sourceDetails.get(entry.key)}"></span><span class="meta" th:attr="data-source-figures=${entry.key}" th:text="${figures.get(entry.key)}"></span></div>
+      <span class="badge" th:attr="data-source-badge=${entry.key},data-status=${entry.value.status}" th:classappend="${entry.value.status == 'ok'} ? 'ok'" th:text="${entry.value.status == 'ok' ? 'Current' : (entry.value.status == 'suspended' ? 'Paused' : #strings.replace(entry.value.status,'_',' '))}"></span></li>
+  </ul>
+</section>
+<aside class="card overview-display">
+  <div class="card-head"><span class="icon"><svg th:replace="~{fragments :: icon('palette')}"></svg></span><h3>Default display</h3></div>
+  <figure class="screen"><div class="device"><div class="device-front"><div class="device-glass"><img width="240" height="240" alt="Preview of the VibeDock display" data-client-preview
+    src="/admin/preview.png" th:src="@{/admin/preview.png}"></div></div></div><figcaption>As shown on the VibeDock</figcaption></figure>
+  <div class="section-actions"><span class="meta" th:text="${defaultScheme}"></span><a class="button secondary" th:href="@{/admin/design}">Edit design</a></div>
+</aside>
+</div>
+
+<section class="card" id="device-summary">
+  <div class="card-head"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></span><h3 class="grow">Devices</h3>
+    <a class="button quiet" th:href="@{/admin/devices}">Manage devices →</a></div>
+  <p th:if="${#lists.isEmpty(clients)}"><em>No device paired yet.</em> Pair one under <a th:href="@{/admin/devices}">Devices</a>.</p>
+  <ul class="status-list" th:unless="${#lists.isEmpty(clients)}">
+    <li th:each="client:${clients}" th:attr="data-device=${client.identifier},data-updating=${client.updating}"><span><strong th:text="${client.name}">VibeDock</strong> <span class="meta" data-live="ip" th:text="${client.ip}"></span></span>
+      <span class="status-actions" data-live="status" th:with="firmwareVersion=${firmwareVersions.get(client.board.id)}"><th:block th:if="${client.web == null and T(org.frifra.vibedock.server.FirmwareVersion).newer(firmwareVersion, client.firmware)}">
+        <span class="badge update" th:if="${client.updating}" th:text="${'Updating to ' + firmwareVersion + ' …'}">Updating</span>
+        <form class="inline-form" th:if="${client.ota and !client.updating}" th:action="@{/admin/clients/{id}/update(id=${client.identifier})}" method="post">
+          <input type="hidden" name="back" value="overview"><button class="badge update" th:text="${'Update to ' + firmwareVersion}">Update</button></form>
+        <a class="badge update" th:unless="${client.ota or client.updating}" th:href="@{/admin/firmware(board=${client.board.id})}" th:text="${'Update to ' + firmwareVersion}">Update</a></th:block>
+      <span class="badge" th:classappend="${client.status == 'Connected'} ? 'ok'" th:text="${client.status}"></span></span></li>
+  </ul>
+  <details th:unless="${#maps.isEmpty(deviceStatus)}"><summary>Legacy device delivery</summary>
+    <ul class="status-list"><li th:each="entry:${deviceStatus}"><span th:text="${entry.key}"></span><span class="badge" th:text="${entry.value}"></span></li></ul>
+  </details>
+</section>
+</main>
+<footer th:replace="~{fragments :: footer}"></footer>
+<script src="../static/admin-state.js" th:src="@{/admin-state.js}"></script>
+<script src="../static/device-state.js" th:src="@{/device-state.js}"></script>
+<script src="../static/source-state.js" th:src="@{/source-state.js}"></script>
+<script src="../static/admin-login.js" th:src="@{/admin-login.js}"></script>
+</body></html>

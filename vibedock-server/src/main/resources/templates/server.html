@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Settings')}"></head>
+<body>
+<header th:replace="~{fragments :: appbar('server')}"></header>
+<main>
+<th:block th:replace="~{fragments :: notices}"></th:block>
+<div class="page-heading"><div><h2>Settings</h2><p>Network, API access, sign-in and server storage.</p></div></div>
+<section class="card" id="addresses">
+  <div class="card-head"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span><h2 class="grow">Network</h2></div>
+  
+  <form th:action="@{/admin/clients/settings}" method="post" autocomplete="off" data-dirty-form>
+    <label for="internal-url">Internal address (LAN)</label>
+    <input id="internal-url" name="internalUrl" th:value="${internalUrl}" th:placeholder="${derivedInternal}" placeholder="http://192.168.1.10:10002">
+    <label for="external-url">External address (optional, e.g. a public host name)</label>
+    <input id="external-url" name="externalUrl" th:value="${externalUrl}" placeholder="https://vibedock.example.com">
+    <label for="poll-seconds">Poll interval in seconds (10–3600)</label>
+    <input id="poll-seconds" name="pollSeconds" type="number" min="10" max="3600" th:value="${pollSeconds}">
+    <small>Devices try the address that answered last, then the other one. Addresses are sent when a device is invited; the poll interval reaches paired devices with their next pull. An empty internal address is derived from the host used to open this page.</small>
+    <p class="notice" th:if="${settingsMessage}" th:text="${settingsMessage}"></p>
+    <p class="notice error" th:if="${settingsError}" th:text="${settingsError}"></p>
+    <div class="form-actions" data-dirty-actions><button>Save network settings</button></div>
+  </form>
+</section>
+<form th:action="@{/admin/settings}" method="post" autocomplete="off" data-dirty-form><input type="hidden" name="page" value="server">
+<section class="card">
+  <div class="card-head"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span><h2 class="grow">Read-only API access</h2></div>
+  <p>One IP address or CIDR range per line, for example <code>192.168.2.0/24</code>. An empty list blocks all access. Forwarded IP headers are ignored.</p>
+  <label for="ips">Allowed source addresses</label><textarea id="ips" name="allowedIps" rows="5" th:text="${allowedIps}"></textarea>
+  <p class="meta">This browser as seen by the server: <strong th:text="${peerIp}"></strong> · JSON endpoint on the public port: <code>/api/v1/usage</code></p>
+</section>
+
+<section class="card"><details><summary>Legacy connection to manually configured devices</summary>
+  <p>The device must be in Wi-Fi mode and reachable over LAN or VPN. Enabled delivery periodically writes display frames to <code>/frame</code>. A pairing token must already exist for this device. No automatic pairing, no Wi-Fi changes and no flashing.</p>
+  <fieldset th:each="i:${#numbers.sequence(0,2)}"><legend th:text="${'Device ' + (i+1)}"></legend>
+    <label>Name</label><input th:name="${'device'+i+'Name'}" th:value="${i < devices.size() ? devices[i].name : 'VibeDock '+(i+1)}">
+    <label>Address</label><input th:name="${'device'+i+'Url'}" placeholder="http://192.168.2.170" th:value="${i < devices.size() ? devices[i].url : ''}">
+    <label>New pairing token</label><input type="password" th:name="${'device'+i+'Token'}" autocomplete="new-password">
+    <label><input type="checkbox" th:name="${'device'+i+'TokenClear'}"> Remove stored pairing token</label>
+    <label><input type="checkbox" th:name="${'device'+i+'Enabled'}" th:checked="${i < devices.size() and devices[i].enabled}"> Enable periodic display delivery to this device</label>
+  </fieldset>
+</details></section>
+
+<div class="savebar" data-dirty-actions><button>Save access settings</button></div>
+</form>
+<section class="card" id="sign-in">
+  <div class="card-head"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span><h2 class="grow">Administration sign-in</h2><span class="badge" th:text="${ownPassword ? 'Own password' : 'ADMIN_PASSWORD'}"></span></div>
+  <p>User <code th:text="${adminUser}">admin</code>. A password set here replaces <code>ADMIN_PASSWORD</code> from the environment (<code>.env</code>) until it is reset.</p>
+  <form th:action="@{/admin/password}" method="post">
+    <label for="current-password">Current password</label><input id="current-password" name="current" type="password" autocomplete="current-password" required>
+    <label for="new-password">New password (at least 8 characters)</label><input id="new-password" name="password" type="password" autocomplete="new-password" minlength="8" required>
+    <label for="repeat-password">Repeat the new password</label><input id="repeat-password" name="repeat" type="password" autocomplete="new-password" minlength="8" required>
+    <p class="notice" th:if="${passwordMessage}" th:text="${passwordMessage}"></p>
+    <p class="notice error" th:if="${passwordError}" th:text="${passwordError}"></p>
+    <div class="form-actions"><button th:if="${ownPassword}" type="submit" name="reset" value="1" class="secondary" formnovalidate>Back to ADMIN_PASSWORD</button><button>Change password</button></div>
+  </form>
+</section>
+<section class="card" id="storage">
+  <div class="card-head"><h2 class="grow">Storage</h2><span class="badge" th:classappend="${storageProblem == null} ? 'ok'" th:text="${storageProblem == null ? 'Writable' : 'Not writable'}"></span></div>
+  <p class="meta">Data directory: <code th:text="${dataDir}"></code> · logs in <code th:text="${logDir}"></code></p>
+</section>
+</main>
+<footer th:replace="~{fragments :: footer}"></footer>
+<script src="../static/admin-state.js" th:src="@{/admin-state.js}"></script>
+</body></html>

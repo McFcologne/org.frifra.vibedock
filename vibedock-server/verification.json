@@ -1,0 +1,120 @@
+{
+  "spring_boot": "3.5.16",
+  "java_release": 21,
+  "tests_passed": 24,
+  "native_firmware_parser_passed": true,
+  "local_http_checks": 5,
+  "docker_container_run_tested": false,
+  "real_provider_credentials_tested": false,
+  "real_device_writes": false,
+  "firmware_flashed": false,
+  "jar_sha256": "195476d0c1324afd9c8f8bf5c3eb910366935bbc48f941174af1ba95f7090901",
+  "provider_source": {
+    "source_commit": "f3e718c897d5ed76af4e07182df899c722118546",
+    "files": [
+      {
+        "path": "Sources/CodexBarCore/Providers/Claude/ClaudeOAuth/ClaudeOAuthDelegatedRefreshCoordinator.swift",
+        "url": "https://raw.githubusercontent.com/steipete/CodexBar/f3e718c897d5ed76af4e07182df899c722118546/Sources/CodexBarCore/Providers/Claude/ClaudeOAuth/ClaudeOAuthDelegatedRefreshCoordinator.swift",
+        "sha256": "ca245bb916952f5fd7cb9bae580b3ad08d53531a883af4875d52f3ba8d368fb9"
+      },
+      {
+        "path": "Sources/CodexBarCore/Providers/Claude/ClaudeOAuth/ClaudeOAuthUsageFetcher.swift",
+        "url": "https://raw.githubusercontent.com/steipete/CodexBar/f3e718c897d5ed76af4e07182df899c722118546/Sources/CodexBarCore/Providers/Claude/ClaudeOAuth/ClaudeOAuthUsageFetcher.swift",
+        "sha256": "2c31674b981eccad2fa9bc502df748b9ec99a32a5a4cec5c4020058ac10123ce"
+      },
+      {
+        "path": "Sources/CodexBarCore/Providers/Codex/CodexOAuth/CodexOAuthUsageFetcher.swift",
+        "url": "https://raw.githubusercontent.com/steipete/CodexBar/f3e718c897d5ed76af4e07182df899c722118546/Sources/CodexBarCore/Providers/Codex/CodexOAuth/CodexOAuthUsageFetcher.swift",
+        "sha256": "8de3281bf3e091b5d3573710c2faf270375399b6b7f6f1613c108d2588796f6e"
+      },
+      {
+        "path": "Sources/CodexBarCore/Providers/Codex/CodexOAuth/CodexTokenRefresher.swift",
+        "url": "https://raw.githubusercontent.com/steipete/CodexBar/f3e718c897d5ed76af4e07182df899c722118546/Sources/CodexBarCore/Providers/Codex/CodexOAuth/CodexTokenRefresher.swift",
+        "sha256": "051bd388be4a5c60d1b7788e699e975cd5cb88b43ef85bf5a975c8025efd65ae"
+      },
+      {
+        "path": "Tests/CodexBarTests/ClaudeOAuthTransportIdentityTests.swift",
+        "url": "https://raw.githubusercontent.com/steipete/CodexBar/f3e718c897d5ed76af4e07182df899c722118546/Tests/CodexBarTests/ClaudeOAuthTransportIdentityTests.swift",
+        "sha256": "5a826031d33b3d80206677416d171a0816da4078656e2eb7ec297de4642916bf"
+      },
+      {
+        "path": "Tests/CodexBarTests/CodexOAuthRequestTests.swift",
+        "url": "https://raw.githubusercontent.com/steipete/CodexBar/f3e718c897d5ed76af4e07182df899c722118546/Tests/CodexBarTests/CodexOAuthRequestTests.swift",
+        "sha256": "fac58598107aa614520118db0b039439240f113502270eba407ef464213af1e9"
+      }
+    ],
+    "tree_sha": "339c42cd097fd10c28b054df6f840f8e98484b8b",
+    "version": "v0.63.0"
+  },
+  "transport_checks": [
+    {
+      "host": "chatgpt.com",
+      "path": "/backend-api/wham/usage",
+      "credentials_sent": false,
+      "tls_requested": "TLSv1.2",
+      "certificate_verification": true,
+      "tls_negotiated": "TLSv1.2",
+      "cipher": "ECDHE-ECDSA-AES128-GCM-SHA256",
+      "certificate_expiry": "Dec 19 21:31:25 2026 GMT",
+      "http_status": 401,
+      "content_type": "application/json",
+      "response_bytes_read": 25
+    },
+    {
+      "host": "api.anthropic.com",
+      "path": "/api/oauth/usage",
+      "credentials_sent": false,
+      "tls_requested": "TLSv1.2",
+      "certificate_verification": true,
+      "tls_negotiated": "TLSv1.2",
+      "cipher": "ECDHE-ECDSA-AES128-GCM-SHA256",
+      "certificate_expiry": "Dec 20 19:15:03 2026 GMT",
+      "http_status": 401,
+      "content_type": "application/json",
+      "response_bytes_read": 186
+    },
+    {
+      "host": "auth.openai.com",
+      "path": "/.well-known/openid-configuration",
+      "credentials_sent": false,
+      "tls_requested": "TLSv1.2",
+      "certificate_verification": true,
+      "tls_negotiated": "TLSv1.2",
+      "cipher": "ECDHE-ECDSA-AES128-GCM-SHA256",
+      "certificate_expiry": "Dec 18 12:10:44 2026 GMT",
+      "http_status": 200,
+      "content_type": "application/json",
+      "response_bytes_read": 1471
+    }
+  ],
+  "baseline_firmware": {
+    "ram_bytes": 49036,
+    "ram_total": 81920,
+    "flash_bytes": 479635,
+    "flash_max": 1044464
+  },
+  "sso_cache_http_checks": 3,
+  "official_cli_help_checked": {
+    "codex": "0.162.1",
+    "claude": "2.1.296"
+  },
+  "browser_sso_tested": false,
+  "automatic_token_refresh_implemented": false,
+  "sso_cache_reload_tests_passed": true,
+  "login_buttons_implemented": true,
+  "login_button_http_checks": 4,
+  "login_button_real_provider_tested": false,
+  "official_codex_app_server_initialize_tested": true,
+  "official_codex_device_code_schema_verified": true,
+  "client_registry_implemented": true,
+  "client_ip_change_unit_tested": true,
+  "client_lifecycle_http_checks": 4,
+  "client_lifecycle_http_test_scope": "loopback registration, approval, preview, callback port change, revocation",
+  "png_rgb565_pixels_identical_tested": true,
+  "client_native_policy_test_passed": true,
+  "client_firmware_compiled": true,
+  "client_firmware_ram_bytes": 30920,
+  "client_firmware_flash_bytes": 372299,
+  "client_firmware_sha256": "71a5157e8bc828559532d4fc21964f99d2262767af7327bd8577410c46e78f6e",
+  "client_wifi_and_hardware_tested": false
+}

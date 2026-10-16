@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Data sources')}"></head>
+<body>
+<header th:replace="~{fragments :: appbar('sources')}"></header>
+<main>
+<th:block th:replace="~{fragments :: notices}"></th:block>
+<div class="page-heading"><div><h2>Data sources</h2><p>Connect provider accounts and choose their display names.</p></div>
+  <div class="heading-actions">
+    <button type="button" class="secondary" data-create-open="export-sources" aria-controls="export-sources" aria-expanded="false" th:unless="${#lists.isEmpty(sources)}">Export</button>
+    <button type="button" class="secondary" data-create-open="import-sources" aria-controls="import-sources" aria-expanded="false" th:unless="${importEntries != null}">Import</button>
+    <button type="button" data-create-open="add-source" aria-controls="add-source" aria-expanded="false"><svg th:replace="~{fragments :: icon('plus')}"></svg>Add data source</button></div></div>
+<p class="notice" th:if="${importMessage}" th:text="${importMessage}"></p>
+<section class="card create-panel" id="export-sources" data-create-panel th:attr="data-create-error=${exportError != null}" th:unless="${#lists.isEmpty(sources)}">
+  <div class="card-head"><h3>Export data sources</h3></div>
+  <p class="notice error" th:if="${exportError}" th:text="${exportError}" role="alert"></p>
+  <p>The file contains every data source with its stored sign-in and tokens, encrypted with this password. Without the password it cannot be restored.</p>
+  <form th:action="@{/admin/sources/export}" method="post" autocomplete="off" class="source-create-form">
+    <div><label for="export-password">Password (at least 10 characters)</label><input id="export-password" name="password" type="password" minlength="10" required autocomplete="new-password"></div>
+    <div><label for="export-confirm">Repeat password</label><input id="export-confirm" name="confirm" type="password" minlength="10" required autocomplete="new-password" data-same-as="export-password"></div>
+    <div class="form-actions"><button type="button" class="secondary" data-create-close="export-sources">Cancel</button><button>Download export</button></div>
+  </form>
+</section>
+<section class="card create-panel" id="import-sources" data-create-panel th:attr="data-create-error=${importError != null}" th:unless="${importEntries != null}">
+  <div class="card-head"><h3>Import data sources</h3></div>
+  <p class="notice error" th:if="${importError}" th:text="${importError}" role="alert"></p>
+  <p>Choose a VibeDock export and enter its password. You review the contained sources before anything changes.</p>
+  <form th:action="@{/admin/sources/import}" method="post" autocomplete="off" class="source-create-form">
+    <div><label for="import-file">Export file</label><input id="import-file" type="file" accept=".json,application/json" required data-file-into="import-content">
+      <textarea id="import-content" name="content" hidden></textarea></div>
+    <div><label for="import-password">Password</label><input id="import-password" name="password" type="password" required autocomplete="off"></div>
+    <div class="form-actions"><button type="button" class="secondary" data-create-close="import-sources">Cancel</button><button>Open export</button></div>
+  </form>
+</section>
+<section class="card create-panel import-review" id="import-review" th:if="${importEntries != null}">
+  <div class="card-head"><h3>Import data sources</h3></div>
+  <p class="notice error" th:if="${importReviewError}" th:text="${importReviewError}" role="alert"></p>
+  <form th:action="@{/admin/sources/import/apply}" method="post">
+    <fieldset class="import-mode"><legend>How to import</legend>
+      <label><input type="radio" name="mode" value="add" checked> Add to the current sources</label>
+      <label><input type="radio" name="mode" value="replace"> Replace all current sources</label></fieldset>
+    <p class="meta" th:text="${#lists.size(importEntries) == 1 ? 'The export contains one data source:' : 'Choose the data sources to import:'}"></p>
+    <ul class="import-list">
+      <li th:each="entry:${importEntries}"><label><input type="checkbox" name="source" th:value="${entry.id}" checked th:disabled="${#lists.size(importEntries) == 1}">
+        <input type="hidden" name="source" th:value="${entry.id}" th:if="${#lists.size(importEntries) == 1}">
+        <strong th:text="${entry.label}"></strong> <span class="meta" th:text="${entry.typeLabel + ' · ' + (entry.signedIn ? 'with credentials' : 'without credentials') + (entry.exists ? ' · already here' : '')}"></span></label></li>
+    </ul>
+    <p class="meta">Replacing removes the current sources and their sign-ins; the imported ones keep their ids, so designs from the exporting server show them again. Added sources get their own sign-in, sources that are already here are added as copies.</p>
+    <div class="form-actions"><button class="secondary" th:formaction="@{/admin/sources/import/cancel}" formnovalidate>Cancel</button><button>Import</button></div>
+  </form>
+</section>
+<section class="card create-panel" id="add-source" data-create-panel th:attr="data-create-error=${sourceCreateError != null}">
+  <div class="card-head"><h3>Add data source</h3></div>
+  <p class="notice error" th:if="${sourceCreateError}" th:text="${sourceCreateError}" role="alert"></p>
+  <form th:action="@{/admin/sources/add}" method="post" autocomplete="off" class="source-create-form">
+    <div><label for="add-type">Type</label>
+      <select id="add-type" name="type"><option th:each="type:${types}" th:value="${type}" th:text="${type == 'codex' ? 'Codex' : (type == 'claude' ? 'Claude' : (type == 'grok' ? 'Grok (SuperGrok / X Premium+)' : (type == 'gemini' ? 'Gemini (Gemini CLI / Code Assist)' : 'Cursor (team Admin API)')))}"></option></select></div>
+    <div><label for="add-label">Name on the display</label><input id="add-label" name="label" maxlength="24" required placeholder="e.g. Work account"></div>
+    <div class="form-actions"><button type="button" class="secondary" data-create-close="add-source">Cancel</button><button>Add data source</button></div>
+  </form>
+  <p class="meta">Codex, Claude, Grok and Gemini: sign in after adding. Cursor: enter the team's Admin API key and the member's e-mail. Each account is independent and can be assigned in Display.</p>
+</section>
+<form th:action="@{/admin/settings}" method="post" autocomplete="off" data-dirty-form><input type="hidden" name="page" value="sources">
+<p th:if="${#lists.isEmpty(sources)}"><em>No data source yet.</em> Add one above.</p>
+<div class="grid-2" data-sortable="/admin/sources/order">
+<section class="card source" th:each="source:${sources}" th:id="${'source-'+source.id}" th:attr="data-sort-id=${source.id}">
+  <div class="card-head"><span class="card-grip" data-sort-grip role="button" tabindex="0" title="Drag the card to reorder it (or use the arrow keys here)" aria-label="Reorder">⠿</span>
+    <span th:replace="~{fragments :: sourceTile(${source.type})}"></span>
+    <div class="grow rename" th:attr="data-rename=@{/admin/sources/{id}/rename(id=${source.id})},data-rename-max=24,data-rename-field=${'label-'+source.id}">
+      <h2 class="source-name"><span data-name th:text="${source.label}">Codex Work</span><small th:text="${source.typeLabel}">Codex</small></h2><button type="button" class="icon-button rename-button" data-rename-start title="Rename" aria-label="Rename"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg></button></div>
+    <span class="badge" th:if="${source.suspended}">Paused</span>
+    <span class="badge" th:unless="${source.suspended}" th:with="reading=${sourceStates.get(source.id)}" th:attr="data-source-badge=${source.id},data-status=${reading == null ? 'waiting' : reading.status}" th:classappend="${reading != null and reading.status == 'ok'} ? 'ok'" th:text="${reading == null ? 'Not available' : (reading.status == 'ok' ? 'Current' : #strings.replace(reading.status,'_',' '))}"></span></div>
+  <div class="source-state"><span>Sign-in</span><span th:text="${source.configured ? (source.type == 'cursor' ? 'Key stored' : 'Credentials stored') : 'Not connected'}"></span>
+    <span>Data</span><span th:with="reading=${sourceStates.get(source.id)}" th:text="${source.suspended ? 'Paused: not polled, the display shows it as paused' : (reading != null and reading.status == 'ok' ? 'Current usage available' : 'Not available')}"></span></div>
+  <div class="source-manage"><span class="meta">Provider account</span>
+    <button type="button" class="secondary small" th:attr="data-dialog-open=${'manage-'+source.id}">Manage</button></div>
+  <dialog class="source-dialog" th:id="${'manage-'+source.id}" th:attr="aria-labelledby=${'manage-title-'+source.id}">
+  <div class="dialog-head"><span th:replace="~{fragments :: sourceTile(${source.type})}"></span>
+    <h3 class="source-name grow" th:id="${'manage-title-'+source.id}"><span data-name th:text="${source.label}">Codex Work</span><small th:text="${source.typeLabel}">Codex</small></h3>
+    <button type="button" class="ghost dialog-close" data-dialog-close aria-label="Close">×</button></div>
+  <div class="login-panel" th:if="${source.type != 'cursor'}" th:attr="data-provider=${source.id}">
+    <button type="button" data-action="start" th:text="${'Sign in with ' + source.typeLabel}">Sign in</button>
+    <button type="button" data-action="cancel" hidden>Cancel</button>
+    <p data-login-message role="status" aria-live="polite">Start the sign-in in your browser. Credentials are saved automatically.</p>
+    <a class="button" data-login-link target="_blank" rel="noopener noreferrer" hidden>Open sign-in page</a>
+    <p data-device-code hidden>One-time code: <code></code> <button type="button" data-action="copy-code">Copy code</button></p>
+    <div data-code-box hidden><label th:for="${source.id+'-login-code'}">One-time code from the browser, if shown</label>
+      <input th:id="${source.id+'-login-code'}" type="password" data-login-code autocomplete="off" maxlength="2048">
+      <button type="button" data-action="code">Complete sign-in</button></div>
+  </div>
+  <label th:for="${'label-'+source.id}">Name on the display</label>
+  <input th:id="${'label-'+source.id}" th:name="${'label_'+source.id}" maxlength="24" required th:value="${source.label}">
+  <th:block th:if="${source.type == 'cursor'}">
+    <p class="meta">Cursor has no sign-in for usage data. A team admin creates an Admin API key under Settings → Cursor Admin API Keys on cursor.com/dashboard; the source shows the share of the chosen member's monthly limit.</p>
+    <label th:for="${'token-'+source.id}">Admin API key <span class="meta" th:if="${source.configured}">(stored; enter a new one to replace it)</span></label>
+    <input th:id="${'token-'+source.id}" type="password" th:name="${'token_'+source.id}" autocomplete="new-password">
+    <label><input type="checkbox" th:name="${'token_'+source.id+'Clear'}"> Remove stored key</label>
+    <label th:for="${'account-'+source.id}">Member e-mail</label>
+    <input th:id="${'account-'+source.id}" type="email" th:name="${'accountId_'+source.id}" th:value="${source.accountId}" placeholder="name@example.com">
+  </th:block>
+  <details th:unless="${source.type == 'cursor' or source.type == 'gemini'}"><summary>Enter token manually (optional)</summary>
+    <label th:for="${'token-'+source.id}">New authorized access token</label><input th:id="${'token-'+source.id}" type="password" th:name="${'token_'+source.id}" autocomplete="new-password">
+    <label><input type="checkbox" th:name="${'token_'+source.id+'Clear'}"> Remove stored token</label>
+    <th:block th:if="${source.type == 'codex'}"><label th:for="${'account-'+source.id}">Workspace/account ID, if required</label>
+      <input th:id="${'account-'+source.id}" th:name="${'accountId_'+source.id}" th:value="${source.accountId}"></th:block>
+  </details>
+  <div class="source-actions">
+  <button class="secondary small" name="suspend" th:value="${!source.suspended}" th:formaction="@{/admin/sources/{id}/suspend(id=${source.id})}" formnovalidate
+          th:text="${source.suspended ? 'Resume data source' : 'Pause data source'}">Pause data source</button>
+  <button class="ghost small" th:formaction="@{/admin/sources/{id}/remove(id=${source.id})}" formnovalidate
+          onclick="return confirm('Remove this data source and its stored sign-in?')">Remove data source</button>
+  <span class="grow"></span><button type="button" class="secondary small" data-dialog-close>Close</button><button class="small">Save</button></div>
+  </dialog>
+</section>
+</div>
+<small style="margin:-6px 0 18px">After a successful browser sign-in, credentials are stored in the Docker data directory, separately for every source. Use the sign-in button to renew expired or revoked credentials.</small>
+<div class="savebar" data-dirty-actions th:unless="${#lists.isEmpty(sources)}"><button>Save data sources</button></div>
+</form>
+
+</main>
+<footer th:replace="~{fragments :: footer}"></footer>
+<script src="../static/admin-state.js" th:src="@{/admin-state.js}"></script>
+<script src="../static/source-state.js" th:src="@{/source-state.js}"></script>
+<script src="../static/admin-login.js" th:src="@{/admin-login.js}"></script>
+</body></html>

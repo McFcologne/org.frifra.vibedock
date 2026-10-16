@@ -1,0 +1,6 @@
+services:
+  vibedock:
+    volumes:
+      - type: bind
+        source: ${VIBEDOCK_DATA_PATH:?Set VIBEDOCK_DATA_PATH to a prepared host directory}
+        target: /data

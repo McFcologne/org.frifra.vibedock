@@ -1,0 +1,371 @@
+package org.frifra.vibedock.server;
+
+import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Value;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import javax.imageio.ImageIO;
+import java.io.*;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.List;
+
+@Component
+public class StatusImage {
+    public record Image(byte[] png,byte[] rgb565) {}
+    /** Optional parts of a device's image: emoji bottom right, colour scheme, weather icon and temperature bottom left. */
+    public record Look(BufferedImage emoji,Scheme scheme,BufferedImage weatherIcon,String weatherText,Layout layout) {
+        public Look { scheme=scheme==null?Scheme.MIDNIGHT:scheme;layout=layout==null?Layout.DEFAULT:layout; }
+        public Look(BufferedImage emoji,Scheme scheme,BufferedImage weatherIcon,String weatherText){this(emoji,scheme,weatherIcon,weatherText,Layout.DEFAULT);}
+        static final Look PLAIN=new Look(null,Scheme.MIDNIGHT,null,null);
+    }
+    private final ZoneId zone;
+    public StatusImage(@Value("${vibedock.time-zone}") String zone){this.zone=ZoneId.of(zone);}
+    public Image render(UsageService.Snapshot snapshot,String ip) throws IOException { return render(snapshot,ip,Look.PLAIN); }
+    public Image render(UsageService.Snapshot snapshot,String ip,BufferedImage emoji) throws IOException {
+        return render(snapshot,ip,new Look(emoji,Scheme.MIDNIGHT,null,null));
+    }
+    /**
+     * Draws the bands of the layout from top to bottom, each at its fixed height. Nothing is scaled; the default layout
+     * gives exactly the image of earlier versions.
+     */
+    public Image render(UsageService.Snapshot snapshot,String ip,Look look) throws IOException { return render(snapshot,ip,look,DisplayType.M1); }
+    /** The image in the resolution of a display type; the layout is fitted to it (see {@link Layout#fit}). */
+    public Image render(UsageService.Snapshot snapshot,String ip,Look look,DisplayType type) throws IOException {
+        var fitted=new Look(look.emoji(),look.scheme(),look.weatherIcon(),look.weatherText(),look.layout().fit(type));
+        return new Frame(type.width(),type.height()).draw(snapshot,ip,fitted);
+    }
+    /** One rendering at a given size; the drawing code below works for any width and height. */
+    private final class Frame {
+    final int w,h;
+    Frame(int w,int h){this.w=w;this.h=h;}
+    Image draw(UsageService.Snapshot snapshot,String ip,Look look) throws IOException {
+        var scheme=look.scheme();
+        var image=new BufferedImage(w,h,BufferedImage.TYPE_INT_RGB);var g=image.createGraphics();
+        try{
+            g.setColor(new Color(scheme.background));g.fillRect(0,0,w,h);
+            // Classic Mac and Windows: no anti-aliasing, crisp pixels like the originals.
+            boolean smooth=scheme.style!=Scheme.Style.MAC&&scheme.style!=Scheme.Style.WINDOWS;
+            g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,smooth?RenderingHints.VALUE_TEXT_ANTIALIAS_ON:RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,smooth?RenderingHints.VALUE_ANTIALIAS_ON:RenderingHints.VALUE_ANTIALIAS_OFF);
+            // Usage bands shrink in proportion (to their minimum, see Layout.fit) when they need more than the screen
+            // has; taller screens: the spare height goes evenly between the bands; the last band stays at the bottom edge.
+            var bands=look.layout().bands();
+            int nominal=bands.stream().filter(Layout.Usage.class::isInstance).mapToInt(Layout.Band::height).sum();
+            int room=h-Layout.CONTEXT_HEIGHT,used=Math.min(nominal,room)+Layout.CONTEXT_HEIGHT;
+            int gaps=bands.size()-1,spare=Math.max(0,h-used),y=0;
+            for(int i=0;i<bands.size();i++){
+                var band=bands.get(i);
+                int height=band instanceof Layout.Usage&&nominal>room?band.height()*room/nominal:band.height();
+                switch(band){
+                    case Layout.Usage usage -> usage(g,scheme,snapshot,usage,y,height,i==bands.size()-1&&spare==0);
+                    case Layout.Context context -> context(g,snapshot,ip,look,context,y);
+                }
+                y+=height+(gaps==0?0:spare/gaps+(i<spare%gaps?1:0));
+            }
+        }finally{g.dispose();}
+        return encode(image,scheme);
+    }
+    /** One usage band: a full-width provider, or two half-width ones side by side. */
+    /** bottom: the band ends at the screen edge; windows get the same margin below as above. */
+    private void usage(Graphics2D g,Scheme scheme,UsageService.Snapshot snapshot,Layout.Usage band,int y,int height,boolean bottom){
+        var sources=band.sources();
+        if(band.compact()){row(g,scheme,snapshot.label(sources.get(0)),snapshot.providers().get(sources.get(0)),y,height,bottom);return;}
+        if(sources.size()==1){provider(g,scheme,snapshot.label(sources.get(0)),snapshot.providers().get(sources.get(0)),y+22,height,bottom);return;}
+        for(int column=0;column<sources.size();column++){
+            var panel=(Graphics2D)g.create();
+            try{
+                panel.translate(column*(w/2),y);panel.clipRect(0,0,w/2,height);
+                compact(panel,scheme,snapshot.label(sources.get(column)),snapshot.providers().get(sources.get(column)),height,bottom);
+            }finally{panel.dispose();}
+        }
+    }
+    private void provider(Graphics2D g,Scheme scheme,String title,UsageService.Provider p,int top,int height,boolean bottom){
+        if(p==null)p=new UsageService.Provider("unconfigured",null,null,null);
+        // Rate limited with last known values: keep them and show the time they were read.
+        boolean held=p.status().equals("rate_limited")&&p.observedAt()!=null&&(p.fiveHour()!=null||p.week()!=null);
+        String status=held?"Rate limited \u00b7 "+DateTimeFormatter.ofPattern("HH:mm").withZone(zone).format(Instant.ofEpochSecond(p.observedAt()))
+                :p.status().equals("ok")?null:DeviceSender.statusLabel(p.status());
+        // Narrow screens: the status is shortened to the room the title leaves.
+        g.setFont(new Font(scheme.font(),Font.BOLD,scheme.style==Scheme.Style.TERMINAL?15:16));
+        int room=w-20-g.getFontMetrics().stringWidth((scheme.style==Scheme.Style.TERMINAL?"> ":"")+title)-8;
+        if(status!=null&&scheme.style!=Scheme.Style.MAC&&scheme.style!=Scheme.Style.WINDOWS)
+            status=fit(g,scheme,scheme.style==Scheme.Style.TERMINAL?status.toUpperCase(Locale.ROOT):status,10,room);
+        switch(scheme.style){
+            case TERMINAL -> {
+                text(g,scheme,"> "+title.toUpperCase(Locale.ROOT),10,top,15,scheme.title,true);
+                if(status!=null)right(g,scheme,status,w-10,top,10,scheme.warning);
+            }
+            case MAC -> macWindow(g,scheme,title,status,top,4,w-9,height-(bottom?8:4));
+            case WINDOWS -> windowsWindow(g,scheme,title,status,top,4,w-8,height-(bottom?6:3));
+            default -> {
+                text(g,scheme,title,10,top,16,scheme.title,true);
+                if(status!=null)right(g,scheme,status,w-10,top,10,scheme.warning);
+            }
+        }
+        if(p.period()!=null)window(g,scheme,p.period(),p.week(),top+22);
+        else{window(g,scheme,"5h",p.fiveHour(),top+22);window(g,scheme,"Week",p.week(),top+52);}
+    }
+    /**
+     * The weather/mood band, 56 px: weather, update time and mood, and the device IP in its bottom-left corner
+     * (rows 36-55, columns 0-149). The left slot ends above the IP, the right slot uses the full height.
+     */
+    private void context(Graphics2D g,UsageService.Snapshot snapshot,String ip,Look look,Layout.Context band,int y){
+        var scheme=look.scheme();
+        // Time of the newest provider reading, not of this rendering: the image (and its ETag) only changes with new data.
+        var observed=snapshot.providers().values().stream().map(UsageService.Provider::observedAt).filter(Objects::nonNull).max(Long::compare);
+        String updated="Updated "+observed.map(t->DateTimeFormatter.ofPattern("HH:mm").withZone(zone).format(Instant.ofEpochSecond(t))).orElse("--:--");
+        if(!band.moodLeft()){
+            var weatherIcon=styled(look.weatherIcon(),scheme);var emoji=styled(look.emoji(),scheme);
+            if(look.weatherText()!=null){
+                // Weather left: icon, temperature, then the update time on the same line.
+                int x=10;
+                if(weatherIcon!=null){icon(g,scheme,weatherIcon,x,y+4);x+=weatherIcon.getWidth()+5;}
+                text(g,scheme,look.weatherText(),x,y+23,16,desktopText(scheme),true);
+                x+=g.getFontMetrics().stringWidth(look.weatherText())+10;
+                g.setFont(new Font(scheme.font(),Font.PLAIN,10));
+                if(x+g.getFontMetrics().stringWidth(updated)<=w-(emoji!=null?emoji.getWidth()+10:6))text(g,scheme,updated,x,y+23,10,desktopMuted(scheme),false);
+            } else text(g,scheme,updated,10,y+28,10,desktopMuted(scheme),false);
+            // Mood right with the same 6 px margin to the right and bottom edge of the band.
+            if(emoji!=null)g.drawImage(emoji,w-6-emoji.getWidth(),y+50-emoji.getHeight(),null);
+        }else{
+            // Mood left in the short slot, followed by the update time; weather right in the tall slot.
+            var mood=styled(resize(look.emoji(),30),scheme);int x=10;
+            if(mood!=null){g.drawImage(mood,x,y+5,null);x+=36;}
+            text(g,scheme,updated,x,y+24,10,desktopMuted(scheme),false);
+            var weatherIcon=styled(look.weatherIcon(),scheme);
+            if(weatherIcon!=null)icon(g,scheme,weatherIcon,w-6-weatherIcon.getWidth(),y+4);
+            if(look.weatherText()!=null)right(g,scheme,look.weatherText(),w-6,y+50,16,desktopText(scheme));
+        }
+        // IP corner in the device's footer style; the mood may reach into the rest of the bottom row. A text with a
+        // space (web displays: "VibeDock server v0.2.0") is drawn as it is, shortened to the corner.
+        g.setColor(new Color(scheme.background));g.fillRect(0,y+36,Math.min(150,w),20);
+        int size=12,room=Math.min(150,w)-14;String label="IP: "+ip;
+        if(ip.contains(" ")){label=fit(g,Scheme.MIDNIGHT,ip,size,room);if(!ip.equals(label)){size=10;label=fit(g,Scheme.MIDNIGHT,ip,size,room);}}
+        if(label!=null)text(g,Scheme.MIDNIGHT,label,10,y+51,size,scheme.light()?0x000000:0xffffff,false);
+    }
+    /** Light colour schemes: a thin grey outline keeps white icons (clouds, snow) visible. */
+    private static void icon(Graphics2D g,Scheme scheme,BufferedImage icon,int x,int y){
+        if(scheme.light()&&scheme.style==Scheme.Style.MODERN)outline(g,icon,x,y,0x9aa0a6);
+        g.drawImage(icon,x,y,null);
+    }
+    private Image encode(BufferedImage image,Scheme scheme) throws IOException {
+        byte[] pixels=new byte[w*h*2];int offset=0;
+        for(int y=0;y<h;y++)for(int x=0;x<w;x++){
+            int rgb=image.getRGB(x,y);
+            // Terminal schemes: every other row darker, like the scan lines of an old monitor.
+            if(scheme.style==Scheme.Style.TERMINAL&&(y&1)==1)rgb=(((rgb>>16&255)*7/10)<<16)|(((rgb>>8&255)*7/10)<<8)|((rgb&255)*7/10);
+            int r=(rgb>>19)&31,b=(rgb>>3)&31,green=(rgb>>10)&63;
+            int value=(r<<11)|(green<<5)|b;pixels[offset++]=(byte)(value>>8);pixels[offset++]=(byte)value;
+            image.setRGB(x,y,((r*255/31)<<16)|((green*255/63)<<8)|(b*255/31));
+        }
+        var bytes=new ByteArrayOutputStream();ImageIO.write(image,"png",bytes);return new Image(bytes.toByteArray(),pixels);
+    }
+    private static BufferedImage resize(BufferedImage icon,int size){
+        if(icon==null)return null;var image=new BufferedImage(size,size,BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();
+        try{g.drawImage(icon.getScaledInstance(size,size,java.awt.Image.SCALE_AREA_AVERAGING),0,0,null);}finally{g.dispose();}return image;
+    }
+    /** Half-width provider: the theme's own window or heading at half width; compact text, nothing scaled. */
+    private void compact(Graphics2D g,Scheme scheme,String title,UsageService.Provider p,int height,boolean bottom){
+        if(p==null)p=new UsageService.Provider("unconfigured",null,null,null);
+        int top=16;
+        switch(scheme.style){
+            case MAC -> macWindow(g,scheme,title,null,22,2,w/2-6,height-(bottom?8:4));
+            case WINDOWS -> windowsWindow(g,scheme,title,null,22,2,w/2-4,height-(bottom?6:3));
+            default -> text(g,scheme,(scheme.style==Scheme.Style.TERMINAL?"> ":"")+title,6,top,10,scheme.title,true);
+        }
+        if(!p.status().equals("ok")){
+            String status=p.status().equals("rate_limited")?"Limited":DeviceSender.statusLabel(p.status());
+            int y=scheme.style==Scheme.Style.MAC||scheme.style==Scheme.Style.WINDOWS?top+14:top+10;
+            text(g,scheme,status.length()>18?status.substring(0,18):status,6,y,8,scheme.style==Scheme.Style.WINDOWS?scheme.muted:scheme.warning,false);
+        }
+        // Half width: the label column fits about four characters, so "Month" becomes "30d".
+        if(p.period()!=null)compactWindow(g,scheme,p.period().equals("Month")?"30d":p.period(),p.week(),45);
+        else{compactWindow(g,scheme,"5h",p.fiveHour(),45);compactWindow(g,scheme,"Week",p.week(),74);}
+    }
+    private void compactWindow(Graphics2D g,Scheme scheme,String label,ProviderClient.Window q,int y){
+        if(miniWindow(g,scheme,label,q,0,y,w/2))text(g,scheme,reset(q),6,y+10,8,scheme.muted,false);
+    }
+    /** Label, small bar and remaining percent in a column from x0 that is span wide; false without readings. */
+    private boolean miniWindow(Graphics2D g,Scheme scheme,String label,ProviderClient.Window q,int x0,int y,int span){
+        text(g,scheme,label,x0+6,y,9,scheme.text,false);int x=x0+32,width=span-71,right=x0+span-6;
+        if(q==null){right(g,scheme,"--",right,y,9,scheme.muted);return false;}
+        double left=Math.max(0,Math.min(100,100-q.usedPercent()));int fill=(int)Math.round(width*left/100);
+        if(scheme.style==Scheme.Style.TERMINAL){int n=(int)Math.round(5*left/100);text(g,scheme,"["+"#".repeat(n)+".".repeat(5-n)+"]",x-2,y,9,scheme.text,false);}
+        else if(scheme.style==Scheme.Style.WINDOWS){bevel(g,x,y-7,width,9,false);g.setColor(new Color(0x000080));for(int b=0;b<(int)Math.round((width-6)/7*left/100);b++)g.fillRect(x+3+b*7,y-5,5,4);}
+        else if(scheme.style==Scheme.Style.MAC){g.setColor(Color.BLACK);g.drawRect(x,y-6,width,6);if(fill>0)g.fillRect(x+1,y-5,Math.min(width-2,fill),5);}
+        else{g.setColor(new Color(scheme.track));g.fillRoundRect(x,y-6,width,6,6,6);if(fill>0){g.setColor(new Color(barColor(left)));g.fillRoundRect(x,y-6,Math.max(6,fill),6,6,6);}}
+        right(g,scheme,String.format(Locale.ROOT,"%.0f%%",left),right,y,9,scheme.text);
+        return true;
+    }
+    /**
+     * Compact band, 46 px: the theme's heading or window title with the status, below it one row with the small bars of
+     * both windows side by side (a single window spans the width). No reset times.
+     */
+    private void row(Graphics2D g,Scheme scheme,String title,UsageService.Provider p,int y,int height,boolean bottom){
+        if(p==null)p=new UsageService.Provider("unconfigured",null,null,null);
+        boolean held=p.status().equals("rate_limited")&&p.observedAt()!=null&&(p.fiveHour()!=null||p.week()!=null);
+        String status=held?"Limited \u00b7 "+DateTimeFormatter.ofPattern("HH:mm").withZone(zone).format(Instant.ofEpochSecond(p.observedAt()))
+                :p.status().equals("ok")?null:DeviceSender.statusLabel(p.status());
+        int top=y+16,bars=y+height-11;
+        switch(scheme.style){
+            case MAC -> macWindow(g,scheme,title,status,y+22,4,w-9,height-(bottom?8:4));
+            case WINDOWS -> windowsWindow(g,scheme,title,status,y+22,4,w-8,height-(bottom?6:3));
+            default -> {
+                boolean terminal=scheme.style==Scheme.Style.TERMINAL;
+                g.setFont(new Font(scheme.font(),Font.BOLD,13));
+                int room=w-20-g.getFontMetrics().stringWidth((terminal?"> ":"")+title)-8;
+                text(g,scheme,terminal?"> "+title.toUpperCase(Locale.ROOT):title,10,top,13,scheme.title,true);
+                if(status!=null){status=fit(g,scheme,terminal?status.toUpperCase(Locale.ROOT):status,10,room);if(status!=null)right(g,scheme,status,w-10,top,10,scheme.warning);}
+            }
+        }
+        if(p.period()!=null)miniWindow(g,scheme,p.period().equals("Month")?"30d":p.period(),p.week(),4,bars,w-8);
+        else{miniWindow(g,scheme,"5h",p.fiveHour(),4,bars,w/2-4);miniWindow(g,scheme,"Wk",p.week(),w/2,bars,w/2-4);}
+    }
+    /** Reset time of a window; a window that has not started yet (no usage in it) has none. */
+    private String reset(ProviderClient.Window w){
+        return w.resetsAt()<=0?"Not started":"Reset "+DateTimeFormatter.ofPattern("dd.MM HH:mm").withZone(zone).format(Instant.ofEpochSecond(w.resetsAt()));
+    }
+    /** One quota window: label, bar with the remaining share, remaining percent and reset time. */
+    private void window(Graphics2D g,Scheme scheme,String name,ProviderClient.Window q,int y){
+        text(g,scheme,name,10,y,12,scheme.text,false);
+        // Narrow screens: a shorter label column and bar; the percentage stays right-aligned.
+        int x=w<200?46:60,width=w<200?w-x-42:w-120,height=10,top=y-9,right=w-10;
+        if(scheme.style!=Scheme.Style.MODERN){
+            if(q!=null){
+                double left=Math.max(0,Math.min(100,100-q.usedPercent()));
+                if(scheme.style==Scheme.Style.TERMINAL){
+                    int cells=Math.max(4,width*14/120),filled=(int)Math.round(cells*left/100);
+                    text(g,scheme,"["+"#".repeat(filled)+".".repeat(cells-filled)+"]",x-4,y,12,scheme.text,false);
+                }else if(scheme.style==Scheme.Style.WINDOWS){
+                    // Sunken field with navy blocks, like a Windows 95 progress bar.
+                    bevel(g,x,top-1,width,height+2,false);
+                    int blocks=(int)Math.round((width-4)/8*left/100);
+                    g.setColor(new Color(0x000080));
+                    for(int b=0;b<blocks;b++)g.fillRect(x+3+b*8,top+2,6,height-3);
+                }else{
+                    g.setColor(Color.BLACK);g.drawRect(x,top,width,height);
+                    int fill=(int)Math.round((width-3)*left/100);
+                    if(fill>0)g.fillRect(x+2,top+2,fill,height-3);
+                }
+                right(g,scheme,String.format(Locale.ROOT,"%.0f %%",left),right,y,12,scheme.text);
+                text(g,scheme,reset(q),x,y+13,10,scheme.muted,false);
+            } else right(g,scheme,"--",right,y,12,scheme.muted);
+            return;
+        }
+        g.setColor(new Color(scheme.track));g.fillRoundRect(x,top,width,height,height,height);
+        if(q!=null){
+            double left=Math.max(0,Math.min(100,100-q.usedPercent()));
+            int fill=(int)Math.round(width*left/100);
+            if(fill>0){g.setColor(new Color(barColor(left)));g.fillRoundRect(x,top,Math.max(fill,height),height,height,height);}
+            right(g,scheme,String.format(Locale.ROOT,"%.0f %%",left),right,y,12,scheme.text);
+            text(g,scheme,reset(q),x,y+13,10,scheme.muted,false);
+        } else right(g,scheme,"--",right,y,12,scheme.muted);
+    }
+    }
+    /** The text, shortened with an ellipsis to fit the width at this size; null when not even the ellipsis fits. */
+    private static String fit(Graphics2D g,Scheme scheme,String value,int size,int width){
+        g.setFont(new Font(scheme.font(),Font.PLAIN,size));var metrics=g.getFontMetrics();
+        if(metrics.stringWidth(value)<=width)return value;
+        for(int n=value.length()-1;n>0;n--){String shorter=value.substring(0,n).strip()+"…";if(metrics.stringWidth(shorter)<=width)return shorter;}
+        return null;
+    }
+    /** A classic Mac window per provider: frame with drop shadow and a pinstriped title bar with the name in the middle. */
+    private static void macWindow(Graphics2D g,Scheme scheme,String title,String status,int top,int x,int width,int height){
+        int y=top-19,bar=16;
+        g.setColor(Color.BLACK);g.fillRect(x+2,y+2,width,height);
+        g.setColor(Color.WHITE);g.fillRect(x,y,width,height);
+        g.setColor(Color.BLACK);g.drawRect(x,y,width,height);g.drawLine(x,y+bar,x+width,y+bar);
+        for(int line=y+3;line<y+bar-1;line+=2)g.drawLine(x+3,line,x+width-3,line);
+        g.setFont(new Font(scheme.font(),Font.BOLD,12));
+        // Centred like a Mac window title; with a status on the right the title moves to the left.
+        int w=g.getFontMetrics().stringWidth(title),tx=status==null?x+(width-w)/2:x+14;
+        g.setColor(Color.WHITE);g.fillRect(tx-6,y+1,w+12,bar-1);
+        g.setColor(Color.BLACK);g.drawString(title,tx,y+bar-4);
+        if(status!=null){
+            g.setFont(new Font(scheme.font(),Font.PLAIN,9));
+            int sw=g.getFontMetrics().stringWidth(status),sx=x+width-sw-6;
+            g.setColor(Color.WHITE);g.fillRect(sx-4,y+1,sw+8,bar-1);
+            g.setColor(Color.BLACK);g.drawString(status,sx,y+bar-5);
+        }
+    }
+    /** A Windows 95 style window: grey bevelled frame, navy title bar with white bold title and a close button. */
+    private static void windowsWindow(Graphics2D g,Scheme scheme,String title,String status,int top,int x,int width,int height){
+        int y=top-19,bar=16;
+        g.setColor(new Color(0xc0c0c0));g.fillRect(x,y,width,height);
+        bevel(g,x,y,width,height,true);
+        g.setColor(new Color(0x000080));g.fillRect(x+3,y+3,width-6,bar-1);
+        g.setFont(new Font(scheme.font(),Font.BOLD,11));g.setColor(Color.WHITE);g.drawString(title,x+7,y+bar-2);
+        int bx=x+width-3-15,by=y+5;
+        g.setColor(new Color(0xc0c0c0));g.fillRect(bx,by,13,11);bevel(g,bx,by,13,11,true);
+        g.setColor(Color.BLACK);g.drawLine(bx+4,by+3,bx+8,by+7);g.drawLine(bx+8,by+3,bx+4,by+7);
+        if(status!=null){
+            g.setFont(new Font(scheme.font(),Font.PLAIN,9));
+            g.setColor(Color.WHITE);g.drawString(status,bx-6-g.getFontMetrics().stringWidth(status),y+bar-3);
+        }
+    }
+    /** Two-pixel 3D border: raised (light top left, dark bottom right) or sunken (the other way round). */
+    private static void bevel(Graphics2D g,int x,int y,int w,int h,boolean raised){
+        Color outerLight=raised?new Color(0xdfdfdf):new Color(0x808080),outerDark=raised?Color.BLACK:Color.WHITE;
+        Color innerLight=raised?Color.WHITE:Color.BLACK,innerDark=raised?new Color(0x808080):new Color(0xdfdfdf);
+        g.setColor(outerLight);g.drawLine(x,y,x+w-1,y);g.drawLine(x,y,x,y+h-1);
+        g.setColor(outerDark);g.drawLine(x,y+h-1,x+w-1,y+h-1);g.drawLine(x+w-1,y,x+w-1,y+h-1);
+        g.setColor(innerLight);g.drawLine(x+1,y+1,x+w-2,y+1);g.drawLine(x+1,y+1,x+1,y+h-2);
+        g.setColor(innerDark);g.drawLine(x+1,y+h-2,x+w-2,y+h-2);g.drawLine(x+w-2,y+1,x+w-2,y+h-2);
+    }
+    /** Text outside the windows: on the Windows desktop white, otherwise the scheme's text colours. */
+    private static int desktopText(Scheme scheme){return scheme.style==Scheme.Style.WINDOWS?0xffffff:scheme.text;}
+    private static int desktopMuted(Scheme scheme){return scheme.style==Scheme.Style.WINDOWS?0xd8f0f0:scheme.muted;}
+    /** Icons in the look of the scheme: tinted phosphor for terminals, 1-bit ordered dithering for the Mac. */
+    static BufferedImage styled(BufferedImage icon,Scheme scheme){
+        if(icon==null||scheme.style==Scheme.Style.MODERN||scheme.style==Scheme.Style.WINDOWS)return icon;
+        int[] bayer={0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5};
+        var out=new BufferedImage(icon.getWidth(),icon.getHeight(),BufferedImage.TYPE_INT_ARGB);
+        for(int y=0;y<icon.getHeight();y++)for(int x=0;x<icon.getWidth();x++){
+            int argb=icon.getRGB(x,y),alpha=argb>>>24;
+            if(alpha<96)continue;
+            int luma=(299*(argb>>16&255)+587*(argb>>8&255)+114*(argb&255))/1000;
+            if(scheme.style==Scheme.Style.TERMINAL){
+                int level=Math.max(70,luma),c=scheme.text;
+                out.setRGB(x,y,0xff000000|((c>>16&255)*level/255)<<16|((c>>8&255)*level/255)<<8|(c&255)*level/255);
+            }else{
+                boolean dark=luma*16/256<=bayer[(y&3)*4+(x&3)];
+                out.setRGB(x,y,dark?0xff000000:0xffffffff);
+            }
+        }
+        return out;
+    }
+    /** Draws the icon's shape one pixel larger in every direction in a solid colour, as an outline behind the icon. */
+    static void outline(Graphics2D g,BufferedImage icon,int x,int y,int rgb){
+        var mask=new BufferedImage(icon.getWidth(),icon.getHeight(),BufferedImage.TYPE_INT_ARGB);
+        for(int j=0;j<icon.getHeight();j++)for(int i=0;i<icon.getWidth();i++){
+            int alpha=icon.getRGB(i,j)>>>24;
+            if(alpha>96)mask.setRGB(i,j,0xff000000|rgb);
+        }
+        for(int dy=-1;dy<=1;dy++)for(int dx=-1;dx<=1;dx++)if(dx!=0||dy!=0)g.drawImage(mask,x+dx,y+dy,null);
+    }
+    /** Remaining share and colour: green from 60 % up, then smoothly over yellow-green, yellow and orange to red at 8 %. */
+    private static final double[] BAR_STOPS={60,45,32,20,8};
+    private static final int[] BAR_COLOURS={0x34c759,0xa3d13b,0xffcc00,0xff9f0a,0xff453a};
+    static int barColor(double left){
+        if(!(left<BAR_STOPS[0]))return BAR_COLOURS[0];
+        for(int i=1;i<BAR_STOPS.length;i++){
+            if(left>=BAR_STOPS[i]){
+                double t=(BAR_STOPS[i-1]-left)/(BAR_STOPS[i-1]-BAR_STOPS[i]);return mix(BAR_COLOURS[i-1],BAR_COLOURS[i],t);
+            }
+        }
+        return BAR_COLOURS[BAR_COLOURS.length-1];
+    }
+    private static int mix(int a,int b,double t){
+        int r=(int)Math.round(((a>>16)&255)*(1-t)+((b>>16)&255)*t),g=(int)Math.round(((a>>8)&255)*(1-t)+((b>>8)&255)*t),bl=(int)Math.round((a&255)*(1-t)+(b&255)*t);
+        return (r<<16)|(g<<8)|bl;
+    }
+    private static void right(Graphics2D g,Scheme scheme,String value,int x,int y,int size,int color){
+        g.setFont(new Font(scheme.font(),Font.PLAIN,size));
+        text(g,scheme,value,x-g.getFontMetrics().stringWidth(value),y,size,color,false);
+    }
+    private static void text(Graphics2D g,Scheme scheme,String value,int x,int y,int size,int color,boolean bold){
+        g.setFont(new Font(scheme.font(),bold?Font.BOLD:Font.PLAIN,size));g.setColor(new Color(color));g.drawString(value,x,y);
+    }
+}

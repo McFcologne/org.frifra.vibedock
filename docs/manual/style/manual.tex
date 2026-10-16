@@ -1,0 +1,86 @@
+% Layout of the PDF manual (scripts/docs.sh with DOCS_PDF): title page, page header with logo, footer with version and
+% page numbers, coloured headings, framed screenshots. docs.sh defines \vibedockversion and \vibedocklogo before this file.
+\usepackage{fancyhdr,lastpage,titlesec,caption,framed,tikz,needspace}
+\usepackage[titles]{tocloft}
+\setlength{\cftsecnumwidth}{2em}\setlength{\cftsubsecnumwidth}{2.8em}
+\renewcommand{\cftmarktoc}{\markboth{\contentsname}{}}
+% Figures stay where the text names them.
+\usepackage{float}
+\floatplacement{figure}{H}
+\definecolor{vibeaccent}{HTML}{4C40D6}
+\definecolor{vibeink}{HTML}{1F2430}
+\definecolor{vibemuted}{HTML}{6B7280}
+\definecolor{vibeline}{HTML}{D9DCE3}
+\definecolor{shadecolor}{HTML}{F4F5F8}
+\AtBeginDocument{\hypersetup{colorlinks=true,linkcolor=vibeaccent,urlcolor=vibeaccent,citecolor=vibeaccent}}
+
+% Header: logo and title on the left, the chapter on the right; footer: version and page x of y.
+\makeatletter
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\raisebox{-0.3\height}{\vibeoriginalincludegraphics[height=16pt]{\vibedocklogo}}\hspace{0.6em}%
+  {\color{vibeink}\bfseries VibeDock}\hspace{0.5em}{\color{vibemuted}User manual}}
+\fancyhead[R]{\color{vibemuted}\small\leftmark}
+\fancyfoot[L]{\color{vibemuted}\small Version \vibedockversion}
+\fancyfoot[R]{\color{vibemuted}\small Page \thepage\ of \pageref*{LastPage}}
+\renewcommand{\headrulewidth}{0.5pt}
+\renewcommand{\footrulewidth}{0.5pt}
+\renewcommand{\headrule}{{\color{vibeline}\hrule\@height\headrulewidth\@width\headwidth}\vskip-\headrulewidth}
+\renewcommand{\footrule}{{\color{vibeline}\vskip-\footruleskip\vskip-\footrulewidth\hrule\@width\headwidth\@height\footrulewidth\vskip\footruleskip}}
+\fancypagestyle{plain}{\fancyhf{}\renewcommand{\headrulewidth}{0pt}\renewcommand{\footrulewidth}{0pt}}
+\renewcommand{\sectionmark}[1]{\markboth{\thesection\quad #1}{}}
+\makeatother
+
+% Headings: every chapter on a new page, numbers in the accent colour.
+\titleformat{\section}{\color{vibeink}\LARGE\bfseries}{\color{vibeaccent}\thesection}{0.6em}{}[\vspace{2pt}{\color{vibeline}\titlerule[0.8pt]}]
+\titleformat{\subsection}{\color{vibeink}\Large\bfseries}{\color{vibeaccent}\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\color{vibeink}\large\bfseries}{\color{vibeaccent}\thesubsubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{0pt}{14pt}
+\titlespacing*{\subsection}{0pt}{18pt}{6pt}
+\titlespacing*{\subsubsection}{0pt}{12pt}{4pt}
+\newcommand{\sectionbreak}{\clearpage}
+
+% Figures: thin frame around screenshots, captions small and muted.
+\let\vibeoriginalincludegraphics\includegraphics
+\renewcommand{\includegraphics}[2][]{{\setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.6pt}\fcolorbox{vibeline}{white}{\vibeoriginalincludegraphics[#1,height=0.72\textheight,keepaspectratio]{#2}}}}
+% (tall full-page screenshots shrink to fit the page together with their caption)
+\DeclareCaptionFont{vibemuted}{\color{vibemuted}}
+\captionsetup{font={small,vibemuted},labelfont={bf},skip=6pt}
+
+% Code on a light grey background.
+\makeatletter
+\@ifundefined{Shaded}{}{\renewenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}}
+\makeatother
+\setlength{\FrameSep}{6pt}
+
+% Title page and table of contents.
+\renewcommand{\maketitle}{%
+  \begin{titlepage}
+  \begin{tikzpicture}[remember picture,overlay]
+    \fill[vibeaccent] (current page.north west) rectangle ([yshift=-8cm]current page.north east);
+    \node[anchor=north west,inner sep=0pt] at ([xshift=2.2cm,yshift=-2.4cm]current page.north west)
+      {\vibeoriginalincludegraphics[width=3.2cm]{\vibedocklogo}};
+    \node[anchor=north west,text=white,align=left,inner sep=0pt] at ([xshift=6.2cm,yshift=-3.1cm]current page.north west)
+      {{\fontsize{36}{40}\selectfont\bfseries VibeDock}\\[10pt]{\LARGE User manual}};
+    \fill[vibeline] ([xshift=2.2cm,yshift=3.9cm]current page.south west) rectangle ([xshift=-2.2cm,yshift=3.95cm]current page.south east);
+  \end{tikzpicture}\par
+  \vspace*{7.2cm}
+  {\Large\color{vibeink} Server administration, displays and firmware\par}
+  \vspace{0.5cm}
+  {\large\color{vibemuted} Version \vibedockversion\par}
+  \vspace{0.15cm}
+  {\color{vibemuted} Build \vibedockbuild\par}
+  \vspace{1.2cm}
+  % Prominent on the first page: who is behind this, and who is not.
+  {\setlength{\fboxsep}{10pt}\setlength{\fboxrule}{1.2pt}\fcolorbox{vibeaccent}{white}{\parbox{\dimexpr\textwidth-2\fboxsep-2\fboxrule}{%
+    {\large\bfseries\color{vibeaccent} Independent hobby project}\par\vspace{4pt}
+    {\color{vibeink} VibeDock is not made, endorsed or supported by Vibe TV (vibetv.shop), the seller of the display
+    hardware. We built this server and firmware for fun and get nothing for the link. Questions about the hardware,
+    orders or warranty go to the seller, questions about this software to its repository.}}}\par}
+  \vfill
+  {\small\color{vibemuted} The screenshots show a demo installation with made-up data. They are made again by
+  \texttt{vibedock-server/scripts/docs.sh} from the sources of this version.\par}
+  \vspace{0.4cm}
+  \end{titlepage}}
+\let\vibeoriginaltableofcontents\tableofcontents
+\renewcommand{\tableofcontents}{{\hypersetup{linkcolor=vibeink}\vibeoriginaltableofcontents}\clearpage}

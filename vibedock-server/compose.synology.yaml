@@ -1,0 +1,32 @@
+# Synology Container Manager: runs the prebuilt image (built with scripts/image.sh amd64 and the file
+# target/vibedock-server-<version>-amd64.tar imported under Container Manager > Image > Import), with the data on the volume. Administration listens on 8080, the device API on 8081;
+# Web Station can publish them as HTTPS, e.g. administration on 10001 and device API on 10002.
+# Create a project with this file in /volume1/docker/vibedock-server; set ADMIN_PASSWORD (Container Manager does not
+# always read a .env, then write the password into the file on the NAS, never into Git).
+services:
+  vibedock:
+    container_name: vibedock-server
+    image: vibedock-server:amd64
+    restart: unless-stopped
+    ports:
+      - "8080:8080"   # administration (Web Station: HTTPS 10001)
+      - "8081:8081"   # device API (Web Station: HTTPS 10002; devices in the LAN use http://NAS-IP:8081)
+    environment:
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      ADMIN_BIND_ADDRESS: "0.0.0.0"
+      ADMIN_PORT: "8080"
+      API_PORT: "8081"
+      DATA_DIR: /data
+      TIME_ZONE: Europe/Berlin
+      # Addresses announced to devices; also settable in the administration UI. Internal: plain http to the NAS IP
+      # (a certificate never matches an IP address), external: the Web Station HTTPS address.
+      INTERNAL_URL: ${INTERNAL_URL:-}
+      EXTERNAL_URL: ${EXTERNAL_URL:-}
+    volumes:
+      # Settings, provider logins and devices; the container user (UID 10001) needs write access.
+      - /volume1/docker/vibedock-server/data:/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL

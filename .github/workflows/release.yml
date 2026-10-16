@@ -1,0 +1,134 @@
+name: Release VibeDock
+# A version tag (0.2.0 or v0.2.0), pushed or created with a release on GitHub, becomes a GitHub release with:
+#   vibedock-server-<version>.jar, vibedock-server-<version>-amd64.tar.gz, vibedock-server-<version>-arm64.tar.gz
+#   (Docker images: docker load -i, Synology Container Manager > Image > Import) and the firmware of every board
+#   (vibedock-m1-<version>.bin, vibedock-<board>-<version>.bin). The job artifacts only carry the files to the release
+#   job and are deleted after a day.
+on:
+  push:
+    tags: ['v[0-9]*', '[0-9]*']
+  release:
+    types: [published]
+permissions:
+  contents: write
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: version
+        run: echo "version=$(vibedock-server/scripts/version.sh)" >> "$GITHUB_OUTPUT"
+
+  server:
+    needs: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Build and test
+        working-directory: vibedock-server
+        run: |
+          mvn -B verify -Drevision="${{ needs.version.outputs.version }}"
+          cp target/vibedock-server.jar "vibedock-server-${{ needs.version.outputs.version }}.jar"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: server-jar
+          retention-days: 1
+          path: vibedock-server/vibedock-server-*.jar
+
+  image:
+    needs: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the ${{ matrix.arch }} image
+        working-directory: vibedock-server
+        run: |
+          v="${{ needs.version.outputs.version }}"
+          docker buildx build --platform "linux/${{ matrix.arch }}" --build-context git=../.git \
+            -t "vibedock-server:${{ matrix.arch }}" \
+            --output "type=docker,dest=vibedock-server-$v-${{ matrix.arch }}.tar" .
+          gzip -9 "vibedock-server-$v-${{ matrix.arch }}.tar"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: image-${{ matrix.arch }}
+          retention-days: 1
+          path: vibedock-server/vibedock-server-*.tar.gz
+          compression-level: 0
+
+  firmware:
+    needs: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build the firmware
+        working-directory: vibedock-client
+        run: |
+          python -m pip install "platformio==6.2.0"
+          sh scripts/images.sh build
+          for dir in build/*/; do board=$(basename "$dir"); case $board in vibedock-*) name=$board;; *) name=vibedock-$board;; esac
+            cp "$dir/flash.bin" "$name-${{ needs.version.outputs.version }}.bin"; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          retention-days: 1
+          path: vibedock-client/vibedock-*.bin
+
+  release:
+    needs: [version, server, image, firmware]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Create or complete the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # The version's section of CHANGELOG.md goes above the commit list GitHub generates.
+          v="${{ needs.version.outputs.version }}"
+          awk -v v="$v" '$0 ~ "^## v?" v "$" {on=1; next} /^## / {on=0} on' CHANGELOG.md > notes.md
+          # Created as a draft, completed file by file (with retries for the large images), then published, also
+          # when a later run completes a release that is still a draft.
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            if [ -s notes.md ]; then set -- --notes-file notes.md; else set --; fi
+            gh release create "$TAG" --draft --title "VibeDock $v" --generate-notes --verify-tag "$@"
+          fi
+          for file in assets/*; do
+            ok=
+            for attempt in 1 2 3; do
+              if gh release upload "$TAG" "$file" --clobber; then ok=1; break; fi
+              echo "Upload of $file failed (attempt $attempt)"; sleep 15
+            done
+            [ -n "$ok" ] || { echo "Could not upload $file"; exit 1; }
+          done
+          gh release edit "$TAG" --draft=false

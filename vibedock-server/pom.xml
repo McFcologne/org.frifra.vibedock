@@ -1,0 +1,33 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId><version>3.5.16</version><relativePath/></parent>
+  <groupId>org.frifra.vibedock</groupId><artifactId>vibedock-server</artifactId><version>${revision}</version>
+  <licenses><license><name>Apache-2.0</name><url>https://www.apache.org/licenses/LICENSE-2.0</url></license></licenses>
+  <!-- The version comes from the Git tag (scripts/version.sh, -Drevision=...); untagged builds stay a snapshot. -->
+  <properties><java.version>21</java.version><revision>0.0.0-SNAPSHOT</revision></properties>
+  <dependencies>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-security</artifactId></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-thymeleaf</artifactId></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>org.springframework.security</groupId><artifactId>spring-security-test</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>com.networknt</groupId><artifactId>json-schema-validator</artifactId><version>1.5.6</version><scope>test</scope></dependency>
+  </dependencies>
+  <build><finalName>vibedock-server</finalName><plugins><plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId><executions><execution><goals><goal>build-info</goal></goals>
+      <configuration><additionalProperties><git.describe>${git.commit.id.describe}</git.describe></additionalProperties></configuration></execution></executions></plugin>
+    <!-- Builds from a Git checkout (IDE, mvn) also know their tag; the Docker build gets it as VIBEDOCK_VERSION instead.
+         The execution comes from spring-boot-starter-parent; JGit's match knows no [...] classes, hence "*". -->
+    <plugin><groupId>io.github.git-commit-id</groupId><artifactId>git-commit-id-maven-plugin</artifactId><version>9.0.1</version>
+      <configuration><failOnNoGitDirectory>false</failOnNoGitDirectory><failOnUnableToExtractRepoInfo>false</failOnUnableToExtractRepoInfo>
+        <generateGitPropertiesFile>false</generateGitPropertiesFile><includeOnlyProperties><includeOnlyProperty>git.commit.id.describe</includeOnlyProperty></includeOnlyProperties>
+        <gitDescribe><tags>true</tags><match>*</match><dirty>-dirty</dirty><always>true</always></gitDescribe></configuration></plugin>
+    <plugin><groupId>org.codehaus.mojo</groupId><artifactId>license-maven-plugin</artifactId><version>2.6.0</version>
+      <executions><execution><id>runtime-license-report</id><phase>generate-resources</phase><goals><goal>add-third-party</goal></goals></execution></executions>
+      <configuration><excludedScopes>test,provided</excludedScopes><includeTransitiveDependencies>true</includeTransitiveDependencies>
+        <thirdPartyFilename>MAVEN-THIRD-PARTY.txt</thirdPartyFilename><force>true</force><sortArtifactByName>true</sortArtifactByName>
+      </configuration>
+    </plugin></plugins></build>
+  <!-- Without the repository's .git (Docker build context) git-commit-id sets nothing; build-info needs a value. -->
+  <profiles><profile><id>no-git</id><activation><file><missing>${project.basedir}/../.git</missing></file></activation>
+    <properties><git.commit.id.describe>none</git.commit.id.describe></properties></profile></profiles>
+</project>

@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Firmware')}"></head>
+<body>
+<header th:replace="~{fragments :: appbar('devices')}"></header>
+<main>
+<div class="page-heading"><div><h2>Device firmware</h2><p>The firmware built from the same sources as this server, one build per supported board, or an own build you upload.
+  Something not working? See <a href="https://github.com/McFcologne/org.frifra.vibedock/blob/main/docs/manual/MANUAL.md#troubleshooting-a-display" target="_blank" rel="noopener noreferrer">Troubleshooting a display</a>.</p></div>
+  <a class="button secondary" th:href="@{/admin/devices}">← Devices</a></div>
+
+<form class="card board-pick" method="get" th:action="@{/admin/firmware}">
+  <label for="board">Board</label>
+  <select id="board" name="board" onchange="this.form.submit()">
+    <option th:each="option:${boards}" th:value="${option.board.id}" th:selected="${option.board.id == board.id}"
+            th:text="${option.board.label + ' · ' + option.board.chip + (option.available ? '' : ' (not in this installation)')}"></option></select>
+  <p class="meta" th:text="${board.note}"></p>
+  <noscript><button>Show</button></noscript>
+</form>
+
+<section class="card" th:if="${firmware == null and !anyFirmware}">
+  <p><strong>No firmware in this installation.</strong> The Docker image built with <code>docker compose up -d --build</code> or <code>scripts/image.sh</code>
+    contains it; a server started from the IDE or with <code>java -jar</code> does not. Build it yourself with <code>vibedock-client/scripts/build.sh</code>.</p>
+</section>
+
+<section class="card" th:if="${firmware == null and anyFirmware}">
+  <p><strong>No firmware for this board in this installation.</strong> Choose another board above.</p>
+</section>
+
+<section class="card own-firmware" data-own-firmware th:attr="data-board=${board.id},data-esp8266=${board.esp8266()}">
+  <div class="card-head"><h3 class="grow">Own firmware build</h3>
+    <form th:if="${uploadedAt != null}" method="post" th:action="@{/admin/firmware/upload/remove(board=${board.id})}"
+          data-confirm="Remove the uploaded build? The built-in firmware applies again."><button class="secondary">Use the built-in firmware</button></form></div>
+  <p th:if="${uploadedAt != null}"><span class="badge update">Uploaded</span> Build <strong th:text="${firmware.version}"></strong>, uploaded
+    <span th:text="${uploadedAt}"></span>, replaces the built-in firmware of this board for USB and for updates over Wi-Fi.</p>
+  <p>Upload a build of your own, e.g. a test version: <code th:text="${'vibedock-client/firmware/.pio/build/' + board.id + '/firmware.bin'}"></code>
+    <th:block th:unless="${board.esp8266()}">and <code>flash.bin</code> from the same folder (the USB image with bootloader and partition table)</th:block>.
+    The server reads version and board from the file, signs it with its key for updates over Wi-Fi and offers it to the devices of this board until you
+    go back to the built-in firmware. Only upload firmware you built from these sources and trust: the devices install it.</p>
+  <p class="notice error" th:if="${uploadIncomplete}" th:text="${board.esp8266() ? 'The upload is incomplete.' : 'Waiting for the second file: upload both firmware.bin and flash.bin of the same build.'}"></p>
+  <div class="flash-row"><input type="file" accept=".bin" multiple data-own-files aria-label="Firmware files">
+    <button type="button" data-own-upload disabled>Upload</button></div>
+  <p class="meta" data-own-state aria-live="polite"></p>
+</section>
+
+<th:block th:if="${firmware != null}">
+<section class="card firmware-card">
+  <div class="card-head"><h3 class="grow">VibeDock firmware <span th:text="${firmware.version}">0.1.0</span> · <span th:text="${board.label}"></span></h3>
+    <a class="button" th:href="@{/admin/firmware/{file}(file=${firmware.fileName()})}" download>Download</a></div>
+  <dl class="firmware-facts">
+    <dt>File</dt><dd><code th:text="${firmware.fileName()}"></code></dd>
+    <dt>Size</dt><dd th:text="${#numbers.formatInteger(firmware.size,1,'COMMA') + ' bytes'}"></dd>
+    <dt>SHA-256</dt><dd><code class="hash" th:text="${firmware.sha256}"></code></dd>
+    <dt>Chip</dt><dd th:text="${board.chip}"></dd>
+    <dt>Address</dt><dd><code>0x0</code> · <th:block th:text="${board.esp8266() ? 'writes only the firmware' : 'bootloader, partition table and firmware in one image'}"></th:block>; Wi-Fi settings, pairing and colour calibration stay on the device</dd>
+  </dl>
+  <table class="firmware-devices" th:unless="${#lists.isEmpty(clients)}">
+    <thead><tr><th>Device</th><th>Installed</th><th></th></tr></thead>
+    <tbody><tr th:each="client:${clients}" th:attr="data-device=${client.identifier},data-updating=${client.updating}"><td th:text="${client.name}"></td>
+      <td data-live="firmware" th:text="${client.firmware != null ? client.firmware : 'unknown'}"></td>
+      <td data-live="update" th:with="newer=${T(org.frifra.vibedock.server.FirmwareVersion).newer(firmware.version, client.firmware)}"><span class="badge ok" th:if="${client.firmware == firmware.version}">Current</span>
+        <span class="badge ok" th:if="${!newer and client.firmware != firmware.version}" title="The device runs a newer build than this server offers; no downgrade is offered">Newer</span>
+        <th:block th:if="${newer}">
+          <span class="badge update" th:if="${client.updating}" th:text="${'Updating to ' + firmware.version + ' …'}">Updating</span>
+          <form class="inline-form" th:if="${client.ota and !client.updating}" th:action="@{/admin/clients/{id}/update(id=${client.identifier})}" method="post">
+            <input type="hidden" name="back" value="firmware"><button class="badge update" th:text="${'Update to ' + firmware.version + ' over Wi-Fi'}">Update</button></form>
+          <span class="badge" th:if="${client.otaNeedsPairing and !client.updating}" title="Paired before this server sent its signing key: pair it again over USB below (Only pair) to update over Wi-Fi">Pair again for Wi-Fi updates</span>
+          <span class="badge" th:unless="${client.ota or client.otaNeedsPairing or client.updating}" title="This firmware cannot update over Wi-Fi: install it once over USB below">Install over USB</span>
+        </th:block></td></tr></tbody>
+  </table>
+</section>
+
+<section class="card" id="web-flasher" th:attr="data-firmware=@{/admin/firmware/{file}(file=${firmware.fileName()})},data-version=${firmware.version},data-esptool=@{/admin/firmware/esptool.js},data-board=${board.id},data-chip=${board.chip}">
+  <div class="card-head"><h3 class="grow">Install from the browser</h3></div>
+  <p th:unless="${webFlasher}" class="notice error">The browser flasher (esptool-js) is not part of this installation.</p>
+  <p class="notice error" data-flasher-unsupported hidden>Flashing from the browser needs Chrome or Edge on a computer and the administration opened over
+    <strong>HTTPS</strong> or on <strong>localhost</strong> (Web Serial). Open it that way, or use the commands below.</p>
+  <div class="flash-guide" aria-hidden="true">
+    <svg width="0" height="0" class="flash-guide-defs">
+      <defs>
+        <linearGradient id="cube-side-shade" x1="0" y1="0" x2=".35" y2="1"><stop offset="0" stop-color="#e2e1d9"/><stop offset="1" stop-color="#c3c2b8"/></linearGradient>
+        <linearGradient id="cube-front-shade" x1="0" y1="0" x2=".4" y2="1"><stop offset="0" stop-color="#f3f2ec"/><stop offset="1" stop-color="#dddcd3"/></linearGradient>
+        <linearGradient id="cube-screen-shade" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#26272b"/><stop offset=".5" stop-color="#141518"/><stop offset="1" stop-color="#0c0d0f"/></linearGradient>
+        <filter id="cube-shadow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="28"/></filter>
+        <filter id="cube-contact" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="7"/></filter>
+        <filter id="guide-soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2"/></filter>
+        <linearGradient id="guide-paper" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e9ebef"/></linearGradient>
+        <linearGradient id="guide-accent" x1="0" y1="0" x2=".6" y2="1"><stop offset="0" stop-color="#7a70f0"/><stop offset="1" stop-color="#4c40d6"/></linearGradient>
+        <linearGradient id="guide-cable-fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfcfca"/><stop offset=".55" stop-color="#cfcfca"/><stop offset="1" stop-color="#cfcfca" stop-opacity="0"/></linearGradient>
+        <clipPath id="cube-screen-clip"><path d="M158 205 L550 340 L437 845 L100 640 Z"/></clipPath>
+        <g id="vibedock-cube">
+          <path d="M110 745 L500 1000 L1010 680 L560 430 Z" fill="#000" opacity=".3" filter="url(#cube-shadow)"/>
+          <path d="M70 726 L455 972 L862 656" fill="none" stroke="#000" stroke-width="34" stroke-linejoin="round" opacity=".42" filter="url(#cube-contact)"/>
+          <g class="cube-edge"><path d="M615 290 L945 150 L860 650 L455 965 Z"/><path d="M140 125 L500 42 L945 150 L615 290 Z"/><path d="M140 125 L615 290 L455 965 L65 720 Z"/></g>
+          <path class="cube-face" fill="url(#cube-side-shade)" stroke="#d3d2c9" d="M615 290 L945 150 L860 650 L455 965 Z"/>
+          <path class="cube-face" fill="#f1f0ea" stroke="#f1f0ea" d="M140 125 L500 42 L945 150 L615 290 Z"/>
+          <path class="cube-face" fill="url(#cube-front-shade)" stroke="#e9e8e1" d="M140 125 L615 290 L455 965 L65 720 Z"/>
+          <path fill="none" stroke="#fff" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" opacity=".8" d="M92 690 L150 140 L600 292"/>
+          <path fill="#a9a89f" stroke="#a9a89f" stroke-width="8" stroke-linejoin="round" d="M153 199 L557 335 L442 852 L94 640 Z"/>
+          <path fill="url(#cube-screen-shade)" d="M158 205 L550 340 L437 845 L100 640 Z"/>
+          <path fill="#fff" opacity=".05" d="M158 205 L550 340 L520 470 L135 330 Z"/>
+        </g>
+      </defs>
+    </svg>
+    <figure>
+      <svg viewBox="0 0 260 150">
+        <path class="cable" d="M92 58 C112 40 140 32 160 48 C170 56 176 64 182 74"/>
+        <g transform="translate(4 12) scale(.105)"><use href="#vibedock-cube"/></g>
+        <g class="laptop">
+          <path filter="url(#guide-soft)" fill="#000" opacity=".22" d="M128.0 126.0 L204.0 152.0 L240.0 136.0 L162.0 110.0 Z"/>
+          <path class="lt-edge-front" d="M126.0 121.0 L202.0 147.0 L201.7 150.2 L125.7 124.2 Z"/>
+          <path class="lt-edge-left" d="M126.0 121.0 L160.0 107.0 L159.7 110.2 L125.7 124.2 Z"/>
+          <path class="lt-base" d="M126.0 121.0 L202.0 147.0 L236.0 133.0 L160.0 107.0 Z"/>
+          <path class="lt-well" d="M147.3 116.2 L212.7 138.6 L228.3 132.2 L162.9 109.8 Z"/>
+          <path class="lt-keys" d="M149.8 116.3 L153.7 117.7 L156.0 116.7 L152.1 115.4 Z M154.6 118.0 L158.5 119.3 L160.8 118.4 L156.9 117.1 Z M159.4 119.6 L163.3 120.9 L165.6 120.0 L161.7 118.7 Z M164.2 121.3 L168.1 122.6 L170.3 121.7 L166.5 120.3 Z M169.0 122.9 L192.1 130.8 L194.3 129.9 L171.3 122.0 Z M193.0 131.1 L196.9 132.4 L199.1 131.5 L195.2 130.2 Z M197.8 132.7 L201.7 134.1 L203.9 133.1 L200.0 131.8 Z M202.6 134.4 L206.5 135.7 L208.7 134.8 L204.8 133.5 Z M207.4 136.0 L211.2 137.3 L213.5 136.4 L209.6 135.1 Z M152.7 115.2 L156.6 116.5 L158.8 115.6 L154.9 114.2 Z M157.5 116.8 L161.4 118.1 L163.6 117.2 L159.7 115.9 Z M162.3 118.4 L166.2 119.8 L168.4 118.8 L164.5 117.5 Z M167.1 120.1 L171.0 121.4 L173.2 120.5 L169.3 119.2 Z M171.9 121.7 L175.8 123.1 L178.0 122.1 L174.1 120.8 Z M176.7 123.4 L180.5 124.7 L182.8 123.8 L178.9 122.4 Z M181.5 125.0 L185.3 126.3 L187.6 125.4 L183.7 124.1 Z M186.3 126.6 L190.1 128.0 L192.4 127.0 L188.5 125.7 Z M191.0 128.3 L194.9 129.6 L197.2 128.7 L193.3 127.4 Z M195.8 129.9 L199.7 131.3 L202.0 130.3 L198.1 129.0 Z M200.6 131.6 L204.5 132.9 L206.8 132.0 L202.9 130.6 Z M205.4 133.2 L209.3 134.5 L211.6 133.6 L207.7 132.3 Z M210.2 134.8 L214.1 136.2 L216.3 135.2 L212.5 133.9 Z M155.6 114.0 L159.4 115.3 L161.7 114.4 L157.8 113.1 Z M160.3 115.6 L164.2 117.0 L166.5 116.0 L162.6 114.7 Z M165.1 117.3 L169.0 118.6 L171.3 117.7 L167.4 116.3 Z M169.9 118.9 L173.8 120.2 L176.1 119.3 L172.2 118.0 Z M174.7 120.5 L178.6 121.9 L180.9 121.0 L177.0 119.6 Z M179.5 122.2 L183.4 123.5 L185.6 122.6 L181.8 121.3 Z M184.3 123.8 L188.2 125.2 L190.4 124.2 L186.6 122.9 Z M189.1 125.5 L193.0 126.8 L195.2 125.9 L191.4 124.5 Z M193.9 127.1 L197.8 128.4 L200.0 127.5 L196.1 126.2 Z M198.7 128.7 L202.6 130.1 L204.8 129.2 L200.9 127.8 Z M203.5 130.4 L207.4 131.7 L209.6 130.8 L205.7 129.5 Z M208.3 132.0 L212.2 133.4 L214.4 132.4 L210.5 131.1 Z M213.1 133.7 L217.0 135.0 L219.2 134.1 L215.3 132.7 Z M158.4 112.8 L162.3 114.1 L164.5 113.2 L160.7 111.9 Z M163.2 114.5 L167.1 115.8 L169.3 114.9 L165.4 113.5 Z M168.0 116.1 L171.9 117.4 L174.1 116.5 L170.2 115.2 Z M172.8 117.7 L176.7 119.1 L178.9 118.1 L175.0 116.8 Z M177.6 119.4 L181.5 120.7 L183.7 119.8 L179.8 118.4 Z M182.4 121.0 L186.3 122.3 L188.5 121.4 L184.6 120.1 Z M187.2 122.7 L191.1 124.0 L193.3 123.1 L189.4 121.7 Z M192.0 124.3 L195.8 125.6 L198.1 124.7 L194.2 123.4 Z M196.8 125.9 L200.6 127.3 L202.9 126.3 L199.0 125.0 Z M201.6 127.6 L205.4 128.9 L207.7 128.0 L203.8 126.6 Z M206.3 129.2 L210.2 130.5 L212.5 129.6 L208.6 128.3 Z M211.1 130.9 L215.0 132.2 L217.3 131.3 L213.4 129.9 Z M215.9 132.5 L219.8 133.8 L222.1 132.9 L218.2 131.6 Z M161.3 111.6 L165.1 113.0 L167.4 112.0 L163.5 110.7 Z M166.1 113.3 L169.9 114.6 L172.2 113.7 L168.3 112.4 Z M170.9 114.9 L174.7 116.2 L177.0 115.3 L173.1 114.0 Z M175.6 116.6 L179.5 117.9 L181.8 117.0 L177.9 115.6 Z M180.4 118.2 L184.3 119.5 L186.6 118.6 L182.7 117.3 Z M185.2 119.8 L189.1 121.2 L191.4 120.2 L187.5 118.9 Z M190.0 121.5 L193.9 122.8 L196.2 121.9 L192.3 120.6 Z M194.8 123.1 L198.7 124.4 L200.9 123.5 L197.1 122.2 Z M199.6 124.8 L203.5 126.1 L205.7 125.2 L201.9 123.8 Z M204.4 126.4 L208.3 127.7 L210.5 126.8 L206.7 125.5 Z M209.2 128.0 L213.1 129.4 L215.3 128.4 L211.4 127.1 Z M214.0 129.7 L217.9 131.0 L220.1 130.1 L216.2 128.8 Z M218.8 131.3 L222.7 132.6 L224.9 131.7 L221.0 130.4 Z"/>
+          <path class="lt-pad" d="M153.5 128.6 L179.3 137.4 L190.2 133.0 L164.3 124.1 Z"/>
+          <path class="lt-lip" d="M157.9 131.9 L170.1 136.1 L170.9 135.7 L158.8 131.6 Z"/>
+          <path class="lt-shell" d="M159.7 107.1 L235.7 133.1 L246.7 70.1 L170.7 44.1 Z"/>
+          <path class="lt-glass" d="M158.0 107.8 L234.0 133.8 L245.0 70.8 L169.0 44.8 Z"/>
+          <path class="lt-hinge" d="M162.5 109.4 L229.4 132.3 L229.4 134.5 L162.5 111.6 Z"/>
+          <g transform="matrix(0.7068 0.2418 -0.0968 0.5544 171.12 48.59)">
+            <rect width="100" height="100" fill="#f6f7f9"/><rect width="100" height="12" fill="#fff"/><rect x="5" y="3.5" width="5" height="5" rx="1.2" fill="#e7e8e3"/><rect x="13" y="5" width="16" height="2.2" rx="1" fill="#2a2d34"/>
+            <rect x="5" y="18" width="90" height="34" rx="3" fill="#fff"/><rect x="10" y="23" width="34" height="3" rx="1.5" fill="#2a2d34"/><rect x="10" y="30" width="56" height="2" rx="1" fill="#c5c9d2"/><rect x="10" y="35" width="48" height="2" rx="1" fill="#c5c9d2"/>
+            <rect x="72" y="40" width="18" height="7" rx="2" fill="#5b4fe0"/>
+            <rect x="5" y="58" width="90" height="36" rx="3" fill="#fff"/><rect x="10" y="64" width="40" height="3" rx="1.5" fill="#2a2d34"/><rect x="10" y="74" width="80" height="4" rx="2" fill="#e3e5ea"/><rect x="10" y="74" width="52" height="4" rx="2" fill="#5b4fe0"/>
+            <path d="M0 0 L100 0 L100 40 L0 100 Z" fill="#fff" opacity=".18"/>
+          </g>
+        </g>
+      </svg>
+      <figcaption><b>1</b> Connect the display by USB</figcaption>
+    </figure>
+    <figure>
+      <svg viewBox="0 0 260 150">
+        <path class="cable fade" d="M100 58 C128 52 142 76 132 98 C124 116 132 130 150 140"/>
+        <g transform="translate(14 12) scale(.105)"><use href="#vibedock-cube"/></g>
+        <path class="arrow" transform="matrix(.85 .3 -.13 1.05 128 36)" d="M0 0 H24 m-7 -6 l7 6 l-7 6"/>
+        <ellipse cx="186" cy="92" rx="23" ry="4.5" fill="#000" opacity=".2" filter="url(#guide-soft)"/>
+        <g transform="matrix(.85 .3 -.13 1.05 170 24)">
+          <path d="M4 4 H32 L44 16 V60 H4 Z" fill="#c9ccd3"/><path d="M2 2 H30 L42 14 V58 H2 Z" fill="#e4e6ea"/>
+          <path d="M0 0 H28 L40 12 V56 H0 Z" fill="url(#guide-paper)" stroke="#c3c7ce" stroke-width=".6" stroke-linejoin="round"/>
+          <path d="M28 0 V12 H40 Z" fill="#d6d9df" stroke="#c3c7ce" stroke-width=".6" stroke-linejoin="round"/>
+          <rect x="5" y="9" width="17" height="2.2" rx="1.1" fill="#c9cdd4"/><rect x="5" y="15" width="26" height="2.2" rx="1.1" fill="#d5d8de"/><rect x="5" y="20" width="22" height="2.2" rx="1.1" fill="#d5d8de"/>
+          <rect x="5" y="33" width="30" height="13" rx="2.5" fill="url(#guide-accent)"/><text x="20" y="42.6" class="guide-label">.bin</text>
+        </g>
+      </svg>
+      <figcaption><b>2</b> Download the backup</figcaption>
+    </figure>
+    <figure>
+      <svg viewBox="0 0 260 150">
+        <path class="cable fade" d="M150 58 C178 52 192 76 182 98 C174 116 182 130 200 140"/>
+        <g transform="translate(64 12) scale(.105)"><use href="#vibedock-cube"/>
+          <!-- The start screen after the restart (firmware layout, 240 x 240 px) in the photo's perspective. -->
+          <image href="/flash-guide-start.png" th:href="@{/flash-guide-start.png}" x="100" y="205" width="450.7" height="640.7"/></g>
+        <ellipse cx="221" cy="79" rx="15" ry="3.5" fill="#000" opacity=".2" filter="url(#guide-soft)"/>
+        <g transform="matrix(.85 .3 -.13 1.05 206 40)">
+          <circle cx="19.30" cy="14.50" r="16" fill="#3d32b8"/><circle cx="18.75" cy="14.75" r="16" fill="#3d32b8"/><circle cx="18.20" cy="15.00" r="16" fill="#3d32b8"/><circle cx="17.65" cy="15.25" r="16" fill="#3d32b8"/><circle cx="17.10" cy="15.50" r="16" fill="#3d32b8"/><circle cx="16.55" cy="15.75" r="16" fill="#3d32b8"/>
+          <circle cx="16" cy="16" r="16" fill="url(#guide-accent)"/><ellipse cx="12" cy="9" rx="9" ry="5" fill="#fff" opacity=".18"/>
+          <path d="M23.34 14.03 A7.6 7.6 0 1 1 16.00 8.40" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M15.70 4.60 L20.60 8.40 L15.70 12.20 Z" fill="#fff" stroke="#fff" stroke-width=".9" stroke-linejoin="round"/>
+        </g>
+      </svg>
+      <figcaption><b>3</b> Install, the display restarts</figcaption>
+    </figure>
+  </div>
+  <ol class="flash-steps">
+    <li><strong>Connect the display by USB</strong> and close other programs that use its serial port.
+      <div class="flash-row"><label for="flash-baud">Speed</label>
+        <select id="flash-baud"><option value="115200" selected>115200 (most reliable)</option><option value="460800">460800 (faster, not with every USB adapter)</option><option value="921600">921600</option></select>
+        <button type="button" data-flash="connect">Connect</button><button type="button" class="secondary" data-flash="disconnect" disabled>Disconnect</button>
+        <button type="button" class="secondary" data-restart>Restart display</button>
+        <button type="button" class="secondary" data-read-log title="What the display did since its last starts, e.g. why a server connection failed">Display log</button></div>
+      <p class="meta" data-flash-device>Not connected.</p></li>
+    <li><strong>Back up the whole flash</strong> of this device and keep the file private: it is the only way back to its current firmware and contains its Wi-Fi and pairing data.
+      <div class="flash-row"><button type="button" class="secondary" data-flash="backup" disabled>Download backup</button>
+        <label class="check"><input type="checkbox" data-flash-confirm> I have a verified full backup of this device</label></div></li>
+    <li><strong>Install</strong> <span th:text="${firmware.fileName()}"></span>. The device restarts afterwards and keeps its settings.
+      <div class="flash-row"><button type="button" data-flash="install" disabled th:text="${'Install ' + firmware.version}">Install</button>
+        <button type="button" class="link-button" data-pair-only>Only pair a display that already runs this firmware</button></div></li>
+  </ol>
+  <div class="flash-pair" data-pair hidden>
+    <h4>Pair this device now?</h4>
+    <p>The display gets your Wi-Fi and this server's address over the cable and shows its image right after its restart: no setup Wi-Fi, no pairing code.
+      The Wi-Fi password goes from this browser to the device only; the server never sees it.</p>
+    <p class="notice error" th:if="${internalLoopback}">This page is opened on localhost, so the server's LAN address is unknown to it. Set the internal address under
+      <a th:href="@{/admin/server}">Settings</a> first, otherwise the device cannot reach the server.</p>
+    <div class="flash-row" data-pair-ask><button type="button" data-pair-start>Pair now</button><button type="button" class="secondary" data-pair-skip>Not now</button></div>
+    <form class="flash-pair-form" data-pair-form hidden autocomplete="off">
+      <label>Name<input name="name" maxlength="40" required></label>
+      <div class="net-pick" data-net-pick><div class="net-pick-head"><span>Wi-Fi</span><button type="button" class="link-button" data-net-refresh>Refresh networks</button></div>
+        <button type="button" class="net-pick-button" aria-haspopup="listbox" aria-expanded="false"><span data-net-value>Choose a network …</span>
+          <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="net-pick-pop" hidden><input type="search" placeholder="Search networks …" aria-label="Search networks" autocomplete="off" maxlength="32">
+          <ul role="listbox"></ul></div>
+        <input type="hidden" name="ssid"></div>
+      <label>Wi-Fi password<input name="password" type="password" maxlength="64" autocomplete="new-password"></label>
+      <div class="flash-row"><button type="submit">Send to the display</button><button type="button" class="secondary" data-pair-skip>Cancel</button></div>
+    </form>
+    <p class="meta" data-pair-state aria-live="polite"></p>
+  </div>
+  <progress data-flash-progress max="100" value="0" hidden></progress>
+  <div class="flash-log-box"><pre class="flash-log" data-flash-log aria-live="polite" hidden></pre>
+    <button type="button" class="icon-button" data-copy-from="[data-flash-log]" title="Copy log" aria-label="Copy log"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg></button></div>
+  <p class="meta">What the log lines mean: <a href="https://github.com/McFcologne/org.frifra.vibedock/blob/main/docs/manual/MANUAL.md#troubleshooting-a-display" target="_blank" rel="noopener noreferrer">Troubleshooting a display</a>.</p>
+  <p class="meta">If writing stops, do not unplug the device: connect again and repeat <em>Install</em> at 115200. The bootloader is in the chip's ROM and stays available.</p>
+</section>
+
+<section class="card">
+  <div class="card-head"><h3 class="grow">Install with esptool</h3></div>
+  <p>With Python and <a href="https://docs.espressif.com/projects/esptool/en/release-v4/">esptool 4.8.1</a> on any computer
+    (<code>python3 -m pip install "esptool==4.8.1"</code>). Replace <code>PORT</code> with the display's serial port, e.g. <code>/dev/cu.usbserial-110</code> or <code>COM3</code>.</p>
+  <ol class="flash-steps">
+    <li>Back up the whole flash:
+      <pre th:text="${'python3 -m esptool --chip ' + board.esptoolChip() + ' --port PORT --baud 115200 read_flash 0x0 ALL vibedock-backup.bin'}"></pre></li>
+    <li>Write the firmware, keeping the settings:
+      <pre th:if="${board.esp8266()}" th:text="${'python3 -m esptool --chip esp8266 --port PORT --baud 460800 write_flash --flash_mode dio --flash_freq 40m --flash_size 4MB 0x0 ' + firmware.fileName()}"></pre>
+      <pre th:unless="${board.esp8266()}" th:text="${'python3 -m esptool --chip ' + board.esptoolChip() + ' --port PORT --baud 460800 write_flash --flash_size keep 0x0 ' + firmware.fileName()}"></pre></li>
+  </ol>
+  <p class="meta">Checking the backup, restoring it and the repository's <code>vibedock-client/scripts/flash.sh</code> are described in
+    <a href="https://github.com/McFcologne/org.frifra.vibedock/blob/main/vibedock-client/FLASHING.md" target="_blank" rel="noopener noreferrer">FLASHING.md</a>.</p>
+</section>
+<script type="module" th:if="${webFlasher}" src="../static/firmware-flasher.js" th:src="@{/firmware-flasher.js}"></script>
+<script src="../static/firmware-upload.js" th:src="@{/firmware-upload.js}"></script>
+<script src="../static/device-state.js" th:src="@{/device-state.js}"></script>
+</th:block>
+</main>
+<footer th:replace="~{fragments :: footer}"></footer>
+</body></html>

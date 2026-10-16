@@ -1,0 +1,108 @@
+package org.frifra.vibedock.server;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import javax.imageio.ImageIO;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.nio.file.*;
+import java.util.*;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+
+/**
+ * Colour emoji for the status image. Java2D cannot draw colour emoji fonts, so the Twemoji PNG set (CC-BY 4.0,
+ * bundled in the Docker image) is used instead. "-" or an empty value means no emoji.
+ */
+@Component
+public class Twemoji {
+    static final int SIZE=44;
+    static final String NONE="-";
+    private final Path directory;
+    private final Map<String,Optional<BufferedImage>> cache=new ConcurrentHashMap<>();
+    /** One emoji of the installed set: the text to store, its PNG file name and a searchable Unicode name. */
+    public record Entry(String emoji,String file,String name) {}
+    private volatile List<Entry> catalog;
+
+    public Twemoji(@Value("${vibedock.emoji-dir:/app/twemoji/72x72}") String directory){this.directory=Path.of(directory);}
+
+    /** Twemoji file names for an emoji: code points in hex joined by "-"; U+FE0F is dropped unless the sequence has a ZWJ. */
+    static List<String> fileNames(String emoji){
+        int[] points=emoji.strip().codePoints().toArray();
+        String full=hex(Arrays.stream(points));
+        String plain=hex(Arrays.stream(points).filter(c->c!=0xfe0f));
+        boolean zwj=Arrays.stream(points).anyMatch(c->c==0x200d);
+        return (zwj?List.of(full,plain):List.of(plain,full)).stream().distinct().toList();
+    }
+    private static String hex(java.util.stream.IntStream points){
+        return points.mapToObj(Integer::toHexString).collect(Collectors.joining("-"));
+    }
+
+    /** All emoji of the installed set in code point order, without skin-tone variants. */
+    public List<Entry> catalog(){
+        var result=catalog;
+        if(result==null){result=buildCatalog();if(!result.isEmpty())catalog=result;}
+        return result;
+    }
+    /** The catalog entry for an emoji, if the installed set has it. */
+    public Optional<Entry> entry(String emoji){
+        if(emoji==null||emoji.isBlank()||emoji.length()>32)return Optional.empty();
+        return fileNames(emoji).stream().filter(name->Files.isRegularFile(directory.resolve(name+".png"))).findFirst()
+                .map(name->new Entry(emoji.strip(),name,describe(name)));
+    }
+    /** The PNG of one emoji for the admin picker; only names made of hex code points are served. */
+    public Optional<byte[]> png(String file){
+        if(file==null||!file.matches("[0-9a-f]{1,6}(-[0-9a-f]{1,6}){0,10}"))return Optional.empty();
+        try{return Optional.of(Files.readAllBytes(directory.resolve(file+".png")));}catch(Exception e){return Optional.empty();}
+    }
+    private List<Entry> buildCatalog(){
+        if(!Files.isDirectory(directory))return List.of();
+        try(var files=Files.list(directory)){
+            return files.map(f->f.getFileName().toString()).filter(n->n.matches("[0-9a-f]{1,6}(-[0-9a-f]{1,6}){0,10}\\.png"))
+                    .map(n->n.substring(0,n.length()-4)).map(Twemoji::codePoints)
+                    .filter(points->Arrays.stream(points).noneMatch(c->c>=0x1f3fb&&c<=0x1f3ff))
+                    .sorted(Arrays::compare)
+                    .map(points->{String file=hex(Arrays.stream(points));return new Entry(new String(points,0,points.length),file,describe(file));})
+                    .toList();
+        }catch(Exception e){return List.of();}
+    }
+    private static int[] codePoints(String file){return Arrays.stream(file.split("-")).mapToInt(h->Integer.parseInt(h,16)).toArray();}
+    /** Lower-case Unicode names of the visible code points, e.g. "rocket" or "regional indicator symbol letter d ...". */
+    static String describe(String file){
+        int[] points=codePoints(file);
+        // Flags are pairs of regional indicators: name them by their country code, e.g. "flag de".
+        if(points.length==2&&Arrays.stream(points).allMatch(c->c>=0x1f1e6&&c<=0x1f1ff))
+            return "flag "+(char)('a'+points[0]-0x1f1e6)+(char)('a'+points[1]-0x1f1e6);
+        return Arrays.stream(points).filter(c->c!=0xfe0f&&c!=0x200d)
+                .mapToObj(Character::getName).filter(Objects::nonNull).map(n->n.toLowerCase(Locale.ROOT)).collect(Collectors.joining(" "));
+    }
+
+    /** The emoji scaled to SIZE pixels, or empty for none or unknown. */
+    public Optional<BufferedImage> image(String emoji){return image(emoji,SIZE);}
+    public Optional<BufferedImage> image(String emoji,int size){
+        if(emoji==null||emoji.isBlank()||emoji.equals(NONE)||emoji.length()>32||size<8||size>72)return Optional.empty();
+        if(cache.size()>256)cache.clear();
+        return cache.computeIfAbsent(size+":"+emoji.strip(),key->load(emoji.strip(),size));
+    }
+    /** Accepts empty, "-" and every emoji of the installed set. */
+    public void validate(String emoji){
+        if(emoji==null||emoji.isBlank()||emoji.strip().equals(NONE))return;
+        if(!Files.isDirectory(directory))throw new IllegalArgumentException("The emoji set is not installed ("+directory+")");
+        if(emoji.strip().length()>32||image(emoji).isEmpty())throw new IllegalArgumentException("Unknown emoji: "+emoji.strip());
+    }
+    private Optional<BufferedImage> load(String emoji,int size){
+        for(String name:fileNames(emoji)){
+            Path file=directory.resolve(name+".png");
+            if(!Files.isRegularFile(file))continue;
+            try{
+                BufferedImage source=ImageIO.read(file.toFile());
+                if(source==null)continue;
+                var scaled=new BufferedImage(size,size,BufferedImage.TYPE_INT_ARGB);var g=scaled.createGraphics();
+                try{g.drawImage(source.getScaledInstance(size,size,Image.SCALE_AREA_AVERAGING),0,0,null);}finally{g.dispose();}
+                return Optional.of(scaled);
+            }catch(Exception e){return Optional.empty();}
+        }
+        return Optional.empty();
+    }
+}

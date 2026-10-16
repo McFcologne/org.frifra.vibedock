@@ -1,0 +1,12 @@
+target/
+data/
+.env
+*.log
+.DS_Store
+docker.data/
+
+# Browser test dependencies and failure artifacts
+e2e/node_modules/
+e2e/test-results/
+e2e/playwright-report/
+!scripts/verify.sh

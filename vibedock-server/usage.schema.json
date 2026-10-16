@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "VibeDock Usage API v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "generatedAt", "providers"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "generatedAt": {"type": "integer", "minimum": 0},
+    "providers": {
+      "description": "Keyed by data source id, in the order of the sources.",
+      "type": "object", "additionalProperties": {"$ref": "#/$defs/provider"}
+    },
+    "labels": {
+      "description": "Display name per data source id.",
+      "type": "object", "additionalProperties": {"type": "string"}
+    }
+  },
+  "$defs": {
+    "window": {
+      "type": ["object", "null"], "additionalProperties": false,
+      "required": ["usedPercent", "resetsAt"],
+      "properties": {
+        "usedPercent": {"type": "number", "minimum": 0, "maximum": 100},
+        "resetsAt": {"type": "integer", "minimum": 0, "description": "0: the window has not started yet."},
+        "seconds": {"type": "integer", "minimum": 0, "description": "Length of the window; 0 when unknown."}
+      }
+    },
+    "provider": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "observedAt", "fiveHour", "week"],
+      "properties": {
+        "status": {"enum": ["unconfigured", "suspended", "waiting", "ok", "partial", "unavailable", "authentication_required", "rate_limited", "upstream_error", "invalid_response", "stale"]},
+        "observedAt": {"type": ["integer", "null"], "minimum": 0},
+        "fiveHour": {"$ref": "#/$defs/window"}, "week": {"$ref": "#/$defs/window"},
+        "period": {"type": ["string", "null"], "enum": ["Day", "Week", "Month", null], "description": "Names a single long window (e.g. Cursor, Grok)."}
+      }
+    }
+  }
+}
