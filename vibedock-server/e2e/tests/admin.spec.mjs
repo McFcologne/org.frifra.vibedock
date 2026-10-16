@@ -74,7 +74,7 @@ test('switching targets protects unsaved changes with Keep editing or Discard',a
 
 test('footer links to the generated license page and uses the packaged version',async ({page}) => {
   const footer=page.getByRole('contentinfo');await expect(footer).toContainText('VibeDock');await expect(footer).not.toContainText('development');
-  await expect(footer.getByRole('link',{name:'README',exact:true})).toHaveAttribute('href',/github\.com\/McFcologne\/vibedock/);
+  await expect(footer.getByRole('link',{name:'README',exact:true})).toHaveAttribute('href',/github\.com\/McFcologne\/org\.frifra\.vibedock#readme/);
   await footer.getByRole('link',{name:'Licenses & notices',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Licenses & notices',exact:true})).toBeVisible();
   await expect(page.locator('.license-report')).toContainText('spring-boot');
