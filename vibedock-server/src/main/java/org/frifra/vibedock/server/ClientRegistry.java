@@ -35,17 +35,23 @@ public class ClientRegistry {
      * display: its {@link DisplayType} id, null for the VibeTV M1; chosen in the editor or reported by the device.
      * web: set for a web display, which fetches the image by link instead of being a paired device.
      * board: its {@link Board} id, null for the VibeTV M1; chosen when pairing or reported by the device.
+     * callbackNetwork: pairing target plus the mask reported at pairing; missing means IPv4 /24 for old devices.
+     * This additive field may be missing in older files; only re-pairing can change it.
      */
     record Device(String identifier,String name,String keyHash,String ip,int port,long pairedAt,Long lastPullAt,String lastPullIp,Design design,
-                  boolean serverFooter,String firmware,String display,Web web,String board) {
+                  boolean serverFooter,String firmware,String display,Web web,String board,String callbackNetwork) {
         Device(String identifier,String name,String keyHash,String ip,int port,long pairedAt,Long lastPullAt,String lastPullIp,Design design,
-               boolean serverFooter,String firmware){this(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,null,null,null);}
-        Device pulled(long at,String peer,boolean footer,String version){return new Device(identifier,name,keyHash,ip,port,pairedAt,at,peer,design,footer,version,display,web,board);}
-        Device withDesign(Design next){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,next,serverFooter,firmware,display,web,board);}
-        Device withName(String next){return new Device(identifier,next,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board);}
-        Device withDisplay(String next){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,next,web,board);}
-        Device withWeb(Web next){return new Device(identifier,name,hash(next.secret()),ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,next,board);}
-        Device withBoard(String next,String nextDisplay){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,nextDisplay,web,next);}
+               boolean serverFooter,String firmware){this(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,null,null,null,null);}
+        Device(String identifier,String name,String keyHash,String ip,int port,long pairedAt,Long lastPullAt,String lastPullIp,Design design,
+               boolean serverFooter,String firmware,String display,Web web,String board){
+            this(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,null);
+        }
+        Device pulled(long at,String peer,boolean footer,String version){return new Device(identifier,name,keyHash,ip,port,pairedAt,at,peer,design,footer,version,display,web,board,callbackNetwork);}
+        Device withDesign(Design next){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,next,serverFooter,firmware,display,web,board,callbackNetwork);}
+        Device withName(String next){return new Device(identifier,next,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,callbackNetwork);}
+        Device withDisplay(String next){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,next,web,board,callbackNetwork);}
+        Device withWeb(Web next){return new Device(identifier,name,hash(next.secret()),ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,next,board,callbackNetwork);}
+        Device withBoard(String next,String nextDisplay){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,nextDisplay,web,next,callbackNetwork);}
         DisplayType displayType(){return DisplayType.of(display);}
         Board boardType(){return Board.of(board);}
     }
@@ -140,6 +146,12 @@ public class ClientRegistry {
     public synchronized void paired(String id,String name,String key,String ip,int port) throws IOException {paired(id,name,key,ip,port,null);}
     /** The same with the device's board (null: keep the one known, the VibeTV M1 for a new device). */
     public synchronized void paired(String id,String name,String key,String ip,int port,String board) throws IOException {
+        paired(id,name,key,ip,port,board,null);
+    }
+    /** Network learned once during pairing; null uses IPv4 /24 anchored to the original pairing address. */
+    public synchronized void paired(String id,String name,String key,String ip,int port,String board,String callbackNetwork) throws IOException {
+        if(callbackNetwork!=null&&(ClientPairing.UNKNOWN_IP.equals(ip)||!IpNetworks.parse(callbackNetwork).matches(ip)
+                ||IpNetworks.parse(callbackNetwork).bits()==0))throw new IllegalArgumentException("Callback network must contain the pairing address");
         validateClient(id,name,ip,port);validateKey(key);
         List<Device> next=new ArrayList<>(state.devices());
         var previous=next.stream().filter(d->d.identifier().equals(id)).findFirst();
@@ -147,7 +159,7 @@ public class ClientRegistry {
         if(next.size()>=100)throw new IllegalArgumentException("At most 100 clients");
         next.add(new Device(id,name.trim(),hash(key),ip,port,clock.instant().getEpochSecond(),null,null,previous.map(Device::design).orElse(null),
                 previous.map(Device::serverFooter).orElse(false),previous.map(Device::firmware).orElse(null),previous.map(Device::display).orElse(null),null,
-                previous.map(Device::board).orElse(null)));
+                previous.map(Device::board).orElse(null),callbackNetwork));
         save(state.withDevices(next));
         if(board!=null)setBoard(id,board);
     }
@@ -269,7 +281,7 @@ public class ClientRegistry {
         var nextState=state.withDevices(next);
         if(persist)save(nextState);else state=nextState;
     }
-    /** Where a device answers on port 80 (its last reported address), for an immediate pull. */
+    /** Endpoint for an immediate pull: reports may change the IP only inside the network fixed at pairing. */
     public record Address(String ip,int port) {}
     /** Devices that show the default design. */
     public synchronized List<Address> followingDefault(){
@@ -279,7 +291,15 @@ public class ClientRegistry {
     /** Every paired device. */
     public synchronized List<Address> all(){return state.devices().stream().map(ClientRegistry::address).toList();}
     /** Web displays cannot be asked to pull; they count as not reachable. */
-    private static Address address(Device d){return new Address(d.web()!=null||d.lastPullIp()==null?d.ip():d.lastPullIp(),d.port());}
+    private static Address address(Device d){
+        if(d.web()!=null||ClientPairing.UNKNOWN_IP.equals(d.ip()))return new Address(ClientPairing.UNKNOWN_IP,d.port());
+        String target=d.ip();
+        String network=d.callbackNetwork();
+        // Legacy firmware supplied no mask. Keep this fallback anchored to the original pairing IP.
+        if(network==null&&IpNetworks.literal(d.ip()).length==4)network=d.ip()+"/24";
+        if(network!=null&&d.lastPullIp()!=null&&IpNetworks.parse(network).matches(d.lastPullIp()))target=d.lastPullIp();
+        return new Address(target,d.port());
+    }
     public synchronized List<View> views(){return state.devices().stream().map(this::view).toList();}
     public synchronized View get(String id){return view(find(id));}
 

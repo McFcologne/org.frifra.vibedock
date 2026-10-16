@@ -83,7 +83,7 @@ class DeviceApiController {
     }
     /**
      * The device's own address as it reports it; behind NAT (e.g. Docker Desktop) the remote address is only the
-     * gateway. The report is trusted because the request is authenticated with the device key.
+     * gateway. The report is display data; callback selection separately enforces the network fixed at pairing.
      */
     static String deviceAddress(String reported,String remote){
         if(reported!=null&&!reported.isBlank()&&reported.length()<=45){

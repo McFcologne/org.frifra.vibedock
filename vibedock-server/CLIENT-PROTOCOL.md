@@ -2,7 +2,7 @@
 
 # VibeDock image client protocol, version 2
 
-Version 2 replaces the push protocol of version 1. **The server makes the first contact, afterwards the device pulls.** After pairing the server never connects to the device again, so NAT, VPN or firewalls between server and device only matter for the one-time invitation.
+Version 2 replaces the push protocol of version 1. **The server makes the first contact, afterwards the device pulls.** HTTP pairing remains enabled for trusted home networks; the administration form displays a warning. The server can optionally send `POST /pull` to a device address inside the network established at pairing; regular polling also works behind NAT, VPN or firewalls.
 
 | Step | Direction | Request |
 | --- | --- | --- |
@@ -12,7 +12,7 @@ Version 2 replaces the push protocol of version 1. **The server makes the first 
 
 ## 1. Pairing code
 
-A device that is connected to Wi-Fi but not paired shows its IP address and a random 6-digit pairing code. The code changes on every restart. After 5 wrong codes the device stops accepting pairing requests until it is restarted (answer **429**). The code proves physical access to the display; nobody else on the network can pair the device.
+A device that is connected to Wi-Fi but not paired shows its IP address and a random 6-digit pairing code. The code changes on every restart. After 5 wrong codes the device stops accepting pairing requests until it is restarted (answer **429**). The code limits casual pairing attempts but does not authenticate or encrypt HTTP. A network observer can capture the code and device key; an active attacker can replace the server addresses and TLS/OTA trust keys. Use HTTP pairing only on a trusted home network, or pair over USB (step 2a). The warning does not block pairing or require an extra activation setting.
 
 ## 2. Invitation (server → device)
 
@@ -42,15 +42,15 @@ Content-Type: application/json
 - **Simple and full check:** normally the device only compares the server certificate with `pin` (no clock needed). When that fails, typically after the certificate was renewed, it does one full check against `anchor` (chain, host name, validity) and sends `X-VibeDock-Tls-Check: full`. Only on such a request the server adds `X-VibeDock-Tls-Pin` with the fingerprint of the current certificate of the external address, and the device only accepts that header over a fully verified connection. A renewed leaf or intermediate certificate therefore needs no new invitation; a change of root does. On the M1 (TLS 1.3) the simple check requires exactly the pinned certificate and the server's proof of its key (CertificateVerify) and skips chain, root and validity; when the server sends no `X-VibeDock-Tls-Pin`, the M1 pins the certificate its own full check verified.
 - `key` is the device's secret. The server stores only its SHA-256 hash in `/data/clients.json` (permissions 0600).
 
-The device checks the code. On success it stores the addresses and the key, leaves pairing mode and answers:
+The device checks the code. On success it stores the addresses and the key, leaves pairing mode and answers with its current Wi-Fi subnet mask:
 
 ```json
-{"identifier": "vibedock-112233445566", "name": "VibeDock", "board": "vibedock-m1"}
+{"identifier": "vibedock-112233445566", "name": "VibeDock", "board": "vibedock-m1", "subnetMask": "255.255.255.0"}
 ```
 
 | Answer | Meaning |
 | --- | --- |
-| **200** | paired; the server stores the device (a repeated pairing of the same identifier replaces its key) |
+| **200** | paired; the server stores the device and callback network (re-pairing replaces the key and network) |
 | **403** | wrong pairing code |
 | **429** | too many wrong codes, restart the device |
 
@@ -65,7 +65,7 @@ Right after flashing, the administration's browser flasher (*Devices › Firmwar
 | `VIBEDOCK-LOG` | `VIBEDOCK-LOG ["05-14 09:41:00 Start v0.1.0 vibedock-m1, Power on",…]`, the last 24 events oldest first: starts, Wi-Fi, pairing, server answers and why a connection failed (HTTP and TLS errors). Kept in `/log.txt` across restarts; no keys or passwords. **Devices → Firmware → Display log** shows it. |
 | `VIBEDOCK-SETUP {json}` | `VIBEDOCK-SETUP OK`, then the device restarts; or `VIBEDOCK-SETUP ERROR <reason>` |
 
-The setup JSON is the invitation of step 2 without `code`, plus `ssid` and `password` of the Wi-Fi. The server creates it with `POST /admin/firmware/setup` (`{"identifier","name","board"}`, CSRF-protected; `board` is what the device reported, or the board chosen on the page for firmware that reports none): it registers the device with a new key and returns `{"pairing":{…},"warnings":[…]}`; the browser adds the Wi-Fi, which never reaches the server. Addresses on the administration's own machine (localhost) are left out; with nothing else configured the setup is refused. The device appears under *Devices* as *Waiting for first pull* and gets its address with the first pull; `GET /admin/firmware/setup/{identifier}` reports that. The browser sends a line in pieces of 128 bytes with 40 ms pauses, because the device keeps a 1 kB receive buffer, and repeats a line that got no answer. The commands are only reachable over the cable, which can rewrite the whole flash anyway.
+The setup JSON is the invitation of step 2 without `code`, plus `ssid` and `password` of the Wi-Fi. The server creates it with `POST /admin/firmware/setup` (`{"identifier","name","board"}`, CSRF-protected; `board` is what the device reported, or the board chosen on the page for firmware that reports none): it registers the device with a new key and returns `{"pairing":{…},"warnings":[…]}`; the browser adds the Wi-Fi, which never reaches the server. Addresses on the administration's own machine (localhost) are left out; with nothing else configured the setup is refused. The device appears under *Devices* as *Waiting for first pull* and reports its display address with the first pull; this does not establish a trusted server callback endpoint and immediate callbacks remain disabled for USB-paired devices; `GET /admin/firmware/setup/{identifier}` reports that. The browser sends a line in pieces of 128 bytes with 40 ms pauses, because the device keeps a 1 kB receive buffer, and repeats a line that got no answer. The commands are only reachable over the cable, which can rewrite the whole flash anyway.
 
 ## 3. Image pull (device → server)
 
@@ -80,7 +80,7 @@ X-VibeDock-Display: 240x240
 X-VibeDock-Board: vibedock-m1
 ```
 
-`X-VibeDock-Device-IP` is the device's own address. The administration shows it instead of the connection's source address, which behind NAT (Docker Desktop, reverse proxies) is only a gateway. Without the header, or with an invalid value, the source address is used.
+`X-VibeDock-Device-IP` is the device's own address. The administration shows it instead of the connection's source address, which behind NAT (Docker Desktop, reverse proxies) is only a gateway. Without the header, or with an invalid value, the source address is used. Both are reporting data. For immediate `POST /pull` callbacks, a reported IP is used only inside the network fixed during HTTP pairing: the administrator-entered target IP plus the device's `subnetMask`. Pulls cannot change that network. With no mask (older firmware or an existing registration), IPv4 defaults to the original pairing IP's `/24`; IPv6 remains fixed to the original IP. An invalid, non-contiguous or unrestricted mask binds callbacks to the exact pairing IP and produces a warning. Reports outside the permitted network remain visible, but callbacks retain the original pairing destination and port. USB-paired and web displays have no callback endpoint and use regular polling.
 
 `X-VibeDock-Footer: server` says that the firmware shows the IP the server draws into the image (see *Image format*). Without it the server keeps the weather/mood band, which carries the IP, at the bottom.
 

@@ -39,6 +39,10 @@ If the device still runs its original firmware, first follow [Build and test](#b
 4. **Pair in the administration.** When the display shows **Invite in the administration**, note its IP address and six-digit pairing code. In the server administration, open **Devices → Pair device**, enter both and confirm. Reconnect your phone to your normal network if necessary.
 5. **Check the result.** The device receives its server addresses, access key and polling interval, then pulls its display image. The default interval is **30 seconds**. Its IP remains visible on the display.
 
+**HTTP pairing is unencrypted.** Use it only on a trusted home network: network attackers can read the device key or replace its TLS/OTA trust keys. The pairing form shows a warning but remains available. **Devices → Firmware → Only pair** over USB is an alternative without reinstalling firmware.
+
+The HTTP pairing reply includes the Wi-Fi subnet mask. The server fixes the allowed callback network at pairing and accepts later DHCP address changes only inside that network. Older devices without this field use the first three octets of the original IPv4 pairing IP (`/24`). No extra pairing field is needed.
+
 The pairing code changes after every restart. Five wrong codes lock pairing until the device is restarted. The code is shown on the physical display, not on the local web page.
 
 <details>

@@ -7,7 +7,10 @@ test('pairing form hides its trigger and restores it after Cancel and Escape',as
   await trigger.click();await expect(trigger).toBeHidden();await expect(panel).toBeVisible();
   await panel.getByRole('button',{name:'Cancel',exact:true}).click();
   await expect(panel).toBeHidden();await expect(trigger).toBeFocused();
-  await trigger.click();await page.getByLabel('Device IP',{exact:true}).press('Escape');
+  await trigger.click();await expect(panel.getByText('HTTP pairing is unencrypted.',{exact:false})).toBeVisible();
+  await expect(panel.getByLabel('Device IP',{exact:true})).toBeVisible();
+  await expect(panel.getByRole('button',{name:'Pair device',exact:true})).toBeEnabled();
+  await panel.getByLabel('Device IP',{exact:true}).press('Escape');
   await expect(panel).toBeHidden();await expect(trigger).toBeVisible();
 });
 

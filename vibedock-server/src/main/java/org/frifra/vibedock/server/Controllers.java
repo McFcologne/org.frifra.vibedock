@@ -192,7 +192,8 @@ class Controllers {
             @RequestParam(defaultValue="") String repeat,@RequestParam(required=false) String reset,RedirectAttributes flash) throws Exception {
         try{
             if(reset!=null)admin.reset(current);else admin.change(current,password,repeat);
-            flash.addFlashAttribute("passwordMessage",reset!=null?"The password from ADMIN_PASSWORD applies again.":"Password changed. It applies from the next sign-in.");
+            flash.addFlashAttribute("passwordMessage",reset!=null?"The password from ADMIN_PASSWORD applies again.":"Password changed. All existing sessions have been signed out.");
+            return "redirect:/login?expired";
         }catch(IllegalArgumentException e){flash.addFlashAttribute("passwordError",e.getMessage());}
         return "redirect:/admin/server#sign-in";
     }

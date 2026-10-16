@@ -52,17 +52,23 @@ public class ClientPairing {
         String id=reply.path("identifier").asText("");
         String deviceName=name!=null&&!name.isBlank()?name.trim():reply.path("name").asText("VibeDock");
         String reported=reply.path("board").asText("");
-        registry.paired(id,deviceName,pairing.key(),target,port,Board.find(reported).or(()->Board.find(board)).map(Board::id).orElse(null));
-        return new Invitation(registry.get(id),pairing.warnings());
+        String network=null;List<String> warnings=new ArrayList<>(pairing.warnings());
+        String mask=reply.path("subnetMask").asText("");
+        if(!mask.isBlank()){
+            try{network=IpNetworks.subnet(target,mask);}
+            catch(IllegalArgumentException e){network=target+"/"+(IpNetworks.literal(target).length*8);warnings.add("Invalid device subnet mask; immediate pulls remain bound to the original pairing IP");}
+        }
+        registry.paired(id,deviceName,pairing.key(),target,port,Board.find(reported).or(()->Board.find(board)).map(Board::id).orElse(null),network);
+        return new Invitation(registry.get(id),List.copyOf(warnings));
     }
 
-    /** Device address until its first pull, for a device set up over USB: not reachable for an immediate pull. */
+    /** No administrator-approved callback address: regular image polling still works. */
     static final String UNKNOWN_IP="0.0.0.0";
     /** The pairing for a device set up over USB by the browser flasher, and warnings about its https addresses. */
     public record Setup(Map<String,Object> pairing,List<String> warnings) {}
     /**
      * Pairs a device that is set up over USB right after flashing: the browser hands this pairing to the device
-     * together with the Wi-Fi it entered. The device is registered now and gets its address with its first pull.
+     * together with the Wi-Fi it entered. Pulls report a display address, never a trusted callback address.
      */
     public Setup setUp(String identifier,String name,List<String> servers) throws Exception {return setUp(identifier,name,null,servers);}
     /** @param board the board the display reports over USB, or the one chosen on the firmware page. */

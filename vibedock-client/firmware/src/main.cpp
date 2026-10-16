@@ -701,6 +701,7 @@ void handlePair() {
   if (status == 400) { web.send(400, "application/json", "{\"error\":\"no usable server address or invalid key\"}"); return; }
   if (status != 200) { web.send(500, "application/json", "{\"error\":\"storage\"}"); return; }
   JsonDocument reply; reply["identifier"] = identifier; reply["name"] = deviceName; reply["board"] = VIBEDOCK_BOARD;
+  reply["subnetMask"] = WiFi.subnetMask().toString();  // fixed by the server at pairing, not updated by image pulls
   String out; serializeJson(reply, out);
   web.send(200, "application/json", out);
   mode = Mode::Paired; lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u; lastImage = millis();

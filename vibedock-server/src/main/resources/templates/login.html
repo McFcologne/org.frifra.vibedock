@@ -18,6 +18,7 @@
     <small>Administration</small>
   </div>
   <p class="notice error" th:if="${param.error}">Invalid username or password.</p>
+  <p class="notice" th:if="${param.expired}">Your session has expired or the password has changed. Please sign in again.</p>
   <p class="notice" th:if="${param.logout}">You have been signed out.</p>
   <label for="username">Username</label>
   <input id="username" name="username" autocomplete="username" required autofocus>

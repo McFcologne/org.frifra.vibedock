@@ -45,7 +45,7 @@ server; a display only receives its image.
 - **Weather and mood.** Show an emoji and weather icon/temperature; swap their slots, including the slot sizes. The update time and device IP stay with their band and cannot be hidden. The weather location is never drawn.
 - **Thirteen display themes.** Modern dark and light themes, classic green/amber terminals, classic Mac and classic Windows. Previews and devices use the same server renderer.
 - **Encrypted account transfer.** Export data sources with their saved sign-ins and restore selected sources by adding them or replacing the current collection.
-- **Device management.** Pair using the IP and six-digit code, inspect status and previews, rename, reorder by dragging, force a redraw, update, or remove a device.
+- **Device management.** Pair using the IP and six-digit code on a trusted home network (HTTP pairing is unencrypted), inspect status and previews, rename, reorder by dragging, force a redraw, update, or remove a device.
 - **Boards.** Besides the VibeTV M1 (ESP8266), the firmware builds for ESP32, ESP32-S3 and ESP32-C3 boards with a display (not yet tested on hardware); each device has a board that decides which firmware it gets.
 - **Web displays.** A browser, tablet or another program shows the image without hardware: a full-screen page that reloads itself, or a plain PNG link, protected by a secret in the link.
 - **Firmware from the server.** The Docker image carries the matching display firmware for every board: download it, install it from Chrome or Edge over USB and pair the display over the same cable in one go, or update paired displays over Wi-Fi with firmware signed by the server.
