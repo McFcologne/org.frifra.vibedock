@@ -5,7 +5,8 @@ name: Release VibeDock
 #   (vibedock-m1-<version>.bin, vibedock-<board>-<version>.bin). The job artifacts only carry the files to the release
 #   job and are deleted after a day.
 # The Docker image also goes to the GitHub Container Registry: ghcr.io/<owner>/vibedock-server:<version> for amd64 and
-# arm64, and :latest for a plain x.y.z version. Started by hand with a tag (Actions > Release VibeDock > Run workflow),
+# arm64, and :latest for a plain x.y.z version; with the repository secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN also
+# to Docker Hub as <username>/vibedock-server (searchable, and Synology's Container Manager shows its updates). Started by hand with a tag (Actions > Release VibeDock > Run workflow),
 # the run only publishes that tag's image and leaves its release alone, e.g. for a release that is already published.
 on:
   push:
@@ -110,12 +111,24 @@ jobs:
       - name: Tag the multi-architecture image
         env:
           GH_TOKEN: ${{ github.token }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
           v="${{ needs.version.outputs.version }}"
           image="ghcr.io/$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')/vibedock-server"
           echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          set -- -t "$image:$v"
-          case $v in *[!0-9.]*) ;; *) set -- "$@" -t "$image:latest";; esac  # latest only for a plain x.y.z version
+          targets="$image"
+          if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
+            echo "$DOCKERHUB_TOKEN" | docker login docker.io -u "$DOCKERHUB_USERNAME" --password-stdin
+            targets="$targets docker.io/$(echo "$DOCKERHUB_USERNAME" | tr '[:upper:]' '[:lower:]')/vibedock-server"
+          else
+            echo "No Docker Hub secrets: published to ghcr.io only"
+          fi
+          set --
+          for target in $targets; do
+            set -- "$@" -t "$target:$v"
+            case $v in *[!0-9.]*) ;; *) set -- "$@" -t "$target:latest";; esac  # latest only for a plain x.y.z version
+          done
           docker buildx imagetools create "$@" \
             --annotation "index:org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
             --annotation "index:org.opencontainers.image.description=VibeDock server: AI usage on small desk displays" \

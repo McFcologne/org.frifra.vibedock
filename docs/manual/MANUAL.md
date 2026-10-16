@@ -246,15 +246,17 @@ Wi-Fi](#updates-over-wi-fi)).
 
 ## Ready-made image from the registry
 
-Every release is also published to the GitHub Container Registry for amd64 and arm64; Docker picks the right one:
+Every release is also published to Docker Hub and the GitHub Container Registry, for amd64 and arm64; Docker picks
+the right one:
 
 ```sh
-docker pull ghcr.io/mcfcologne/vibedock-server:latest     # or a version: ...:0.1.0
+docker pull mcfcologne/vibedock-server:latest             # Docker Hub; or a version: ...:0.1.0
+docker pull ghcr.io/mcfcologne/vibedock-server:latest     # the same image from GitHub
 ```
 
-Use `ghcr.io/mcfcologne/vibedock-server:latest` as the image in the `docker run` command or the `compose.yaml` below
-instead of `vibedock-server:amd64`; to update, pull again and recreate the container. On a Synology, add
-`https://ghcr.io` under *Container Manager › Registry › Settings*, then search for `mcfcologne/vibedock-server`.
+Use one of them as the image in the `docker run` command or the `compose.yaml` below instead of
+`vibedock-server:amd64`; to update, pull again and recreate the container. On a Synology, *Container Manager ›
+Registry* finds `mcfcologne/vibedock-server` on Docker Hub, and *Image* then shows when a new version is available.
 
 ## Ready-made image from a release
 

@@ -123,8 +123,9 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-Without building: set `VIBEDOCK_IMAGE=ghcr.io/mcfcologne/vibedock-server:latest` in `.env`, then
-`docker compose pull && docker compose up -d`. The image is published for amd64 and arm64 with every release.
+Without building: set `VIBEDOCK_IMAGE=mcfcologne/vibedock-server:latest` in `.env`, then
+`docker compose pull && docker compose up -d`. The image is published for amd64 and arm64 with every release, on
+Docker Hub (`mcfcologne/vibedock-server`) and on GitHub (`ghcr.io/mcfcologne/vibedock-server`).
 
 | What | Where |
 | --- | --- |
