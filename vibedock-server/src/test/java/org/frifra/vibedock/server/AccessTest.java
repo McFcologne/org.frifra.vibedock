@@ -393,6 +393,33 @@ class AccessTest {
                 .with(r->{r.setLocalPort(10001);return r;})).andExpect(status().is3xxRedirection());
         mvc.perform(get(path).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isUnauthorized());
     }
+    @Test void usbLogsAreSavedShownDownloadedAndRemovedWithTheDevice() throws Exception {
+        String id="vibedock-log-access",body="{\"firmware\":\"0.1.1\",\"board\":\"vibedock-m1\",\"lines\":[\"Start\",\"Wi-Fi Home: 192.168.1.20\"]}";
+        var admin=user("admin").roles("ADMIN");
+        clients.paired(id,"Log desk","d".repeat(64),"192.168.1.20",80);
+        mvc.perform(post("/admin/clients/"+id+"/logs").contentType("application/json").content(body).with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(status().is4xxClientError());
+        mvc.perform(post("/admin/clients/"+id+"/logs").contentType("application/json").content(body).with(admin)
+                .with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isForbidden());
+        mvc.perform(post("/admin/clients/"+id+"/logs").contentType("application/json").content(body).with(admin).with(csrf())
+                .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNotFound());
+        var saved=mvc.perform(post("/admin/clients/"+id+"/logs").contentType("application/json").content(body).with(admin).with(csrf())
+                .with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isOk()).andExpect(jsonPath("$.count").value(1)).andReturn();
+        String name=new com.fasterxml.jackson.databind.ObjectMapper().readTree(saved.getResponse().getContentAsString()).path("name").asText().replace(".json","");
+        mvc.perform(post("/admin/clients/../logs").contentType("application/json").content(body).with(admin).with(csrf())
+                .with(r->{r.setLocalPort(10001);return r;})).andExpect(status().is4xxClientError());
+        mvc.perform(get("/admin/devices").with(admin).with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Logs (1)")));
+        mvc.perform(get("/admin/clients/"+id+"/logs").with(admin).with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("Wi-Fi Home: 192.168.1.20")));
+        mvc.perform(get("/admin/clients/"+id+"/logs/"+name+".txt").with(admin).with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(status().isOk()).andExpect(header().string("Content-Disposition",org.hamcrest.Matchers.containsString("attachment")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Firmware: 0.1.1")));
+        mvc.perform(get("/admin/clients/"+id+"/logs/"+name+".txt").with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isUnauthorized());
+        mvc.perform(post("/admin/clients/"+id+"/remove").with(admin).with(csrf()).with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(status().is3xxRedirection());
+        mvc.perform(get("/admin/clients/"+id+"/logs/"+name+".txt").with(admin).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isNotFound());
+    }
     @Test void firmwareIsOfferedForDownloadAndDevicesReportTheirVersion() throws Exception {
         String key="ab".repeat(32);
         for(var client:clients.views())clients.remove(client.identifier());

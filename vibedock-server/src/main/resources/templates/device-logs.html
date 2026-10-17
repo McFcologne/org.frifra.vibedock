@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Device logs')}"></head>
+<body>
+<header th:replace="~{fragments :: appbar('devices')}"></header>
+<main>
+<div class="page-heading"><div><h2 th:text="${'Logs of ' + deviceName}">Logs</h2>
+  <p>The last <span th:text="${keep}">10</span> logs read from this display, newest first. Read a log under
+  <a th:href="@{/admin/firmware}">Firmware</a> over USB; it is saved here. <code th:text="${identifier}"></code></p></div>
+  <div class="heading-actions"><a class="button secondary" th:href="@{/admin/devices}">Devices</a></div></div>
+<p class="meta" th:if="${entries.isEmpty()}">No logs saved yet.</p>
+<section class="card device-log" th:each="item:${entries}" th:with="entry=${item.entry}">
+  <div class="card-head"><h3 class="grow" th:text="${#dates.format(new java.util.Date(entry.savedAt), 'yyyy-MM-dd HH:mm:ss')}">time</h3>
+    <span class="badge" th:text="${entry.source == 'usb' ? 'USB' : 'Network'}">USB</span>
+    <a class="button secondary" th:href="@{/admin/clients/{id}/logs/{name}.txt(id=${identifier},name=${#strings.substringBefore(entry.name,'.json')})}">Download</a>
+    <form th:action="@{/admin/clients/{id}/logs/{name}/delete(id=${identifier},name=${#strings.substringBefore(entry.name,'.json')})}" method="post">
+      <button class="icon-button danger" title="Delete this log" aria-label="Delete this log" data-confirm="Delete this log?">✕</button></form></div>
+  <p class="meta"><span th:text="${'Firmware ' + (entry.firmware ?: 'unknown') + ' · board ' + (entry.board ?: 'unknown') + ' · ' + entry.lines + ' lines'}"></span></p>
+  <details><summary>Show log</summary><pre class="log-lines" th:text="${item.text}"></pre></details>
+</section>
+</main>
+<footer th:replace="~{fragments :: footer}"></footer>
+</body></html>

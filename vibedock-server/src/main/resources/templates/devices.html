@@ -102,6 +102,8 @@
     <div class="card-actions"><form th:if="${client.web != null}" th:action="@{/admin/clients/{id}/web/renew(id=${client.identifier})}" method="post">
         <button class="secondary small-button" title="New secret: the old links stop working" data-confirm="Create new links? The old links stop working.">New links</button></form>
       <a class="button secondary icon-label" th:href="@{/admin/design(device=${client.identifier})}"><svg th:replace="~{fragments :: icon('palette')}"></svg>Edit design</a>
+      <a th:if="${client.web == null}" class="button secondary" th:href="@{/admin/clients/{id}/logs(id=${client.identifier})}"
+         th:text="${'Logs (' + logCounts[client.identifier] + ')'}" title="Logs read from this display">Logs</a>
       <form th:action="@{/admin/clients/{id}/remove(id=${client.identifier})}" method="post"><button class="icon-button danger" title="Remove device" aria-label="Remove device"
           th:attr="data-confirm=${client.web != null ? 'Remove this web display? Its links stop working.' : 'Remove this device? It returns to pairing mode.'}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 12.5h9l1-12.5M10 11v6M14 11v6"/></svg></button></form></div></div>
 </section>

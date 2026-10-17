@@ -186,9 +186,22 @@ card.querySelector('[data-read-log]').addEventListener('click', async () => {
       terminal.writeLine('  (The display restarted when the port was opened; the lines before the last start are from its earlier runs.)');
     for (const line of lines) terminal.writeLine('  ' + line);
     if (!lines.length) terminal.writeLine('  (empty)');
+    await saveLog(info, lines);
   } catch (error) { terminal.writeLine('Reading the display log failed: ' + (error?.message || error)); }
   finally { await closeConsole(); }
 });
+// Every log read is kept on the server (the last ones per display), for its log page and support requests.
+async function saveLog(info, lines) {
+  if (!info?.identifier) return;
+  const page = '/admin/clients/' + encodeURIComponent(info.identifier) + '/logs';
+  try {
+    const response = await fetch(page, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...csrf },
+      body: JSON.stringify({ firmware: info.version ?? null, board: info.board ?? null, lines }) });
+    const saved = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(saved.error || 'HTTP ' + response.status);
+    terminal.writeLine(`Saved on the server (${saved.count} of the last ${saved.keep} logs of this display): ${location.origin}${page}`);
+  } catch (error) { terminal.writeLine('The log could not be saved on the server: ' + (error?.message || error)); }
+}
 card.querySelector('[data-pair-only]').addEventListener('click', async () => {
   if (busy) return;
   if (loader) await disconnect();  // esptool holds the port

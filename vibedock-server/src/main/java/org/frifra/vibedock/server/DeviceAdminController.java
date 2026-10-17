@@ -14,9 +14,9 @@ import java.util.List;
 class DeviceAdminController {
     private static final Logger log=LoggerFactory.getLogger(DeviceAdminController.class);
     private final ClientRegistry registry;private final ClientPairing pairing;private final DesignService designs;private final ServerAddresses addresses;private final DevicePoke poke;
-    private final Firmware firmware;private final ApplicationInfo info;
-    DeviceAdminController(ClientRegistry registry,ClientPairing pairing,DesignService designs,ServerAddresses addresses,DevicePoke poke,Firmware firmware,ApplicationInfo info){
-        this.info=info;
+    private final Firmware firmware;private final ApplicationInfo info;private final DeviceLogs logs;
+    DeviceAdminController(ClientRegistry registry,ClientPairing pairing,DesignService designs,ServerAddresses addresses,DevicePoke poke,Firmware firmware,ApplicationInfo info,DeviceLogs logs){
+        this.info=info;this.logs=logs;
         this.registry=registry;this.pairing=pairing;this.designs=designs;this.addresses=addresses;this.poke=poke;this.firmware=firmware;
     }
     @PostMapping("/admin/clients/invite") String invite(@RequestParam String ip,@RequestParam(defaultValue="80") int port,
@@ -39,9 +39,47 @@ class DeviceAdminController {
         return "redirect:/admin/server";
     }
     @PostMapping("/admin/clients/{identifier}/remove") String remove(@PathVariable String identifier,RedirectAttributes flash) throws IOException {
-        try{registry.remove(identifier);}
+        try{registry.remove(identifier);logs.deleteAll(identifier);}
         catch(IllegalArgumentException e){flash.addFlashAttribute("deviceRemovalError","The device was already removed.");}
         return "redirect:/admin/devices";
+    }
+
+    // ---- logs read from a display (over USB on the firmware page) ----
+    record LogUpload(String firmware,String board,List<String> lines) {}
+    @PostMapping(value="/admin/clients/{identifier}/logs",produces="application/json") @ResponseBody
+    org.springframework.http.ResponseEntity<java.util.Map<String,Object>> saveLog(@PathVariable String identifier,@RequestBody LogUpload upload) throws IOException {
+        try{
+            var entry=logs.save(identifier,"usb",upload.firmware(),upload.board(),upload.lines());
+            log.info("Saved the USB log of {} ({} lines)",identifier,entry.lines());
+            return org.springframework.http.ResponseEntity.ok(java.util.Map.of("name",entry.name(),"count",logs.count(identifier),"keep",DeviceLogs.KEEP));
+        }catch(IllegalArgumentException e){return org.springframework.http.ResponseEntity.badRequest().body(java.util.Map.of("error",e.getMessage()));}
+    }
+    @GetMapping("/admin/clients/{identifier}/logs") String logs(@PathVariable String identifier,org.springframework.ui.Model model) throws IOException {
+        java.util.List<java.util.Map<String,Object>> entries=new java.util.ArrayList<>();
+        try{
+            for(var entry:logs.list(identifier))
+                entries.add(java.util.Map.of("entry",entry,"text",String.join("\n",logs.read(identifier,entry.name()).map(DeviceLogs.Log::lines).orElse(List.of()))));
+        }catch(IllegalArgumentException e){throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND);}
+        String name=identifier;
+        try{name=registry.get(identifier).name();}catch(IllegalArgumentException notPaired){ /* logs of a display that is not paired */ }
+        model.addAttribute("identifier",identifier);model.addAttribute("deviceName",name);
+        model.addAttribute("entries",entries);model.addAttribute("keep",DeviceLogs.KEEP);
+        return "device-logs";
+    }
+    @GetMapping(value="/admin/clients/{identifier}/logs/{name}.txt",produces="text/plain;charset=UTF-8") @ResponseBody
+    org.springframework.http.ResponseEntity<String> downloadLog(@PathVariable String identifier,@PathVariable String name) throws IOException {
+        java.util.Optional<DeviceLogs.Log> found;
+        try{found=logs.read(identifier,name+".json");}catch(IllegalArgumentException e){found=java.util.Optional.empty();}
+        if(found.isEmpty())return org.springframework.http.ResponseEntity.notFound().build();
+        var entry=found.get().entry();
+        String text="VibeDock device log of "+identifier+"\nRead: "+java.time.Instant.ofEpochMilli(entry.savedAt())+" over "+("usb".equals(entry.source())?"USB":"the network")
+                +"\nFirmware: "+entry.firmware()+" · board: "+entry.board()+"\n\n"+String.join("\n",found.get().lines())+"\n";
+        return org.springframework.http.ResponseEntity.ok()
+                .header("Content-Disposition","attachment; filename=\"vibedock-log-"+identifier.replace(':','-')+"-"+name+".txt\"").body(text);
+    }
+    @PostMapping("/admin/clients/{identifier}/logs/{name}/delete") String deleteLog(@PathVariable String identifier,@PathVariable String name) throws IOException {
+        try{logs.delete(identifier,name+".json");}catch(IllegalArgumentException ignored){ /* nothing to delete */ }
+        return "redirect:/admin/clients/"+java.net.URLEncoder.encode(identifier,java.nio.charset.StandardCharsets.UTF_8)+"/logs";
     }
     /** Redraws the device screen now: the next pull ignores the ETag, and the device is asked to pull immediately. */
     @PostMapping("/admin/clients/{identifier}/refresh") String refresh(@PathVariable String identifier,RedirectAttributes flash) {
