@@ -35,6 +35,31 @@
         <span th:unless="${t.network}" class="meta" title="This firmware sends its log only over USB; update it to read it over the network">USB only</span></td></tr></tbody>
   </table>
 </section>
+<section class="card" id="support-file">
+  <div class="card-head"><h3 class="grow">Support file</h3></div>
+  <p>One file with what a problem needs: version and platform, the data sources (no sign-ins or keys), the displays, the server and
+    access log of the chosen days and the saved display logs. Keys, tokens, links and e-mail addresses are removed. It is encrypted with
+    a key that is shown once here: attach the file to the issue, and send the key separately, never in the issue.</p>
+  <form class="flash-row" data-support-create>
+    <label>Logs of the last<select name="days"><option value="1">day</option><option value="3">3 days</option><option value="7" selected>7 days</option><option value="14">14 days</option></select></label>
+    <label class="check"><input type="checkbox" name="hideHosts" value="true"> Also hide host names and public IP addresses</label>
+    <button>Create support file</button></form>
+  <div class="notice" data-support-key hidden><p><strong>Key of <span data-support-name></span></strong> (shown only now):</p>
+    <div class="web-link"><code data-support-key-value></code>
+      <button type="button" class="icon-button" data-copy-from="[data-support-key-value]" title="Copy key" aria-label="Copy key"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg></button></div></div>
+  <p class="notice error" data-support-error hidden></p>
+</section>
+
+<section class="card" id="support-open">
+  <div class="card-head"><h3 class="grow">Open a support file</h3></div>
+  <p class="meta">For the analysis: the file is decrypted here and shown; nothing of it is stored on this server.</p>
+  <form class="flash-row" data-support-open>
+    <input type="file" name="file" accept=".vdsupport,application/json" required aria-label="Support file">
+    <input name="key" required placeholder="Key (xxxxxxxx-xxxx-…)" autocomplete="off" spellcheck="false" aria-label="Key">
+    <button class="secondary">Open</button></form>
+  <p class="notice error" data-support-open-error hidden></p>
+  <div data-support-contents hidden></div>
+</section>
 </main>
 <footer th:replace="~{fragments :: footer}"></footer>
 <script type="module" src="../static/troubleshooting.js" th:src="@{/troubleshooting.js}"></script>

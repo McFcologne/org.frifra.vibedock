@@ -75,6 +75,22 @@ test('flip image saves in place and only touch boards offer it',async ({page,app
   await page.reload();await expect(flip).toBeChecked();
 });
 
+test('support file is created with a key shown once and opens again with it',async ({page,app}) => {
+  await page.goto(app.baseURL+'/admin/troubleshooting');
+  const download=page.waitForEvent('download');
+  await page.getByRole('button',{name:'Create support file',exact:true}).click();
+  const file=await (await download).path();
+  const key=await page.locator('[data-support-key-value]').textContent();
+  expect(key).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-/);
+  const open=page.locator('[data-support-open]');
+  await open.locator('input[type=file]').setInputFiles(file);
+  await open.getByLabel('Key').fill('wrong');await open.getByRole('button',{name:'Open',exact:true}).click();
+  await expect(page.locator('[data-support-open-error]')).toContainText('Wrong key');
+  await open.getByLabel('Key').fill(key);await open.getByRole('button',{name:'Open',exact:true}).click();
+  const contents=page.locator('[data-support-contents]');
+  await expect(contents).toContainText('Displays (2)');await expect(contents).toContainText('Shelf');
+});
+
 test('footer links to the generated license page and uses the packaged version',async ({page}) => {
   const footer=page.getByRole('contentinfo');await expect(footer).toContainText('VibeDock');await expect(footer).not.toContainText('development');
   await expect(footer.getByRole('link',{name:'README',exact:true})).toHaveAttribute('href',/github\.com\/McFcologne\/org\.frifra\.vibedock#readme/);

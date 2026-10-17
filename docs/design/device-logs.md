@@ -2,7 +2,7 @@
 
 # Device logs and support files
 
-Status: steps 1 and 2 implemented on branch `0.2.0`; step 3 planned.
+Status: steps 1 to 3 implemented on branch `0.2.0`.
 
 Goal: everything needed to analyse a problem of a user, server and displays alike, in one file that is safe to
 attach to a public ticket.
@@ -31,22 +31,25 @@ attach to a public ticket.
 
 Needs firmware newer than 0.1.1; displays with older firmware keep the USB way. Protocol: `CLIENT-PROTOCOL.md`, section 3c.
 
-## Step 3 – encrypted support file
+## Step 3 – encrypted support file (implemented)
 
-- *Settings › Support* creates one file with:
-  - `summary.json`: version, commit, Java and platform, Docker, time zone, uptime, storage state, poll interval,
-    number of IP rules
-  - `sources.json`: per data source its type, status, last HTTP code or error and time – no tokens, no account ids
-  - `devices.json`: per display its identifier, board, display type, firmware, last pull, Wi-Fi update state,
-    callback network, paired over HTTP or USB
-  - the server log and access log of the chosen time range, and the saved display logs
-- Everything passes one redactor (`SupportRedactor`): known secrets from the settings replaced literally, bearer
-  tokens, 64-digit hex values, web display links, JWT-like strings, `password=`/`token=` values and e-mail
-  addresses by pattern; optionally host names, public IP addresses and Wi-Fi names.
+- *Devices › Troubleshooting* creates one file (`SupportFile`, endpoints `POST /admin/support/file` and
+  `POST /admin/support/open`) with the logs of the last 1–14 days:
+  - summary: version, Java and platform, Docker, time zone, uptime, poll interval, number of IP rules, data
+    sources and displays, test mode
+  - data sources: type, name, paused, status and time of the last reading – no tokens, no account ids
+  - displays: identifier, name, board, display type, firmware, state, last pull, address, Wi-Fi update state and
+    error, flipped, web display
+  - the server log (also the rotated files) and the access log of the chosen days, the newest 3 MB at most, and the
+    saved display logs of those days
+- Everything passes one redactor (`SupportRedactor`): known secrets from the settings (hand-entered keys, web display
+  secrets) replaced literally, bearer tokens, 64-digit hex values, web display links, JWT-like strings,
+  `password=`/`token=`/`key=` values and e-mail addresses by pattern; optionally host names and public IP addresses
+  (private addresses stay).
 - **Encryption:** the server creates a random key in GUID form for every file and encrypts the file with it
   (AES-256-GCM, key derived with PBKDF2 like the data source export in `SourceTransfer`, its own format name as
   associated data). The key is shown once, with a copy button, and not stored. The file (`.vdsupport`) can be
   attached to a public issue; the key goes to the maintainer separately, never into the issue.
-- **Opening a support file:** *Settings › Support › Open support file* takes the file and the key, decrypts it in
+- **Opening a support file:** *Troubleshooting › Open a support file* takes the file and the key, decrypts it in
   memory and shows its contents (summary, sources, displays, logs) for analysis; nothing of it is stored.
-- A GitHub issue template asks for version, board, description and whether a support file is attached.
+- Open: a GitHub issue template that asks for version, board, description and whether a support file is attached.

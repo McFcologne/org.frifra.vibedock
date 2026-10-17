@@ -67,6 +67,13 @@ class DeviceLogs {
         for(String old:names.subList(Math.min(KEEP,names.size()),names.size()))Files.deleteIfExists(dir.resolve(old));
         return entry(name,stored);
     }
+    /** Every display with saved logs (also displays that are not paired). */
+    synchronized List<String> identifiers() throws IOException {
+        if(!Files.isDirectory(root))return List.of();
+        try(var dirs=Files.list(root)){
+            return dirs.filter(Files::isDirectory).map(d->d.getFileName().toString()).filter(n->IDENTIFIER.matcher(n).matches()).sorted().toList();
+        }
+    }
     /** The device's logs, newest first. */
     synchronized List<Entry> list(String identifier) throws IOException {
         Path dir=directory(identifier);List<Entry> entries=new ArrayList<>();

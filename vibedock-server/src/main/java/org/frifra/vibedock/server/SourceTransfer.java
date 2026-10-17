@@ -168,7 +168,8 @@ class SourceTransfer {
             return target;
         }finally{Files.deleteIfExists(temporary);Arrays.fill(bytes,(byte)0);}
     }
-    private static Cipher cipher(int mode,String format,String password,byte[] salt,int iterations,byte[] nonce) throws GeneralSecurityException {
+    /** AES-256-GCM with a PBKDF2 key from the password; the format and version are the associated data (also SupportFile). */
+    static Cipher cipher(int mode,String format,String password,byte[] salt,int iterations,byte[] nonce) throws GeneralSecurityException {
         var spec=new PBEKeySpec(password.toCharArray(),salt,iterations,256);
         try{
             byte[] key=SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).getEncoded();

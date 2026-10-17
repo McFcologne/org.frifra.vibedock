@@ -1,0 +1,67 @@
+package org.frifra.vibedock.server;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
+import java.nio.file.*;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+
+/** The support file: created encrypted with a one-time key, secrets removed, opened again only with that key. */
+@SpringBootTest(properties={"vibedock.admin-auth=none","vibedock.admin-password=","vibedock.polling=false"})
+@AutoConfigureMockMvc
+class SupportFileTest {
+    static Path logs;
+    @DynamicPropertySource static void directory(DynamicPropertyRegistry r) throws Exception {
+        var dir=Files.createTempDirectory("vibedock-support-");r.add("vibedock.data-dir",dir::toString);
+        logs=Files.createDirectories(dir.resolve("logs"));r.add("vibedock.log-dir",logs::toString);
+    }
+    @Autowired MockMvc mvc;
+    @Autowired ClientRegistry clients;
+    @Autowired DeviceLogs deviceLogs;
+    final ObjectMapper json=new ObjectMapper();
+
+    @Test void createdFilesHideSecretsAndOpenOnlyWithTheirKey() throws Exception {
+        String now=LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),old=LocalDateTime.now().minusDays(9).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        Files.write(logs.resolve("access.test.log"),List.of(
+                old+" 192.168.1.5 :10002 \"GET /old\" 200 1 1ms",
+                now+" 192.168.1.5 :10002 \"GET /api/v1/clients/x/image Authorization: Bearer abcdefabcdef\" 200 1 1ms",
+                now+" 203.0.113.9 :10001 \"POST /admin/login password=hunter22hunter\" 302 1 1ms",
+                now+" 192.168.1.6 :10002 \"GET /web/s3cretSecretValue/image.png\" 200 1 1ms mail me@example.org via home.example.com"));
+        String key="ab".repeat(32),id="vibedock-support-test";
+        clients.paired(id,"Desk",key,"192.168.1.40",80,"waveshare-s3-touch-lcd-147");
+        try{
+            deviceLogs.save(id,"usb","0.2.0","waveshare-s3-touch-lcd-147",List.of("Start v0.2.0","Server https://home.example.com: HTTP 200"));
+            var created=json.readTree(mvc.perform(post("/admin/support/file").param("days","7").param("hideHosts","true").with(csrf()).with(r->{r.setLocalPort(10001);return r;}))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            String file=new String(Base64.getDecoder().decode(created.path("data").asText()));
+            Assertions.assertTrue(created.path("name").asText().endsWith(".vdsupport"));
+            Assertions.assertTrue(created.path("key").asText().matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"));
+            Assertions.assertFalse(file.contains("Desk")||file.contains("GET"),"the file is encrypted");
+            // The wrong key opens nothing.
+            mvc.perform(post("/admin/support/open").contentType("application/json").content(json.writeValueAsString(Map.of("content",file,"key","00000000-0000-0000-0000-000000000000")))
+                    .with(csrf()).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").value("Wrong key, or the file was changed"));
+            String opened=mvc.perform(post("/admin/support/open").contentType("application/json").content(json.writeValueAsString(Map.of("content",file,"key",created.path("key").asText())))
+                    .with(csrf()).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.summary.days").value(7)).andExpect(jsonPath("$.summary.hostsHidden").value(true))
+                    .andExpect(jsonPath("$.displays[?(@.identifier=='"+id+"')].board").value("waveshare-s3-touch-lcd-147"))
+                    .andExpect(jsonPath("$.deviceLogs[0].lines[0]").value("Start v0.2.0"))
+                    .andReturn().getResponse().getContentAsString();
+            for(String secret:List.of("abcdefabcdef","hunter22hunter","s3cretSecretValue","me@example.org","home.example.com","203.0.113.9","/old"))
+                Assertions.assertFalse(opened.contains(secret),secret+" must not be in the support file");
+            Assertions.assertTrue(opened.contains("192.168.1.5"),"private addresses stay");
+            Assertions.assertTrue(opened.contains("Bearer [redacted]")&&opened.contains("/web/[redacted]")&&opened.contains("[e-mail]")&&opened.contains("[host]"));
+            mvc.perform(post("/admin/support/file").param("days","30").with(csrf()).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isBadRequest());
+            mvc.perform(post("/admin/support/file").with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNotFound());
+        }finally{clients.remove(id);deviceLogs.deleteAll(id);}
+    }
+}

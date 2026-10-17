@@ -876,8 +876,16 @@ To test a fix before a release, build the firmware from your checkout and instal
 
 ## Report a problem
 
-Copy the display log, and note the server version (page footer), the board and the firmware version, and what the
-display showed. Remove host names or addresses you do not want to share.
+**Devices → Troubleshooting → Create support file** puts what a problem needs into one file: version and platform,
+the data sources (without sign-ins or keys), the displays, the server and access log of the chosen days and the
+saved display logs. Keys, tokens, display links and e-mail addresses are removed; *Also hide host names and public IP
+addresses* removes those as well (addresses in the home network stay). The file is encrypted with a key that the page
+shows once and does not keep: attach the file to the issue and send the key separately, never in the issue.
+**Open a support file** on the same page decrypts such a file with its key and shows its contents; nothing of it is
+stored.
+
+Without a support file: copy the display log, and note the server version (page footer), the board and the firmware
+version, and what the display showed.
 
 # Regenerating this manual
 
