@@ -94,8 +94,23 @@ constexpr uint16_t pixel(uint8_t high, uint8_t low) { return uint16_t(high) << 8
 // Colour correction of the panel: one gamma for the brightness curve, one gain per channel for the white balance.
 // The gamma registers of the ST7789 shape all three channels alike, so the colour cast can only be fixed here.
 // gamma is in hundredths (250 = 2.5, darker mid and dark tones), gains in percent of the full channel.
-// The defaults are calibrated on the 240x240 ST7789 IPS panel by eye against the server preview.
-struct ToneSettings { uint16_t gamma = 250; uint8_t red = 91, green = 94, blue = 73; };
+// The defaults are calibrated on the 240x240 ST7789 IPS panel of the VibeTV M1 by eye against the server preview;
+// other boards set their own (VIBEDOCK_TONE_*, neutral until calibrated on the device).
+#ifndef VIBEDOCK_TONE_GAMMA
+#define VIBEDOCK_TONE_GAMMA 250
+#define VIBEDOCK_TONE_RED 91
+#define VIBEDOCK_TONE_GREEN 94
+#define VIBEDOCK_TONE_BLUE 73
+#endif
+struct ToneSettings {
+  uint16_t gamma = VIBEDOCK_TONE_GAMMA; uint8_t red = VIBEDOCK_TONE_RED, green = VIBEDOCK_TONE_GREEN, blue = VIBEDOCK_TONE_BLUE;
+  bool operator==(const ToneSettings &o) const { return gamma == o.gamma && red == o.red && green == o.green && blue == o.blue; }
+};
+// Settings saved without the "custom" mark were the VibeTV M1's defaults on every board: they count as a calibration
+// only where they differ from those.
+constexpr bool legacyCalibration(long gamma, long red, long green, long blue) {
+  return gamma != 250 || red != 91 || green != 94 || blue != 73;
+}
 constexpr uint16_t minGamma = 50, maxGamma = 350; constexpr uint8_t minGain = 40, maxGain = 100;
 constexpr uint16_t clampGamma(long v) { return v < minGamma ? minGamma : v > maxGamma ? maxGamma : uint16_t(v); }
 constexpr uint8_t clampGain(long v) { return v < minGain ? minGain : v > maxGain ? maxGain : uint8_t(v); }
@@ -111,4 +126,22 @@ struct Tone {
     for (int i = 0; i <= top; i++) out[i] = uint8_t(lround(top * (gain / 100.0) * pow(double(i) / top, gamma / 100.0)));
   }
 };
+// Touch panels: a finished touch is a swipe when it went at least minSwipe pixels, clearly more in one direction
+// than in the other (1.5 times; narrow panels leave little room sideways).
+enum class Swipe : uint8_t { None, Left, Right, Up, Down };
+constexpr int minSwipe = 30;
+constexpr int distance(int v) { return v < 0 ? -v : v; }
+constexpr Swipe swipeOf(int dx, int dy) {
+  return distance(dx) >= minSwipe && 2 * distance(dx) >= 3 * distance(dy) ? (dx < 0 ? Swipe::Left : Swipe::Right)
+       : distance(dy) >= minSwipe && 2 * distance(dy) >= 3 * distance(dx) ? (dy < 0 ? Swipe::Up : Swipe::Down)
+       : Swipe::None;
+}
+// Backlight in percent: swipes up and down change it in steps, never below minBrightness (the screen stays readable).
+constexpr uint8_t minBrightness = 10, brightnessStep = 15;
+constexpr uint8_t clampBrightness(long v) { return v < minBrightness ? minBrightness : v > 100 ? 100 : uint8_t(v); }
+constexpr uint8_t nextBrightness(uint8_t percent, bool up) { return clampBrightness(long(percent) + (up ? brightnessStep : -long(brightnessStep))); }
+// X-VibeDock-Orientation: "flipped" turns the picture by 180 degrees, "upright" turns it back; anything else keeps it.
+constexpr bool flippedOf(const char *orientation, bool current) {
+  return orientation[0] == 'f' && orientation[1] == 'l' ? true : orientation[0] == 'u' && orientation[1] == 'p' ? false : current;
+}
 }

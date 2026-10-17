@@ -10,6 +10,10 @@
 #include <ArduinoJson.h>
 #include <TFT_eSPI.h>
 #include "client_policy.h"
+#include "touch.h"
+#if defined(VIBEDOCK_BOOT_TRACE) && defined(ESP32) && ESP_ARDUINO_VERSION_MAJOR >= 3
+#include "esp32-hal-periman.h"  // the pin owners in the start diagnosis
+#endif
 #include <qrcode.h>
 
 #ifndef VIBEDOCK_VERSION
@@ -37,6 +41,10 @@ bool networkVerified = false;
 String pin;  // SHA-1 fingerprint of the https server certificate, learned over a fully verified connection
 String servers[2]; uint8_t serverCount = 0, serverIndex = 0, storedIndex = 0;
 uint32_t pollSeconds = client_policy::defaultPollSeconds;
+uint8_t brightness = 100;  // backlight in percent; touch boards change it with swipes up and down
+String pendingGesture;  // a swipe for the server (X-VibeDock-Gesture), sent with the next image pull
+bool upsideDown = false;  // mounted upside down: the picture is turned by 180 degrees (set in the administration)
+void applyOrientation(bool flipped);
 client_policy::ToneSettings toneSettings;  // colour correction of the panel, set on the status page
 client_policy::Tone panelTone;
 
@@ -309,9 +317,10 @@ bool saveConfig() {
   JsonDocument doc;
   doc["identifier"] = identifier; doc["name"] = deviceName;
   doc["ssid"] = ssid; doc["password"] = password; doc["key"] = key; doc["poll"] = pollSeconds; doc["pin"] = pin;
-  doc["verified"] = networkVerified;
+  doc["verified"] = networkVerified; doc["brightness"] = brightness; doc["flipped"] = upsideDown;
   JsonObject t = doc["tone"].to<JsonObject>();
   t["gamma"] = toneSettings.gamma; t["red"] = toneSettings.red; t["green"] = toneSettings.green; t["blue"] = toneSettings.blue;
+  t["custom"] = !(toneSettings == client_policy::ToneSettings());  // calibrated on the status page
   JsonArray list = doc["servers"].to<JsonArray>();
   for (uint8_t i = 0; i < serverCount; i++) list.add(servers[i]);
   doc["server"] = storedIndex = serverIndex;  // the address that answered last: tried first after a restart
@@ -333,11 +342,16 @@ bool loadConfig() {
       serverCount = 0;
       for (JsonVariant url : doc["servers"].as<JsonArray>()) if (serverCount < 2) servers[serverCount++] = url.as<String>();
       serverIndex = storedIndex = serverCount ? std::min<uint8_t>(doc["server"] | 0, serverCount - 1) : 0;
+      brightness = client_policy::clampBrightness(doc["brightness"] | 100);
+      upsideDown = doc["flipped"] | false;
       client_policy::ToneSettings d; JsonObject t = doc["tone"];
-      toneSettings.gamma = client_policy::clampGamma(t["gamma"] | long(d.gamma));
-      toneSettings.red = client_policy::clampGain(t["red"] | long(d.red));
-      toneSettings.green = client_policy::clampGain(t["green"] | long(d.green));
-      toneSettings.blue = client_policy::clampGain(t["blue"] | long(d.blue));
+      long gamma = t["gamma"] | long(d.gamma), red = t["red"] | long(d.red), green = t["green"] | long(d.green), blue = t["blue"] | long(d.blue);
+      // Only a calibration made on this display is kept; otherwise the board's defaults apply.
+      bool custom = t["custom"].isNull() ? !t.isNull() && client_policy::legacyCalibration(gamma, red, green, blue) : t["custom"].as<bool>();
+      if (custom) {
+        toneSettings.gamma = client_policy::clampGamma(gamma); toneSettings.red = client_policy::clampGain(red);
+        toneSettings.green = client_policy::clampGain(green); toneSettings.blue = client_policy::clampGain(blue);
+      } else toneSettings = d;
     }
   }
   file.close();
@@ -459,8 +473,8 @@ void handleQuickBoots() {
 }
 
 // ---- Wi-Fi setup portal (access point) ----
-struct Network { String ssid; int32_t rssi; bool open; };
-Network networks[12]; uint8_t networkCount = 0;
+struct WifiNetwork { String ssid; int32_t rssi; bool open; };
+WifiNetwork networks[12]; uint8_t networkCount = 0;
 // Scans once, keeps the strongest entry per name and sorts by signal.
 void scanWifi() {
   networkCount = 0;
@@ -514,7 +528,7 @@ void portalPage() {
   web.sendContent(F("<form action=\"/save\" method=\"post\"><section class=\"card\"><h2>Networks nearby</h2>"));
   if (networkCount == 0) web.sendContent(F("<p class=\"muted\">No networks found.</p>"));
   for (uint8_t i = 0; i < networkCount; i++) {
-    const Network &n = networks[i];
+    const WifiNetwork &n = networks[i];
     String name = html(n.ssid);
     int level = n.rssi > -60 ? 3 : n.rssi > -72 ? 2 : 1;
     web.sendContent("<label class=\"net\"><input type=\"radio\" name=\"net\" value=\"" + name
@@ -769,8 +783,8 @@ struct ImageRequest {
 File *uploadFile = nullptr; String uploadRequest;
 int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
   if (!r.http.begin(*r.client, url)) return HTTPC_ERROR_CONNECTION_FAILED;
-  const char *wanted[] = {"ETag", "X-VibeDock-Image-Format", "X-VibeDock-Poll-Seconds", "X-VibeDock-Tls-Pin", "X-VibeDock-Redraw", "X-VibeDock-Update", "x-MD5", "X-VibeDock-Length", "X-VibeDock-Send-Log"};
-  r.http.collectHeaders(wanted, 9);
+  const char *wanted[] = {"ETag", "X-VibeDock-Image-Format", "X-VibeDock-Poll-Seconds", "X-VibeDock-Tls-Pin", "X-VibeDock-Redraw", "X-VibeDock-Update", "x-MD5", "X-VibeDock-Length", "X-VibeDock-Send-Log", "X-VibeDock-Orientation"};
+  r.http.collectHeaders(wanted, 10);
   // HTTP/1.0: a reverse proxy (Synology) then cannot answer chunked; the body ends with the connection or its length.
   r.http.useHTTP10(true);
   r.http.setTimeout(r.verified ? 15000 : 5000);
@@ -787,6 +801,7 @@ int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
   if (!updateError.isEmpty()) r.http.addHeader("X-VibeDock-Update-Error", updateError);
   if (r.verified) r.http.addHeader("X-VibeDock-Tls-Check", "full");
   if (conditional && !etag.isEmpty() && haveImage) r.http.addHeader("If-None-Match", etag);
+  if (conditional && !pendingGesture.isEmpty()) r.http.addHeader("X-VibeDock-Gesture", pendingGesture);
   if (uploadFile) {  // the log, straight from flash: no copy on the heap the TLS handshake needs
     r.http.addHeader("Content-Type", "text/plain; charset=utf-8");
     r.http.addHeader("X-VibeDock-Log-Request", uploadRequest);
@@ -930,7 +945,7 @@ void pull() {
   }
   lastStatus = code;
   if (code > 0) {
-    failedInRow = 0;
+    failedInRow = 0; pendingGesture = "";  // the server has it (an older one ignores it)
     if (storedIndex != serverIndex) saveConfig();  // flash only when the answering address changes
   }
   if (code == 200 || code == 304) { learnPin(request); updateError = ""; }
@@ -939,6 +954,10 @@ void pull() {
   if (code > 0 && http.hasHeader("X-VibeDock-Poll-Seconds")) {
     uint32_t poll = client_policy::clampPoll(http.header("X-VibeDock-Poll-Seconds").toInt());
     if (poll != pollSeconds) { pollSeconds = poll; saveConfig(); }
+  }
+  if ((code == 200 || code == 304) && http.hasHeader("X-VibeDock-Orientation")) {
+    bool flipped = client_policy::flippedOf(http.header("X-VibeDock-Orientation").c_str(), upsideDown);
+    if (flipped != upsideDown) { applyOrientation(flipped); saveConfig(); logEvent(flipped ? "Picture flipped" : "Picture upright", true); }
   }
   client_policy::ImageSize size;
   if (code == 200 && !validImage(http, size))
@@ -1023,8 +1042,6 @@ void statusPage() {
   if (!paired) body += F("<p class=\"muted\">Enter this IP address and the pairing code shown on the display in the VibeDock administration.</p>");
   body += "</section>";
   web.sendContent(body);
-  if (paired) web.sendContent("<section class=\"card\"><h2>Current image</h2><img class=\"screen\" src=\"/image.bmp?t="
-      + String(millis()) + "\" width=\"240\" height=\"240\" alt=\"Current image\"><p class=\"muted\"><a href=\"/\">Reload</a> (fetches a fresh image from the server)</p></section>");
   if (paired) colourCard();
   pageEnd();
 }
@@ -1035,17 +1052,23 @@ String slider(const char *name, const char *label, int value, int low, int high,
   String show = gamma ? "(this.value/100).toFixed(2)" : "this.value+' %'";
   return "<label class=\"f\" for=\"" + String(name) + "\">" + label + " <b>" + shown + "</b></label><input type=\"range\" id=\""
       + name + "\" name=\"" + name + "\" min=\"" + low + "\" max=\"" + high + "\" step=\"" + step + "\" value=\"" + value
-      + "\" oninput=\"this.previousSibling.lastChild.textContent=" + show + "\" onchange=\"this.form.submit()\">";
+      + "\" oninput=\"this.previousSibling.lastChild.textContent=" + show + "\" onchange=\"const b=new URLSearchParams(new FormData(this.form));b.set('live','1');fetch('/colours',{method:'POST',body:b}).catch(()=>this.form.submit())\">";
 }
+// The image as the server sends it, uncorrected, next to the sliders: the reference the display is matched to. A
+// slider change goes to the display in the background; the page and the image stay as they are.
 void colourCard() {
   using namespace client_policy;
+  uint16_t w = lastImageSize.width ? lastImageSize.width : 240, h = lastImageSize.height ? lastImageSize.height : 240;
   web.sendContent("<form action=\"/colours\" method=\"post\"><section class=\"card\"><h2>Display colours</h2>"
+      "<div style=\"display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start\"><figure style=\"margin:0;flex:none\"><img class=\"screen\" src=\"/image.bmp?t="
+      + String(millis()) + "\" width=\"" + w + "\" height=\"" + h + "\" style=\"width:" + w + "px;height:" + h + "px;max-width:100%;object-fit:contain;image-rendering:pixelated\" alt=\"Current image\">"
+        "<figcaption class=\"muted\">Uncorrected, as the server sends it. <a href=\"/\">Reload</a></figcaption></figure><div style=\"flex:1;min-width:200px\">"
       + slider("gamma", "Gamma (higher: darker mid tones)", toneSettings.gamma, minGamma, maxGamma, 5, true)
       + slider("red", "Red", toneSettings.red, minGain, maxGain, 1, false)
       + slider("green", "Green", toneSettings.green, minGain, maxGain, 1, false)
       + slider("blue", "Blue", toneSettings.blue, minGain, maxGain, 1, false)
-      + "<p class=\"muted\">Applied to this display only. Compare it with the preview in the VibeDock administration.</p>"
-        "<button name=\"reset\" value=\"1\">Reset to defaults</button></section></form>");
+      + "<p class=\"muted\">Applied to this display only: move a slider until the display looks like the image beside it.</p>"
+        "<button name=\"reset\" value=\"1\">Reset to defaults</button></div></div></section></form>");
 }
 void saveColours() {
   using namespace client_policy;
@@ -1057,6 +1080,7 @@ void saveColours() {
   panelTone.build(toneSettings); saveConfig();
   // Redraw everything with the new correction: unconditional request on the next loop.
   forgetRows(); etag = ""; lastPull = millis() - clampPoll(pollSeconds) * 1000u;
+  if (web.hasArg("live")) { web.send(204, "text/plain", ""); return; }  // slider moved, the page stays
   web.sendHeader("Location", "/", true); web.send(303, "text/plain", "");
 }
 // The device keeps no copy of the image (too little RAM), so it fetches a fresh one from the server and
@@ -1089,9 +1113,16 @@ void imagePage() {
 uint32_t lastPullRequest = 0;
 void handlePullRequest() {
   if (mode != Mode::Paired) { web.send(409, "text/plain", ""); return; }
-  if (lastPullRequest != 0 && !client_policy::pullRequestAllowed(millis(), lastPullRequest)) { web.send(429, "text/plain", ""); return; }
+  uint32_t poll = client_policy::clampPoll(pollSeconds) * 1000u;
+  if (lastPullRequest != 0 && !client_policy::pullRequestAllowed(millis(), lastPullRequest)) {
+    // Too soon after the last one (e.g. a setting switched on and off again): pulled when the pause is over, not
+    // only at the next poll. Still at most one pull per pause.
+    uint32_t wait = client_policy::pullRequestMs - (millis() - lastPullRequest);
+    if (millis() - lastPull < poll - wait) lastPull = millis() - poll + wait;
+    web.send(202, "text/plain", ""); return;
+  }
   lastPullRequest = millis(); if (lastPullRequest == 0) lastPullRequest = 1;
-  lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u;  // due in the next loop
+  lastPull = millis() - poll;  // due in the next loop
   web.send(202, "text/plain", "");
 }
 void startPairingServer() {
@@ -1169,8 +1200,42 @@ void serialPoll(bool duringTls = false) {
 // ---- lifecycle ----
 // Version and board, readable in the binary: the server takes them from an uploaded own build.
 const char IDENTITY[] PROGMEM = "VIBEDOCK-FIRMWARE " VIBEDOCK_VERSION " " VIBEDOCK_BOARD;
+#ifdef VIBEDOCK_PANEL_JD9853
+// The JD9853 takes the ST7789 commands but needs the vendor's register set after them (from Waveshare's demo for the
+// ESP32-S3-Touch-LCD-1.47). Entries: command, number of data bytes, data.
+void initJd9853() {
+  static const uint8_t sequence[] = {
+    0xDF, 2, 0x98, 0x53, 0xB2, 1, 0x23, 0xB7, 4, 0x00, 0x47, 0x00, 0x6F, 0xBB, 6, 0x1C, 0x1A, 0x55, 0x73, 0x63, 0xF0,
+    0xC0, 2, 0x44, 0xA4, 0xC1, 1, 0x16, 0xC3, 8, 0x7D, 0x07, 0x14, 0x06, 0xCF, 0x71, 0x72, 0x77,
+    0xC4, 12, 0x00, 0x00, 0xA0, 0x79, 0x0B, 0x0A, 0x16, 0x79, 0x0B, 0x0A, 0x16, 0x82,
+    0xC8, 32, 0x3F, 0x32, 0x29, 0x29, 0x27, 0x2B, 0x27, 0x28, 0x28, 0x26, 0x25, 0x17, 0x12, 0x0D, 0x04, 0x00,
+              0x3F, 0x32, 0x29, 0x29, 0x27, 0x2B, 0x27, 0x28, 0x28, 0x26, 0x25, 0x17, 0x12, 0x0D, 0x04, 0x00,
+    0xD0, 5, 0x04, 0x06, 0x6B, 0x0F, 0x00, 0xD7, 2, 0x00, 0x30, 0xE6, 1, 0x14, 0xDE, 1, 0x01,
+    0xB7, 5, 0x03, 0x13, 0xEF, 0x35, 0x35, 0xC1, 3, 0x14, 0x15, 0xC0, 0xC2, 2, 0x06, 0x3A, 0xC4, 2, 0x72, 0x12,
+    0xBE, 1, 0x00, 0xDE, 1, 0x02, 0xE5, 3, 0x00, 0x02, 0x00, 0xE5, 3, 0x01, 0x02, 0x00, 0xDE, 1, 0x00,
+    0x35, 1, 0x00, 0x3A, 1, 0x05, 0xDE, 1, 0x02, 0xE5, 3, 0x00, 0x02, 0x00, 0xDE, 1, 0x00, 0x21, 0};
+  panel.writecommand(0x11); delay(120);
+  for (size_t i = 0; i < sizeof(sequence); i += 2 + sequence[i + 1]) {
+    panel.writecommand(sequence[i]);
+    for (uint8_t k = 0; k < sequence[i + 1]; k++) panel.writedata(sequence[i + 2 + k]);
+  }
+  delay(10); panel.writecommand(0x29);
+}
+#endif
+
+// Diagnosis of a board that stays dark (build with PLATFORMIO_BUILD_FLAGS=-DVIBEDOCK_BOOT_TRACE): the backlight comes on
+// before the panel, the start waits 3 s for a serial monitor, and every step of the start is printed.
+#ifdef VIBEDOCK_BOOT_TRACE
+#define BOOT_TRACE(step) do { Serial.println("TRACE " step); Serial.flush(); } while (0)
+#else
+#define BOOT_TRACE(step) do {} while (0)
+#endif
 void setup() {
   Serial.setRxBufferSize(1024); Serial.begin(115200);  // the flasher sends in paced chunks
+#ifdef VIBEDOCK_BOOT_TRACE
+  pinMode(TFT_BL, OUTPUT); digitalWrite(TFT_BL, TFT_BACKLIGHT_ON); delay(3000);
+#endif
+  BOOT_TRACE("serial");
   Serial.println(); Serial.println(reinterpret_cast<const __FlashStringHelper *>(IDENTITY));
   platform::onTlsWait([] { serialPoll(true); });  // the log stays readable during a long TLS handshake
 #ifdef VIBEDOCK_POWER_PIN
@@ -1179,11 +1244,34 @@ void setup() {
 #ifndef VIBEDOCK_ROTATION
 #define VIBEDOCK_ROTATION 0
 #endif
-  panel.init(); panel.setRotation(VIBEDOCK_ROTATION); panel.setSwapBytes(true); panel.fillScreen(TFT_BLACK);
+  BOOT_TRACE("panel init");
+  panel.init();
+  BOOT_TRACE("panel init done");
+#if defined(VIBEDOCK_BOOT_TRACE) && defined(ESP32) && ESP_ARDUINO_VERSION_MAJOR >= 3
+  // Which driver holds the display pins (GPIO, SPI_MASTER_*, ...).
+  for (int pin : {TFT_SCLK, TFT_MOSI, TFT_CS, TFT_DC, TFT_RST, TFT_BL})
+    Serial.printf("TRACE pin %d: %s\n", pin, perimanGetTypeName(perimanGetPinBusType(pin)));
+#endif
+#ifdef VIBEDOCK_PANEL_JD9853
+  initJd9853();
+#endif
+  panel.setRotation(VIBEDOCK_ROTATION); panel.setSwapBytes(true); panel.fillScreen(TFT_BLACK);
+  BOOT_TRACE("panel cleared");
+#ifdef VIBEDOCK_BOOT_TRACE
+  // Red, green, blue for a second each: shows whether the panel receives anything at all.
+  for (uint16_t colour : {uint16_t(TFT_RED), uint16_t(TFT_GREEN), uint16_t(TFT_BLUE)}) { panel.fillScreen(colour); delay(1000); }
+  BOOT_TRACE("test colours shown");
+#endif
 #if VIBEDOCK_CANVAS
   canvas.setColorDepth(VIBEDOCK_CANVAS); canvas.createSprite(240, 240); canvas.fillSprite(TFT_BLACK);
+  BOOT_TRACE("canvas ready");
 #endif
   pinMode(TFT_BL, OUTPUT); digitalWrite(TFT_BL, TFT_BACKLIGHT_ON);
+#if VIBEDOCK_TOUCH
+  BOOT_TRACE("touch");
+  touch::begin();
+#endif
+  BOOT_TRACE("wifi");
   WiFi.persistent(false); WiFi.mode(WIFI_STA);
   // No modem sleep: with it the access point holds incoming packets until the next beacon, and phone hotspots drop
   // them. Over TLS 1.3 the M1 needs whole 16 kB records through a 2 kB TCP window; with sleep the answers stalled.
@@ -1193,8 +1281,11 @@ void setup() {
   WiFi.setSleep(false);
 #endif
   message("Starting network", Step::WiFi);
+  BOOT_TRACE("first screen drawn");
   logEvent("Start v" VIBEDOCK_VERSION " " VIBEDOCK_BOARD ", " + platform::resetReason());
   if (!platform::mountStorage() || !loadConfig()) { message("Storage error", Step::None, true); return; }
+  if (brightness < 100) platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness);
+  if (upsideDown) applyOrientation(true);
   loadLog();
   loadAnchor(); loadOtaKey();
   serialReady();
@@ -1215,8 +1306,51 @@ void setup() {
     if (online) message("Connecting to server", Step::Server); else showWaiting();
   }
 }
+#if VIBEDOCK_TOUCH
+// Swipes: left and right switch the colour scheme on the server (paired displays only), up and down the brightness.
+uint32_t lastTouchPoll = 0, brightnessChangedAt = 0; bool brightnessDirty = false;
+void touchPoll() {
+  static bool touching = false; static int16_t startX, startY, lastX, lastY; static uint8_t idle = 0;
+  if (brightnessDirty && millis() - brightnessChangedAt >= 3000) { brightnessDirty = false; saveConfig(); }  // flash once per series
+  if (millis() - lastTouchPoll < 20) return;
+  lastTouchPoll = millis();
+  int16_t x, y;
+  if (touch::read(x, y)) {
+    if (!touching) { touching = true; startX = x; startY = y; }
+    lastX = x; lastY = y; idle = 0; return;
+  }
+  // Released only after 60 ms without a point: the controllers drop single readings during a swipe.
+  if (!touching || ++idle < 3) return;
+  touching = false; idle = 0;
+  int dx = lastX - startX, dy = lastY - startY;
+  if (upsideDown) { dx = -dx; dy = -dy; }  // the panel's coordinates do not turn with the picture
+  auto swipe = client_policy::swipeOf(dx, dy);
+  if (swipe == client_policy::Swipe::Up || swipe == client_policy::Swipe::Down) {
+    brightness = client_policy::nextBrightness(brightness, swipe == client_policy::Swipe::Up);
+    platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness);
+    brightnessDirty = true; brightnessChangedAt = millis();
+  } else if (swipe != client_policy::Swipe::None && mode == Mode::Paired) {
+    pendingGesture = swipe == client_policy::Swipe::Left ? "scheme-next" : "scheme-previous";
+    logEvent("Touch: " + pendingGesture, true);
+    lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u;  // the new image right away
+  }
+}
+#endif
+
+// Turns the picture by 180 degrees or back (Flip image in the administration); the next pull draws every row.
+void applyOrientation(bool flipped) {
+  upsideDown = flipped;
+  panel.setRotation((VIBEDOCK_ROTATION + (flipped ? 2 : 0)) % 4);
+  forgetRows();
+  if (imageOnScreen) { etag = ""; lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u; }  // the image again, every row
+  else present(true);
+}
+
 void loop() {
   serialPoll();
+#if VIBEDOCK_TOUCH
+  touchPoll();
+#endif
   if (logDirty && millis() - logSavedAt >= 60000) saveLog();
   static bool clockLogged = false;
   if (!clockLogged && clockSet()) { clockLogged = true; logEvent("Clock set (NTP)"); }

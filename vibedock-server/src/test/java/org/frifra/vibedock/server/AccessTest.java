@@ -409,8 +409,9 @@ class AccessTest {
         String name=new com.fasterxml.jackson.databind.ObjectMapper().readTree(saved.getResponse().getContentAsString()).path("name").asText().replace(".json","");
         mvc.perform(post("/admin/clients/../logs").contentType("application/json").content(body).with(admin).with(csrf())
                 .with(r->{r.setLocalPort(10001);return r;})).andExpect(status().is4xxClientError());
-        mvc.perform(get("/admin/devices").with(admin).with(r->{r.setLocalPort(10001);return r;}))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("Logs (1)")));
+        mvc.perform(get("/admin/troubleshooting").with(admin).with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("Read log over USB")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("1 of "+DeviceLogs.KEEP)));
         mvc.perform(get("/admin/clients/"+id+"/logs").with(admin).with(r->{r.setLocalPort(10001);return r;}))
                 .andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("Wi-Fi Home: 192.168.1.20")));
         mvc.perform(get("/admin/clients/"+id+"/logs/"+name+".txt").with(admin).with(r->{r.setLocalPort(10001);return r;}))
@@ -469,6 +470,55 @@ class AccessTest {
                     .andExpect(content().string(org.hamcrest.Matchers.containsString("Read log over the network")))
                     .andExpect(content().string(org.hamcrest.Matchers.containsString("Network")));
         }finally{clients.remove(id);deviceLogs.deleteAll(id);}
+    }
+    @Test void touchDisplaysSwipeThroughTheColourSchemes() throws Exception {
+        String key="cd".repeat(32),id="vibedock-touch",image="/api/v1/clients/"+id+"/image";
+        clients.paired(id,"Desk",key,"192.168.1.32",80);
+        try{
+            var start=clients.defaultDesign().scheme();
+            var first=mvc.perform(get(image).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(8080);return r;}))
+                    .andExpect(status().isOk()).andReturn().getResponse().getHeader("ETag");
+            Assertions.assertFalse(clients.views().stream().filter(v->v.identifier().equals(id)).findFirst().orElseThrow().overridden());
+            // Next: a new image right away, and the device keeps its own design from then on.
+            mvc.perform(get(image).header("Authorization","Bearer "+key).header("X-VibeDock-Gesture","scheme-next").header("If-None-Match",first)
+                    .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk());
+            Assertions.assertEquals(start.shifted(1),clients.designFor(id).scheme());
+            Assertions.assertTrue(clients.views().stream().filter(v->v.identifier().equals(id)).findFirst().orElseThrow().overridden());
+            Assertions.assertEquals(start,clients.defaultDesign().scheme());
+            // Previous goes back; the first scheme wraps around to the last; unknown gestures change nothing.
+            mvc.perform(get(image).header("Authorization","Bearer "+key).header("X-VibeDock-Gesture","scheme-previous")
+                    .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk());
+            Assertions.assertEquals(start,clients.designFor(id).scheme());
+            Assertions.assertEquals(Scheme.values()[Scheme.values().length-1],Scheme.values()[0].shifted(-1));
+            mvc.perform(get(image).header("Authorization","Bearer "+key).header("X-VibeDock-Gesture","reboot")
+                    .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk());
+            Assertions.assertEquals(start,clients.designFor(id).scheme());
+            // Without the key nothing changes.
+            mvc.perform(get(image).header("Authorization","Bearer "+"0".repeat(64)).header("X-VibeDock-Gesture","scheme-next")
+                    .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isUnauthorized());
+            Assertions.assertEquals(start,clients.designFor(id).scheme());
+        }finally{clients.remove(id);}
+    }
+    @Test void flipImageTurnsEveryBoardButTheVibeTvM1() throws Exception {
+        String key="ef".repeat(32),id="vibedock-flip",image="/api/v1/clients/"+id+"/image",flip="/admin/clients/"+id+"/flip";
+        clients.paired(id,"Shelf",key,"192.168.1.33",80,"waveshare-s3-touch-lcd-147");
+        try{
+            mvc.perform(get(image).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(8080);return r;}))
+                    .andExpect(status().isOk()).andExpect(header().string("X-VibeDock-Orientation","upright"));
+            mvc.perform(post(flip).param("flipped","true").header("Accept","application/json").with(user("admin").roles("ADMIN")).with(csrf())
+                    .with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isOk()).andExpect(jsonPath("$.flipped").value(true));
+            // Also the 304 carries it: the device turns without a new image.
+            var tag=mvc.perform(get(image).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(8080);return r;}))
+                    .andExpect(header().string("X-VibeDock-Orientation","flipped")).andReturn().getResponse().getHeader("ETag");
+            mvc.perform(get(image).header("Authorization","Bearer "+key).header("If-None-Match",tag).with(r->{r.setLocalPort(8080);return r;}))
+                    .andExpect(status().isNotModified()).andExpect(header().string("X-VibeDock-Orientation","flipped"));
+            // The VibeTV M1 stands as its case decides: no switch, no header.
+            clients.setBoard(id,"vibedock-m1");
+            Assertions.assertFalse(clients.flipped(id));
+            mvc.perform(get(image).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(8080);return r;}))
+                    .andExpect(header().doesNotExist("X-VibeDock-Orientation"));
+            clients.setFlipped(id,true);Assertions.assertFalse(clients.get(id).flipped());
+        }finally{clients.remove(id);}
     }
     @Test void firmwareIsOfferedForDownloadAndDevicesReportTheirVersion() throws Exception {
         String key="ab".repeat(32);

@@ -16,9 +16,9 @@ class DeviceApiController {
     static final String IMAGE_FORMAT="rgb565-be-240x240";
     private static final Logger log=LoggerFactory.getLogger(DeviceApiController.class);
     private final ClientRegistry registry;private final DesignService designs;private final ServerAddresses addresses;private final TlsTrust trust;
-    private final Firmware firmware;private final OtaSigning signing;private final DeviceLogs logs;
-    DeviceApiController(ClientRegistry registry,DesignService designs,ServerAddresses addresses,TlsTrust trust,Firmware firmware,OtaSigning signing,DeviceLogs logs){
-        this.logs=logs;this.registry=registry;this.designs=designs;this.addresses=addresses;this.trust=trust;this.firmware=firmware;this.signing=signing;
+    private final Firmware firmware;private final OtaSigning signing;private final DeviceLogs logs;private final AdminEvents events;
+    DeviceApiController(ClientRegistry registry,DesignService designs,ServerAddresses addresses,TlsTrust trust,Firmware firmware,OtaSigning signing,DeviceLogs logs,AdminEvents events){
+        this.logs=logs;this.events=events;this.registry=registry;this.designs=designs;this.addresses=addresses;this.trust=trust;this.firmware=firmware;this.signing=signing;
     }
     /** The device authenticates with its key; unknown devices and wrong keys get the same 401. */
     @GetMapping("/api/v1/clients/{identifier}/image")
@@ -47,11 +47,22 @@ class DeviceApiController {
             try{if(registry.get(identifier).display()==DisplayType.M1&&type!=DisplayType.M1)registry.setDisplay(identifier,type.id());}
             catch(IOException e){log.warn("Could not store the display type of {}: {}",identifier,e.toString());}
         });
+        // A swipe on a touch display: the next or previous colour scheme. The device keeps it as its own design, also
+        // when it followed the default until now.
+        String gesture=request.getHeader("X-VibeDock-Gesture");
+        int step="scheme-next".equals(gesture)?1:"scheme-previous".equals(gesture)?-1:0;
+        if(step!=0){
+            var current=registry.designFor(identifier);var scheme=current.scheme().shifted(step);
+            try{registry.setDesign(identifier,current.withScheme(scheme));log.info("Device {} switched to the scheme {} by touch",identifier,scheme.id());events.devicesChanged();}
+            catch(IOException e){log.warn("Could not store the scheme of {}: {}",identifier,e.toString());}
+        }
         var display=registry.displayType(identifier);
         byte[] pixels=designs.render(DesignService.forDevice(registry.designFor(identifier),serverFooter),peer,display).rgb565();
         String tag="\""+HexFormat.of().formatHex(Arrays.copyOf(sha256(pixels),12))+"\"";
         var headers=new HttpHeaders();headers.setETag(tag);headers.set("X-VibeDock-Image-Format",display.imageFormat());
         headers.set("X-VibeDock-Poll-Seconds",String.valueOf(registry.pollSeconds()));
+        // Mounted upside down: the device turns its panel by 180 degrees (also its own screens and the swipes).
+        if(registry.get(identifier).board().flippable())headers.set("X-VibeDock-Orientation",registry.flipped(identifier)?"flipped":"upright");
         // A requested update over Wi-Fi: the device fetches /firmware after this pull and installs it if signed.
         firmware.info(registry.get(identifier).board()).filter(i->registry.updatePending(identifier,i.version())).ifPresent(i->headers.set("X-VibeDock-Update",i.version()));
         // A log requested in the administration: the display uploads it after this pull (POST .../log).

@@ -30,5 +30,11 @@ int main(){
   Tone tone;assert(tone.apply(0)==0);assert(tone.apply(0xf800)==28<<11);
   assert(((tone.apply(0x07e0)>>5)&63)==59);assert((tone.apply(0x001f)&31)==23);
   assert(((tone.apply(0x0400)>>5)&63)<16);  // gamma 2.5 lowers the mid tones
+  assert(swipeOf(-60,10)==Swipe::Left);assert(swipeOf(60,-20)==Swipe::Right);assert(swipeOf(5,-50)==Swipe::Up);assert(swipeOf(0,80)==Swipe::Down);
+  assert(swipeOf(25,0)==Swipe::None);assert(swipeOf(50,40)==Swipe::None);assert(swipeOf(-45,28)==Swipe::Left);assert(swipeOf(30,0)==Swipe::Right);assert(swipeOf(0,0)==Swipe::None);
+  assert(nextBrightness(100,true)==100);assert(nextBrightness(100,false)==85);assert(nextBrightness(20,false)==10);assert(nextBrightness(10,true)==25);
+  assert(flippedOf("flipped",false));assert(!flippedOf("upright",true));assert(flippedOf("",true));assert(!flippedOf("",false));assert(!flippedOf("x",false));
+  assert(clampBrightness(0)==10);assert(clampBrightness(255)==100);
+  assert(!legacyCalibration(250,91,94,73));assert(legacyCalibration(240,91,94,73));assert(ToneSettings()==ToneSettings());
   assert(clampGamma(10)==50);assert(clampGamma(999)==350);assert(clampGain(0)==40);assert(clampGain(200)==100);
 }
