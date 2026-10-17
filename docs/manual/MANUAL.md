@@ -550,9 +550,9 @@ the aspect ratio:
 
 ## Appearance and mood
 
-**Style / theme** sets colours and look of the usage monitor; the sixteen themes:
+**Style / theme** sets colours and look of the usage monitor; the twenty themes:
 
-<img src="themes.png" width="100%" alt="The sixteen display themes with example data">
+<img src="themes.png" width="100%" alt="The twenty display themes with example data">
 
 The mood button opens the emoji picker with quick picks, search and all emoji; *None* leaves the slot empty.
 

@@ -43,7 +43,7 @@ server; a display only receives its image.
 - **Up to eight usage widgets.** Stack up to five usage bands and the weather/mood band in any order, spread evenly or aligned to the top. Each usage band holds one full-width source, two half-width sources or one compact row; the VibeTV M1 fits two full bands, one full and two compact ones or four compact ones.
 - **Display types.** Designs adapt to the display of each device: VibeTV M1 (240×240) by default, other common SPI panels from 128×160 to 320×240 per device.
 - **Weather and mood.** Show an emoji and weather icon/temperature; swap their slots, including the slot sizes. The update time and device IP stay with their band and cannot be hidden. The weather location is never drawn.
-- **Sixteen display themes.** Modern dark and light themes, classic green/amber terminals, classic Mac and classic Windows, Windows 11, macOS and a starship console. Previews and devices use the same server renderer.
+- **Twenty display themes.** Modern dark and light themes, classic green/amber terminals, classic Mac and classic Windows, Windows 11, macOS, a starship console, a handheld LCD, a blueprint, neon and a newspaper page. Previews and devices use the same server renderer.
 - **Photos and slideshows.** Instead of the status a display can show uploaded photos, one after the other, optionally only at certain times of day (e.g. at night). The server keeps only reduced copies and cuts them to each display.
 - **Encrypted account transfer.** Export data sources with their saved sign-ins and restore selected sources by adding them or replacing the current collection.
 - **Device management.** Pair using the IP and six-digit code on a trusted home network (HTTP pairing is unencrypted), inspect status and previews, rename, reorder by dragging, force a redraw, update, or remove a device.
@@ -110,7 +110,7 @@ The administration's light/dark appearance is independent of the display theme. 
 
 ## Display themes
 
-<p align="center"><img src="docs/manual/themes.png" width="820" alt="The sixteen display colour schemes with example data"></p>
+<p align="center"><img src="docs/manual/themes.png" width="820" alt="The twenty display colour schemes with example data"></p>
 
 The default layout remains available unchanged: two full-width usage bands followed by weather/mood, update time and IP. Half-width widgets and a different band order are optional. Current firmware supports moving the entire weather/mood band; the editor warns when older firmware needs it at the bottom.
 

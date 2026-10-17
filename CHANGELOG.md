@@ -19,7 +19,7 @@ the administration (over Wi-Fi where their firmware can, otherwise once over USB
 - **Photos and slideshows:** a design can show uploaded photos instead of the status, one after the other, optionally
   only at certain times of day. The server keeps reduced copies (600 × 600 at most) and cuts them to each display; a
   swipe shows the next photo.
-- **Three new themes:** Windows 11, macOS and a starship console. Narrow and rounded displays get their own layout
+- **Seven new themes:** Windows 11, macOS, a starship console, a handheld LCD, a blueprint, neon and a newspaper page. Narrow and rounded displays get their own layout
   (no clipped text, corners kept free).
 - **Administration:** previews in the case of each board, live updates after a swipe, the preview builds up like the
   display, the design editor saves every change right away, a link to each display's own page.

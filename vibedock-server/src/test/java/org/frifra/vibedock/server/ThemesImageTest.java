@@ -24,7 +24,8 @@ class ThemesImageTest {
             new Example(Scheme.PAPER,"☕","⛅","14°"),new Example(Scheme.SKY,"🐧","☁","6°"),new Example(Scheme.SAND,"🍀","🌥","19°"),
             new Example(Scheme.TERMINAL_GREEN,"👾","⛅","13°"),new Example(Scheme.TERMINAL_AMBER,"🍯","⛅","13°"),new Example(Scheme.CLASSIC_MAC,"🍎","☀","21°"),
             new Example(Scheme.CLASSIC_WINDOWS,"💾","⛅","16°"),new Example(Scheme.WINDOWS_11,"💻","⛅","15°"),new Example(Scheme.MACOS,"🍏","☀","22°"),
-            new Example(Scheme.STARSHIP,"🖖","🌥","12°"));
+            new Example(Scheme.STARSHIP,"🖖","🌥","12°"),new Example(Scheme.HANDHELD,"🍄","☀","20°"),new Example(Scheme.BLUEPRINT,"📐","⛅","14°"),
+            new Example(Scheme.NEON,"🌆","🌙","18°"),new Example(Scheme.NEWSPRINT,"📰","🌧","10°"));
 
     @Test void drawsEveryScheme() throws Exception {
         String emoji=System.getenv("VIBEDOCK_TWEMOJI");

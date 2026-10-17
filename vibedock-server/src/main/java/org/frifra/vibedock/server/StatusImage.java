@@ -77,8 +77,9 @@ public class StatusImage {
                 g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL,RenderingHints.VALUE_STROKE_PURE);
             }
             g.setColor(new Color(scheme.background));g.fillRect(0,0,w,h);
-            // Classic Mac and Windows: no anti-aliasing, crisp pixels like the originals.
-            boolean smooth=scheme.style!=Scheme.Style.MAC&&scheme.style!=Scheme.Style.WINDOWS;
+            backdrop(g,scheme);
+            // Classic Mac, Windows and the LCD: no anti-aliasing, crisp pixels like the originals.
+            boolean smooth=scheme.style!=Scheme.Style.MAC&&scheme.style!=Scheme.Style.WINDOWS&&scheme.style!=Scheme.Style.LCD;
             g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,smooth?RenderingHints.VALUE_TEXT_ANTIALIAS_ON:RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,smooth?RenderingHints.VALUE_ANTIALIAS_ON:RenderingHints.VALUE_ANTIALIAS_OFF);
             // Usage bands shrink in proportion (to their minimum, see Layout.fit) when they need more than the screen
@@ -142,6 +143,8 @@ public class StatusImage {
             default -> {
                 text(g,scheme,title,10,top,16,scheme.title,true);
                 if(status!=null)right(g,scheme,status,w-10,top,10,scheme.warning);
+                // Newsprint: a thin rule below the heading, like a column.
+                if(scheme.style==Scheme.Style.PRINT){g.setColor(new Color(scheme.text));g.fillRect(10,top+4,w-20,1);}
             }
         }
         // Window styles on narrow screens: the rows sit a little higher, so the last reset time stays clear of the frame.
@@ -218,6 +221,8 @@ public class StatusImage {
         byte[] pixels=new byte[scale==1?pw*ph*2:0];int offset=0;
         for(int y=0;y<ph;y++)for(int x=0;x<pw;x++){
             int rgb=image.getRGB(x,y);
+            // LCD: every colour (emoji, the IP corner) becomes one of the four shades.
+            if(scheme.style==Scheme.Style.LCD){rgb=lcdShade(rgb);image.setRGB(x,y,rgb);}
             // Terminal schemes: every other row darker, like the scan lines of an old monitor (rows of the display).
             if(scheme.style==Scheme.Style.TERMINAL&&(((int)(y/scale))&1)==1)rgb=(((rgb>>16&255)*7/10)<<16)|(((rgb>>8&255)*7/10)<<8)|((rgb&255)*7/10);
             // Scaled (web displays): full colour; devices: RGB565, and the PNG shows what they show.
@@ -228,6 +233,12 @@ public class StatusImage {
             image.setRGB(x,y,((r*255/31)<<16)|((green*255/63)<<8)|(b*255/31));
         }
         var bytes=new ByteArrayOutputStream();ImageIO.write(image,"png",bytes);return new Image(bytes.toByteArray(),pixels);
+    }
+    /** The LCD shade of a colour: its own when it is one, otherwise by brightness. */
+    static int lcdShade(int rgb){
+        rgb&=0xffffff;for(int shade:Scheme.LCD_SHADES)if(shade==rgb)return rgb;
+        int luma=(299*(rgb>>16&255)+587*(rgb>>8&255)+114*(rgb&255))/1000;
+        return Scheme.LCD_SHADES[luma<70?0:luma<130?1:luma<195?2:3];
     }
     private static BufferedImage resize(BufferedImage icon,int size){return resize(icon,size,size);}
     private static BufferedImage resize(BufferedImage icon,int width,int height){
@@ -266,7 +277,7 @@ public class StatusImage {
         if(scheme.style==Scheme.Style.TERMINAL){int n=(int)Math.round(5*left/100);text(g,scheme,"["+"#".repeat(n)+".".repeat(5-n)+"]",x-2,y,9,scheme.text,false);}
         else if(scheme.style==Scheme.Style.WINDOWS){bevel(g,x,y-7,width,9,false);g.setColor(new Color(0x000080));for(int b=0;b<(int)Math.round((width-6)/7*left/100);b++)g.fillRect(x+3+b*7,y-5,5,4);}
         else if(scheme.style==Scheme.Style.MAC){g.setColor(Color.BLACK);g.drawRect(x,y-6,width,6);if(fill>0)g.fillRect(x+1,y-5,Math.min(width-2,fill),5);}
-        else{g.setColor(new Color(scheme.track));g.fillRoundRect(x,y-6,width,6,6,6);if(fill>0){g.setColor(new Color(barColor(left)));g.fillRoundRect(x,y-6,Math.max(6,fill),6,6,6);}}
+        else bar(g,scheme,x,y-6,width,6,left);
         right(g,scheme,String.format(Locale.ROOT,"%.0f%%",left),right,y,9,scheme.text);
         return true;
     }
@@ -331,14 +342,72 @@ public class StatusImage {
             } else right(g,scheme,"--",right,y,12,scheme.muted);
             return;
         }
-        g.setColor(new Color(scheme.track));g.fillRoundRect(x,top,width,height,height,height);
         if(q!=null){
             double left=Math.max(0,Math.min(100,100-q.usedPercent()));
-            int fill=(int)Math.round(width*left/100);
-            if(fill>0){g.setColor(new Color(barColor(left)));g.fillRoundRect(x,top,Math.max(fill,height),height,height,height);}
+            bar(g,scheme,x,top,width,height,left);
             right(g,scheme,String.format(Locale.ROOT,"%.0f %%",left),right,y,12,scheme.text);
             text(g,scheme,reset(q),x,y+13,10,scheme.muted,false);
-        } else right(g,scheme,"--",right,y,12,scheme.muted);
+        } else{bar(g,scheme,x,top,width,height,-1);right(g,scheme,"--",right,y,12,scheme.muted);}
+    }
+    /**
+     * A quota bar of the modern styles with the remaining share left (0–100; below 0: no reading, the track only):
+     * rounded in the colour scale, as blocks on the LCD, hatched on the blueprint, glowing for neon, black with a small
+     * coloured dot in the newspaper.
+     */
+    private void bar(Graphics2D g,Scheme scheme,int x,int top,int width,int height,double left){
+        int fill=left<0?0:(int)Math.round(width*left/100);
+        switch(scheme.style){
+            case LCD -> {
+                g.setColor(new Color(scheme.muted));g.drawRect(x,top,width-1,height-1);
+                int step=height>6?6:4,blocks=left<0?0:(int)Math.round((width-3)/step*left/100);
+                g.setColor(new Color(scheme.text));
+                for(int b=0;b<blocks;b++)g.fillRect(x+2+b*step,top+2,step-2,height-4);
+            }
+            case BLUEPRINT -> {
+                g.setColor(new Color(scheme.text));g.drawRect(x,top,width-1,height-1);
+                if(fill>2){
+                    var hatch=(Graphics2D)g.create();
+                    try{
+                        hatch.clipRect(x+1,top+1,fill-2,height-2);hatch.setColor(new Color(scheme.title));
+                        for(int d=-height;d<fill;d+=4)hatch.drawLine(x+d,top+height,x+d+height,top);
+                    }finally{hatch.dispose();}
+                    g.drawLine(x+fill-1,top,x+fill-1,top+height-1);
+                }
+            }
+            case PRINT -> {
+                g.setColor(new Color(scheme.track));g.fillRect(x,top+height/4,width,Math.max(2,height/2));
+                if(fill>0){
+                    g.setColor(new Color(scheme.text));g.fillRect(x,top+height/4,fill,Math.max(2,height/2));
+                    g.setColor(new Color(barColor(left)));g.fillOval(x+fill-height/2,top,height,height);
+                }
+            }
+            default -> {
+                g.setColor(new Color(scheme.track));g.fillRoundRect(x,top,width,height,height,height);
+                if(fill>0){
+                    int colour=barColor(left),bar=Math.max(fill,height);
+                    if(scheme.style==Scheme.Style.NEON){
+                        // A soft glow around the bar in its own colour.
+                        for(int r=3;r>=1;r--){g.setColor(new Color(colour>>16&255,colour>>8&255,colour&255,28+12*(3-r)));g.fillRoundRect(x-r,top-r,bar+2*r,height+2*r,height+2*r,height+2*r);}
+                    }
+                    g.setColor(new Color(colour));g.fillRoundRect(x,top,bar,height,height,height);
+                }
+            }
+        }
+    }
+    /** What some styles draw behind everything: the blueprint's grid, the neon horizon. */
+    private void backdrop(Graphics2D g,Scheme scheme){
+        if(scheme.style==Scheme.Style.BLUEPRINT){
+            for(int i=0;i*12<Math.max(w,h);i++){
+                g.setColor(new Color(i%4==0?0x3a6cab:0x285a98));
+                g.drawLine(i*12,0,i*12,h);g.drawLine(0,i*12,w,i*12);
+            }
+        }else if(scheme.style==Scheme.Style.NEON){
+            // A grid running to the horizon in the lower part, faint so that it stays behind the text.
+            int horizon=h*7/10,cx=w/2;var line=new Color(0xff,0x4f,0xd8,40);g.setColor(line);
+            for(int i=1,y=horizon;y<h;i++,y=horizon+i*i*2)g.drawLine(0,y,w,y);
+            for(int i=-8;i<=8;i++)g.drawLine(cx,horizon,cx+i*w/4,h);
+            g.setColor(new Color(0x26,0xf0,0xff,60));g.drawLine(0,horizon,w,horizon);
+        }
     }
     }
     /** The text, shortened with an ellipsis to fit the width at this size; null when not even the ellipsis fits. */
@@ -459,18 +528,24 @@ public class StatusImage {
     /** Text outside the windows: on the Windows desktop white, otherwise the scheme's text colours. */
     private static int desktopText(Scheme scheme){return scheme.style==Scheme.Style.WINDOWS||wallpapered(scheme)?0xffffff:scheme.text;}
     private static int desktopMuted(Scheme scheme){return scheme.style==Scheme.Style.WINDOWS?0xd8f0f0:wallpapered(scheme)?0xe2e6f0:scheme.muted;}
-    /** Icons in the look of the scheme: tinted phosphor for terminals, 1-bit ordered dithering for the Mac. */
+    /**
+     * Icons in the look of the scheme: tinted phosphor for terminals, white lines for the blueprint, grey for the
+     * newspaper, 1-bit ordered dithering for the Mac (the LCD reduces the whole image to its shades, see encode).
+     */
     static BufferedImage styled(BufferedImage icon,Scheme scheme){
-        if(icon==null||(scheme.style!=Scheme.Style.TERMINAL&&scheme.style!=Scheme.Style.MAC))return icon;
+        var s=scheme.style;
+        if(icon==null||(s!=Scheme.Style.TERMINAL&&s!=Scheme.Style.MAC&&s!=Scheme.Style.BLUEPRINT&&s!=Scheme.Style.PRINT))return icon;
         int[] bayer={0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5};
         var out=new BufferedImage(icon.getWidth(),icon.getHeight(),BufferedImage.TYPE_INT_ARGB);
         for(int y=0;y<icon.getHeight();y++)for(int x=0;x<icon.getWidth();x++){
             int argb=icon.getRGB(x,y),alpha=argb>>>24;
             if(alpha<96)continue;
             int luma=(299*(argb>>16&255)+587*(argb>>8&255)+114*(argb&255))/1000;
-            if(scheme.style==Scheme.Style.TERMINAL){
-                int level=Math.max(70,luma),c=scheme.text;
+            if(s==Scheme.Style.TERMINAL||s==Scheme.Style.BLUEPRINT){
+                int level=Math.max(s==Scheme.Style.BLUEPRINT?150:70,luma),c=scheme.text;
                 out.setRGB(x,y,0xff000000|((c>>16&255)*level/255)<<16|((c>>8&255)*level/255)<<8|(c&255)*level/255);
+            }else if(s==Scheme.Style.PRINT){
+                int level=Math.min(210,luma);out.setRGB(x,y,(alpha<<24)|level<<16|level<<8|level);
             }else{
                 boolean dark=luma*16/256<=bayer[(y&3)*4+(x&3)];
                 out.setRGB(x,y,dark?0xff000000:0xffffffff);
