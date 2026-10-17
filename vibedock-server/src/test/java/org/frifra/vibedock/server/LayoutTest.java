@@ -31,7 +31,9 @@ class LayoutTest {
     }
     @Test void defaultIsPixelIdenticalToTheFrozenRendererInEveryTheme() throws Exception {
         var before=new LegacyStatusImage("Europe/Berlin");var after=new StatusImage("Europe/Berlin");
+        // The frozen renderer knows the schemes up to Classic Windows; the later ones have no earlier image.
         for(var scheme:Scheme.values())for(int variant=0;variant<3;variant++)for(boolean weather:List.of(false,true)){
+            if(scheme.ordinal()>Scheme.CLASSIC_WINDOWS.ordinal())continue;
             var oldLook=new LegacyStatusImage.Look(icon(44),scheme,weather?icon(24):null,weather?"13°":null);
             var look=new StatusImage.Look(icon(44),scheme,weather?icon(24):null,weather?"13°":null,Layout.DEFAULT);
             var expected=before.render(snapshot(variant),"192.168.1.50",oldLook);var actual=after.render(snapshot(variant),"192.168.1.50",look);
@@ -69,8 +71,8 @@ class LayoutTest {
         for(var scheme:Scheme.values())for(int variant=0;variant<3;variant++){
             var original=renderer.render(snapshot(variant),"192.168.1.50",new StatusImage.Look(icon(44),scheme,icon(24),"13°")).rgb565();
             var actual=renderer.render(snapshot(variant),"192.168.1.50",new StatusImage.Look(icon(44),scheme,icon(24),"13°",moved)).rgb565();
-            // Windows of the band at the screen edge get a margin below, so with Mac and Windows only the upper band is identical.
-            int rows=scheme.style==Scheme.Style.MAC||scheme.style==Scheme.Style.WINDOWS?92:184;
+            // Windows and console bars of the band at the screen edge get a margin below: there only the upper band is identical.
+            int rows=scheme.windowed()||scheme.style==Scheme.Style.CONSOLE?92:184;
             assertArrayEquals(Arrays.copyOfRange(original,0,rows*480),Arrays.copyOfRange(actual,56*480,(56+rows)*480),scheme+" usage bands, variant "+variant);
             // From row 2: the shadow of a classic Mac window above reaches two rows into the weather band.
             assertArrayEquals(Arrays.copyOfRange(original,186*480,240*480),Arrays.copyOfRange(actual,2*480,56*480),scheme+" weather band, variant "+variant);

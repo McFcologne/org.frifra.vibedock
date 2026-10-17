@@ -18,13 +18,20 @@ public enum Scheme {
     TERMINAL_GREEN("Classic green",0x040b05,0x6fdc8c,0x4fd873,0x2a8344,0x0d2a14,0xb5e8a0,Style.TERMINAL),
     TERMINAL_AMBER("Classic amber",0x0d0800,0xffc23d,0xffb000,0x9a6a00,0x2e1f00,0xffd98a,Style.TERMINAL),
     CLASSIC_MAC("Classic Mac",0xffffff,0x000000,0x000000,0x000000,0xffffff,0x000000,Style.MAC),
-    CLASSIC_WINDOWS("Classic Windows",0x008080,0xffffff,0x000000,0x404040,0xc0c0c0,0xffffff,Style.WINDOWS);
+    CLASSIC_WINDOWS("Classic Windows",0x008080,0xffffff,0x000000,0x404040,0xc0c0c0,0xffffff,Style.WINDOWS),
+    WINDOWS_11("Windows 11",0x1f5fbf,0x1a1a1a,0x1a1a1a,0x5f5f5f,0xd4d4d4,0xc42b1c,Style.FLUENT),
+    MACOS("macOS",0x4a3a7a,0x262626,0x262626,0x6e6e6e,0xd2d2d2,0xd9480f,Style.MACOS),
+    STARSHIP("Starship console",0x000000,0xff9c00,0xffcc99,0xcc99cc,0x2e2e3e,0xff5c5c,Style.CONSOLE);
 
     /**
      * MODERN: rounded colour bars; TERMINAL: monospaced phosphor text with ASCII bars and scan lines; MAC: 1-bit
-     * windows; WINDOWS: grey bevelled windows with a navy title bar on a teal desktop.
+     * windows; WINDOWS: grey bevelled windows with a navy title bar on a teal desktop; FLUENT: light rounded windows
+     * with caption buttons on a blue wallpaper (Windows 11); MACOS: rounded windows with the three window buttons on a
+     * dusk wallpaper; CONSOLE: a starship console of coloured bars and rounded elbows on black.
      */
-    enum Style { MODERN, TERMINAL, MAC, WINDOWS }
+    enum Style { MODERN, TERMINAL, MAC, WINDOWS, FLUENT, MACOS, CONSOLE }
+    /** Styles that draw a window per provider. */
+    boolean windowed(){return style==Style.MAC||style==Style.WINDOWS||style==Style.FLUENT||style==Style.MACOS;}
     public final String label;
     final int background,title,text,muted,track,warning;
     final Style style;
@@ -38,6 +45,8 @@ public enum Scheme {
     /** Light schemes get dark footer text on the device. */
     boolean light(){int r=background>>16&255,g=background>>8&255,b=background&255;return (299*r+587*g+114*b)/1000>140;}
     @JsonValue public String id(){return name().toLowerCase(Locale.ROOT);}
+    /** The scheme {@code step} places further in this list, wrapping around: touch displays swipe through them. */
+    public Scheme shifted(int step){var all=values();return all[Math.floorMod(ordinal()+step,all.length)];}
     static boolean known(String id){
         for(var s:values())if(s.id().equals(id))return true;
         return false;

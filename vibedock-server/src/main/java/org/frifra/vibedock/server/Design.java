@@ -16,4 +16,5 @@ public record Design(Scheme scheme,String mood,WeatherService.Place weather,Layo
         layout=layout==null?Layout.DEFAULT:layout;
     }
     public Design(Scheme scheme,String mood,WeatherService.Place weather){this(scheme,mood,weather,Layout.DEFAULT);}
+    public Design withScheme(Scheme other){return new Design(other,mood,weather,layout);}
 }
