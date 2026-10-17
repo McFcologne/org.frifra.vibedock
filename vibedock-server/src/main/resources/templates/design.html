@@ -27,7 +27,20 @@
 </div>
 <div class="design-side">
 <aside class="card design-preview"><h3 class="section-label"><svg th:replace="~{fragments :: icon('monitor')}"></svg>Preview</h3><figure class="screen"><div class="device"><div class="device-front"><div class="device-glass"><img id="design-preview-image" width="240" height="240" src="/admin/preview.png" alt="Design preview rendered by the device image renderer"></div></div></div><figcaption id="design-preview-caption">Same renderer and image format as your device.</figcaption></figure><p id="preview-status" class="meta" role="status" aria-live="polite"></p></aside>
-<fieldset id="design-style-controls" disabled><section class="card"><h3 class="section-label"><svg th:replace="~{fragments :: icon('palette')}"></svg>Appearance</h3><label for="design-scheme">Style / theme</label><select id="design-scheme"></select></section></fieldset>
+<fieldset id="design-style-controls" disabled><section class="card"><h3 class="section-label"><svg th:replace="~{fragments :: icon('palette')}"></svg>Appearance</h3><label for="design-scheme">Style / theme</label><select id="design-scheme"></select></section>
+<section class="card design-photos"><label for="design-show">Show</label><select id="design-show"><option value="status">Status</option><option value="photos">Photos</option></select>
+<div id="design-photo-settings" hidden>
+  <p class="meta">Choose the photos in their order; a swipe on a touch display shows the next one.</p>
+  <div class="photo-grid" id="design-photos" role="group" aria-label="Photos"></div>
+  <label class="button secondary photo-add">Add photos<input type="file" id="design-photo-upload" accept="image/jpeg,image/png,image/gif,image/bmp" multiple></label>
+  <p class="meta" id="design-photo-state" role="status" aria-live="polite">Kept reduced to 600 × 600 at most, the originals are not stored.</p>
+  <label for="design-photo-seconds">Each photo</label><select id="design-photo-seconds"><option value="10">10 seconds</option><option value="30">30 seconds</option>
+    <option value="60">1 minute</option><option value="300">5 minutes</option><option value="900">15 minutes</option><option value="3600">1 hour</option></select>
+  <label class="check"><input type="checkbox" id="design-photo-shuffle"> Shuffle</label>
+  <label for="design-photo-when">When</label><select id="design-photo-when"><option value="always">Always</option><option value="time">Only at certain times</option></select>
+  <div class="photo-times" id="design-photo-times" hidden><input type="time" id="design-photo-from" aria-label="From"> to <input type="time" id="design-photo-to" aria-label="To">
+    <small>The status at other times; times of the server.</small></div>
+</div></section></fieldset>
 </div>
 </div>
 </form>

@@ -47,9 +47,9 @@ class DesignController {
             @RequestParam(defaultValue="default") String target,@RequestBody DesignService.Input input) throws IOException {
         boolean defaults=target.equals("default");var previous=defaults?registry.defaultDesign():registry.designFor(target);
         var design=input.inherit()?registry.defaultDesign():designs.resolve(input,previous);
-        if(defaults)return designs.render(design,"Preview").png();
+        if(defaults)return designs.render(design,"Preview",DisplayType.M1,target).png();
         var device=registry.get(target);var display=input.display()!=null?DisplayType.of(input.display()):device.display();
         String footer=device.web()!=null?WebDisplayController.footer(info):device.ip();
-        return designs.render(DesignService.forDevice(design,device.serverFooter()),footer,display).png();
+        return designs.render(DesignService.forDevice(design,device.serverFooter()),footer,display,target).png();
     }
 }

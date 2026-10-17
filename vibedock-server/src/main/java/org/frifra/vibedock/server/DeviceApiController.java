@@ -51,16 +51,18 @@ class DeviceApiController {
         // when it followed the default until now.
         String gesture=request.getHeader("X-VibeDock-Gesture");
         int step="scheme-next".equals(gesture)?1:"scheme-previous".equals(gesture)?-1:0;
+        // In a running slideshow a swipe shows the next or previous photo instead.
+        if(step!=0&&designs.skip(registry.designFor(identifier),identifier,step)){log.info("Device {} skipped to another photo by touch",identifier);step=0;}
         if(step!=0){
             var current=registry.designFor(identifier);var scheme=current.scheme().shifted(step);
             try{registry.setDesign(identifier,current.withScheme(scheme));log.info("Device {} switched to the scheme {} by touch",identifier,scheme.id());events.devicesChanged();}
             catch(IOException e){log.warn("Could not store the scheme of {}: {}",identifier,e.toString());}
         }
         var display=registry.displayType(identifier);
-        byte[] pixels=designs.render(DesignService.forDevice(registry.designFor(identifier),serverFooter),peer,display).rgb565();
+        byte[] pixels=designs.render(DesignService.forDevice(registry.designFor(identifier),serverFooter),peer,display,identifier).rgb565();
         String tag="\""+HexFormat.of().formatHex(Arrays.copyOf(sha256(pixels),12))+"\"";
         var headers=new HttpHeaders();headers.setETag(tag);headers.set("X-VibeDock-Image-Format",display.imageFormat());
-        headers.set("X-VibeDock-Poll-Seconds",String.valueOf(registry.pollSeconds()));
+        headers.set("X-VibeDock-Poll-Seconds",String.valueOf(designs.pollSeconds(registry.designFor(identifier),registry.pollSeconds())));
         // Mounted upside down: the device turns its panel by 180 degrees (also its own screens and the swipes).
         if(registry.get(identifier).board().flippable())headers.set("X-VibeDock-Orientation",registry.flipped(identifier)?"flipped":"upright");
         // A requested update over Wi-Fi: the device fetches /firmware after this pull and installs it if signed.

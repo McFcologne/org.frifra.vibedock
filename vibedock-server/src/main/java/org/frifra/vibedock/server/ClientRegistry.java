@@ -147,7 +147,7 @@ public class ClientRegistry {
     private static Design renamed(Design design,Map<String,String> renamed){
         var bands=design.layout().bands().stream().map(b->b instanceof Layout.Usage u
                 ?(Layout.Band)new Layout.Usage(u.sources().stream().map(s->renamed.getOrDefault(s,s)).toList()):b).toList();
-        return new Design(design.scheme(),design.mood(),design.weather(),new Layout(bands));
+        return design.withLayout(new Layout(bands));
     }
 
     // ---- clients ----

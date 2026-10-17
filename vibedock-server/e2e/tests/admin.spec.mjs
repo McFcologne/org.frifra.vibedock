@@ -91,6 +91,23 @@ test('support file is created with a key shown once and opens again with it',asy
   await expect(contents).toContainText('Displays (2)');await expect(contents).toContainText('Shelf');
 });
 
+test('a device shows uploaded photos, saved right away with the time of day',async ({page,app}) => {
+  await editor(page,app);
+  await page.locator('#design-target').selectOption('vibedock-e2e-shelf');
+  await page.locator('#design-override').check();
+  await page.locator('#design-show').selectOption('photos');
+  await expect(page.locator('#design-photos')).toContainText('No photos yet');
+  await page.locator('#design-photo-upload').setInputFiles({name:'red.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAACgAAAAeCAIAAADRv8uKAAAAK0lEQVR4nO3NMQ0AAAgDsMmZfxXIQgYcTfo3056IWCwWi8VisVgsFov/xguJMCDM2TzTeAAAAABJRU5ErkJggg==','base64')});
+  await expect(page.locator('#design-photo-state')).toContainText('1 of 1 photos added');
+  await expect(page.locator('.photo-tile.selected')).toHaveCount(1);
+  await page.locator('#design-photo-when').selectOption('time');
+  await expect(page.locator('#design-photo-from')).toHaveValue('22:00');
+  await expect(page.locator('#design-message')).toContainText('Device design saved');
+  await page.reload();await expect(page.locator('#design-scheme')).toBeEnabled();
+  await expect(page.locator('#design-show')).toHaveValue('photos');await expect(page.locator('#design-photo-when')).toHaveValue('time');
+  await expect(page.locator('.photo-tile.selected .photo-order')).toHaveText('1');
+});
+
 test('footer links to the generated license page and uses the packaged version',async ({page}) => {
   const footer=page.getByRole('contentinfo');await expect(footer).toContainText('VibeDock');await expect(footer).not.toContainText('development');
   await expect(footer.getByRole('link',{name:'README',exact:true})).toHaveAttribute('href',/github\.com\/McFcologne\/org\.frifra\.vibedock#readme/);

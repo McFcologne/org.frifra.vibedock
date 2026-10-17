@@ -26,7 +26,7 @@ class WebDisplayController {
     @GetMapping(value="/web/{secret}/image.png",produces="image/png") ResponseEntity<byte[]> image(@PathVariable String secret,HttpServletRequest request) throws IOException {
         var view=registry.webBySecret(secret).orElseThrow(WebDisplayController::notFound);
         registry.pulled(view.identifier(),request.getRemoteAddr(),true,null);
-        byte[] png=designs.render(view.design(),footer(info),view.display()).png();
+        byte[] png=designs.render(view.design(),footer(info),view.display(),view.identifier()).png();
         return ResponseEntity.ok().contentType(MediaType.IMAGE_PNG).cacheControl(CacheControl.noStore()).body(png);
     }
     /** What a web display shows where devices show their IP. */

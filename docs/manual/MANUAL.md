@@ -499,8 +499,25 @@ data source that is paused or unavailable is shown as such on the display.
 
 <img src="images/31-display-device.png" width="100%" alt="Design of a device">
 
-With **Custom design** a display gets its own complete design; turn it off and save to follow the default again.
-Here the display *Home office* shows one full band and two compact rows in the *Classic Mac* theme.
+With **Custom design** a display gets its own complete design; turn it off to follow the default again (every
+change is saved right away). Here the display *Home office* shows one full band and two compact rows in the
+*Classic Mac* theme.
+
+## Photos and slideshows
+
+Below *Appearance*, **Show → Photos** makes the display show photos instead of the status:
+
+- **Add photos** uploads JPEG, PNG, GIF or BMP files (not HEIC). The server keeps only a copy reduced to 600 × 600
+  pixels at most, turned upright like the photo app shows it; the original is not stored. All designs share these
+  photos; **✕** and **Delete** on a photo removes it from every design.
+- Click the photos to show, in the order clicked (the number on each); click again to leave one out.
+- **Each photo** sets how long one stays (10 seconds to an hour), **Shuffle** a new order every round. Displays with
+  the same slideshow change together; the display pulls once per photo then.
+- **When → Only at certain times** shows the photos only in that time of day (e.g. 22:00 to 07:00) and the status
+  at other times; the times are those of the server (Docker: `TZ`).
+- On a touch display a swipe left or right shows the next or previous photo.
+
+The server cuts every photo to the display's shape from its middle, so a portrait photo fills a narrow display.
 
 ## Display types and hidden bands
 

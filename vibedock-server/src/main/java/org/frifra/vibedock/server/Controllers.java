@@ -33,6 +33,7 @@ class Controllers {
         this.store=store; this.usage=usage; this.devices=devices;this.clients=clients;this.addresses=addresses;
         this.storage=storage;this.firmware=firmware;this.info=info;this.admin=admin;this.dataDir=dataDir;this.logDir=logDir;
     }
+    @org.springframework.beans.factory.annotation.Autowired private DesignService designs;
     @org.springframework.beans.factory.annotation.Value("${vibedock.admin-auth:password}") private String auth;
     /** Without sign-in (ADMIN_AUTH=none) the login page, e.g. a bookmark or after "Sign out", leads to the administration. */
     @GetMapping("/login") String login() { return "none".equals(auth) ? "redirect:/admin" : "login"; }
@@ -89,6 +90,10 @@ class Controllers {
     private static String left(ProviderClient.Window w){return String.format(Locale.ROOT,"%.0f %%",Math.max(0,Math.min(100,100-w.usedPercent())));}
     @GetMapping("/admin/devices") String devices(Model model,HttpServletRequest request) {
         model.addAttribute("clients",clients.views());
+        // The preview's link changes with the design and with the photo a slideshow shows now, so the card follows it.
+        var previews=new java.util.HashMap<String,String>();
+        for(var c:clients.views())previews.put(c.identifier(),c.design().hashCode()+designs.currentPhoto(c.design(),c.identifier()).map(p->"-"+p).orElse(""));
+        model.addAttribute("previewVersions",previews);
         var versions=firmware.versions();  // per board: an uploaded build has its own version
         model.addAttribute("firmwareVersions",versions);model.addAttribute("boards",Board.INVENTORY);
         model.addAttribute("updatable",clients.views().stream().filter(c->c.ota()&&!c.updating()&&versions.containsKey(c.board().id())

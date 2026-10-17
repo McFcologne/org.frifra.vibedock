@@ -9,10 +9,52 @@ import java.util.Objects;
 class DesignService {
     /** An unsaved design from the editor; mood "" or "-" is none, an empty weather location turns weather off. */
     /** display: the device's display type id (editor of a device), null keeps the current one. */
-    record Input(String mood,String scheme,String weatherLocation,Layout layout,boolean inherit,String display) {}
+    record Input(String mood,String scheme,String weatherLocation,Layout layout,boolean inherit,String display,Design.Photos photos) {
+        Input(String mood,String scheme,String weatherLocation,Layout layout,boolean inherit,String display){this(mood,scheme,weatherLocation,layout,inherit,display,null);}
+    }
     private final UsageService usage;private final StatusImage renderer;private final Twemoji twemoji;private final WeatherService weather;
-    DesignService(UsageService usage,StatusImage renderer,Twemoji twemoji,WeatherService weather){
-        this.usage=usage;this.renderer=renderer;this.twemoji=twemoji;this.weather=weather;
+    private final PhotoLibrary photos;private final java.time.Clock clock;
+    /** Swipes in a slideshow: photos skipped per display, in memory only. */
+    private final java.util.Map<String,Integer> skipped=new java.util.concurrent.ConcurrentHashMap<>();
+    DesignService(UsageService usage,StatusImage renderer,Twemoji twemoji,WeatherService weather,PhotoLibrary photos,java.time.Clock clock){
+        this.usage=usage;this.renderer=renderer;this.twemoji=twemoji;this.weather=weather;this.photos=photos;this.clock=clock;
+    }
+    /**
+     * What a display shows now: the current photo of its slideshow while that is active, otherwise the status.
+     * display: the key of the display (its identifier) for its swipes.
+     */
+    StatusImage.Image render(Design design,String ip,DisplayType type,String display) throws IOException {
+        var photo=currentPhoto(design,display);
+        if(photo.isPresent()){var image=photos.render(photo.get(),type);if(image.isPresent())return image.get();}
+        return render(design,ip,type);
+    }
+    /** The photos of the design's slideshow that still exist, if it is active now. */
+    java.util.List<String> activePhotos(Design design){
+        var p=design.photos();
+        if(p==null||!p.active(java.time.LocalTime.now(clock)))return java.util.List.of();
+        return p.images().stream().filter(photos::exists).toList();
+    }
+    /**
+     * The photo shown now: every photo for its seconds, counted from the clock so that all displays with the same
+     * slideshow change together; swipes move a display on. Shuffled: a new order per round, the same for all.
+     */
+    java.util.Optional<String> currentPhoto(Design design,String display){
+        var images=activePhotos(design);if(images.isEmpty())return java.util.Optional.empty();
+        long step=clock.instant().getEpochSecond()/design.photos().seconds()+skipped.getOrDefault(display==null?"":display,0);
+        int n=images.size();
+        if(!design.photos().shuffle())return java.util.Optional.of(images.get((int)Math.floorMod(step,n)));
+        var order=new java.util.ArrayList<>(images);
+        java.util.Collections.shuffle(order,new java.util.Random(images.hashCode()*31L+Math.floorDiv(step,n)));
+        return java.util.Optional.of(order.get((int)Math.floorMod(step,n)));
+    }
+    /** A swipe in a running slideshow: the next (1) or previous (-1) photo; false when no slideshow runs. */
+    boolean skip(Design design,String display,int step){
+        if(activePhotos(design).isEmpty()||display==null)return false;
+        skipped.merge(display,step,Integer::sum);return true;
+    }
+    /** The poll interval while a slideshow runs: one pull per photo, but not slower than the server's interval. */
+    int pollSeconds(Design design,int server){
+        return activePhotos(design).isEmpty()?server:Math.min(server,Math.max(ClientRegistry.MIN_POLL,design.photos().seconds()));
     }
     /** The device image for a design with the current usage data; weather appears once a reading is cached. */
     StatusImage.Image render(Design design,String ip) throws IOException {return render(design,ip,DisplayType.M1);}
@@ -30,7 +72,7 @@ class DesignService {
      */
     static Design forDevice(Design design,boolean serverFooter){
         if(serverFooter||design.layout().contextAtBottom())return design;
-        return new Design(design.scheme(),design.mood(),design.weather(),design.layout().withContextAtBottom());
+        return design.withLayout(design.layout().withContextAtBottom());
     }
     /** Validates an editor input; an unchanged weather location reuses the resolved place instead of geocoding again. */
     Design resolve(Input input,Design previous){
@@ -40,6 +82,8 @@ class DesignService {
         if(!Objects.equals(input.mood(),previous.mood()))twemoji.validate(input.mood());
         String place=input.weatherLocation().strip();
         var resolved=previous.weather()!=null&&place.equals(previous.weather().name())?previous.weather():weather.locate(place);
-        return new Design(Scheme.parse(input.scheme()),input.mood(),resolved,input.layout());
+        var selected=input.photos();
+        if(selected!=null&&selected.images().stream().anyMatch(id->!photos.exists(id)))throw new IllegalArgumentException("A chosen photo was removed; choose again");
+        return new Design(Scheme.parse(input.scheme()),input.mood(),resolved,input.layout(),selected);
     }
 }

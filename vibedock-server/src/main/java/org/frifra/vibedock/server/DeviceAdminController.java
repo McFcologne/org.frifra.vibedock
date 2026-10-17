@@ -210,13 +210,13 @@ class DeviceAdminController {
     @GetMapping(value="/admin/clients/{identifier}/preview.png",produces="image/png") @ResponseBody org.springframework.http.ResponseEntity<byte[]> preview(@PathVariable String identifier) throws IOException {
         var client=registry.get(identifier);
         String footer=client.web()!=null?WebDisplayController.footer(info):client.ip();
-        byte[] png=designs.render(DesignService.forDevice(client.design(),client.serverFooter()),footer,client.display()).png();
+        byte[] png=designs.render(DesignService.forDevice(client.design(),client.serverFooter()),footer,client.display(),identifier).png();
         return org.springframework.http.ResponseEntity.ok().contentType(org.springframework.http.MediaType.IMAGE_PNG)
                 .cacheControl(org.springframework.http.CacheControl.maxAge(java.time.Duration.ofSeconds(10)).cachePrivate().staleWhileRevalidate(java.time.Duration.ofMinutes(5)))
                 .body(png);
     }
     /** The default design as a device would show it; the IP is a placeholder. */
     @GetMapping(value="/admin/preview.png",produces="image/png") @ResponseBody byte[] statusPreview() throws IOException {
-        return designs.render(registry.defaultDesign(),"Preview").png();
+        return designs.render(registry.defaultDesign(),"Preview",DisplayType.M1,"default").png();
     }
 }

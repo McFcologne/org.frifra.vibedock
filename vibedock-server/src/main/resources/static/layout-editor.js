@@ -17,7 +17,9 @@
   const title = id => (catalog.providers.find(p => p.id === id) || {label: id}).label;
   const sourceIds = () => catalog.providers.map(p => p.id);
   const inputFor = design => ({mood: design.mood || '', scheme: design.scheme,
-    weatherLocation: design.weather ? design.weather.name : '', layout: copy(design.layout), inherit: false});
+    weatherLocation: design.weather ? design.weather.name : '', layout: copy(design.layout), inherit: false,
+    photos: design.photos ? copy(design.photos) : null});
+  let library = [];  // the photo library (/admin/photos), oldest first
   const error = message => { $('#design-error').textContent = message; $('#design-error').hidden = !message; };
   function controls() {
     $('#design-controls').disabled = inherit || !catalog;
@@ -216,8 +218,77 @@
     $('#layout-emoji').value = draft.mood || '-';
     const emojiButton = root.querySelector('[data-emoji-open]'); emojiButton.dataset.file = '';
     emojiButton.dispatchEvent(new Event('vibedock-emoji-render'));
-    renderBands(); displayNote(); controls();
+    renderPhotos(); renderBands(); displayNote(); controls();
   }
+  // ---- photos: the box below Appearance ----
+  const photoDefaults = () => ({images: [], seconds: 30, shuffle: false, from: null, to: null});
+  let lastPhotos = photoDefaults();  // kept while Status is chosen, back with Photos
+  let armed = null;  // a photo whose delete button was pressed once
+  function renderPhotos() {
+    const p = draft.photos, on = !!p;
+    $('#design-show').value = on ? 'photos' : 'status'; $('#design-photo-settings').hidden = !on;
+    if (!on) return;
+    $('#design-photo-seconds').value = String(p.seconds); $('#design-photo-shuffle').checked = p.shuffle;
+    const timed = !!p.from; $('#design-photo-when').value = timed ? 'time' : 'always'; $('#design-photo-times').hidden = !timed;
+    if (timed) { $('#design-photo-from').value = p.from; $('#design-photo-to').value = p.to; }
+    const grid = $('#design-photos'); grid.replaceChildren();
+    if (!library.length) grid.append(element('p', 'meta', 'No photos yet: add some.'));
+    for (const photo of library) {
+      const at = p.images.indexOf(photo.id), tile = element('div', 'photo-tile' + (at >= 0 ? ' selected' : ''));
+      const pick = element('button'); pick.type = 'button'; pick.className = 'photo-pick'; pick.setAttribute('aria-pressed', String(at >= 0));
+      pick.setAttribute('aria-label', at >= 0 ? 'Photo ' + (at + 1) + ', click to leave it out' : 'Photo, click to show it');
+      const image = element('img'); image.src = '/admin/photos/' + photo.id + '.jpg'; image.alt = ''; image.loading = 'lazy'; pick.append(image);
+      if (at >= 0) pick.append(element('span', 'photo-order', String(at + 1)));
+      pick.addEventListener('click', () => {
+        if (inherit) return;
+        const i = draft.photos.images.indexOf(photo.id);
+        if (i >= 0) draft.photos.images.splice(i, 1); else draft.photos.images.push(photo.id);
+        renderPhotos(); changed();
+      });
+      const remove = element('button', 'photo-delete' + (armed === photo.id ? ' armed' : ''), armed === photo.id ? 'Delete' : '✕'); remove.type = 'button';
+      remove.title = 'Delete the photo from the library (all designs)'; remove.setAttribute('aria-label', 'Delete photo');
+      remove.addEventListener('click', async () => {
+        if (armed !== photo.id) { armed = photo.id; renderPhotos(); setTimeout(() => { if (armed === photo.id) { armed = null; renderPhotos(); } }, 3000); return; }
+        armed = null;
+        try { await post('/admin/photos/' + photo.id + '/delete', {}); } catch (failure) { error(failure.message); return; }
+        library = library.filter(x => x.id !== photo.id);
+        const i = draft.photos.images.indexOf(photo.id); if (i >= 0) { draft.photos.images.splice(i, 1); changed(); }
+        renderPhotos();
+      });
+      tile.append(pick, remove); grid.append(tile);
+    }
+  }
+  $('#design-show').addEventListener('change', event => {
+    if (event.target.value === 'photos') draft.photos = copy(lastPhotos);
+    else { if (draft.photos) lastPhotos = copy(draft.photos); draft.photos = null; }
+    renderPhotos(); changed();
+  });
+  $('#design-photo-seconds').addEventListener('change', event => { draft.photos.seconds = Number(event.target.value); changed(); });
+  $('#design-photo-shuffle').addEventListener('change', event => { draft.photos.shuffle = event.target.checked; changed(); });
+  $('#design-photo-when').addEventListener('change', event => {
+    if (event.target.value === 'time') { draft.photos.from = '22:00'; draft.photos.to = '07:00'; } else { draft.photos.from = draft.photos.to = null; }
+    renderPhotos(); changed();
+  });
+  for (const id of ['#design-photo-from', '#design-photo-to']) $(id).addEventListener('change', () => {
+    const from = $('#design-photo-from').value, to = $('#design-photo-to').value;
+    if (from && to && from !== to) { draft.photos.from = from; draft.photos.to = to; changed(); }
+  });
+  // One request per photo, as its bytes; the server keeps a reduced copy. New photos are chosen right away.
+  $('#design-photo-upload').addEventListener('change', async event => {
+    const files = [...event.target.files]; event.target.value = ''; let done = 0;
+    for (const file of files) {
+      $('#design-photo-state').textContent = 'Uploading ' + (done + 1) + ' of ' + files.length + ' …';
+      try {
+        const response = await fetch('/admin/photos', {method: 'POST', credentials: 'same-origin', body: file,
+          headers: {'Content-Type': file.type || 'application/octet-stream', Accept: 'application/json', [csrfHeader]: csrf}});
+        const answer = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(file.name + ': ' + (answer.error || 'HTTP ' + response.status));
+        library.push(answer); if (draft.photos) draft.photos.images.push(answer.id); done++;
+      } catch (failure) { error(failure.message); }
+    }
+    $('#design-photo-state').textContent = done + ' of ' + files.length + ' photos added. Kept reduced to 600 × 600 at most.';
+    renderPhotos(); if (done) changed();
+  });
   async function post(url, data, signal) {
     const response = await fetch(url, {method: 'POST', credentials: 'same-origin', signal,
       headers: {'Content-Type': 'application/json', [csrfHeader]: csrf}, body: JSON.stringify(data)});
@@ -275,6 +346,7 @@
   fetch('/admin/designs', {credentials: 'same-origin'}).then(async response => {
     if (!response.ok) throw new Error('Designs could not be loaded. Reload and sign in again.');
     catalog = await response.json();
+    try { const photos = await fetch('/admin/photos', {credentials: 'same-origin'}); if (photos.ok) library = await photos.json(); } catch { /* no library */ }
     $('#design-display').replaceChildren(...catalog.displays.map(d => { const o = document.createElement('option'); o.value = d.id; o.textContent = d.label; return o; }));
     catalog.devices.forEach(d => { const option = element('option', '', d.name + (d.overridden ? ' · own design' : ' · default')); option.value = d.identifier; $('#design-target').append(option); });
     catalog.schemes.forEach(s => { const option = element('option', '', s.label); option.value = s.id; $('#design-scheme').append(option); });
