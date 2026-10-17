@@ -458,8 +458,12 @@ digital photo frame. **Add web display** creates it:
 - The page asks for the image in its window's size and the screen's pixel ratio, so it is sharp on high-resolution
   screens (phones, tablets, 4K). Large screens get a zoomed layout with readable text. The PNG link without
   parameters has the type's own pixels (*Fit the browser*: 360×640); programs can add `?w=<width>&h=<height>&r=<ratio>`.
-- **Home screen:** on an iPhone or iPad, *Share › Add to Home Screen* gives the page the VibeDock icon and the
+- **Home screen:** on an iPhone or iPad, *Share › Add to Home Screen* gives the page the display icon and the
   display's name; it then opens full screen, keeping the notch and the home indicator free.
+- The page asks every 3 seconds whether its image changed, so a new design, new usage data or the next photo appear
+  within seconds; the reload interval stays as a fallback.
+- **Swipe** left or right on the page (or press ← →) to change the theme, in a slideshow the photo, like on touch
+  displays; the web display then keeps it as its own design.
 - The card then offers two links, both containing a long secret: the **Page** for browsers (full screen, reloads
   itself) and the **PNG** for programs. Copy them with the copy button or open them with the arrow.
 - **External address** switches both links between the internal and the external server address (see
@@ -479,8 +483,7 @@ and do not appear on the firmware page.
 # Display design
 
 The display editor sets what a display shows. **Design for** chooses the default design or a device. The preview
-on the right is rendered by the server exactly as the display will show it. Changes stay in the editor until you
-save.
+on the right is rendered by the server exactly as the display will show it. Every change is saved right away.
 
 <img src="images/30-display-default.png" width="100%" alt="Default design">
 
@@ -494,6 +497,10 @@ A design is a list of **bands** from top to bottom. A usage band holds:
 
 The default design above uses two full-width bands, one per source (*Claude ACME*, *Codex ACME*); the
 [web display](#display-types-and-hidden-bands) further below shows two half-width sources per band.
+
+Up to five usage bands fit a tall screen (e.g. a phone as a web display); smaller displays show the first ones that
+fit. **On tall screens** chooses where spare height goes: *Spread the bands evenly* (the default) or *Bands at the
+top*, where the bands stay together and a weather and mood band at the end keeps to the bottom edge.
 
 The **Weather & mood** band holds the weather (icon and temperature for the **Weather location**) and the **Mood**
 emoji; **Swap weather & mood** exchanges the two slots. The update time and the IP address move with this band.
