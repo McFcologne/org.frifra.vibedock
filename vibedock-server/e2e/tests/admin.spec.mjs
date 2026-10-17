@@ -44,7 +44,9 @@ test('default design is saved right away',async ({page,app}) => {
   const scheme=page.locator('#design-scheme'), message=page.locator('#design-message');
   await expect(page.locator('#design-save')).toHaveCount(0);
   await scheme.selectOption('ocean');await expect(message).toContainText('Default design saved');
-  await page.reload();await expect(scheme).toHaveValue('ocean');
+  await page.locator('#design-align').selectOption('top');await expect(message).toContainText('Default design saved');
+  await page.reload();await expect(scheme).toHaveValue('ocean');await expect(page.locator('#design-align')).toHaveValue('top');
+  await page.locator('#design-align').selectOption('spread');await expect(message).toContainText('Default design saved');
 });
 
 test('device inherits the default, can override it, and can return to inheritance',async ({page,app}) => {

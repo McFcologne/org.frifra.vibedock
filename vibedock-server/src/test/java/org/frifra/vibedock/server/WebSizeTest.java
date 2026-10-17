@@ -39,6 +39,30 @@ class WebSizeTest {
         Assertions.assertEquals(240*240*2,renderer.render(snapshot,"1.2.3.4",new StatusImage.Look(null,Scheme.MIDNIGHT,null,null),DisplayType.M1).rgb565().length);
         Assertions.assertThrows(IllegalArgumentException.class,()->renderer.render(snapshot,"x",new StatusImage.Look(null,Scheme.MIDNIGHT,null,null),DisplayType.M1,.5));
     }
+    @Test void tallScreensTakeFiveBandsSpreadOrAtTheTop() throws Exception {
+        var five=new ArrayList<Layout.Band>();for(int i=0;i<5;i++)five.add(new Layout.Usage(List.of("codex")));five.add(new Layout.Context(false));
+        Assertions.assertEquals(6,new Layout(five).fit(DisplayType.FIT.fitting(393,852,3).type()).bands().size());
+        var six=new ArrayList<Layout.Band>(five);six.add(0,new Layout.Usage(List.of("claude")));
+        Assertions.assertThrows(IllegalArgumentException.class,()->new Layout(six));
+        // The JSON keeps alignTop only when set; fitting and moving the weather band keep it.
+        var json=new com.fasterxml.jackson.databind.ObjectMapper();
+        Assertions.assertFalse(json.writeValueAsString(Layout.DEFAULT).contains("alignTop"));
+        var top=new Layout(Layout.DEFAULT.bands(),true);
+        Assertions.assertEquals(top,json.readValue(json.writeValueAsString(top),Layout.class));
+        Assertions.assertTrue(top.fit(DisplayType.M1).alignTop());Assertions.assertTrue(top.withContextAtBottom().alignTop());
+        // Spread: the second band far down; at the top: right below the first. The weather band stays at the bottom.
+        var renderer=new StatusImage("Europe/Berlin");var snapshot=new UsageService.Snapshot(1,0,new LinkedHashMap<>(),Map.of());
+        var tall=DisplayType.FIT.fitting(360,780,1).type();
+        int spread=inked(renderer.render(snapshot,"x",new StatusImage.Look(null,Scheme.MIDNIGHT,null,"5°",Layout.DEFAULT),tall),100,180);
+        int packed=inked(renderer.render(snapshot,"x",new StatusImage.Look(null,Scheme.MIDNIGHT,null,"5°",top),tall),100,180);
+        Assertions.assertEquals(0,spread);Assertions.assertTrue(packed>0);
+        Assertions.assertTrue(inked(renderer.render(snapshot,"x",new StatusImage.Look(null,Scheme.MIDNIGHT,null,"5°",top),tall),730,780)>0,"weather at the bottom");
+    }
+    private static int inked(StatusImage.Image image,int from,int to) throws Exception {
+        var png=ImageIO.read(new ByteArrayInputStream(image.png()));int n=0;
+        for(int y=from;y<to;y++)for(int x=0;x<png.getWidth();x++)if((png.getRGB(x,y)&0xffffff)!=(Scheme.MIDNIGHT.background&0xffffff))n++;
+        return n;
+    }
     @Test void svgEmojiAreDrawnAtAnySize(@TempDir Path dir) throws Exception {
         Files.writeString(dir.resolve("1f916.svg"),"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 36 36\"><circle cx=\"18\" cy=\"18\" r=\"12\" fill=\"#ff0000\"/></svg>");
         var twemoji=new Twemoji(dir.toString());

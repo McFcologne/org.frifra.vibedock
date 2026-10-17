@@ -150,7 +150,7 @@
         const bands = draft.layout.bands; bands.splice(index, 0, bands.splice(dragged, 1)[0]); dragged = null; renderBands(); changed(); });
   }
   function addButton(container) {
-    // Up to four usage bands; the display shows as many as fit its height (compact rows take half the height).
+    // Up to five usage bands; the display shows as many as fit its height (compact rows take half the height).
     if (usageCount() < MAX_USAGE) {
       const add = element('button', 'secondary small design-band-add', '+ Add usage band'); add.type = 'button'; add.disabled = inherit;
       add.addEventListener('click', () => { if (inherit) return;
@@ -159,7 +159,7 @@
       container.append(add);
     }
   }
-  const MAX_USAGE = 4;
+  const MAX_USAGE = 5;
   // The display the bands are checked against: the device's type, the VibeTV M1 for the default design.
   const shownType = () => target === 'default' ? catalog.displays[0] : displayOf(draft.display);
   // The usage bands the display shows, as the server's Layout.fit decides: the first ones that fit at their minimum
@@ -221,8 +221,10 @@
     $('#layout-emoji').value = draft.mood || '-';
     const emojiButton = root.querySelector('[data-emoji-open]'); emojiButton.dataset.file = '';
     emojiButton.dispatchEvent(new Event('vibedock-emoji-render'));
+    $('#design-align').value = draft.layout.alignTop ? 'top' : 'spread';
     renderPhotos(); renderBands(); displayNote(); controls();
   }
+  $('#design-align').addEventListener('change', event => { draft.layout.alignTop = event.target.value === 'top'; changed(); });
   // ---- content: usage monitor or photos (a paused selection is kept for switching back) ----
   const photoDefaults = () => ({images: [], seconds: 30, shuffle: false, from: null, to: null, paused: false});
   let armed = null;  // a photo whose delete button was pressed once

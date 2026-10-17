@@ -83,6 +83,7 @@ public class StatusImage {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,smooth?RenderingHints.VALUE_ANTIALIAS_ON:RenderingHints.VALUE_ANTIALIAS_OFF);
             // Usage bands shrink in proportion (to their minimum, see Layout.fit) when they need more than the screen
             // has; taller screens: the spare height goes evenly between the bands; the last band stays at the bottom edge.
+            // Aligned to the top: the bands stay together, only a weather/mood band at the end moves to the bottom edge.
             var bands=look.layout().bands();
             int nominal=bands.stream().filter(Layout.Usage.class::isInstance).mapToInt(Layout.Band::height).sum();
             int room=h-Layout.CONTEXT_HEIGHT,used=Math.min(nominal,room)+Layout.CONTEXT_HEIGHT;
@@ -96,7 +97,9 @@ public class StatusImage {
                     case Layout.Usage usage -> usage(g,scheme,snapshot,usage,y,height,i==bands.size()-1&&spare==0);
                     case Layout.Context context -> context(g,snapshot,ip,look,context,y);
                 }
-                y+=height+(gaps==0?0:spare/gaps+(i<spare%gaps?1:0));
+                boolean top=look.layout().alignTop();
+                if(top)y+=height+(i==bands.size()-2&&bands.get(bands.size()-1) instanceof Layout.Context?spare:0);
+                else y+=height+(gaps==0?0:spare/gaps+(i<spare%gaps?1:0));
             }
         }finally{g.dispose();}
         return encode(image,scheme);

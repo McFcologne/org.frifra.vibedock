@@ -153,7 +153,7 @@ class LayoutTest {
         assertEquals(3,DisplayType.of("240x320").usageBands());assertEquals(2,DisplayType.of("240x280").usageBands());
         assertEquals(four,four.fit(DisplayType.of("240x320")));assertEquals(3,four.fit(DisplayType.M1).bands().size());
         var u=new Layout.Usage(List.of("codex"));var c=new Layout.Usage(List.of("claude"),true);
-        assertThrows(IllegalArgumentException.class,()->new Layout(List.of(u,u,u,u,u,new Layout.Context(false))));
+        assertThrows(IllegalArgumentException.class,()->new Layout(List.of(u,u,u,u,u,u,new Layout.Context(false))));
         assertThrows(IllegalArgumentException.class,()->new Layout.Usage(List.of("codex","claude"),true));
         // Compact bands: one full and two compact or four compact bands fit the VibeTV M1, a third full one does not.
         var mixed=new Layout(List.of(u,c,c,new Layout.Context(false)));var compact=new Layout(List.of(c,c,c,c,new Layout.Context(true)));
