@@ -46,7 +46,7 @@ server; a display only receives its image.
 - **Thirteen display themes.** Modern dark and light themes, classic green/amber terminals, classic Mac and classic Windows. Previews and devices use the same server renderer.
 - **Encrypted account transfer.** Export data sources with their saved sign-ins and restore selected sources by adding them or replacing the current collection.
 - **Device management.** Pair using the IP and six-digit code on a trusted home network (HTTP pairing is unencrypted), inspect status and previews, rename, reorder by dragging, force a redraw, update, or remove a device.
-- **Boards.** Besides the VibeTV M1 (ESP8266), the firmware builds for ESP32, ESP32-S3 and ESP32-C3 boards with a display (not yet tested on hardware); each device has a board that decides which firmware it gets.
+- **Boards.** Besides the VibeTV M1 (ESP8266), the firmware builds for ESP32, ESP32-S3 and ESP32-C3 boards with a display (tested on hardware: Waveshare ESP32-S3-Touch-LCD-1.47 and ESP32-C6-Touch-LCD-1.69; the others are prepared); each device has a board that decides which firmware it gets.
 - **Web displays.** A browser, tablet or another program shows the image without hardware: a full-screen page that reloads itself, or a plain PNG link, protected by a secret in the link.
 - **Firmware from the server.** The Docker image carries the matching display firmware for every board: download it, install it from Chrome or Edge over USB and pair the display over the same cable in one go, or update paired displays over Wi-Fi with firmware signed by the server.
 - **Responsive administration.** Five navigation areas, remembered light/dark appearance, forms that open on demand, explicit save/discard in the design editor, and a footer with build version, README and generated license information.
@@ -149,7 +149,7 @@ replaces the seller's firmware after you have saved a full backup of your own de
 where to get one is in the [manual](docs/manual/MANUAL.md#getting-a-display).
 
 The same sources also build for several ESP32 boards with a display (Cheap Yellow Display, LilyGO T-Display and
-T-Display-S3, Waveshare ESP32-S3-LCD-1.69, ESP32-C3 with ST7789). These builds compile but are not yet tested on hardware;
+T-Display-S3, Waveshare ESP32-S3-LCD-1.69, ESP32-S3-Touch-LCD-1.47 and ESP32-C6-Touch-LCD-1.69, ESP32-C3 with ST7789). Tested on hardware are the Waveshare ESP32-S3-Touch-LCD-1.47 and ESP32-C6-Touch-LCD-1.69; the others are prepared (they build, their settings follow what the tested boards showed, but none has run on hardware yet);
 see the [client README](vibedock-client/README.md).
 
 ## Client firmware and local device page
@@ -159,7 +159,8 @@ The easiest way is **Devices → Firmware** in the administration (see Quick sta
 ```sh
 cd vibedock-client
 ./scripts/build.sh    # compile only; firmware/.pio/build/vibedock-m1/firmware.bin
-./scripts/flash.sh    # build, detect the ESP8266 and flash after confirmation
+./scripts/flash.sh    # detect the chip, choose the board, build and flash after confirmation
+./scripts/flash.sh waveshare-s3-touch-lcd-147   # a given board; --list shows them, build.sh all builds every board
 ```
 
 The firmware provides QR-based Wi-Fi setup, network scanning, pairing, internal/external server fallback, stale-image protection and a local status page at `http://<device-ip>/`. That page shows state and an image preview and offers persistent gamma/RGB calibration. It is visible on the local network. Power-cycle gestures open Wi-Fi setup or perform a factory reset; see the client README for the exact sequence.

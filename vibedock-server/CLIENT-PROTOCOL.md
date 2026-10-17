@@ -62,7 +62,7 @@ Right after flashing, the administration's browser flasher (*Devices › Firmwar
 | --- | --- |
 | `VIBEDOCK-HELLO` | `VIBEDOCK-READY {"identifier":"vibedock-…","name":"…","version":"0.1.0","paired":false,"board":"vibedock-m1","chip":"ESP8266"}` (also sent once at every start) |
 | `VIBEDOCK-SCAN` | `VIBEDOCK-NETWORKS [{"ssid":"…","rssi":-48,"open":false},…]`, the 12 strongest networks |
-| `VIBEDOCK-LOG` | `VIBEDOCK-LOG ["05-14 09:41:00 Start v0.1.0 vibedock-m1, Power on",…]`, the last 24 events oldest first: starts, Wi-Fi, pairing, server answers and why a connection failed (HTTP and TLS errors). Kept in `/log.txt` across restarts; no keys or passwords. **Devices → Firmware → Display log** shows it. |
+| `VIBEDOCK-LOG` | `VIBEDOCK-LOG ["05-14 09:41:00 Start v0.1.0 vibedock-m1, Power on",…]`, the last 24 events oldest first: starts, Wi-Fi, pairing, server answers and why a connection failed (HTTP and TLS errors). Kept in `/log.txt` across restarts; no keys or passwords. **Devices → Troubleshooting → Read log over USB** shows it. |
 | `VIBEDOCK-SETUP {json}` | `VIBEDOCK-SETUP OK`, then the device restarts; or `VIBEDOCK-SETUP ERROR <reason>` |
 
 The setup JSON is the invitation of step 2 without `code`, plus `ssid` and `password` of the Wi-Fi. The server creates it with `POST /admin/firmware/setup` (`{"identifier","name","board"}`, CSRF-protected; `board` is what the device reported, or the board chosen on the page for firmware that reports none): it registers the device with a new key and returns `{"pairing":{…},"warnings":[…]}`; the browser adds the Wi-Fi, which never reaches the server. Addresses on the administration's own machine (localhost) are left out; with nothing else configured the setup is refused. The device appears under *Devices* as *Waiting for first pull* and reports its address with the first authenticated pull. That contact fixes its callback origin: `X-VibeDock-Device-IP` takes precedence over the socket peer so Docker/NAT does not supply the gateway address. With no valid header, the socket peer is used. IPv4 callbacks initially use that origin's `/24`, until a newer client supplies its mask once (see below); IPv6 stays at the original IP. The origin is persisted and cannot be changed by later reports; `GET /admin/firmware/setup/{identifier}` reports that. The browser sends a line in pieces of 128 bytes with 40 ms pauses, because the device keeps a 1 kB receive buffer, and repeats a line that got no answer. The commands are only reachable over the cable, which can rewrite the whole flash anyway.
@@ -101,7 +101,7 @@ X-VibeDock-Board: vibedock-m1
 
 The endpoint exists only on the public port. Unknown identifiers and wrong keys get the same **401**. The IP allowlist of `/api/v1/usage` does not apply; the device key is the authorization. The device uses the poll interval from the latest `X-VibeDock-Poll-Seconds` (10–3600 s, default 30, set in the administration UI).
 
-**Immediate pull (server → device):** after a design is saved, the server sends `POST http://<device IP>:<port>/pull` without a body to the affected devices (the default design: every device that follows it). After a restart it sends the same request to every paired device as soon as the first usage readings are collected (at most one minute after start). The device answers **202** and pulls in its next loop; at most one such request every 5 seconds is accepted (**429** otherwise), **409** while it is not paired. The request carries nothing secret and needs no key, because the pull that follows is authenticated as usual. Devices the server cannot reach pull at their next poll.
+**Immediate pull (server → device):** after a design is saved, the server sends `POST http://<device IP>:<port>/pull` without a body to the affected devices (the default design: every device that follows it). After a restart it sends the same request to every paired device as soon as the first usage readings are collected (at most one minute after start). The device answers **202** and pulls in its next loop; at most one such pull every 5 seconds: a request within that pause (also **202**) is pulled when it is over (firmware before 0.2.0 answers **429** and pulls at its next poll), **409** while it is not paired. The request carries nothing secret and needs no key, because the pull that follows is authenticated as usual. Devices the server cannot reach pull at their next poll.
 
 **Force refresh:** the device action *Force refresh* in the administration sends the same request; the next pull of that device gets **200** with the full image even if it did not change, without `ETag` and with `X-VibeDock-Redraw: 1`. The firmware then draws every row instead of only the changed ones, and pulls the following image without `If-None-Match`, learning the `ETag` again. The copy for the device's status page is requested with `X-VibeDock-Preview: 1` and does not use up a pending force refresh. Firmware from before this header still loads the full image but only redraws changed rows.
 
@@ -156,18 +156,35 @@ Only the public port accepts it, and only `POST`. The server removes key-like va
 lines, and keeps at most 500 lines of 400 characters. The same is saved for logs the browser reads over USB on the
 firmware page. Firmware up to 0.1.1 does not know the header and keeps sending its log only over USB.
 
+## 3d. Touch gestures (device → server)
+
+Displays with a touch panel send a swipe left or right with their next image pull, which follows right away:
+`X-VibeDock-Gesture: scheme-next` (left) or `scheme-previous` (right). The server switches the display's colour scheme
+to the next or previous one in its list (wrapping around), stores it as the display's own design (also when it
+followed the default until then) and answers with the new image. Other values are ignored, and so is the header on
+older servers. Swipes up and down change the backlight on the display only (10–100 %, kept across restarts).
+
+## 3e. Orientation (server → device)
+
+Every board except the VibeTV M1 (its case decides how it stands) gets `X-VibeDock-Orientation: flipped` or `upright`
+with every 200 and 304 answer, set with *Flip image* on the device card. A display mounted upside down turns its panel
+by 180 degrees, so the image, its own screens and the swipes are turned as well; it stores the setting and draws the
+next image completely. The image itself is the same in both cases. Firmware before 0.2.0 ignores the header.
+
 ## Boards
 
 One firmware source builds for several boards (PlatformIO environments in `vibedock-client/firmware/platformio.ini`, the server's inventory in `Board.java`):
 
-| Board id | Hardware | Chip | Display type |
-| --- | --- | --- | --- |
-| `vibedock-m1` | VibeTV M1 (ESP-12E, 1.54" ST7789) | ESP8266 | 240×240 |
-| `esp32-cyd` | "Cheap Yellow Display" ESP32-2432S028R (2.8" ILI9341) | ESP32 | 320×240 |
-| `lilygo-t-display` | LilyGO T-Display (1.14" ST7789) | ESP32 | 135×240 |
-| `lilygo-t-display-s3` | LilyGO T-Display-S3 (1.9" ST7789, 8-bit parallel) | ESP32-S3 | 170×320 |
-| `waveshare-s3-lcd-169` | Waveshare ESP32-S3-LCD-1.69 (ST7789V2) | ESP32-S3 | 240×280 |
-| `esp32-c3-st7789` | ESP32-C3 with a 1.3" ST7789 (SCL 4, SDA 6, DC 2, RES 3, BLK 10) | ESP32-C3 | 240×240 |
+| Board id | Hardware | Chip | Display type | Status |
+| --- | --- | --- | --- | --- |
+| `vibedock-m1` | VibeTV M1 (ESP-12E, 1.54" ST7789) | ESP8266 | 240×240 | tested |
+| `esp32-cyd` | "Cheap Yellow Display" ESP32-2432S028R (2.8" ILI9341) | ESP32 | 320×240 | prepared |
+| `lilygo-t-display` | LilyGO T-Display (1.14" ST7789) | ESP32 | 135×240 | prepared |
+| `lilygo-t-display-s3` | LilyGO T-Display-S3 (1.9" ST7789, 8-bit parallel) | ESP32-S3 | 170×320 | prepared |
+| `waveshare-s3-lcd-169` | Waveshare ESP32-S3-LCD-1.69 (ST7789V2) | ESP32-S3 | 240×280 | prepared |
+| `waveshare-s3-touch-lcd-147` | Waveshare ESP32-S3-Touch-LCD-1.47 (JD9853, AXS5106L touch) | ESP32-S3 | 172×320 | tested |
+| `waveshare-c6-touch-lcd-169` | Waveshare ESP32-C6-Touch-LCD-1.69 (ST7789V2, CST816 touch; Arduino core 3) | ESP32-C6 | 240×280 | tested |
+| `esp32-c3-st7789` | ESP32-C3 with a 1.3" ST7789 (SCL 4, SDA 6, DC 2, RES 3, BLK 10) | ESP32-C3 | 240×240 | prepared |
 
 Each build yields `flash.bin`, written at `0x0` over USB (on ESP32 chips bootloader, partition table and app merged), and `firmware.bin`, the app for updates over Wi-Fi. The update format is the same on all chips (step 3a); on ESP32 chips the firmware checks the signature with mbedTLS itself before it activates the new app. https on ESP32 chips always uses the full check against the root from pairing (no SHA-1 fingerprint). The device's own screens are laid out for 240×240 and scaled to fit other panels; server images arrive in the panel's resolution.
 
@@ -175,7 +192,7 @@ Each build yields `flash.bin`, written at `0x0` over USB (on ESP32 chips bootloa
 
 Pixels are sent row by row from the top left: `width` pixels per row, `height` rows as named in `X-VibeDock-Image-Format`, two bytes per pixel, most significant byte first, 5 red, 6 green and 5 blue bits. No compression. The administration UI shows a PNG of the same pixels.
 
-**Display types:** the administration keeps an inventory of display resolutions (VibeTV M1 240×240 as default, 240×280, 240×320, 320×240, 170×320, 135×240, 128×160) and renders each device's design for its type: the first usage bands that fit its height (full bands 92 px, compact rows 46 px, shrinking to 88/44 px where needed; the M1 holds two full bands, one full and two compact or four compact ones); split bands show only their first source below 200 px width. Current firmware accepts any size from 16 to 480 px per side and scales it nearest-neighbour to its whole screen, so a wrong type still fills the screen, just distorted; with the right type the image is drawn 1:1.
+**Display types:** the administration keeps an inventory of display resolutions (VibeTV M1 240×240 as default, 240×280, 240×320, 320×240, 170×320, 172×320, 135×240, 128×160) and renders each device's design for its type: the first usage bands that fit its height (full bands 92 px, compact rows 46 px, shrinking to 88/44 px where needed; the M1 holds two full bands, one full and two compact or four compact ones); split bands show only their first source below 200 px width. Current firmware accepts any size from 16 to 480 px per side and scales it nearest-neighbour to its whole screen, so a wrong type still fills the screen, just distorted; with the right type the image is drawn 1:1.
 
 **The server draws the whole image, the device IP included.** It writes `IP: <X-VibeDock-Device-IP>` into the bottom-left corner of the weather/mood band (20 rows, columns 0–149), wherever the design places that band. Current firmware draws the image over the whole screen and shows its own IP footer (rows 220–239) only on its own screens: setup, pairing, `Server unreachable`, `Updates missing`. When its IP changes the device pulls a new image right away.
 

@@ -16,7 +16,7 @@ unable to operate VibeDock, in particular:
 - **Damage from flashing.** Writing firmware can make a device unusable ("bricked"), erase its original firmware and
   settings, or damage it, e.g. through a wrong board, an interrupted write, unsuitable cables, power supplies or
   adapters. Original firmware cannot be restored without your own full backup. Flashing voids any manufacturer
-  warranty and is done entirely at your own risk. The ESP32 builds have not been tested on hardware.
+  warranty and is done entirely at your own risk. Of the ESP32 builds only the Waveshare ESP32-S3-Touch-LCD-1.47 and ESP32-C6-Touch-LCD-1.69 have been tested on hardware; the others are prepared and untested.
 - **Security.** No software is free of errors. We cannot guarantee that VibeDock is free of security
   vulnerabilities. The server stores provider sign-ins and tokens in plaintext in its data directory, the
   administration uses plain HTTP unless you put HTTPS in front of it, and displays talk to the server over the
@@ -623,14 +623,18 @@ first; it decides which image is installed:
 
 <img src="images/20-firmware-board.png" width="80%" alt="Board">
 
-| Board | Chip | Display |
-| --- | --- | --- |
-| VibeTV M1 | ESP8266 | 1.54" ST7789 240×240 |
-| Cheap Yellow Display (ESP32-2432S028R) | ESP32 | 2.8" ILI9341 320×240 |
-| LilyGO T-Display | ESP32 | 1.14" ST7789 135×240 |
-| LilyGO T-Display-S3 | ESP32-S3 | 1.9" ST7789 170×320 |
-| Waveshare ESP32-S3-LCD-1.69 | ESP32-S3 | 1.69" ST7789V2 240×280 |
-| ESP32-C3 with ST7789 240×240 | ESP32-C3 | e.g. C3 SuperMini |
+| Board | Chip | Display | Hardware |
+| --- | --- | --- | --- |
+| VibeTV M1 | ESP8266 | 1.54" ST7789 240×240 | tested |
+| Cheap Yellow Display (ESP32-2432S028R) | ESP32 | 2.8" ILI9341 320×240 | prepared |
+| LilyGO T-Display | ESP32 | 1.14" ST7789 135×240 | prepared |
+| LilyGO T-Display-S3 | ESP32-S3 | 1.9" ST7789 170×320 | prepared |
+| Waveshare ESP32-S3-LCD-1.69 | ESP32-S3 | 1.69" ST7789V2 240×280 | prepared |
+| Waveshare ESP32-S3-Touch-LCD-1.47 | ESP32-S3 | 1.47" JD9853 172×320 | tested |
+| Waveshare ESP32-C6-Touch-LCD-1.69 | ESP32-C6 | 1.69" ST7789V2 240×280 | tested |
+| ESP32-C3 with ST7789 240×240 | ESP32-C3 | e.g. C3 SuperMini | prepared |
+
+*Tested*: runs on real hardware (installation over USB, pairing, images; on the Waveshare boards also touch). *Prepared*: builds, with the settings the tested boards called for, but has not run on hardware yet.
 
 The firmware card shows file, size, SHA-256, chip and flash address, and the displays of this board with their
 installed version. **Download** saves the image; **Update to … over Wi-Fi** updates a paired display.
@@ -776,17 +780,36 @@ pairing code means it is not paired, *Server unreachable* means Wi-Fi works but 
 that shows an image and the green status under **Devices** is fine; a stale image disappears after three missed
 polls.
 
+## Touch displays
+
+Displays with a touch panel (Waveshare ESP32-S3-Touch-LCD-1.47 and ESP32-C6-Touch-LCD-1.69) react to swipes:
+
+| Swipe | Effect |
+| --- | --- |
+| left / right | next / previous colour scheme; the display keeps it as its own design (*Custom design* in the editor) |
+| up / down | brighter / darker (10–100 %), stored on the display |
+
+The scheme changes with the next image, right after the swipe. To follow the default design again, turn off
+*Custom design* for the display in the editor.
+
+## Displays mounted upside down
+
+Every display except the VibeTV M1 (its case decides how it stands) has a *Flip image* switch on its card under
+**Devices**. It turns the picture by 180 degrees, also the display's own screens and the swipes; the display takes it
+over within seconds. The motion sensor of the Waveshare boards is not used: it decided too unreliably.
+
 ## Read the display log
 
-**Devices → Firmware → Connect → Display log** shows the display's last 24 events:
+**Devices → Troubleshooting → Read log over USB** shows the display's last 24 events, for every board and firmware
+(no board to choose, paired or not):
 starts and their reason, Wi-Fi, pairing, every change of the server's answer and why a connection failed. It holds
 no keys or passwords. The copy button next to the log copies it for a report.
 
-Every log read this way is also saved on the server. **Devices → Logs (n)** on the device card lists the last 10 logs
-of the display with the time they were read and how (USB or network), to show, download as text or delete. Removing
+Every log read this way is also saved on the server. On the same page, each paired display links to its last 10 logs
+with the time they were read and how (USB or network), to show, download as text or delete. Removing
 the display removes its logs.
 
-**Read log over the network** on that page asks the display to send its log without a cable: it sends it right
+**Read over the network** there asks the display to send its log without a cable: it sends it right
 after its next image pull, over the same address and encryption as its images, within seconds when the server can
 ask it to pull now. This needs firmware newer than 0.1.1; older firmware sends its log only over USB. The request is
 valid for 10 minutes and for one log.

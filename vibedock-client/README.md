@@ -6,7 +6,7 @@ Turn a compatible VibeDock display into a small Wi-Fi dashboard for your provide
 
 The firmware targets the **VibeTV M1: ESP8266EX with 4 MB flash and a 240×240 ST7789 display**, the desk display sold by Vibe TV ([vibetv.shop](https://vibetv.shop/); not affiliated with this project). Wi-Fi setup, pairing, image pulls and colour calibration are in use on real hardware.
 
-The same sources also build for ESP32 boards with a display: Cheap Yellow Display (ESP32-2432S028R), LilyGO T-Display, LilyGO T-Display-S3, Waveshare ESP32-S3-LCD-1.69 and an ESP32-C3 with a 240×240 ST7789 (wiring and display types in [CLIENT-PROTOCOL.md](../vibedock-server/CLIENT-PROTOCOL.md#boards)). Each is a PlatformIO environment in `firmware/platformio.ini`; `firmware/src/platform.h` holds what differs between the chips. These builds compile but are not yet tested on hardware.
+The same sources also build for ESP32 boards with a display: Cheap Yellow Display (ESP32-2432S028R), LilyGO T-Display, LilyGO T-Display-S3, Waveshare ESP32-S3-LCD-1.69, Waveshare ESP32-S3-Touch-LCD-1.47, Waveshare ESP32-C6-Touch-LCD-1.69 and an ESP32-C3 with a 240×240 ST7789 (wiring and display types in [CLIENT-PROTOCOL.md](../vibedock-server/CLIENT-PROTOCOL.md#boards)). Each is a PlatformIO environment in `firmware/platformio.ini`; `firmware/src/platform.h` holds what differs between the chips. Tested on hardware: the VibeTV M1, the Waveshare ESP32-S3-Touch-LCD-1.47 and ESP32-C6-Touch-LCD-1.69. The other boards are prepared: they build and use what the tested boards showed, but have not run on hardware (status per board in [CLIENT-PROTOCOL.md](../vibedock-server/CLIENT-PROTOCOL.md#boards), tests in [VALIDATION.md](../vibedock-server/VALIDATION.md)).
 
 <p align="center"><img src="../docs/manual/images/62-image-test-bench.png" width="320" alt="Example of the VibeDock status display with usage bands, weather, mood, update time and IP address"></p>
 
@@ -83,19 +83,20 @@ The page does not refresh automatically. **Reload** fetches a fresh image from t
 
 ### Adjust display colours
 
-1. Open the device page and compare the physical display with the server's preview.
-2. Under **Display colours**, adjust gamma or an individual colour channel. Higher gamma makes mid tones darker.
-3. Release the slider to apply the change. The device saves it and requests a complete redraw.
-4. Use **Reset to defaults** to restore the panel calibration below.
+1. Open the device page (the IP link on the device card). **Display colours** shows the image as the server sends it,
+   uncorrected, next to the sliders: put the display beside the monitor and match it to that image.
+2. Adjust gamma or an individual colour channel. Higher gamma makes mid tones darker.
+3. Release the slider to apply the change. The device saves it and redraws completely; the page and its image stay.
+4. Use **Reset to defaults** to restore the board's defaults below.
 
-| Control | Default | Range |
-| --- | --- | --- |
-| Gamma | 2.50 | 0.50–3.50 |
-| Red | 91% | 40–100% |
-| Green | 94% | 40–100% |
-| Blue | 73% | 40–100% |
+| Control | VibeTV M1 | ESP32 boards | Range |
+| --- | --- | --- | --- |
+| Gamma | 2.50 | 1.00 (neutral) | 0.50–3.50 |
+| Red | 91% | 100% | 40–100% |
+| Green | 94% | 100% | 40–100% |
+| Blue | 73% | 100% | 40–100% |
 
-These defaults were calibrated by eye on the supported panel. Correction runs per colour channel in the firmware; it affects this device only and survives a normal restart.
+The M1 defaults were calibrated by eye on its panel; the other panels start neutral. Correction runs per colour channel in the firmware; it affects this device only and survives a normal restart.
 
 ## Understand the device status
 
@@ -151,7 +152,7 @@ Power-on and external resets count toward this sequence; software restarts and c
 | Device list offers the update only via USB or asks to pair again | Firmware before updates over Wi-Fi, or a pairing older than the server's signing key: install over USB and pair there, or pair again (USB *Only pair*, or remove and invite with the code). |
 | Browser flasher cannot connect | Use 115200 baud (the default), close other programs on the serial port, and open the administration over HTTPS or on `localhost` in Chrome or Edge. |
 | Browser image and panel colours differ | Expected: the browser image is uncorrected. Adjust gamma/RGB on the device page while comparing the physical panel. |
-| HTTPS stops working | Check server certificates, hostname, the root supplied at pairing and NTP access. The device rejects connections it cannot verify. Read **Devices → Firmware → Display log** only after the display shows an image or "Server unreachable" (opening USB restarts it); [TLS.md](TLS.md#reading-the-device-log) explains the TLS lines. |
+| HTTPS stops working | Check server certificates, hostname, the root supplied at pairing and NTP access. The device rejects connections it cannot verify. Read **Devices → Troubleshooting → Read log over USB** only after the display shows an image or "Server unreachable" (opening USB restarts it); [TLS.md](TLS.md#reading-the-device-log) explains the TLS lines. |
 | Anything else | Read the display log and follow [Troubleshooting a display](../docs/manual/MANUAL.md#troubleshooting-a-display) in the manual. |
 | HTTPS server offers only TLS 1.3 | Works with the VibeTV M1; the ESP32 boards need TLS 1.2 on the server for now. |
 | Build cannot find PlatformIO | Install it in `vibedock-client/.venv` as described below; a global installation is not required. |
@@ -164,7 +165,7 @@ The firmware uses PlatformIO, independently of the server's Maven build. Use Pla
 
 Open `vibedock-client/` as a separate IntelliJ IDEA project. Open **View → Tool Windows → Terminal** and make sure the current directory contains this README and the `firmware/` folder. When starting from the monorepo root, first run `cd vibedock-client`.
 
-Install the pinned PlatformIO version and esptool (for `scripts/flash.sh`) in an isolated Python environment:
+Install the pinned PlatformIO version and esptool (for `scripts/flash.sh`) in an isolated Python environment. It needs Python 3.10 or newer (the ESP32-C6 build, Arduino core 3, refuses older ones; the Python 3.9 of macOS does not do, use one from python.org):
 
 ```sh
 python3 -m venv .venv
@@ -249,7 +250,7 @@ References: [PlatformIO installation](https://docs.platformio.org/en/latest/core
 
 Follow [FLASHING.md](FLASHING.md) for device identification, a complete backup, verification, installation and recovery. Keep the backup private, record its SHA256 and device identity, and restore only a matching backup from that same device. Original firmware and device backups are not distributed with this project.
 
-After preparing and verifying the backup, `scripts/flash.sh` builds the candidate, detects a connected ESP8266 and its flash size, shows the firmware details and asks for confirmation before writing. It writes firmware only, preserving LittleFS Wi-Fi and pairing settings. A full backup restore is a separate operation that replaces the entire flash. Neither the build configuration nor the native test installs anything on a device.
+After preparing and verifying the backup, `scripts/flash.sh [board]` detects the connected chip (and on the M1 its flash size), takes the board with that chip or offers the boards that share it (`--list` shows them), builds the candidate, shows the firmware details and asks for confirmation before writing. It writes firmware only, preserving LittleFS Wi-Fi and pairing settings. A full backup restore is a separate operation that replaces the entire flash. Neither the build configuration nor the native test installs anything on a device.
 
 ## Technical reference
 
