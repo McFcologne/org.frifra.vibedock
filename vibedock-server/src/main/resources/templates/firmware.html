@@ -12,8 +12,10 @@
   <label for="board">Board</label>
   <select id="board" name="board" onchange="this.form.submit()">
     <option th:each="option:${boards}" th:value="${option.board.id}" th:selected="${option.board.id == board.id}"
-            th:text="${option.board.label + ' · ' + option.board.chip + (option.available ? '' : ' (not in this installation)')}"></option></select>
-  <p class="meta" th:text="${board.note}"></p>
+            th:text="${option.board.label + ' · ' + option.board.chip + (option.board.tested ? ' · tested' : ' · untested') + (option.available ? '' : ' (not in this installation)')}"></option></select>
+  <p class="meta"><span class="badge" th:classappend="${board.tested} ? 'ok' : 'update'" th:text="${board.tested ? 'Tested on hardware' : 'Prepared, not tested on hardware'}"></span>
+    <span th:text="${board.note}"></span></p>
+  <p class="notice warn" th:unless="${board.tested}">This firmware builds, but it has never run on this board. Back up the flash before installing it (step 2 below); if the display stays dark, install the backup again.</p>
   <noscript><button>Show</button></noscript>
 </form>
 

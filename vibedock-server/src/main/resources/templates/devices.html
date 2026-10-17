@@ -83,7 +83,8 @@
       <p class="meta" data-live="ip">IP <strong th:if="${client.ip == '0.0.0.0'}">known after its first pull</strong>
         <a th:unless="${client.ip == '0.0.0.0'}" th:href="${'http://' + (client.ip.contains(':') ? '[' + client.ip + ']' : client.ip) + '/'}" target="_blank" rel="noopener noreferrer"
            title="The display's own status page (colour calibration, image) in this network"><strong th:text="${client.ip}"></strong></a></p>
-      <p class="meta device-identifier" th:text="${client.identifier + ' · ' + client.board.label}"></p>
+      <p class="meta device-identifier"><th:block th:text="${client.identifier + ' · ' + client.board.label}"></th:block>
+        <span th:unless="${client.board.tested}" class="badge update" title="The firmware for this board builds, but it has never run on the real board">untested board</span></p>
       <div class="meta firmware-line" data-live="firmware" th:with="firmwareVersion=${firmwareVersions.get(client.board.id)}"><span>Firmware <strong th:text="${client.firmware != null ? client.firmware : 'unknown'}"></strong></span>
         <th:block th:if="${T(org.frifra.vibedock.server.FirmwareVersion).offered(firmwareVersion, client.firmware)}">
           <span class="badge update" th:if="${client.updating}" th:text="${'Updating to ' + firmwareVersion + ' …'}">Updating</span>

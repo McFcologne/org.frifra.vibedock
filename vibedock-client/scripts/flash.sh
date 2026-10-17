@@ -14,6 +14,9 @@ python="$client_dir/.venv/bin/python"
 [ -x "$python" ] || { echo "PlatformIO/esptool missing. Follow the one-time setup in README.md." >&2; exit 1; }
 
 boards() { sed -n 's/^\[env:\(.*\)\]$/\1/p' "$ini"; }
+# custom_hardware of the board's environment: tested on the real board, or prepared (builds, untested).
+hardware_of() { awk -v env="[env:$1]" '$0 == env {e = 1; next} /^\[/ {e = 0} e && $1 == "custom_hardware" {print $3; exit}' "$ini"; }
+status_of() { [ "$(hardware_of "$1")" = tested ] && echo "tested on hardware" || echo "PREPARED, NOT TESTED on hardware"; }
 # The esptool chip of a board, from the PlatformIO board of its environment.
 chip_of() {
     case "$(awk -v env="[env:$1]" '$0 == env {e = 1; next} /^\[/ {e = 0} e && $1 == "board" {print $3; exit}' "$ini")" in
@@ -28,7 +31,7 @@ board=""; yes=""
 for arg in "$@"; do
     case "$arg" in
         --yes) yes=1 ;;
-        --list) for b in $(boards); do printf '%-28s %s\n' "$b" "$(chip_of "$b")"; done; exit 0 ;;
+        --list) for b in $(boards); do printf '%-28s %-9s %s\n' "$b" "$(chip_of "$b")" "$(status_of "$b")"; done; exit 0 ;;
         -*) echo "Unknown option $arg" >&2; exit 1 ;;
         *) board="$arg" ;;
     esac
@@ -40,6 +43,27 @@ else
     chip=auto
 fi
 
+# The board the VibeDock firmware on the device names (VIBEDOCK-READY {"board":...}); empty for other or older firmware.
+# Opening the port with DTR and RTS released does not restart the device; it may still be starting after esptool.
+reported_board() {
+    "$python" - "$1" <<'PY' 2>/dev/null
+import json, sys, time
+import serial
+port = serial.Serial()
+port.port, port.baudrate, port.timeout, port.dtr, port.rts = sys.argv[1], 115200, 0.3, False, False
+port.open()
+end, buffer = time.time() + 8, b""
+while time.time() < end:
+    port.write(b"VIBEDOCK-HELLO\n")
+    buffer += port.read(4096)
+    for line in buffer.split(b"\n"):
+        at = line.find(b"VIBEDOCK-READY ")
+        if at >= 0:
+            try: print(json.loads(line[at + 15:].decode(errors="replace")).get("board") or ""); sys.exit(0)
+            except ValueError: pass
+    buffer = buffer[-4096:]
+PY
+}
 esptool() { "$python" -m esptool --chip "$chip" --baud "${VIBEDOCK_BAUD:-115200}" "$@"; }
 
 # 1. Serial port: VIBEDOCK_SERIAL_PORT if set, otherwise every USB serial port where a (matching) chip answers.
@@ -102,8 +126,14 @@ if [ -z "$board" ]; then
     if [ ${#matching[@]} -eq 0 ]; then echo "No board with chip $chip in platformio.ini." >&2; exit 1
     elif [ ${#matching[@]} -eq 1 ]; then board="${matching[0]}"
     else
+        # A device that already runs VibeDock firmware names its board itself (VIBEDOCK-HELLO over the cable).
+        reported=$(reported_board "$port" || true)
+        for b in "${matching[@]}"; do [ "$b" = "$reported" ] && board="$b"; done
+        [ -n "$board" ] && echo "The device reports its board: $board"
+    fi
+    if [ -z "$board" ]; then
         echo "Boards with $chip:"
-        for i in "${!matching[@]}"; do echo "  $((i + 1))) ${matching[$i]}"; done
+        for i in "${!matching[@]}"; do printf '  %d) %-28s %s\n' "$((i + 1))" "${matching[$i]}" "$(status_of "${matching[$i]}")"; done
         read -r -p "Which board? [1-${#matching[@]}] " choice
         [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le ${#matching[@]} ] || { echo "Nothing written."; exit 1; }
         board="${matching[$((choice - 1))]}"
@@ -131,7 +161,8 @@ if [ "$chip" = esp8266 ]; then
 fi
 
 echo
-echo "Board:      $board ($chip)"
+echo "Board:      $board ($chip), $(status_of "$board")"
+[ "$(hardware_of "$board")" = tested ] || echo "Warning:    this firmware has never run on this board. If it fails, flash the board's previous firmware again."
 echo "Port:       $port  (MAC ${esp_macs[$pick]})"
 [ -n "$size" ] && echo "Flash size: ${size} MB"
 echo "Firmware:   $image"

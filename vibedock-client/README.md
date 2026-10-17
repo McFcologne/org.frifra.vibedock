@@ -250,7 +250,7 @@ References: [PlatformIO installation](https://docs.platformio.org/en/latest/core
 
 Follow [FLASHING.md](FLASHING.md) for device identification, a complete backup, verification, installation and recovery. Keep the backup private, record its SHA256 and device identity, and restore only a matching backup from that same device. Original firmware and device backups are not distributed with this project.
 
-After preparing and verifying the backup, `scripts/flash.sh [board]` detects the connected chip (and on the M1 its flash size), takes the board with that chip or offers the boards that share it (`--list` shows them), builds the candidate, shows the firmware details and asks for confirmation before writing. It writes firmware only, preserving LittleFS Wi-Fi and pairing settings. A full backup restore is a separate operation that replaces the entire flash. Neither the build configuration nor the native test installs anything on a device.
+After preparing and verifying the backup, `scripts/flash.sh [board]` detects the connected chip (and on the M1 its flash size), takes the board with that chip, or the board the VibeDock firmware on the device names, or offers the boards that share the chip, each marked tested on hardware or prepared (`--list` shows them), builds the candidate, shows the firmware details and asks for confirmation before writing. It writes firmware only, preserving LittleFS Wi-Fi and pairing settings. A full backup restore is a separate operation that replaces the entire flash. Neither the build configuration nor the native test installs anything on a device.
 
 ## Technical reference
 
