@@ -759,6 +759,17 @@ class AccessTest {
         mvc.perform(get("/web/"+secret+"/icon.png").with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk()).andExpect(content().contentType("image/png"));
         mvc.perform(get("/web/"+"0".repeat(64)+"/icon.png").with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNotFound());
         mvc.perform(get("/web/"+secret).with(r->{r.setLocalPort(8080);return r;})).andExpect(content().string(org.hamcrest.Matchers.containsString("rel=\"apple-touch-icon\" href=\"/web/"+secret+"/icon.png\"")));
+        // Changes: the state tag follows the image; a swipe changes the theme (POST only, no session needed).
+        var state=new com.fasterxml.jackson.databind.ObjectMapper().readTree(mvc.perform(get("/web/"+secret+"/state").with(r->{r.setLocalPort(8080);return r;}))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).path("tag").asText();
+        var scheme=clients.designFor(view.identifier()).scheme();
+        mvc.perform(post("/web/"+secret+"/swipe").param("direction","next").with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNoContent());
+        Assertions.assertEquals(scheme.shifted(1),clients.designFor(view.identifier()).scheme());
+        mvc.perform(get("/web/"+secret+"/state").with(r->{r.setLocalPort(8080);return r;})).andExpect(jsonPath("$.tag").value(org.hamcrest.Matchers.not(state)));
+        mvc.perform(get("/web/"+secret+"/swipe").with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isMethodNotAllowed());
+        mvc.perform(post("/web/"+"0".repeat(64)+"/swipe").param("direction","next").with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNotFound());
+        mvc.perform(post("/web/"+secret+"/swipe").param("direction","next").with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isNotFound());
+        clients.setDesign(view.identifier(),null);
         // Fitting the browser: the window's shape at its full resolution; devices cannot fit.
         clients.setDisplay(view.identifier(),"fit");
         var fitted=javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(mvc.perform(get("/web/"+secret+"/image.png").param("w","393").param("h","852").param("r","3")

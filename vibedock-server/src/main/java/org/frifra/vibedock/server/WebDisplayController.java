@@ -6,6 +6,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
+import java.util.HexFormat;
 
 /**
  * Web displays on the public port: a page that shows the image full screen and reloads it, and the image itself as
@@ -15,13 +16,14 @@ import java.io.IOException;
  */
 @Controller
 class WebDisplayController {
-    private final ClientRegistry registry;private final DesignService designs;private final ApplicationInfo info;
-    WebDisplayController(ClientRegistry registry,DesignService designs,ApplicationInfo info){
-        this.registry=registry;this.designs=designs;this.info=info;
+    private final ClientRegistry registry;private final DesignService designs;private final ApplicationInfo info;private final AdminEvents events;
+    WebDisplayController(ClientRegistry registry,DesignService designs,ApplicationInfo info,AdminEvents events){
+        this.registry=registry;this.designs=designs;this.info=info;this.events=events;
     }
     @GetMapping("/web/{secret}") String page(@PathVariable String secret,Model model){
         var view=registry.webBySecret(secret).orElseThrow(WebDisplayController::notFound);
         model.addAttribute("name",view.name());model.addAttribute("image","/web/"+secret+"/image.png");model.addAttribute("icon","/web/"+secret+"/icon.png");
+        model.addAttribute("state","/web/"+secret+"/state");model.addAttribute("swipe","/web/"+secret+"/swipe");
         model.addAttribute("reload",view.web().reloadSeconds());model.addAttribute("ratio",(double)view.display().height()/view.display().width());
         return "web-display";
     }
@@ -34,10 +36,29 @@ class WebDisplayController {
         byte[] png=designs.render(view.design(),footer(info),sized.type(),view.identifier(),sized.scale()).png();
         return ResponseEntity.ok().contentType(MediaType.IMAGE_PNG).cacheControl(CacheControl.noStore()).body(png);
     }
-    /** The home screen icon of the page (iOS web clips, Android shortcuts): the VibeDock icon. */
+    /**
+     * What the image shows now, as a short tag: the page asks every few seconds and loads a new image only when it
+     * changed, so changes (a new design, new usage data, the next photo) appear within seconds.
+     */
+    @GetMapping(value="/web/{secret}/state",produces="application/json") ResponseEntity<java.util.Map<String,String>> state(@PathVariable String secret) throws IOException {
+        var view=registry.webBySecret(secret).orElseThrow(WebDisplayController::notFound);
+        byte[] png=designs.render(view.design(),footer(info),view.display(),view.identifier()).png();
+        String tag;try{tag=HexFormat.of().formatHex(java.util.Arrays.copyOf(java.security.MessageDigest.getInstance("SHA-256").digest(png),12));}
+        catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(java.util.Map.of("tag",tag));
+    }
+    /** A swipe on the page: the next or previous theme, in a slideshow the next or previous photo (like touch displays). */
+    @PostMapping("/web/{secret}/swipe") ResponseEntity<Void> swipe(@PathVariable String secret,@RequestParam String direction){
+        var view=registry.webBySecret(secret).orElseThrow(WebDisplayController::notFound);
+        int step=switch(direction){case "next"->1;case "previous"->-1;default->0;};
+        if(step==0)return ResponseEntity.badRequest().build();
+        DeviceApiController.swipe(registry,designs,events,view.identifier(),step);
+        return ResponseEntity.noContent().build();
+    }
+    /** The home screen icon of the page (iOS web clips, Android shortcuts): the display's icon, as on the devices' own pages. */
     @GetMapping(value="/web/{secret}/icon.png",produces="image/png") ResponseEntity<byte[]> icon(@PathVariable String secret) throws IOException {
         registry.webBySecret(secret).orElseThrow(WebDisplayController::notFound);
-        byte[] png;try(var in=getClass().getResourceAsStream("/static/apple-touch-icon.png")){if(in==null)throw notFound();png=in.readAllBytes();}
+        byte[] png;try(var in=getClass().getResourceAsStream("/web-display-icon.png")){if(in==null)throw notFound();png=in.readAllBytes();}
         return ResponseEntity.ok().contentType(MediaType.IMAGE_PNG).cacheControl(CacheControl.maxAge(java.time.Duration.ofDays(7)).cachePrivate()).body(png);
     }
     /** What a web display shows where devices show their IP. */
