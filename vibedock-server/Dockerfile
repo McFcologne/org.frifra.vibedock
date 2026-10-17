@@ -16,12 +16,13 @@ FROM --platform=$BUILDPLATFORM python:3.12-slim-bookworm AS firmware
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/* \
     && git config --global safe.directory '*' && pip install --no-cache-dir "platformio==6.2.0"
 # PlatformIO keeps its toolchain in a build cache. A build cancelled during the download leaves a package without
-# its manifest there; the build then clears the cached packages and downloads them again once.
+# its manifest there; the build then clears the cached packages and downloads them again once. VIBEDOCK_PRUNE drops
+# each board's build directory and the ESP-IDF installer copies (cache/tools, several GB) to keep the disk use down.
 RUN --mount=type=bind,from=git,target=/repo.git --mount=type=cache,id=vibedock-platformio,target=/root/.platformio,sharing=locked \
     mkdir -p /out /w && if git --git-dir=/repo.git rev-parse -q --verify HEAD >/dev/null; then \
       git --git-dir=/repo.git archive HEAD vibedock-client/firmware vibedock-client/scripts | tar -x -C /w \
       && cd /w/vibedock-client/firmware && export GIT_DIR=/repo.git GIT_WORK_TREE=/w \
-      && { sh ../scripts/images.sh /out || { rm -rf /root/.platformio/packages /root/.platformio/platforms /root/.platformio/.cache \
+      && export VIBEDOCK_PRUNE=1 && { sh ../scripts/images.sh /out || { rm -rf /root/.platformio/packages /root/.platformio/platforms /root/.platformio/.cache /root/.platformio/tools \
              && sh ../scripts/images.sh /out; }; }; \
     fi
 
