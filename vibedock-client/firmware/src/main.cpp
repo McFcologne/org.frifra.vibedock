@@ -701,6 +701,7 @@ void handlePair() {
   if (status == 400) { web.send(400, "application/json", "{\"error\":\"no usable server address or invalid key\"}"); return; }
   if (status != 200) { web.send(500, "application/json", "{\"error\":\"storage\"}"); return; }
   JsonDocument reply; reply["identifier"] = identifier; reply["name"] = deviceName; reply["board"] = VIBEDOCK_BOARD;
+  reply["subnetMask"] = WiFi.subnetMask().toString();  // fixed by the server at pairing; pulls only fill it in once if it is missing
   String out; serializeJson(reply, out);
   web.send(200, "application/json", out);
   mode = Mode::Paired; lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u; lastImage = millis();
@@ -774,6 +775,7 @@ int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
   r.http.addHeader("Accept-Encoding", "identity");  // never compressed: the image is read byte for byte  // over TLS 1.3 a 16 kB record has to arrive whole before any byte reads r.http.setReuse(false);
   r.http.addHeader("Authorization", "Bearer " + key);
   r.http.addHeader("X-VibeDock-Device-IP", WiFi.localIP().toString());  // the server may only see a NAT gateway
+  r.http.addHeader("X-VibeDock-Subnet-Mask", WiFi.subnetMask().toString());  // USB and legacy registrations learn their mask once
   r.http.addHeader("X-VibeDock-Footer", "server");  // this firmware shows the IP the server draws into the image
   r.http.addHeader("X-VibeDock-Firmware", VIBEDOCK_VERSION);  // lets the administration offer updates
   r.http.addHeader("X-VibeDock-Display", String(panel.width()) + "x" + String(panel.height()));  // suggests the display type

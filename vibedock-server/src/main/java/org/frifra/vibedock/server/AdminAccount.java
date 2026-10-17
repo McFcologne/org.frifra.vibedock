@@ -17,6 +17,15 @@ class AdminAccount implements UserDetailsService {
     private final String name,configured;
     private final SettingsStore store;
     private volatile String own;
+    private org.springframework.security.core.session.SessionRegistry sessions;
+    @org.springframework.beans.factory.annotation.Autowired
+    void sessionRegistry(org.springframework.security.core.session.SessionRegistry sessions){this.sessions=sessions;}
+    private void revokeSessions(){
+        if(sessions==null)return; // Standalone account tests have no servlet sessions.
+        for(var principal:sessions.getAllPrincipals())
+            if(principal instanceof UserDetails user&&name.equals(user.getUsername()))
+                sessions.getAllSessions(principal,false).forEach(org.springframework.security.core.session.SessionInformation::expireNow);
+    }
 
     AdminAccount(@Value("${vibedock.admin-user}") String name,@Value("${vibedock.admin-password}") String password,SettingsStore store) throws IOException {
         this.name=name;this.store=store;
@@ -37,13 +46,13 @@ class AdminAccount implements UserDetailsService {
         if(next==null||!next.equals(repeat))throw new IllegalArgumentException("The new passwords do not match.");
         int bytes=next.getBytes(StandardCharsets.UTF_8).length;
         if(next.length()<8||bytes>72)throw new IllegalArgumentException("The new password needs at least 8 characters (at most 72 bytes).");
-        String hash=BCRYPT.encode(next);store.saveAdminPasswordHash(hash);own=hash;
+        String hash=BCRYPT.encode(next);store.saveAdminPasswordHash(hash);own=hash;revokeSessions();
     }
     /** Back to ADMIN_PASSWORD; only possible while it is set. */
     synchronized void reset(String current) throws IOException {
         check(current);
         if(configured==null)throw new IllegalArgumentException("ADMIN_PASSWORD is not set, so the password cannot be reset to it.");
-        store.saveAdminPasswordHash(null);own=null;
+        store.saveAdminPasswordHash(null);own=null;revokeSessions();
     }
     private void check(String current){
         if(current==null||!BCRYPT.matches(current,hash()))throw new IllegalArgumentException("The current password is wrong.");

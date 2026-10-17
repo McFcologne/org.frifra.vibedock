@@ -24,7 +24,7 @@ class DevicePoke {
     void pullNow(List<ClientRegistry.Address> devices){
         if(!enabled||devices.isEmpty())return;
         for(var device:devices){
-            if(ClientPairing.UNKNOWN_IP.equals(device.ip()))continue;  // set up over USB, no pull yet
+            if(ClientPairing.UNKNOWN_IP.equals(device.ip()))continue;  // Web display or USB device that has not contacted the server yet
             String host=device.ip().contains(":")?"["+device.ip()+"]":device.ip();
             var request=HttpRequest.newBuilder(URI.create("http://"+host+":"+device.port()+"/pull")).timeout(Duration.ofSeconds(3))
                     .POST(HttpRequest.BodyPublishers.noBody()).build();

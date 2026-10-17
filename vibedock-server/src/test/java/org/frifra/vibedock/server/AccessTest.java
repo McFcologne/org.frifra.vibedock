@@ -132,6 +132,14 @@ class AccessTest {
         mvc.perform(post("/logout").header("Accept","text/html").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
                 .andExpect(redirectedUrl("/login?logout"));
     }
+    @Test void loginShowsWhyAPasswordChangeSignedYouOut() throws Exception {
+        mvc.perform(get("/login").param("expired","").flashAttr("passwordMessage","Password changed. Sign in with the new password.")
+                .with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Password changed. Sign in with the new password.")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Your session has expired"))));
+        mvc.perform(get("/login").param("expired","").with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Your session has expired")));
+    }
     @Test void ownPasswordReplacesTheConfiguredOneUntilReset() throws Exception {
         var admin=user("admin").roles("ADMIN");
         try{
@@ -454,9 +462,25 @@ class AccessTest {
         mvc.perform(get("/admin/firmware/setup/vibedock-a1b2c3d4e5f6").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
                 .andExpect(jsonPath("$.status").value("Waiting for first pull")).andExpect(jsonPath("$.ip").value(""));
         mvc.perform(get("/api/v1/clients/vibedock-a1b2c3d4e5f6/image").header("Authorization","Bearer "+key)
-                .with(r->{r.setLocalPort(8080);r.setRemoteAddr("192.168.1.44");return r;})).andExpect(status().isOk());
+                .header("X-VibeDock-Device-IP","192.168.1.44").header("X-VibeDock-Firmware","0.1.0")
+                .with(r->{r.setLocalPort(8080);r.setRemoteAddr("172.17.0.1");return r;})).andExpect(status().isOk());
+        Assertions.assertEquals("192.168.1.44",clients.address("vibedock-a1b2c3d4e5f6").ip(),"Use the device report, not the Docker gateway");
         mvc.perform(get("/admin/firmware/setup/vibedock-a1b2c3d4e5f6").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
                 .andExpect(jsonPath("$.status").value("Connected")).andExpect(jsonPath("$.ip").value("192.168.1.44"));
+        mvc.perform(get("/api/v1/clients/vibedock-a1b2c3d4e5f6/image").header("Authorization","Bearer wrong")
+                .header("X-VibeDock-Device-IP","192.168.1.44").header("X-VibeDock-Firmware","0.1.1").header("X-VibeDock-Subnet-Mask","255.255.0.0")
+                .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/clients/vibedock-a1b2c3d4e5f6/image").header("Authorization","Bearer "+key)
+                .header("X-VibeDock-Device-IP","192.168.1.44").header("X-VibeDock-Firmware","0.1.1").header("X-VibeDock-Subnet-Mask","255.255.254.0")
+                .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/clients/vibedock-a1b2c3d4e5f6/image").header("Authorization","Bearer "+key)
+                .header("X-VibeDock-Device-IP","192.168.0.99").header("X-VibeDock-Firmware","0.1.1").header("X-VibeDock-Subnet-Mask","255.255.0.0")
+                .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk());
+        Assertions.assertEquals("192.168.0.99",clients.address("vibedock-a1b2c3d4e5f6").ip());
+        mvc.perform(get("/api/v1/clients/vibedock-a1b2c3d4e5f6/image").header("Authorization","Bearer "+key)
+                .header("X-VibeDock-Device-IP","192.168.2.99").header("X-VibeDock-Firmware","0.1.1").header("X-VibeDock-Subnet-Mask","255.255.0.0")
+                .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk());
+        Assertions.assertEquals("192.168.1.44",clients.address("vibedock-a1b2c3d4e5f6").ip());
         mvc.perform(get("/admin/firmware/setup/vibedock-000000000000").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
                 .andExpect(status().isNotFound());
         clients.remove("vibedock-a1b2c3d4e5f6");clients.configure("","",30);

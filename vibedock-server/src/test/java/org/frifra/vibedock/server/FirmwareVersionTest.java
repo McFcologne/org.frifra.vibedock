@@ -4,6 +4,13 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class FirmwareVersionTest {
+    @org.junit.jupiter.api.Test void protocolUpgradesRequireAKnownNewerVersion(){
+        org.junit.jupiter.api.Assertions.assertTrue(FirmwareVersion.knownNewer("0.1.1","0.1.0"));
+        org.junit.jupiter.api.Assertions.assertTrue(FirmwareVersion.knownNewer("0.1.0-1-gabcdef-dirty","0.1.0"));
+        for(String version:new String[]{null,"0.1.0","0.1.0-dirty","0.0.9","unknown","999999999999999999999.1.0"})
+            org.junit.jupiter.api.Assertions.assertFalse(FirmwareVersion.knownNewer(version,"0.1.0"));
+    }
+
     @Test void offersOnlyNewerFirmware() {
         assertTrue(FirmwareVersion.newer("0.2.5","0.2.4"));
         assertTrue(FirmwareVersion.newer("0.2.4-33-g2051f44","0.2.4-29-g92b2427"));

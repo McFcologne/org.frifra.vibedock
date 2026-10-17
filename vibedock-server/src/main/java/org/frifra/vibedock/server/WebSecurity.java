@@ -30,7 +30,13 @@ class WebSecurity {
             factory.addAdditionalTomcatConnectors(connector);
         };
     }
-    @Bean SecurityFilterChain security(HttpSecurity http) throws Exception {
+    @Bean org.springframework.security.core.session.SessionRegistry sessionRegistry(){
+        return new org.springframework.security.core.session.SessionRegistryImpl();
+    }
+    @Bean org.springframework.security.web.session.HttpSessionEventPublisher sessionEvents(){
+        return new org.springframework.security.web.session.HttpSessionEventPublisher();
+    }
+    @Bean SecurityFilterChain security(HttpSecurity http,org.springframework.security.core.session.SessionRegistry sessions) throws Exception {
         // Behind a TLS reverse proxy (e.g. Synology Web Station) absolute http:// redirects would break; browsers get
         // a relative redirect to the login page instead. Other clients keep HTTP Basic.
         var login=new LoginUrlAuthenticationEntryPoint("/login");login.setFavorRelativeUris(true);
@@ -42,6 +48,7 @@ class WebSecurity {
                 // Login page assets; the port guard still limits them to the administration port.
                 .requestMatchers("/login","/error","/app.css","/theme.js","/logo.svg","/favicon.ico","/apple-touch-icon.png").permitAll()
                 .anyRequest().hasRole("ADMIN"))
+                .sessionManagement(s -> s.maximumSessions(-1).sessionRegistry(sessions).expiredUrl("/login?expired"))
                 .formLogin(f -> f.loginPage("/login").defaultSuccessUrl("/admin",true).permitAll())
                 // Sign out by GET as well and without the CSRF token: opening /logout or a form from before a server
                 // restart (expired token) used to end on a 403 page. A forged sign-out link can only sign you out.
@@ -58,6 +65,12 @@ class WebSecurity {
                 HttpServletRequest request=(HttpServletRequest)req;
                 HttpServletResponse response=(HttpServletResponse)res;
                 String path=request.getRequestURI();
+                // Never log bearer URLs or query strings. Missing attributes log as "-", never as the raw request.
+                String decoded;
+                try{decoded=java.net.URLDecoder.decode(path,java.nio.charset.StandardCharsets.UTF_8);}
+                catch(IllegalArgumentException e){decoded="/web/invalid";} // Malformed escapes are not safe to log.
+                String loggedPath=decoded.startsWith("/web/")||decoded.startsWith("/web;")?"/web/[redacted]":path;
+                request.setAttribute("vibedock.accessRequest",request.getMethod()+" "+loggedPath+" "+request.getProtocol());
                 boolean api=path.equals("/api/v1/usage");
                 // Device pull (protocol v2): authenticated by the device key in the controller.
                 boolean image=path.matches("/api/v1/clients/[A-Za-z0-9_.:-]{8,80}/(image|firmware)")

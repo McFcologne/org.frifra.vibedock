@@ -425,11 +425,21 @@ Every paired display has a card:
 
 ## Pairing a display with its code
 
+**HTTP pairing is unencrypted.** Use it only on a trusted home network. A network attacker can read the
+device key or replace its TLS/OTA trust keys. The form shows a warning and remains available without
+extra activation. Alternatively, use **Devices → Firmware → Only pair** over USB without reinstalling firmware.
+
 A display without pairing shows its IP address and a six-digit code (see [The display's own
 screens](#the-displays-own-screens)). Open **Pair device**, enter both, optionally a name, and choose the
 **board** for a display whose firmware does not report its board (VibeDock firmware reports it itself):
 
 <img src="images/13-pair-device.png" width="80%" alt="Pair device">
+
+The display supplies its subnet mask automatically. IP changes within that network are accepted for immediate
+reloads; older devices without a mask use the first three blocks of the original IPv4 pairing IP (`/24`).
+There is no extra input field. Version 0.1.0 remains supported with `/24`; the first valid authenticated
+mask report from a newer client may replace this fallback once. The original IP stays fixed, and later
+firmware updates or IP reports cannot change an already learned network.
 
 The server sends its addresses (internal first, external as fallback) to the display; the display then shows its
 image. **Device port** is only needed when the display does not listen on port 80. Displays installed from the
@@ -593,7 +603,8 @@ Changes the administration password with the current one. The new password (at l
 `ADMIN_PASSWORD` from `.env`; the server keeps only its hash in the data directory (`admin-password`), so it stays
 after updates. The badge shows which one applies. **Back to ADMIN_PASSWORD** deletes the own password again. If the
 own password is lost, delete `admin-password` in the data directory and restart the server; `ADMIN_PASSWORD`
-applies again. The current session stays signed in.
+applies again. Changing or resetting the password signs out every session, this one included; sign in again
+with the new password.
 
 ## Storage
 

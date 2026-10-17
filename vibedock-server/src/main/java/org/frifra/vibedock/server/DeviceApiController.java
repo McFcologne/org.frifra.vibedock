@@ -32,7 +32,8 @@ class DeviceApiController {
         String peer=deviceAddress(request.getHeader("X-VibeDock-Device-IP"),request.getRemoteAddr());
         boolean serverFooter="server".equals(request.getHeader("X-VibeDock-Footer"));
         String version=request.getHeader("X-VibeDock-Firmware");
-        registry.pulled(identifier,peer,serverFooter,version!=null&&version.matches("[0-9A-Za-z.+-]{1,40}")?version:null);
+        registry.pulled(identifier,peer,serverFooter,version!=null&&version.matches("[0-9A-Za-z.+-]{1,40}")?version:null,
+                request.getHeader("X-VibeDock-Subnet-Mask"));
         String updateError=request.getHeader("X-VibeDock-Update-Error");
         registry.otaReport(identifier,request.getHeader("X-VibeDock-Ota"),
                 updateError!=null&&updateError.matches("[ -~]{1,120}")?updateError:null);
@@ -83,11 +84,17 @@ class DeviceApiController {
     }
     /**
      * The device's own address as it reports it; behind NAT (e.g. Docker Desktop) the remote address is only the
-     * gateway. The report is trusted because the request is authenticated with the device key.
+     * gateway. The report is display data; callback selection separately enforces the network fixed at pairing.
+     * A display never has a loopback, link-local, unspecified or multicast address: such reports (e.g. 127.0.0.1 or
+     * the cloud metadata address 169.254.169.254) are ignored and the connection's source address counts instead.
      */
     static String deviceAddress(String reported,String remote){
         if(reported!=null&&!reported.isBlank()&&reported.length()<=45){
-            try{IpNetworks.literal(reported.trim());return reported.trim();}catch(IllegalArgumentException ignored){}
+            try{
+                var address=java.net.InetAddress.getByAddress(IpNetworks.literal(reported.trim()));
+                if(!address.isLoopbackAddress()&&!address.isLinkLocalAddress()&&!address.isAnyLocalAddress()&&!address.isMulticastAddress())
+                    return reported.trim();
+            }catch(IllegalArgumentException|java.net.UnknownHostException ignored){}
         }
         return remote;
     }

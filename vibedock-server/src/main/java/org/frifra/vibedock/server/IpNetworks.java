@@ -43,6 +43,20 @@ final class IpNetworks {
         if (bits<0 || bits>address.length*8) throw new IllegalArgumentException("Invalid CIDR prefix length");
         return new Network(address,bits);
     }
+    /** Widest network a device may report for itself: a home or office LAN, never a large part of the address space. */
+    static final int MIN_SUBNET_BITS=16;
+    /** Bind the reported IPv4 mask to the administrator's pairing target, never to a later pull. */
+    static String subnet(String ip,String mask) {
+        byte[] address=literal(ip),bytes=literal(mask);
+        if(address.length!=4||bytes.length!=4)throw new IllegalArgumentException("An IPv4 subnet mask is required");
+        int bits=0;boolean zero=false;
+        for(byte value:bytes)for(int bit=7;bit>=0;bit--){
+            if((value&(1<<bit))==0)zero=true;
+            else{if(zero)throw new IllegalArgumentException("Subnet mask must be contiguous");bits++;}
+        }
+        if(bits<MIN_SUBNET_BITS)throw new IllegalArgumentException("Subnet masks wider than /"+MIN_SUBNET_BITS+" are not accepted");
+        return ip+"/"+bits;
+    }
     static boolean allows(List<String> ranges,String peer) {
         return ranges.stream().map(IpNetworks::parse).anyMatch(n -> n.matches(peer));
     }
