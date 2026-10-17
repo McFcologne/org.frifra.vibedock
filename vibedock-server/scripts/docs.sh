@@ -6,7 +6,7 @@
 #   scripts/docs.sh serve           no screenshots: the demo server stays up at http://127.0.0.1:10001/admin for local work
 #   DEMO_DATA=docker.data scripts/docs.sh serve   the same with that data directory (demo-… tokens give made-up usage)
 #   DOCS_VERSION=0.1.0 scripts/docs.sh
-#   EMOJI_DIR=…/twemoji/72x72       an existing Twemoji PNG set; otherwise the pinned set is downloaded once
+#   EMOJI_DIR=…/twemoji/svg         an existing Twemoji SVG (or 72x72 PNG) set; otherwise the pinned set is downloaded once
 #   PLAYWRIGHT_CHROMIUM=…/chromium  a Chromium of your own instead of Playwright's
 #   DOCS_PDF=…/vibedock-manual.pdf    also makes the PDF (pandoc and XeLaTeX with DejaVu fonts; the Docker build does)
 #   LICENSE_INVENTORY=…/components.json  the Docker image's components for the PDF's license list (the Docker build)
@@ -19,13 +19,13 @@ mvn -q -Drevision="$version" -DskipTests package dependency:build-classpath -Dmd
 if [ -z "${EMOJI_DIR:-}" ]; then
     # The same pinned Twemoji release as the Docker image (see Dockerfile).
     twemoji=17.0.3 sum=a0855654b633045ae2337537e77f1bb4361162f7fcd910e613eaab1d6d9c5fca
-    EMOJI_DIR="$server/target/docs-twemoji/twemoji-$twemoji/assets/72x72"
+    EMOJI_DIR="$server/target/docs-twemoji/twemoji-$twemoji/assets/svg"
     if [ ! -d "$EMOJI_DIR" ]; then
         mkdir -p target/docs-twemoji
         curl -fsSL -o target/docs-twemoji/twemoji.tgz "https://github.com/jdecked/twemoji/archive/refs/tags/v$twemoji.tar.gz"
         if command -v sha256sum >/dev/null; then check="sha256sum -c -"; else check="shasum -a 256 -c -"; fi  # macOS: shasum
         echo "$sum  target/docs-twemoji/twemoji.tgz" | $check >/dev/null
-        tar xzf target/docs-twemoji/twemoji.tgz -C target/docs-twemoji "twemoji-$twemoji/assets/72x72"
+        tar xzf target/docs-twemoji/twemoji.tgz -C target/docs-twemoji "twemoji-$twemoji/assets/svg"
     fi
 fi
 [ -d e2e/node_modules ] || (cd e2e && npm ci --silent)

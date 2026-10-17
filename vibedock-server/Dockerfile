@@ -37,14 +37,15 @@ COPY src ./src
 COPY --from=version /version /version
 RUN mvn -B verify -Drevision="$(cat /version)"
 
-# Twemoji PNGs (graphics CC-BY 4.0) for the emoji in the status image; Java2D cannot draw colour emoji fonts.
+# Twemoji SVGs (graphics CC-BY 4.0) for the emoji in the status image, sharp at any size; Java2D cannot draw colour
+# emoji fonts.
 FROM --platform=$BUILDPLATFORM alpine:3.22 AS twemoji
 ARG TWEMOJI_VERSION
 ARG TWEMOJI_SHA256=a0855654b633045ae2337537e77f1bb4361162f7fcd910e613eaab1d6d9c5fca
 RUN wget -qO /tmp/twemoji.tgz "https://github.com/jdecked/twemoji/archive/refs/tags/v${TWEMOJI_VERSION}.tar.gz" \
     && echo "${TWEMOJI_SHA256}  /tmp/twemoji.tgz" | sha256sum -c - \
-    && tar xzf /tmp/twemoji.tgz -C /tmp "twemoji-${TWEMOJI_VERSION}/assets/72x72" "twemoji-${TWEMOJI_VERSION}/LICENSE-GRAPHICS" \
-    && mkdir /twemoji && mv "/tmp/twemoji-${TWEMOJI_VERSION}/assets/72x72" "/tmp/twemoji-${TWEMOJI_VERSION}/LICENSE-GRAPHICS" /twemoji/
+    && tar xzf /tmp/twemoji.tgz -C /tmp "twemoji-${TWEMOJI_VERSION}/assets/svg" "twemoji-${TWEMOJI_VERSION}/LICENSE-GRAPHICS" \
+    && mkdir /twemoji && mv "/tmp/twemoji-${TWEMOJI_VERSION}/assets/svg" "/tmp/twemoji-${TWEMOJI_VERSION}/LICENSE-GRAPHICS" /twemoji/
 
 FROM --platform=$BUILDPLATFORM node:22-bookworm-slim AS node
 
@@ -83,7 +84,7 @@ COPY e2e/package.json e2e/package-lock.json ./e2e/
 RUN cd e2e && npm ci --silent && npx playwright install --with-deps chromium
 COPY scripts ./scripts
 COPY e2e/docs ./e2e/docs
-COPY --from=twemoji /twemoji/72x72 /twemoji
+COPY --from=twemoji /twemoji/svg /twemoji
 COPY --from=runtime /app/legal/components.json /legal/components.json
 RUN --mount=type=bind,from=git,target=/repo.git mkdir -p /out && if git --git-dir=/repo.git rev-parse -q --verify HEAD >/dev/null; then \
       git --git-dir=/repo.git archive HEAD docs/manual docs/logo.svg | tar -x -C / \
