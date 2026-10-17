@@ -14,9 +14,9 @@ import java.util.List;
 class DeviceAdminController {
     private static final Logger log=LoggerFactory.getLogger(DeviceAdminController.class);
     private final ClientRegistry registry;private final ClientPairing pairing;private final DesignService designs;private final ServerAddresses addresses;private final DevicePoke poke;
-    private final Firmware firmware;private final ApplicationInfo info;private final DeviceLogs logs;
-    DeviceAdminController(ClientRegistry registry,ClientPairing pairing,DesignService designs,ServerAddresses addresses,DevicePoke poke,Firmware firmware,ApplicationInfo info,DeviceLogs logs){
-        this.info=info;this.logs=logs;
+    private final Firmware firmware;private final ApplicationInfo info;private final DeviceLogs logs;private final AdminEvents events;
+    DeviceAdminController(ClientRegistry registry,ClientPairing pairing,DesignService designs,ServerAddresses addresses,DevicePoke poke,Firmware firmware,ApplicationInfo info,DeviceLogs logs,AdminEvents events){
+        this.info=info;this.logs=logs;this.events=events;
         this.registry=registry;this.pairing=pairing;this.designs=designs;this.addresses=addresses;this.poke=poke;this.firmware=firmware;
     }
     @PostMapping("/admin/clients/invite") String invite(@RequestParam String ip,@RequestParam(defaultValue="80") int port,
@@ -58,7 +58,7 @@ class DeviceAdminController {
     org.springframework.http.ResponseEntity<java.util.Map<String,Object>> saveLog(@PathVariable String identifier,@RequestBody LogUpload upload) throws IOException {
         try{
             var entry=logs.save(identifier,"usb",upload.firmware(),upload.board(),upload.lines());
-            log.info("Saved the USB log of {} ({} lines)",identifier,entry.lines());
+            log.info("Saved the USB log of {} ({} lines)",identifier,entry.lines());events.logSaved(identifier);
             return org.springframework.http.ResponseEntity.ok(java.util.Map.of("name",entry.name(),"count",logs.count(identifier),"keep",DeviceLogs.KEEP));
         }catch(IllegalArgumentException e){return org.springframework.http.ResponseEntity.badRequest().body(java.util.Map.of("error",e.getMessage()));}
     }
@@ -71,7 +71,7 @@ class DeviceAdminController {
             var view=registry.get(identifier);
             if(view.web()!=null||!sendsLog(view.firmware())){flash.addFlashAttribute("logMessage","This display can send its log only over USB. Update its firmware to read it over the network.");return page;}
             logs.request(identifier);poke.pullNow(List.of(registry.address(identifier)));
-            flash.addFlashAttribute("logMessage","Requested. The log appears here within seconds, or with the display's next pull (reload this page).");
+            flash.addFlashAttribute("logMessage","Requested. The log appears here by itself: within seconds, or with the display's next pull.");
         }catch(IllegalArgumentException e){flash.addFlashAttribute("logMessage","The device was already removed.");}
         return page;
     }
@@ -203,10 +203,17 @@ class DeviceAdminController {
                 "updateError",v.updateError()==null?"":v.updateError(),"status",v.status()));
         return out;
     }
-    @GetMapping(value="/admin/clients/{identifier}/preview.png",produces="image/png") @ResponseBody byte[] preview(@PathVariable String identifier) throws IOException {
+    /**
+     * Kept briefly by the browser (private, 10 s, then shown while it fetches the next): reloading the page shows the
+     * previews at once instead of empty while they load (the default no-store made them flicker).
+     */
+    @GetMapping(value="/admin/clients/{identifier}/preview.png",produces="image/png") @ResponseBody org.springframework.http.ResponseEntity<byte[]> preview(@PathVariable String identifier) throws IOException {
         var client=registry.get(identifier);
         String footer=client.web()!=null?WebDisplayController.footer(info):client.ip();
-        return designs.render(DesignService.forDevice(client.design(),client.serverFooter()),footer,client.display()).png();
+        byte[] png=designs.render(DesignService.forDevice(client.design(),client.serverFooter()),footer,client.display()).png();
+        return org.springframework.http.ResponseEntity.ok().contentType(org.springframework.http.MediaType.IMAGE_PNG)
+                .cacheControl(org.springframework.http.CacheControl.maxAge(java.time.Duration.ofSeconds(10)).cachePrivate().staleWhileRevalidate(java.time.Duration.ofMinutes(5)))
+                .body(png);
     }
     /** The default design as a device would show it; the IP is a placeholder. */
     @GetMapping(value="/admin/preview.png",produces="image/png") @ResponseBody byte[] statusPreview() throws IOException {

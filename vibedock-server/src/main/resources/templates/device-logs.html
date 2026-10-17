@@ -3,7 +3,7 @@
 <head th:replace="~{fragments :: head('Device logs')}"></head>
 <body>
 <header th:replace="~{fragments :: appbar('devices')}"></header>
-<main>
+<main th:attr="data-log-device=${identifier}">
 <div class="page-heading"><div><h2 th:text="${'Logs of ' + deviceName}">Logs</h2>
   <p>The last <span th:text="${keep}">10</span> logs read from this display, newest first. Logs read over USB
   (<a th:href="@{/admin/troubleshooting}">Troubleshooting</a>) or sent by the display over the network are saved here. <code th:text="${identifier}"></code></p></div>
@@ -11,7 +11,7 @@
     <form th:if="${networkLog}" th:action="@{/admin/clients/{id}/logs/request(id=${identifier})}" method="post">
       <button title="The display sends its log over its server connection">Read log over the network</button></form></div></div>
 <p class="notice" th:if="${logMessage}" th:text="${logMessage}" role="status"></p>
-<p class="notice" th:if="${logRequested and logMessage == null}">A log has been requested; the display sends it with its next pull. Reload this page.</p>
+<p class="notice" th:if="${logRequested and logMessage == null}">A log has been requested; the display sends it with its next pull. It appears here by itself.</p>
 <p class="meta" th:if="${paired and !networkLog}">This display's firmware sends its log only over USB (Troubleshooting). Newer firmware can send it over the network.</p>
 <p class="meta" th:if="${entries.isEmpty()}">No logs saved yet.</p>
 <section class="card device-log" th:each="item:${entries}" th:with="entry=${item.entry}">
@@ -25,4 +25,5 @@
 </section>
 </main>
 <footer th:replace="~{fragments :: footer}"></footer>
+<script src="../static/device-logs.js" th:src="@{/device-logs.js}"></script>
 </body></html>

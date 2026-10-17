@@ -24,7 +24,7 @@
 <section class="card">
   <div class="card-head"><h3 class="grow">Paired displays</h3></div>
   <p class="meta" th:if="${#lists.isEmpty(targets)}">No displays paired yet. A log read over USB is kept anyway.</p>
-  <table class="firmware-devices" th:unless="${#lists.isEmpty(targets)}">
+  <table class="firmware-devices" data-log-targets th:unless="${#lists.isEmpty(targets)}">
     <thead><tr><th>Display</th><th>Board · firmware</th><th>Saved logs</th><th></th></tr></thead>
     <tbody><tr th:each="t:${targets}" th:with="c=${t.device}">
       <td><strong th:text="${c.name}"></strong><br><span class="meta" th:text="${c.status}"></span></td>

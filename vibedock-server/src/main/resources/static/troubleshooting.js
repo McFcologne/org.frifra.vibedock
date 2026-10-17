@@ -4,6 +4,14 @@ const card = document.getElementById('usb-log');
 const output = card.querySelector('[data-usb-output]'), buttons = card.querySelectorAll('[data-usb-log],[data-usb-restart]');
 const writeLine = line => { output.hidden = false; output.textContent += line + '\n'; output.scrollTop = output.scrollHeight; };
 let port, busy = false;
+// New logs (AdminEvents "logs"): the table of saved logs is fetched again and swapped in; the USB output stays.
+try {
+  new EventSource('/admin/events').addEventListener('logs', async () => {
+    const table = document.querySelector('[data-log-targets]'); if (!table) return;
+    const page = new DOMParser().parseFromString(await (await fetch(location.pathname, { credentials: 'same-origin' })).text(), 'text/html');
+    const fresh = page.querySelector('[data-log-targets]'); if (fresh) table.replaceWith(document.importNode(fresh, true));
+  });
+} catch { /* reload by hand */ }
 
 if (!('serial' in navigator) || !window.isSecureContext) {
   card.querySelector('[data-usb-unsupported]').hidden = false;

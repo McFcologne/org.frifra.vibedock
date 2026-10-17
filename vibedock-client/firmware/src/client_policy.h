@@ -94,20 +94,21 @@ constexpr uint16_t pixel(uint8_t high, uint8_t low) { return uint16_t(high) << 8
 // Colour correction of the panel: one gamma for the brightness curve, one gain per channel for the white balance.
 // The gamma registers of the ST7789 shape all three channels alike, so the colour cast can only be fixed here.
 // gamma is in hundredths (250 = 2.5, darker mid and dark tones), gains in percent of the full channel.
-// The defaults are calibrated on the 240x240 ST7789 IPS panel of the VibeTV M1 by eye against the server preview;
-// other boards set their own (VIBEDOCK_TONE_*, neutral until calibrated on the device).
+// The defaults are calibrated by eye against the uncorrected image on the device page: these on the 240x240 ST7789
+// IPS panel of the VibeTV M1 (until 0.2.0: 250/91/94/73), the other boards set their own (VIBEDOCK_TONE_*; the
+// Waveshare 1.47 calibrated, the rest neutral until calibrated on the device).
 #ifndef VIBEDOCK_TONE_GAMMA
-#define VIBEDOCK_TONE_GAMMA 250
-#define VIBEDOCK_TONE_RED 91
-#define VIBEDOCK_TONE_GREEN 94
-#define VIBEDOCK_TONE_BLUE 73
+#define VIBEDOCK_TONE_GAMMA 320
+#define VIBEDOCK_TONE_RED 100
+#define VIBEDOCK_TONE_GREEN 74
+#define VIBEDOCK_TONE_BLUE 40
 #endif
 struct ToneSettings {
   uint16_t gamma = VIBEDOCK_TONE_GAMMA; uint8_t red = VIBEDOCK_TONE_RED, green = VIBEDOCK_TONE_GREEN, blue = VIBEDOCK_TONE_BLUE;
   bool operator==(const ToneSettings &o) const { return gamma == o.gamma && red == o.red && green == o.green && blue == o.blue; }
 };
-// Settings saved without the "custom" mark were the VibeTV M1's defaults on every board: they count as a calibration
-// only where they differ from those.
+// Settings saved without the "custom" mark (firmware before 0.2.0) held the VibeTV M1's defaults of that time on
+// every board: they count as a calibration only where they differ from those, so such devices get the new defaults.
 constexpr bool legacyCalibration(long gamma, long red, long green, long blue) {
   return gamma != 250 || red != 91 || green != 94 || blue != 73;
 }

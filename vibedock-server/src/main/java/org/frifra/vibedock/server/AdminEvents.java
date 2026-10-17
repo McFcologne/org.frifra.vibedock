@@ -9,9 +9,9 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Pushes changes to open administration pages (GET /admin/events, server-sent events): a display's design changed,
- * e.g. by a swipe on its touch panel. The pages then refresh their device cards at once instead of with their next
- * timer (device-state.js).
+ * Pushes changes to open administration pages (GET /admin/events, server-sent events): "devices" when a display's
+ * design changed, e.g. by a swipe on its touch panel (device-state.js refreshes the cards at once instead of with its
+ * next timer); "logs" with the display's identifier when a log of it was saved (log pages and Troubleshooting).
  */
 @Controller
 class AdminEvents {
@@ -21,9 +21,11 @@ class AdminEvents {
         page.onCompletion(()->pages.remove(page));page.onTimeout(()->pages.remove(page));page.onError(e->pages.remove(page));
         return page;
     }
-    void devicesChanged(){
+    void devicesChanged(){send("devices","changed");}
+    void logSaved(String identifier){send("logs",identifier);}
+    private void send(String name,String data){
         for(var page:pages){
-            try{page.send(SseEmitter.event().name("devices").data("changed"));}
+            try{page.send(SseEmitter.event().name(name).data(data));}
             catch(Exception e){pages.remove(page);}
         }
     }

@@ -98,7 +98,7 @@ class DeviceApiController {
         }
         var lines=new String(body,java.nio.charset.StandardCharsets.UTF_8).lines().filter(l->!l.isBlank()).toList();
         var entry=logs.save(identifier,"net",request.getHeader("X-VibeDock-Firmware"),request.getHeader("X-VibeDock-Board"),lines);
-        log.info("Saved the log {} sent by {} ({} lines)",entry.name(),identifier,entry.lines());
+        log.info("Saved the log {} sent by {} ({} lines)",entry.name(),identifier,entry.lines());events.logSaved(identifier);
         return ResponseEntity.noContent().build();
     }
     /** The firmware offered by this server, signed for the device's updater; fetched by the device after a pull named it. */

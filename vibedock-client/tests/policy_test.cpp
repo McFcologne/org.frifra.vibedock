@@ -27,7 +27,7 @@ int main(){
   assert(pixel(0xf8,0)==0xf800);assert(pixel(0x07,0xe0)==0x07e0);assert(pixel(0,0x1f)==0x001f);
   ToneSettings neutral;neutral.gamma=100;neutral.red=neutral.green=neutral.blue=100;Tone same(neutral);
   for(uint32_t c=0;c<65536;c++)assert(same.apply(uint16_t(c))==c);
-  Tone tone;assert(tone.apply(0)==0);assert(tone.apply(0xf800)==28<<11);
+  ToneSettings m1;m1.gamma=250;m1.red=91;m1.green=94;m1.blue=73;Tone tone(m1);assert(tone.apply(0)==0);assert(tone.apply(0xf800)==28<<11);
   assert(((tone.apply(0x07e0)>>5)&63)==59);assert((tone.apply(0x001f)&31)==23);
   assert(((tone.apply(0x0400)>>5)&63)<16);  // gamma 2.5 lowers the mid tones
   assert(swipeOf(-60,10)==Swipe::Left);assert(swipeOf(60,-20)==Swipe::Right);assert(swipeOf(5,-50)==Swipe::Up);assert(swipeOf(0,80)==Swipe::Down);
