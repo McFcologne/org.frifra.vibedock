@@ -751,6 +751,21 @@ class AccessTest {
                 .andExpect(status().isOk()).andExpect(content().contentType("image/png")).andReturn().getResponse().getContentAsByteArray();
         var image=javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(png));Assertions.assertEquals(240,image.getWidth());Assertions.assertEquals(320,image.getHeight());
         Assertions.assertEquals("192.168.1.77",clients.get(view.identifier()).ip());Assertions.assertEquals("Connected",clients.get(view.identifier()).status());
+        // The page asks for its window's size and pixel ratio: the type's image as large as it fits, drawn sharp.
+        var sharp=javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(mvc.perform(get("/web/"+secret+"/image.png").param("w","390").param("h","844").param("r","3")
+                .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray()));
+        Assertions.assertEquals(240*5,sharp.getWidth());Assertions.assertEquals(320*5,sharp.getHeight());  // 390/240 x 3 = 4.875, rounded up to 5
+        // The home screen icon, behind the secret as well.
+        mvc.perform(get("/web/"+secret+"/icon.png").with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk()).andExpect(content().contentType("image/png"));
+        mvc.perform(get("/web/"+"0".repeat(64)+"/icon.png").with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNotFound());
+        mvc.perform(get("/web/"+secret).with(r->{r.setLocalPort(8080);return r;})).andExpect(content().string(org.hamcrest.Matchers.containsString("rel=\"apple-touch-icon\" href=\"/web/"+secret+"/icon.png\"")));
+        // Fitting the browser: the window's shape at its full resolution; devices cannot fit.
+        clients.setDisplay(view.identifier(),"fit");
+        var fitted=javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(mvc.perform(get("/web/"+secret+"/image.png").param("w","393").param("h","852").param("r","3")
+                .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray()));
+        Assertions.assertEquals(360*3.5,fitted.getWidth());Assertions.assertEquals(780*3.5,fitted.getHeight());  // see WebSizeTest
+        Assertions.assertThrows(IllegalArgumentException.class,()->{clients.paired("vibedock-fit-test","Desk","a".repeat(64),"192.168.1.30",80);clients.setDisplay("vibedock-fit-test","fit");});
+        clients.remove("vibedock-fit-test");clients.setDisplay(view.identifier(),"240x320");
         // Only on the public port, only GET, only with the right secret; the admin list shows the links.
         mvc.perform(get("/web/"+secret).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isNotFound());
         mvc.perform(post("/web/"+secret).with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isMethodNotAllowed());

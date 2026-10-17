@@ -452,8 +452,14 @@ digital photo frame. **Add web display** creates it:
 
 <img src="images/14-add-web-display.png" width="80%" alt="Add web display">
 
-- **Name**, **Display type** (the image size, e.g. *320×240 landscape*) and **Reload every** (how often the page
-  loads a new image).
+- **Name**, **Display type** and **Reload every** (how often the page loads a new image). *Fit the browser* (the
+  default) gives the image the shape of the browser window, e.g. a phone held upright or a TV; the other types keep
+  the size of a device display (e.g. *320×240 landscape*), shown as large as the window holds.
+- The page asks for the image in its window's size and the screen's pixel ratio, so it is sharp on high-resolution
+  screens (phones, tablets, 4K). Large screens get a zoomed layout with readable text. The PNG link without
+  parameters has the type's own pixels (*Fit the browser*: 360×640); programs can add `?w=<width>&h=<height>&r=<ratio>`.
+- **Home screen:** on an iPhone or iPad, *Share › Add to Home Screen* gives the page the VibeDock icon and the
+  display's name; it then opens full screen, keeping the notch and the home indicator free.
 - The card then offers two links, both containing a long secret: the **Page** for browsers (full screen, reloads
   itself) and the **PNG** for programs. Copy them with the copy button or open them with the arrow.
 - **External address** switches both links between the internal and the external server address (see
@@ -923,7 +929,8 @@ DOCS_PDF=../docs/manual/vibedock-manual.pdf ./scripts/docs.sh   # screenshots an
 - `DOCS_PDF` also makes the PDF; it needs pandoc, XeLaTeX (TeX Live) and the DejaVu fonts. Title page, page header
   and footer, headings and frames are defined in `docs/manual/style/manual.tex`. `keep-with-figure.lua` next to it moves a
   heading to the next page together with its first picture when both do not fit.
-- `EMOJI_DIR` points to Twemoji 72×72 PNGs; without it the script downloads the pinned Twemoji release once.
+- `EMOJI_DIR` points to the Twemoji SVGs (`assets/svg`; the 72×72 PNGs work too); without it the script downloads the
+  pinned Twemoji release once.
 - `PLAYWRIGHT_CHROMIUM` uses an installed Chromium instead of Playwright's own.
 
 **In the Docker image.** Every Docker build (Compose, `scripts/image.sh`, the release workflow) runs the same script

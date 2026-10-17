@@ -32,14 +32,36 @@ public class StatusImage {
      */
     public Image render(UsageService.Snapshot snapshot,String ip,Look look) throws IOException { return render(snapshot,ip,look,DisplayType.M1); }
     /** The image in the resolution of a display type; the layout is fitted to it (see {@link Layout#fit}). */
-    public Image render(UsageService.Snapshot snapshot,String ip,Look look,DisplayType type) throws IOException {
+    public Image render(UsageService.Snapshot snapshot,String ip,Look look,DisplayType type) throws IOException { return render(snapshot,ip,look,type,1); }
+    /**
+     * The image drawn at scale times the display type's pixels (web displays on high-resolution screens): the layout
+     * stays the type's, text and lines are drawn sharp at the larger size. The emoji of the look are expected at
+     * scale times their size. Scaled images have a PNG only, no RGB565 pixels.
+     */
+    public Image render(UsageService.Snapshot snapshot,String ip,Look look,DisplayType type,double scale) throws IOException {
+        if(!(scale>=1&&scale<=MAX_SCALE))throw new IllegalArgumentException("Scale 1–"+MAX_SCALE);
         var fitted=new Look(look.emoji(),look.scheme(),look.weatherIcon(),look.weatherText(),look.layout().fit(type));
-        return new Frame(type.width(),type.height(),type.corner()).draw(snapshot,ip,fitted);
+        return new Frame(type.width(),type.height(),type.corner(),scale).draw(snapshot,ip,fitted);
     }
+    static final double MAX_SCALE=8;
     /** One rendering at a given size; the drawing code below works for any width and height. */
     private final class Frame {
-    final int w,h,corner;
-    Frame(int w,int h,int corner){this.w=w;this.h=h;this.corner=corner;}
+    final int w,h,corner;final double scale;
+    Frame(int w,int h,int corner,double scale){this.w=w;this.h=h;this.corner=corner;this.scale=scale;}
+    /** Width and height of an icon in the frame's pixels (icons come at scale times their size). */
+    int iw(BufferedImage icon){return (int)Math.round(icon.getWidth()/scale);}
+    int ih(BufferedImage icon){return (int)Math.round(icon.getHeight()/scale);}
+    void put(Graphics2D g,BufferedImage icon,int x,int y){
+        if(scale==1)g.drawImage(icon,x,y,null);else g.drawImage(icon,x,y,iw(icon),ih(icon),null);
+    }
+    /** The scheme's icon look; the Mac's dithering keeps its pixel size on scaled images. */
+    BufferedImage look(BufferedImage icon,Scheme scheme){
+        if(icon==null||scale==1||scheme.style!=Scheme.Style.MAC)return styled(icon,scheme);
+        var dithered=styled(resize(icon,iw(icon),ih(icon)),scheme);
+        var out=new BufferedImage(icon.getWidth(),icon.getHeight(),BufferedImage.TYPE_INT_ARGB);var g=out.createGraphics();
+        try{g.drawImage(dithered,0,0,out.getWidth(),out.getHeight(),null);}finally{g.dispose();}
+        return out;
+    }
     /** How far the rounded corners reach in from the side at a distance from the top or bottom edge. */
     int inset(int fromEdge){
         if(corner<=0||fromEdge>=corner)return 0;
@@ -47,8 +69,13 @@ public class StatusImage {
     }
     Image draw(UsageService.Snapshot snapshot,String ip,Look look) throws IOException {
         var scheme=look.scheme();
-        var image=new BufferedImage(w,h,BufferedImage.TYPE_INT_RGB);var g=image.createGraphics();
+        var image=new BufferedImage((int)Math.round(w*scale),(int)Math.round(h*scale),BufferedImage.TYPE_INT_RGB);var g=image.createGraphics();
         try{
+            if(scale!=1){
+                g.scale(scale,scale);
+                g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL,RenderingHints.VALUE_STROKE_PURE);
+            }
             g.setColor(new Color(scheme.background));g.fillRect(0,0,w,h);
             // Classic Mac and Windows: no anti-aliasing, crisp pixels like the originals.
             boolean smooth=scheme.style!=Scheme.Style.MAC&&scheme.style!=Scheme.Style.WINDOWS;
@@ -133,26 +160,26 @@ public class StatusImage {
         boolean narrow=w<200;
         BufferedImage rightMood=null;
         if(!band.moodLeft()){
-            var weatherIcon=styled(look.weatherIcon(),scheme);var emoji=styled(look.emoji(),scheme);
+            var weatherIcon=look(look.weatherIcon(),scheme);var emoji=look(look.emoji(),scheme);
             if(look.weatherText()!=null){
                 // Weather left: icon, temperature, then the update time on the same line.
                 int x=10;
-                if(weatherIcon!=null){icon(g,scheme,weatherIcon,x,y+4);x+=weatherIcon.getWidth()+5;}
+                if(weatherIcon!=null){icon(g,scheme,weatherIcon,x,y+4);x+=iw(weatherIcon)+5;}
                 text(g,scheme,look.weatherText(),x,y+23,16,desktopText(scheme),true);
                 x+=g.getFontMetrics().stringWidth(look.weatherText())+10;
                 g.setFont(new Font(scheme.font(),Font.PLAIN,10));
-                if(narrow)centredTime(g,scheme,time,x,w-6-(emoji!=null?emoji.getWidth()+4:0),y+23);
-                else if(x+g.getFontMetrics().stringWidth(updated)<=w-(emoji!=null?emoji.getWidth()+10:6))text(g,scheme,updated,x,y+23,10,desktopMuted(scheme),false);
-            } else if(narrow)centredTime(g,scheme,time,10,w-6-(emoji!=null?emoji.getWidth()+4:0),y+28);
+                if(narrow)centredTime(g,scheme,time,x,w-6-(emoji!=null?iw(emoji)+4:0),y+23);
+                else if(x+g.getFontMetrics().stringWidth(updated)<=w-(emoji!=null?iw(emoji)+10:6))text(g,scheme,updated,x,y+23,10,desktopMuted(scheme),false);
+            } else if(narrow)centredTime(g,scheme,time,10,w-6-(emoji!=null?iw(emoji)+4:0),y+28);
             else text(g,scheme,updated,10,y+28,10,desktopMuted(scheme),false);
             rightMood=emoji;  // drawn last, in front of the IP corner
         }else{
             // Mood left in the short slot, followed by the update time; weather right in the tall slot.
-            var mood=styled(resize(look.emoji(),30),scheme);int x=10;
-            if(mood!=null){g.drawImage(mood,x,y+5,null);x+=36;}
+            var mood=look(resize(look.emoji(),(int)Math.round(30*scale)),scheme);int x=10;
+            if(mood!=null){put(g,mood,x,y+5);x+=36;}
             text(g,scheme,updated,x,y+24,10,desktopMuted(scheme),false);
-            var weatherIcon=styled(look.weatherIcon(),scheme);
-            if(weatherIcon!=null)icon(g,scheme,weatherIcon,w-6-weatherIcon.getWidth(),y+4);
+            var weatherIcon=look(look.weatherIcon(),scheme);
+            if(weatherIcon!=null)icon(g,scheme,weatherIcon,w-6-iw(weatherIcon),y+4);
             if(look.weatherText()!=null)right(g,scheme,look.weatherText(),w-6,y+50,16,desktopText(scheme));
         }
         // IP corner in the device's footer style; the mood may reach into the rest of the bottom row. A text with a
@@ -162,12 +189,12 @@ public class StatusImage {
         // Rounded panels: the text starts where the corner leaves room near the bottom edge.
         int left=Math.max(10,inset(4)+3),size=12,room=Math.min(150,w)-4-left;
         int moodMargin=Math.max(6,inset(12));
-        if(rightMood!=null)room=Math.min(room,w-moodMargin-rightMood.getWidth()-4-left);
+        if(rightMood!=null)room=Math.min(room,w-moodMargin-iw(rightMood)-4-left);
         String full=ip.contains(" ")?ip:"IP: "+ip,label=fit(g,Scheme.MIDNIGHT,full,size,room);
         if(!full.equals(label)){size=10;label=fit(g,Scheme.MIDNIGHT,full,size,room);}
         if(label!=null)text(g,Scheme.MIDNIGHT,label,left,y+51,size,scheme.light()?0x000000:0xffffff,false);
         // Mood right with the same 6 px margin to the right and bottom edge of the band, in front of everything.
-        if(rightMood!=null)g.drawImage(rightMood,w-moodMargin-rightMood.getWidth(),y+50-rightMood.getHeight(),null);
+        if(rightMood!=null)put(g,rightMood,w-moodMargin-iw(rightMood),y+50-ih(rightMood));
     }
     /** The update time centred on the screen, kept between from and to; left out when it does not fit. */
     private void centredTime(Graphics2D g,Scheme scheme,String time,int from,int to,int baseline){
@@ -176,25 +203,33 @@ public class StatusImage {
         if(x+width<=to)text(g,scheme,time,x,baseline,10,desktopMuted(scheme),false);
     }
     /** Light colour schemes: a thin grey outline keeps white icons (clouds, snow) visible. */
-    private static void icon(Graphics2D g,Scheme scheme,BufferedImage icon,int x,int y){
-        if(scheme.light()&&scheme.style==Scheme.Style.MODERN)outline(g,icon,x,y,0x9aa0a6);
-        g.drawImage(icon,x,y,null);
+    private void icon(Graphics2D g,Scheme scheme,BufferedImage icon,int x,int y){
+        if(scheme.light()&&scheme.style==Scheme.Style.MODERN){
+            var mask=mask(icon,0x9aa0a6);
+            for(int dy=-1;dy<=1;dy++)for(int dx=-1;dx<=1;dx++)if(dx!=0||dy!=0)put(g,mask,x+dx,y+dy);
+        }
+        put(g,icon,x,y);
     }
     private Image encode(BufferedImage image,Scheme scheme) throws IOException {
-        byte[] pixels=new byte[w*h*2];int offset=0;
-        for(int y=0;y<h;y++)for(int x=0;x<w;x++){
+        int pw=image.getWidth(),ph=image.getHeight();
+        byte[] pixels=new byte[scale==1?pw*ph*2:0];int offset=0;
+        for(int y=0;y<ph;y++)for(int x=0;x<pw;x++){
             int rgb=image.getRGB(x,y);
-            // Terminal schemes: every other row darker, like the scan lines of an old monitor.
-            if(scheme.style==Scheme.Style.TERMINAL&&(y&1)==1)rgb=(((rgb>>16&255)*7/10)<<16)|(((rgb>>8&255)*7/10)<<8)|((rgb&255)*7/10);
+            // Terminal schemes: every other row darker, like the scan lines of an old monitor (rows of the display).
+            if(scheme.style==Scheme.Style.TERMINAL&&(((int)(y/scale))&1)==1)rgb=(((rgb>>16&255)*7/10)<<16)|(((rgb>>8&255)*7/10)<<8)|((rgb&255)*7/10);
+            // Scaled (web displays): full colour; devices: RGB565, and the PNG shows what they show.
+            if(scale!=1){if(scheme.style==Scheme.Style.TERMINAL)image.setRGB(x,y,rgb);continue;}
             int r=(rgb>>19)&31,b=(rgb>>3)&31,green=(rgb>>10)&63;
-            int value=(r<<11)|(green<<5)|b;pixels[offset++]=(byte)(value>>8);pixels[offset++]=(byte)value;
+            int value=(r<<11)|(green<<5)|b;
+            pixels[offset++]=(byte)(value>>8);pixels[offset++]=(byte)value;
             image.setRGB(x,y,((r*255/31)<<16)|((green*255/63)<<8)|(b*255/31));
         }
         var bytes=new ByteArrayOutputStream();ImageIO.write(image,"png",bytes);return new Image(bytes.toByteArray(),pixels);
     }
-    private static BufferedImage resize(BufferedImage icon,int size){
-        if(icon==null)return null;var image=new BufferedImage(size,size,BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();
-        try{g.drawImage(icon.getScaledInstance(size,size,java.awt.Image.SCALE_AREA_AVERAGING),0,0,null);}finally{g.dispose();}return image;
+    private static BufferedImage resize(BufferedImage icon,int size){return resize(icon,size,size);}
+    private static BufferedImage resize(BufferedImage icon,int width,int height){
+        if(icon==null)return null;var image=new BufferedImage(width,height,BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();
+        try{g.drawImage(icon.getScaledInstance(width,height,java.awt.Image.SCALE_AREA_AVERAGING),0,0,null);}finally{g.dispose();}return image;
     }
     /** Half-width provider: the theme's own window or heading at half width; compact text, nothing scaled. */
     private void compact(Graphics2D g,Scheme scheme,String title,UsageService.Provider p,int height,boolean bottom){
@@ -442,12 +477,17 @@ public class StatusImage {
     }
     /** Draws the icon's shape one pixel larger in every direction in a solid colour, as an outline behind the icon. */
     static void outline(Graphics2D g,BufferedImage icon,int x,int y,int rgb){
+        var mask=mask(icon,rgb);
+        for(int dy=-1;dy<=1;dy++)for(int dx=-1;dx<=1;dx++)if(dx!=0||dy!=0)g.drawImage(mask,x+dx,y+dy,null);
+    }
+    /** The icon's shape in a solid colour. */
+    static BufferedImage mask(BufferedImage icon,int rgb){
         var mask=new BufferedImage(icon.getWidth(),icon.getHeight(),BufferedImage.TYPE_INT_ARGB);
         for(int j=0;j<icon.getHeight();j++)for(int i=0;i<icon.getWidth();i++){
             int alpha=icon.getRGB(i,j)>>>24;
             if(alpha>96)mask.setRGB(i,j,0xff000000|rgb);
         }
-        for(int dy=-1;dy<=1;dy++)for(int dx=-1;dx<=1;dx++)if(dx!=0||dy!=0)g.drawImage(mask,x+dx,y+dy,null);
+        return mask;
     }
     /** Remaining share and colour: green from 60 % up, then smoothly over yellow-green, yellow and orange to red at 8 %. */
     private static final double[] BAR_STOPS={60,45,32,20,8};

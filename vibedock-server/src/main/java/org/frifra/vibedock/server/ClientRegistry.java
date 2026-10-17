@@ -229,6 +229,7 @@ public class ClientRegistry {
     /** Sets the display type of a device (null or the M1 id: the VibeTV M1). */
     public synchronized void setDisplay(String id,String type) throws IOException {
         var d=find(id);String next=type==null||type.equals(DisplayType.M1.id())?null:DisplayType.of(type).id();
+        if(DisplayType.FIT.id().equals(next)&&d.web()==null)throw new IllegalArgumentException("Only web displays fit the browser");
         if(Objects.equals(next,d.display()))return;
         List<Device> list=new ArrayList<>(state.devices());list.replaceAll(x->x.identifier().equals(id)?x.withDisplay(next):x);save(state.withDevices(list));
     }

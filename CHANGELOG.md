@@ -10,6 +10,9 @@ the administration (over Wi-Fi where their firmware can, otherwise once over USB
 - **Waveshare touch displays:** ESP32-S3-Touch-LCD-1.47 (172×320) and ESP32-C6-Touch-LCD-1.69 (240×280) are tested
   on hardware. A swipe left or right changes the theme, up and down the brightness. The other ESP32 boards are
   prepared (they build, but have not run on hardware); the administration, `flash.sh` and the manual mark both.
+- **Sharp web displays:** the page asks for its window's size and pixel ratio, so phones, tablets and TVs get a
+  sharp image; *Fit the browser* takes the window's shape. Emoji are drawn from the Twemoji SVGs. Added to the home
+  screen of an iPhone, the page has the VibeDock icon and opens full screen.
 - **Flip image** on the device card turns a display mounted upside down, also its own screens and the swipes.
 - **Photos and slideshows:** a design can show uploaded photos instead of the status, one after the other, optionally
   only at certain times of day. The server keeps reduced copies (600 × 600 at most) and cuts them to each display; a

@@ -181,7 +181,7 @@
     const hidden = usage.length - shownBands().size;
     if (target === 'default') { note.textContent = hidden ? 'VibeTV M1 shows ' + (usage.length - hidden) + ' of ' + usage.length + ' usage bands.' : ''; return; }
     const type = displayOf(draft.display);
-    const parts = [type.width + ' × ' + type.height + ' px'];
+    const parts = [type.id === 'fit' ? 'the browser\'s size, preview ' + type.width + ' × ' + type.height + ' px' : type.width + ' × ' + type.height + ' px'];
     if (hidden) parts.push('shows ' + (usage.length - hidden) + ' of ' + usage.length + ' usage bands');
     if (!type.halfWidth && usage.some(b => b.sources.length > 1)) parts.push('split bands show their first source');
     note.textContent = parts.join(' · ');
@@ -208,6 +208,9 @@
     // The preview in the device's case (Board.previewCase), the default design in the VibeTV M1's.
     const front = document.querySelector('.design-preview .device-front');
     if (front) { front.classList.remove('case-147', 'case-c6'); if (target !== 'default' && device().previewCase) front.classList.add(device().previewCase); }
+    // Fitting the browser is for web displays only.
+    const fit = $('#design-display').querySelector('option[value="fit"]');
+    if (fit) { fit.hidden = fit.disabled = target === 'default' || !device().web; }
     if (target !== 'default') { draft.display = device().display; $('#design-display').value = draft.display; }
     else { const image = $('#design-preview-image'); image.width = 240; image.height = 240; }
     fitCase();

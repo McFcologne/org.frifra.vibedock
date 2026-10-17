@@ -104,7 +104,7 @@ class Controllers {
         var bases=new java.util.HashMap<String,String>();
         for(var c:clients.views())if(c.web()!=null)bases.put(c.identifier(),WebDisplayController.base(c,addresses,request));
         model.addAttribute("webBases",bases);model.addAttribute("externalSet",!addresses.external().isBlank());
-        model.addAttribute("displayTypes",DisplayType.INVENTORY);
+        model.addAttribute("displayTypes",DisplayType.INVENTORY);model.addAttribute("webDisplayTypes",DisplayType.WEB);
         return "devices";
     }
     /** A data source as the page shows it; the token itself never leaves the server. */

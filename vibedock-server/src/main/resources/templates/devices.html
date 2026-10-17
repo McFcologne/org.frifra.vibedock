@@ -42,7 +42,7 @@
     <div class="grid-3">
       <div><label for="web-name">Name</label><input id="web-name" name="name" maxlength="40" placeholder="Kitchen tablet" required></div>
       <div><label for="web-display">Display type</label><select id="web-display" name="display">
-        <option th:each="type:${displayTypes}" th:value="${type.id}" th:text="${type.label}"></option></select></div>
+        <option th:each="type:${webDisplayTypes}" th:value="${type.id}" th:text="${type.label}" th:selected="${type.id == 'fit'}"></option></select></div>
       <div><label for="web-reload">Reload every</label><select id="web-reload" name="reloadSeconds">
         <option value="10">10 s</option><option value="30" selected>30 s</option><option value="60">1 min</option><option value="300">5 min</option></select></div>
     </div>

@@ -20,8 +20,37 @@ public record DisplayType(String id,String label,int width,int height,int corner
             new DisplayType("172x320","172×320 · 1.47\" JD9853",172,320,18),
             new DisplayType("135x240","135×240 · 1.14\" ST7789",135,240),
             new DisplayType("128x160","128×160 · 1.8\" ST7735",128,160));
+    /**
+     * Web displays only: the image takes the shape of the browser window and its full resolution (see
+     * {@link #fitting}); the size here is what the administration's previews and programs without a size get.
+     */
+    public static final DisplayType FIT=new DisplayType("fit","Fit the browser · any size, sharp",360,640);
+    /** What a web display can show: the device types and the browser's own size. */
+    public static final List<DisplayType> WEB=java.util.stream.Stream.concat(INVENTORY.stream(),java.util.stream.Stream.of(FIT)).toList();
     /** The type of an id; unknown or missing ids are the VibeTV M1. */
-    public static DisplayType of(String id){return INVENTORY.stream().filter(t->t.id().equals(id)).findFirst().orElse(M1);}
+    public static DisplayType of(String id){return WEB.stream().filter(t->t.id().equals(id)).findFirst().orElse(M1);}
+    /** Short side of a fitted image in its own pixels: the layout's bands keep a readable size on large screens. */
+    static final int FIT_SHORT_SIDE=360;
+    /**
+     * The image for a browser area of width x height CSS pixels at a device pixel ratio: the type and the scale to
+     * draw it at. FIT takes the area's shape (short side {@value #FIT_SHORT_SIDE}, larger screens are zoomed), the
+     * other types keep theirs and are drawn as large as the area holds. The scale is rounded up to quarter steps (few
+     * different sizes to draw) and limited to 16 megapixels.
+     */
+    public record Sized(DisplayType type,double scale) {}
+    public Sized fitting(int cssWidth,int cssHeight,double ratio){
+        int cw=Math.max(100,Math.min(4096,cssWidth)),ch=Math.max(100,Math.min(4096,cssHeight));
+        double r=Double.isFinite(ratio)?Math.max(1,Math.min(4,ratio)):1;
+        DisplayType type=this;double zoom;
+        if(this==FIT||id.equals(FIT.id)){
+            zoom=Math.max(1,Math.min(cw,ch)/(double)FIT_SHORT_SIDE);
+            int w=(int)Math.round(cw/zoom),h=(int)Math.round(ch/zoom);
+            type=new DisplayType(FIT.id,FIT.label,Math.max(120,Math.min(1600,w)),Math.max(120,Math.min(1600,h)));
+        }else zoom=Math.min(cw/(double)width,ch/(double)height);
+        double scale=Math.max(1,Math.ceil(zoom*r*4)/4);
+        while(scale>1&&type.width*scale*type.height*scale>16_000_000)scale-=.25;
+        return new Sized(type,Math.min(StatusImage.MAX_SCALE,scale));
+    }
     /** The type a device reports as "<width>x<height>", if it is in the inventory. */
     public static Optional<DisplayType> reported(String size){
         if(size==null)return Optional.empty();

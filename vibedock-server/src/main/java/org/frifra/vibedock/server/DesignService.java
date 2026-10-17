@@ -23,10 +23,12 @@ class DesignService {
      * What a display shows now: the current photo of its slideshow while that is active, otherwise the status.
      * display: the key of the display (its identifier) for its swipes.
      */
-    StatusImage.Image render(Design design,String ip,DisplayType type,String display) throws IOException {
+    StatusImage.Image render(Design design,String ip,DisplayType type,String display) throws IOException {return render(design,ip,type,display,1);}
+    /** The same at scale times the type's pixels (web displays on high-resolution screens; PNG only). */
+    StatusImage.Image render(Design design,String ip,DisplayType type,String display,double scale) throws IOException {
         var photo=currentPhoto(design,display);
-        if(photo.isPresent()){var image=photos.render(photo.get(),type);if(image.isPresent())return image.get();}
-        return render(design,ip,type);
+        if(photo.isPresent()){var image=photos.render(photo.get(),type,scale);if(image.isPresent())return image.get();}
+        return render(design,ip,type,scale);
     }
     /** The photos of the design's slideshow that still exist, if it is active now. */
     java.util.List<String> activePhotos(Design design){
@@ -59,12 +61,13 @@ class DesignService {
     /** The device image for a design with the current usage data; weather appears once a reading is cached. */
     StatusImage.Image render(Design design,String ip) throws IOException {return render(design,ip,DisplayType.M1);}
     /** The image in the resolution of a display type, the design fitted to it. */
-    StatusImage.Image render(Design design,String ip,DisplayType type) throws IOException {
+    StatusImage.Image render(Design design,String ip,DisplayType type) throws IOException {return render(design,ip,type,1);}
+    StatusImage.Image render(Design design,String ip,DisplayType type,double scale) throws IOException {
         var current=weather.current(design.weather());
-        var look=new StatusImage.Look(twemoji.image(design.mood()).orElse(null),design.scheme(),
-                current.flatMap(c->twemoji.image(WeatherService.emoji(c.code(),c.day()),24)).orElse(null),
+        var look=new StatusImage.Look(twemoji.image(design.mood(),(int)Math.round(Twemoji.SIZE*scale)).orElse(null),design.scheme(),
+                current.flatMap(c->twemoji.image(WeatherService.emoji(c.code(),c.day()),(int)Math.round(24*scale))).orElse(null),
                 current.map(c->WeatherService.temperature(c.temperature())).orElse(null),design.layout());
-        return renderer.render(usage.snapshot(),ip,look,type);
+        return renderer.render(usage.snapshot(),ip,look,type,scale);
     }
     /**
      * What a device actually shows: firmware that draws the IP corner itself (rows 220-239) needs the weather/mood

@@ -76,20 +76,23 @@ class PhotoLibrary {
     }
     boolean exists(String id){return id!=null&&ID.matcher(id).matches()&&Files.isRegularFile(file(id));}
     /** The photo cut to the display's shape (centred, filling it) as PNG and RGB565 like the status image. */
-    Optional<StatusImage.Image> render(String id,DisplayType type) throws IOException {
+    Optional<StatusImage.Image> render(String id,DisplayType type) throws IOException {return render(id,type,1);}
+    /** The same at scale times the type's pixels (web displays; PNG only, no RGB565). */
+    Optional<StatusImage.Image> render(String id,DisplayType type,double scale) throws IOException {
         if(!exists(id))return Optional.empty();
-        String key=id+"/"+type.width()+"x"+type.height();
+        int w=(int)Math.round(type.width()*scale),h=(int)Math.round(type.height()*scale);
+        String key=id+"/"+w+"x"+h+(scale==1?"":"/web");
         var cached=rendered.get(key);if(cached!=null)return Optional.of(cached);
         var photo=ImageIO.read(file(id).toFile());if(photo==null)return Optional.empty();
-        int w=type.width(),h=type.height();
-        double scale=Math.max((double)w/photo.getWidth(),(double)h/photo.getHeight());
-        int sw=(int)Math.ceil(photo.getWidth()*scale),sh=(int)Math.ceil(photo.getHeight()*scale);
+        double cover=Math.max((double)w/photo.getWidth(),(double)h/photo.getHeight());
+        int sw=(int)Math.ceil(photo.getWidth()*cover),sh=(int)Math.ceil(photo.getHeight()*cover);
         var canvas=new BufferedImage(w,h,BufferedImage.TYPE_INT_RGB);var g=canvas.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BICUBIC);
         g.setRenderingHint(RenderingHints.KEY_RENDERING,RenderingHints.VALUE_RENDER_QUALITY);
         g.drawImage(scaled(photo,sw,sh),(w-sw)/2,(h-sh)/2,null);g.dispose();
-        byte[] pixels=new byte[w*h*2];int offset=0;
-        for(int y=0;y<h;y++)for(int x=0;x<w;x++){
+        // Devices: RGB565, and the PNG shows what they show. Web displays get the photo in full colour.
+        byte[] pixels=new byte[scale==1?w*h*2:0];int offset=0;
+        if(scale==1)for(int y=0;y<h;y++)for(int x=0;x<w;x++){
             int rgb=canvas.getRGB(x,y),r=(rgb>>19)&31,green=(rgb>>10)&63,b=(rgb>>3)&31,value=(r<<11)|(green<<5)|b;
             pixels[offset++]=(byte)(value>>8);pixels[offset++]=(byte)value;
             canvas.setRGB(x,y,((r*255/31)<<16)|((green*255/63)<<8)|(b*255/31));
