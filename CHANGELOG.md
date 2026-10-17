@@ -2,6 +2,22 @@
 
 The release workflow publishes the section of the tagged version (`## 0.1.0` for the tag `v0.1.0` or `0.1.0`) above the list of commits that GitHub generates.
 
+## 0.1.1
+
+Security fixes for the server and the display firmware. Update the server image; displays then offer
+**Update to 0.1.1** in the administration.
+
+- **No secrets in the access log:** web display links are logged as `/web/[redacted]`, query strings not at all.
+  Access logs written by 0.1.0 can contain web display links; delete them or create new links for your web displays.
+- **Password changes sign out every session**, the current one included; the login page says why.
+- **Immediate redraws only reach the display's own network.** The server asks a display to pull a new image right
+  away only inside the network fixed when it was paired: the subnet mask the display reports (at least `/16`), or
+  `/24` around its first address; displays paired over USB get it with their first image pull. Addresses a display
+  cannot have (loopback, link-local, unspecified, multicast) are ignored.
+- **HTTP pairing shows a warning** that it is unencrypted; **Only pair** over USB is the alternative.
+- **Firmware 0.1.1** reports its subnet mask with every image pull, so displays paired before learn their network once.
+  Displays with 0.1.0 keep working.
+
 ## 0.1.0
 
 The first release of VibeDock: a server that reads how much of your AI coding plans is left and small desk displays
