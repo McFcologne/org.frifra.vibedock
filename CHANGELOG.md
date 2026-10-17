@@ -2,6 +2,34 @@
 
 The release workflow publishes the section of the tagged version (`## 0.1.0` for the tag `v0.1.0` or `0.1.0`) above the list of commits that GitHub generates.
 
+## 0.2.0
+
+New boards, touch, photos and better diagnosis. Update the server image; paired displays then offer the update in
+the administration (over Wi-Fi where their firmware can, otherwise once over USB).
+
+- **Waveshare touch displays:** ESP32-S3-Touch-LCD-1.47 (172×320) and ESP32-C6-Touch-LCD-1.69 (240×280) are tested
+  on hardware. A swipe left or right changes the theme, up and down the brightness. The other ESP32 boards are
+  prepared (they build, but have not run on hardware); the administration, `flash.sh` and the manual mark both.
+- **Flip image** on the device card turns a display mounted upside down, also its own screens and the swipes.
+- **Photos and slideshows:** a design can show uploaded photos instead of the status, one after the other, optionally
+  only at certain times of day. The server keeps reduced copies (600 × 600 at most) and cuts them to each display; a
+  swipe shows the next photo.
+- **Three new themes:** Windows 11, macOS and a starship console. Narrow and rounded displays get their own layout
+  (no clipped text, corners kept free).
+- **Administration:** previews in the case of each board, live updates after a swipe, the preview builds up like the
+  display, the design editor saves every change right away, a link to each display's own page.
+- **Troubleshooting page:** read a display's log over USB from any board (no board to choose) or over the network,
+  logs refresh by themselves, and an **encrypted support file** (summary, data sources, displays, logs; secrets
+  removed) for problem reports, with the key shown once.
+- **Colours:** calibrated defaults for the VibeTV M1 (gamma 3.20, 100/74/40 %) and the Waveshare boards (1.50,
+  100/91/76 %); the device page shows the uncorrected image beside the sliders and applies changes without reloading.
+- **Firmware updates** are also offered for another build of the same version (e.g. a local build).
+- **`flash.sh`** finds the chip, takes the board the device reports, and asks only when it cannot tell.
+- **Test mode for development:** made-up usage and no sign-in (`DEMO_USAGE`, `ADMIN_AUTH=none`), and a quicker Docker
+  build without the manual.
+- ESP32 boards stay on Arduino core 2 (core 3 crashed on the ESP32-S3); only the C6 uses core 3. Docker needs room
+  for its toolchain: free space in Docker Desktop if the build reports *No space left on device*.
+
 ## 0.1.1
 
 Security fixes for the server and the display firmware. Update the server image; displays then offer

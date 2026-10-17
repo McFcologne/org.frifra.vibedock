@@ -29,7 +29,7 @@ Provider quota endpoints are internal interfaces, not guaranteed public APIs. Re
 - A Java **21** JDK for local server builds and debugging. Docker supplies its own Java runtime, so a host JDK is not required for Docker-only operation.
 - Maven **3.6.3 or newer**, or IntelliJ's bundled Maven. The repository currently has no Maven wrapper.
 - Docker Desktop, running with a working Docker connection and Docker Compose.
-- Python 3 for the client virtual environment and PlatformIO **6.2.0**.
+- Python **3.10 or newer** for the client virtual environment and PlatformIO **6.2.0** (the ESP32-C6 build refuses older ones; the Python 3.9 of macOS is too old).
 - A C++ compiler for the client policy test (`c++`, available with Apple's Command Line Tools).
 - Network access for the first Maven, Docker and PlatformIO dependency downloads.
 
@@ -212,7 +212,7 @@ This native test checks timing, rollover, pixel decoding and the colour correcti
 
 ## Share configurations without sharing secrets
 
-IntelliJ's **Store as project file** option allows credential-free configurations to be saved in `.run/*.run.xml`. Only the client build configuration is currently supplied; the server and policy-test configurations above are instructions to create them.
+IntelliJ's **Store as project file** option allows credential-free configurations to be saved in `.run/*.run.xml`. Supplied are the client build configuration and, in `vibedock-server/.run/`, the server configurations: Spring Boot, Docker Compose, a quick Compose build without the manual, a test server with made-up usage and no sign-in that takes over the normal container and its data, demo servers and the multi-platform image build. The verify and policy-test configurations above are instructions to create them.
 
 Keep machine-specific SDK paths, Docker connection details and passwords local. Before committing a run configuration, review its XML for credentials. The client ignore file explicitly allows its shared run XML even when a global Git ignore rule excludes `.run`. Generated `.venv`, `.pio`, runtime data and device backups remain ignored.
 

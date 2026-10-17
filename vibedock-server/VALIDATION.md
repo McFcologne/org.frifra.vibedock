@@ -32,7 +32,8 @@ What the tested boards showed, and what the prepared ones take over:
   ESP32 boards stay on core 2, only the C6 uses core 3. The first build after a board of the other platform fails
   once; `build.sh` and `images.sh` build every board on its own and retry once.
 - **Colours:** the VibeTV M1's calibration (gamma 2.5, reduced blue) does not fit the other panels; the ESP32 boards
-  start neutral and keep only a calibration made on their status page.
+  keep only a calibration made on their status page. Calibrated by eye: the M1 at gamma 3.20 with 100/74/40 %, the
+  Waveshare 1.47 at 1.50 with 100/91/76 %, which also suits the C6; the other boards start neutral.
 - **Rounded panels:** the 240×280 type keeps text and mood clear of 36 px corners, the 172×320 one of 18 px.
 - **Orientation:** the motion sensor decided unreliably; the boards no longer use it. *Flip image* on the device card
   turns the picture instead (header `X-VibeDock-Orientation`).

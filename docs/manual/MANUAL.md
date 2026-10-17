@@ -514,7 +514,7 @@ Below *Appearance*, **Show → Photos** makes the display show photos instead of
 - **Each photo** sets how long one stays (10 seconds to an hour), **Shuffle** a new order every round. Displays with
   the same slideshow change together; the display pulls once per photo then.
 - **When → Only at certain times** shows the photos only in that time of day (e.g. 22:00 to 07:00) and the status
-  at other times; the times are those of the server (Docker: `TZ`).
+  at other times; the times are those of the server (Docker: `TIME_ZONE`).
 - On a touch display a swipe left or right shows the next or previous photo.
 
 The server cuts every photo to the display's shape from its middle, so a portrait photo fills a narrow display.
@@ -534,7 +534,7 @@ the aspect ratio:
 
 ## Appearance and mood
 
-**Style / theme** sets colours and look (e.g. *Midnight*, *Classic Windows*, *Classic Mac*, *Paper*). The mood
+**Style / theme** sets colours and look (e.g. *Midnight*, *Classic Windows*, *Classic Mac*, *Paper*, *Windows 11*, *macOS*, *Starship console*). The mood
 button opens the emoji picker with quick picks, search and all emoji; *None* leaves the slot empty.
 
 <img src="images/34-emoji-picker.png" width="100%" alt="Emoji picker">

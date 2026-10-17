@@ -1,0 +1,53 @@
+package org.frifra.vibedock.server;
+
+import org.junit.jupiter.api.*;
+import javax.imageio.ImageIO;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.nio.file.*;
+import java.time.*;
+import java.util.*;
+import java.util.List;
+
+/**
+ * Draws docs/themes.png, every colour scheme with example data, with the server's renderer. Runs only with the emoji
+ * set at hand: {@code VIBEDOCK_TWEMOJI=<twemoji>/assets/72x72 mvn test -Dtest=ThemesImageTest} (from vibedock-server).
+ */
+class ThemesImageTest {
+    record Example(Scheme scheme,String mood,String weather,String temperature) {}
+    static final List<Example> EXAMPLES=List.of(
+            new Example(Scheme.MIDNIGHT,"🤖","⛅","13°"),new Example(Scheme.OCEAN,"🐙","🌧","9°"),new Example(Scheme.FOREST,"🌵","☀","21°"),
+            new Example(Scheme.SUNSET,"🔥","🌥","17°"),new Example(Scheme.LAVENDER,"🦄","🌨","-2°"),new Example(Scheme.MONO,"🎧","☁","11°"),
+            new Example(Scheme.PAPER,"☕","⛅","14°"),new Example(Scheme.SKY,"🐧","☁","6°"),new Example(Scheme.SAND,"🍀","🌥","19°"),
+            new Example(Scheme.TERMINAL_GREEN,"👾","⛅","13°"),new Example(Scheme.TERMINAL_AMBER,"🍯","⛅","13°"),new Example(Scheme.CLASSIC_MAC,"🍎","☀","21°"),
+            new Example(Scheme.CLASSIC_WINDOWS,"💾","⛅","16°"),new Example(Scheme.WINDOWS_11,"💻","⛅","15°"),new Example(Scheme.MACOS,"🍏","☀","22°"),
+            new Example(Scheme.STARSHIP,"🖖","🌥","12°"));
+
+    @Test void drawsEveryScheme() throws Exception {
+        String emoji=System.getenv("VIBEDOCK_TWEMOJI");
+        Assumptions.assumeTrue(emoji!=null&&Files.isDirectory(Path.of(emoji)),"VIBEDOCK_TWEMOJI not set");
+        Assertions.assertEquals(Scheme.values().length,EXAMPLES.size(),"every scheme has an example");
+        var twemoji=new Twemoji(emoji);var renderer=new StatusImage("Europe/Berlin");
+        long updated=LocalDateTime.of(2026,10,14,7,12).atZone(ZoneId.of("Europe/Berlin")).toEpochSecond();
+        var snapshot=new UsageService.Snapshot(1,updated,new LinkedHashMap<>(Map.of(
+                "codex",new UsageService.Provider("ok",updated,new ProviderClient.Window(0,updated+5*3600,5*3600),new ProviderClient.Window(22,updated+6*86400+1560,7*86400)),
+                "claude",new UsageService.Provider("ok",updated,new ProviderClient.Window(5,updated+9000,5*3600),new ProviderClient.Window(14,updated+5*86400-2040,7*86400)))),
+                Map.of("codex","Codex","claude","Claude"));
+        int columns=5,cell=256,label=22,gap=16,rows=(EXAMPLES.size()+columns-1)/columns;
+        var sheet=new BufferedImage(gap+columns*cell,gap/2+rows*(label+240+gap)+gap/2,BufferedImage.TYPE_INT_RGB);
+        var g=sheet.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g.setColor(new Color(0xf6f7f9));g.fillRect(0,0,sheet.getWidth(),sheet.getHeight());
+        g.setFont(new Font(Font.SANS_SERIF,Font.PLAIN,14));
+        for(int i=0;i<EXAMPLES.size();i++){
+            var e=EXAMPLES.get(i);int x=gap+(i%columns)*cell,y=gap/2+(i/columns)*(label+240+gap);
+            var look=new StatusImage.Look(twemoji.image(e.mood()).orElseThrow(),e.scheme(),twemoji.image(e.weather(),24).orElseThrow(),e.temperature(),Layout.DEFAULT);
+            var image=ImageIO.read(new ByteArrayInputStream(renderer.render(snapshot,"192.168.1.50",look).png()));
+            g.setColor(new Color(0x3c4048));g.drawString(e.scheme().label,x,y+15);
+            g.drawImage(image,x,y+label,null);
+        }
+        g.dispose();
+        Path out=Path.of("../docs/themes.png");Files.createDirectories(out.getParent());ImageIO.write(sheet,"png",out.toFile());
+    }
+}

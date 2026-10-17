@@ -89,14 +89,14 @@ The page does not refresh automatically. **Reload** fetches a fresh image from t
 3. Release the slider to apply the change. The device saves it and redraws completely; the page and its image stay.
 4. Use **Reset to defaults** to restore the board's defaults below.
 
-| Control | VibeTV M1 | ESP32 boards | Range |
+| Control | VibeTV M1 | Waveshare 1.47 and C6 | Range |
 | --- | --- | --- | --- |
-| Gamma | 2.50 | 1.00 (neutral) | 0.50–3.50 |
-| Red | 91% | 100% | 40–100% |
-| Green | 94% | 100% | 40–100% |
-| Blue | 73% | 100% | 40–100% |
+| Gamma | 3.20 | 1.50 | 0.50–3.50 |
+| Red | 100% | 100% | 40–100% |
+| Green | 74% | 91% | 40–100% |
+| Blue | 40% | 76% | 40–100% |
 
-The M1 defaults were calibrated by eye on its panel; the other panels start neutral. Correction runs per colour channel in the firmware; it affects this device only and survives a normal restart.
+The defaults were calibrated by eye against the uncorrected image on the device page; the other ESP32 boards start neutral (gamma 1.00, 100 % each). A calibration made on a device's page stays; devices that still held the earlier M1 defaults (2.50, 91/94/73 %) get the new ones with the update. Correction runs per colour channel in the firmware; it affects this device only and survives a normal restart.
 
 ## Understand the device status
 

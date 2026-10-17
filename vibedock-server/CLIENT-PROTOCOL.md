@@ -154,7 +154,7 @@ Content-Type: text/plain; charset=utf-8
 
 Only the public port accepts it, and only `POST`. The server removes key-like values and web display links from the
 lines, and keeps at most 500 lines of 400 characters. The same is saved for logs the browser reads over USB on the
-firmware page. Firmware up to 0.1.1 does not know the header and keeps sending its log only over USB.
+Troubleshooting page. Firmware up to 0.1.1 does not know the header and keeps sending its log only over USB.
 
 ## 3d. Touch gestures (device → server)
 
