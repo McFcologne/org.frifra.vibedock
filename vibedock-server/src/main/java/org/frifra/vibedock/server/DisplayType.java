@@ -8,13 +8,16 @@ import java.util.*;
  * The renderer adapts any design to the type: it keeps the first usage bands that fit and shows a split band's first
  * source alone on narrow screens.
  */
-public record DisplayType(String id,String label,int width,int height) {
+public record DisplayType(String id,String label,int width,int height,int corner) {
+    /** corner: radius of the panel's rounded corners in pixels (0 = square); the image keeps its text clear of them. */
+    public DisplayType(String id,String label,int width,int height){this(id,label,width,height,0);}
     public static final DisplayType M1=new DisplayType("vibedock-m1","VibeTV M1 · 240×240 ST7789",240,240);
     public static final List<DisplayType> INVENTORY=List.of(M1,
-            new DisplayType("240x280","240×280 · 1.69\" ST7789",240,280),
+            new DisplayType("240x280","240×280 · 1.69\" ST7789",240,280,36),
             new DisplayType("240x320","240×320 portrait · 2.0–2.8\" ST7789 / ILI9341",240,320),
             new DisplayType("320x240","320×240 landscape · 2.4–2.8\" ILI9341",320,240),
             new DisplayType("170x320","170×320 · 1.9\" ST7789",170,320),
+            new DisplayType("172x320","172×320 · 1.47\" JD9853",172,320,18),
             new DisplayType("135x240","135×240 · 1.14\" ST7789",135,240),
             new DisplayType("128x160","128×160 · 1.8\" ST7735",128,160));
     /** The type of an id; unknown or missing ids are the VibeTV M1. */

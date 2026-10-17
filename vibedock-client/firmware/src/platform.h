@@ -131,6 +131,22 @@ inline String freeHeap() {
 #endif
 }
 
+// Backlight brightness in percent by PWM; 100 drives the pin fully on as before.
+inline void backlight(uint8_t pin, bool activeHigh, uint8_t percent) {
+  if (percent >= 100) { pinMode(pin, OUTPUT); digitalWrite(pin, activeHigh ? HIGH : LOW); return; }
+  uint32_t duty = uint32_t(percent) * 255 / 100; if (!activeHigh) duty = 255 - duty;
+#if defined(ESP8266)
+  analogWriteRange(255); analogWrite(pin, duty);
+#elif ESP_ARDUINO_VERSION_MAJOR >= 3
+  static bool attached = false;
+  if (!attached) attached = ledcAttach(pin, 5000, 8);
+  ledcWrite(pin, duty);
+#else
+  static bool attached = false;
+  if (!attached) { ledcSetup(0, 5000, 8); ledcAttachPin(pin, 0); attached = true; }
+  ledcWrite(0, duty);
+#endif
+}
 inline bool mountStorage() {
 #if defined(ESP8266)
   return LittleFS.begin();
