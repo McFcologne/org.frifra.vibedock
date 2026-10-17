@@ -7,7 +7,8 @@ out=${1:?usage: images.sh OUT [pio]}; pio=${2:-pio}
 firmware=$(CDPATH= cd -- "$(dirname -- "$0")/../firmware" && pwd)
 mkdir -p "$out"
 for board in $(sed -n 's/^\[env:\(.*\)\]$/\1/p' "$firmware/platformio.ini"); do
-    "$pio" run -d "$firmware" -e "$board"
+    # The first build after a board of the other platform (C6: Arduino core 3) fails while PlatformIO switches the core.
+    "$pio" run -d "$firmware" -e "$board" || "$pio" run -d "$firmware" -e "$board"
     mkdir -p "$out/$board"
     cp "$firmware/.pio/build/$board/flash.bin" "$firmware/.pio/build/$board/firmware.bin" "$out/$board/"
     cp "$firmware/.pio/build/$board/version" "$out/version"
