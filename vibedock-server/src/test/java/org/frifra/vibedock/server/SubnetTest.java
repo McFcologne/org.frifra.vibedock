@@ -15,4 +15,9 @@ class SubnetTest {
             assertThrows(IllegalArgumentException.class,()->IpNetworks.subnet("192.168.1.50",mask));
         assertThrows(IllegalArgumentException.class,()->IpNetworks.subnet("::1","255.255.255.0"));
     }
+    @Test void devicesCannotClaimNetworksWiderThanASlash16(){
+        for(String mask:new String[]{"128.0.0.0","255.0.0.0","255.254.0.0"})
+            assertThrows(IllegalArgumentException.class,()->IpNetworks.subnet("10.1.2.3",mask),mask);
+        assertEquals("10.1.2.3/16",IpNetworks.subnet("10.1.2.3","255.255.0.0"));
+    }
 }

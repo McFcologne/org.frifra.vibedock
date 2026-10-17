@@ -19,6 +19,11 @@ public final class FirmwareVersion {
         for(int i=0;i<a.length;i++)if(a[i]!=b[i])return a[i]>b[i];
         return false;
     }
+    /** Unknown or malformed version strings cannot opt into protocol upgrades. */
+    static boolean knownNewer(String candidate,String installed){
+        try{return candidate!=null&&installed!=null&&parse(candidate)!=null&&parse(installed)!=null&&newer(candidate,installed);}
+        catch(NumberFormatException e){return false;}
+    }
     private static long[] parse(String version){
         var m=FORM.matcher(version.trim());
         if(!m.matches())return null;

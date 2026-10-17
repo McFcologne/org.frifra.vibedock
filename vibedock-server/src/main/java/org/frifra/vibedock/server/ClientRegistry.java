@@ -36,7 +36,7 @@ public class ClientRegistry {
      * web: set for a web display, which fetches the image by link instead of being a paired device.
      * board: its {@link Board} id, null for the VibeTV M1; chosen when pairing or reported by the device.
      * callbackNetwork: pairing target plus the mask reported at pairing; missing means IPv4 /24 for old devices.
-     * This additive field may be missing in older files; only re-pairing can change it.
+     * This field may be missing in older files. The first valid authenticated mask fixes it once; USB origins are fixed by their first authenticated pull.
      */
     record Device(String identifier,String name,String keyHash,String ip,int port,long pairedAt,Long lastPullAt,String lastPullIp,Design design,
                   boolean serverFooter,String firmware,String display,Web web,String board,String callbackNetwork) {
@@ -46,6 +46,8 @@ public class ClientRegistry {
                boolean serverFooter,String firmware,String display,Web web,String board){
             this(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,null);
         }
+        Device withCallbackNetwork(String network){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,network);}
+        Device withCallbackOrigin(String origin){return new Device(identifier,name,keyHash,origin,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,null);}
         Device pulled(long at,String peer,boolean footer,String version){return new Device(identifier,name,keyHash,ip,port,pairedAt,at,peer,design,footer,version,display,web,board,callbackNetwork);}
         Device withDesign(Design next){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,next,serverFooter,firmware,display,web,board,callbackNetwork);}
         Device withName(String next){return new Device(identifier,next,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,callbackNetwork);}
@@ -271,8 +273,22 @@ public class ClientRegistry {
     public synchronized void pulled(String id,String peer) throws IOException {var c=find(id);pulled(id,peer,c.serverFooter(),c.firmware());}
     public synchronized void pulled(String id,String peer,boolean serverFooter) throws IOException {pulled(id,peer,serverFooter,find(id).firmware());}
     public synchronized void pulled(String id,String peer,boolean serverFooter,String firmware) throws IOException {
+        pulled(id,peer,serverFooter,firmware,null);
+    }
+    public synchronized void pulled(String id,String peer,boolean serverFooter,String firmware,String subnetMask) throws IOException {
         var c=find(id);long now=clock.instant().getEpochSecond();
-        boolean persist=c.lastPullAt()==null || now-c.lastPullAt()>=60 || !Objects.equals(peer,c.lastPullIp()) || serverFooter!=c.serverFooter()
+        // USB establishes trust on its first authenticated contact. Never re-anchor on later reports.
+        boolean learnOrigin=c.web()==null&&ClientPairing.UNKNOWN_IP.equals(c.ip())&&usableCallbackIp(peer);
+        if(learnOrigin)c=c.withCallbackOrigin(peer);
+        boolean learnNetwork=false;
+        if(c.web()==null&&c.callbackNetwork()==null&&!ClientPairing.UNKNOWN_IP.equals(c.ip())
+                &&FirmwareVersion.knownNewer(firmware,"0.1.0")&&subnetMask!=null&&!subnetMask.isBlank()){
+            try{
+                String network=IpNetworks.subnet(c.ip(),subnetMask.trim());
+                if(IpNetworks.parse(network).matches(peer)){c=c.withCallbackNetwork(network);learnNetwork=true;}
+            }catch(IllegalArgumentException ignored){ /* Invalid masks do not consume the one-time upgrade. */ }
+        }
+        boolean persist=learnOrigin||learnNetwork||c.lastPullAt()==null || now-c.lastPullAt()>=60 || !Objects.equals(peer,c.lastPullIp()) || serverFooter!=c.serverFooter()
                 || !Objects.equals(firmware,c.firmware());
         if(c.lastPullAt()==null)log.info("Device {} ({}) pulled its first image from {}",c.name(),id,peer);
         else if(!Objects.equals(peer,c.lastPullIp()))log.info("Device {} ({}) now pulls from {} (was {})",c.name(),id,peer,c.lastPullIp());
@@ -280,6 +296,12 @@ public class ClientRegistry {
         List<Device> next=new ArrayList<>(state.devices());next.replaceAll(x->x.identifier().equals(id)?updated:x);
         var nextState=state.withDevices(next);
         if(persist)save(nextState);else state=nextState;
+    }
+    private static boolean usableCallbackIp(String ip){
+        try{
+            var address=java.net.InetAddress.getByAddress(IpNetworks.literal(ip));
+            return !address.isAnyLocalAddress()&&!address.isMulticastAddress();
+        }catch(IllegalArgumentException|java.net.UnknownHostException e){return false;}
     }
     /** Endpoint for an immediate pull: reports may change the IP only inside the network fixed at pairing. */
     public record Address(String ip,int port) {}

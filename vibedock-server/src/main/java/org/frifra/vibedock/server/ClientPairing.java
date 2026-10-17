@@ -62,13 +62,13 @@ public class ClientPairing {
         return new Invitation(registry.get(id),List.copyOf(warnings));
     }
 
-    /** No administrator-approved callback address: regular image polling still works. */
+    /** USB callback address not known until the first authenticated image pull. */
     static final String UNKNOWN_IP="0.0.0.0";
     /** The pairing for a device set up over USB by the browser flasher, and warnings about its https addresses. */
     public record Setup(Map<String,Object> pairing,List<String> warnings) {}
     /**
      * Pairs a device that is set up over USB right after flashing: the browser hands this pairing to the device
-     * together with the Wi-Fi it entered. Pulls report a display address, never a trusted callback address.
+     * together with the Wi-Fi it entered. Its first authenticated pull establishes the callback origin and the IPv4 /24 boundary.
      */
     public Setup setUp(String identifier,String name,List<String> servers) throws Exception {return setUp(identifier,name,null,servers);}
     /** @param board the board the display reports over USB, or the one chosen on the firmware page. */

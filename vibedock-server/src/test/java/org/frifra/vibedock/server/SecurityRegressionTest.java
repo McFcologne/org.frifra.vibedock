@@ -55,7 +55,7 @@ class SecurityRegressionTest {
   registry.remove(view.identifier());
  }
 
- @Test void deviceReportsCannotChangeTheServerCallbackEndpoint() throws Exception {
+ @Test void callbackNetworksStayFixedAndUsbLearnsItsOriginOnAuthenticatedContact() throws Exception {
   var received=new CountDownLatch(1);String id="vibedock-audit-device",key="b".repeat(64);
   var observer=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
   observer.createContext("/pull",exchange->{if(exchange.getRequestMethod().equals("POST"))received.countDown();exchange.sendResponseHeaders(202,-1);exchange.close();});observer.start();
@@ -67,11 +67,25 @@ class SecurityRegressionTest {
    assertEquals("127.0.0.1",registry.get(id).ip(),"Reported address remains visible on the display");
    assertEquals("192.0.2.123",registry.address(id).ip());
    registry.paired(id,"Synthetic USB device",key,ClientPairing.UNKNOWN_IP,observer.getAddress().getPort());
-   assertEquals(200,http.send(request,HttpResponse.BodyHandlers.discarding()).statusCode());
    assertEquals(ClientPairing.UNKNOWN_IP,registry.address(id).ip());
+   var unauthenticated=HttpRequest.newBuilder(request.uri()).header("Authorization","Bearer "+"c".repeat(64))
+    .header("X-VibeDock-Device-IP","192.0.2.200").GET().build();
+   assertEquals(401,http.send(unauthenticated,HttpResponse.BodyHandlers.discarding()).statusCode());
+   assertEquals(ClientPairing.UNKNOWN_IP,registry.address(id).ip());
+   // First authenticated contact claims the cloud metadata address: the connection's source counts instead.
+   var metadata=HttpRequest.newBuilder(request.uri()).header("Authorization","Bearer "+key)
+    .header("X-VibeDock-Device-IP","169.254.169.254").GET().build();
+   assertEquals(200,http.send(metadata,HttpResponse.BodyHandlers.discarding()).statusCode());
+   assertEquals("127.0.0.1",registry.address(id).ip());assertEquals("127.0.0.1",registry.get(id).ip());
+   assertEquals(200,http.send(request,HttpResponse.BodyHandlers.discarding()).statusCode());
+   assertEquals("127.0.0.1",registry.address(id).ip());
    ReflectionTestUtils.setField(poke,"enabled",true);
    poke.pullNow(List.of(registry.address(id)));
-   assertFalse(received.await(300,TimeUnit.MILLISECONDS),"USB reports must not cause server callbacks");
+   assertTrue(received.await(3,TimeUnit.SECONDS),"The first authenticated USB contact enables immediate pulls");
+   var outside=HttpRequest.newBuilder(request.uri()).header("Authorization","Bearer "+key)
+    .header("X-VibeDock-Device-IP","192.0.2.200").GET().build();
+   assertEquals(200,http.send(outside,HttpResponse.BodyHandlers.discarding()).statusCode());
+   assertEquals("127.0.0.1",registry.address(id).ip());
   }finally{ReflectionTestUtils.setField(poke,"enabled",false);observer.stop(0);registry.remove(id);}
  }
 

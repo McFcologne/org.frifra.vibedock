@@ -100,6 +100,58 @@ class ClientTest {
             registry.pulled(result.view().identifier(),"127.0.0.2");assertEquals("127.0.0.1",registry.address(result.view().identifier()).ip());
         }finally{server.stop(0);}
     }
+    @Test void wideMasksNeitherWidenPairingNorTheOneTimeUpgrade(@TempDir Path dir) throws Exception {
+        var registry=new ClientRegistry(dir.toString(),json,Clock.systemUTC());String id="vibedock-wide-mask";
+        registry.paired(id,"Wide",key,"10.1.2.3",80);
+        registry.pulled(id,"10.1.2.3",true,"0.1.1","128.0.0.0");  // invalid: does not use up the one-time upgrade
+        registry.pulled(id,"10.9.9.9",true,"0.1.1");assertEquals("10.1.2.3",registry.address(id).ip());
+        registry.pulled(id,"10.1.2.3",true,"0.1.1","255.255.0.0");
+        registry.pulled(id,"10.1.200.7",true,"0.1.1");assertEquals("10.1.200.7",registry.address(id).ip());
+        registry.pulled(id,"10.2.0.1",true,"0.1.1","255.0.0.0");assertEquals("10.1.2.3",registry.address(id).ip());
+    }
+    @Test void spoofedSpecialAddressesFallBackToTheConnectionSource(){
+        for(String reported:List.of("127.0.0.1","127.8.8.8","::1","169.254.169.254","fe80::1","0.0.0.0","::","224.0.0.1","ff02::1"))
+            assertEquals("192.168.1.50",DeviceApiController.deviceAddress(reported,"192.168.1.50"),reported);
+        assertEquals("192.168.1.60",DeviceApiController.deviceAddress("192.168.1.60","172.17.0.1"));
+        assertEquals("fd00::5",DeviceApiController.deviceAddress("fd00::5","172.17.0.1"));
+    }
+    @Test void usbFirstContactPinsTheOriginAcrossDhcpChangesAndRestarts(@TempDir Path dir) throws Exception {
+        var registry=new ClientRegistry(dir.toString(),json,Clock.systemUTC());String id="vibedock-usb-origin";
+        registry.paired(id,"USB",key,ClientPairing.UNKNOWN_IP,80);
+        assertEquals(ClientPairing.UNKNOWN_IP,registry.address(id).ip());
+        for(String invalid:List.of("0.0.0.0","::","224.0.0.1","not-an-ip")){
+            registry.pulled(id,invalid);assertEquals(ClientPairing.UNKNOWN_IP,registry.address(id).ip());
+        }
+        registry.pulled(id,"192.168.1.50");assertEquals("192.168.1.50",registry.address(id).ip());
+        registry.pulled(id,"192.168.1.99");assertEquals("192.168.1.99",registry.address(id).ip());
+        var reloaded=new ClientRegistry(dir.toString(),json,Clock.systemUTC());
+        assertEquals("192.168.1.99",reloaded.address(id).ip());
+        reloaded.pulled(id,"192.168.2.1");assertEquals("192.168.1.50",reloaded.address(id).ip());
+        reloaded.pulled(id,"192.168.2.99");assertEquals("192.168.1.50",reloaded.address(id).ip());
+        var web=reloaded.addWeb("Web",null,30);reloaded.pulled(web.identifier(),"192.168.1.50");
+        assertEquals(ClientPairing.UNKNOWN_IP,reloaded.address(web.identifier()).ip());
+    }
+    @Test void legacyAndUsbClientsLearnOnlyTheirFirstValidMask(@TempDir Path dir) throws Exception {
+        var registry=new ClientRegistry(dir.toString(),json,Clock.systemUTC());
+        for(String id:List.of("vibedock-mask-legacy","vibedock-mask-usb")){
+            registry.paired(id,"Mask upgrade",key,id.endsWith("usb")?ClientPairing.UNKNOWN_IP:"192.168.17.5",80);
+            registry.pulled(id,"192.168.17.5",true,"0.1.0"); // No mask: old firmware remains usable.
+            registry.pulled(id,"192.168.17.9",true,"0.1.0");assertEquals("192.168.17.9",registry.address(id).ip());
+            for(String version:new String[]{null,"0.1.0","v0.1.0","0.1.0-dirty","0.0.9","unknown","999999999999999999999.1.0"})
+                registry.pulled(id,"192.168.17.9",true,version,"255.255.240.0");
+            registry.pulled(id,"192.168.20.1",true,"0.1.0");assertEquals("192.168.17.5",registry.address(id).ip());
+            for(String invalid:List.of("0.0.0.0","255.0.255.0"))registry.pulled(id,"192.168.17.9",true,"0.1.1",invalid);
+            registry.pulled(id,"192.168.32.1",true,"0.1.1","255.255.240.0"); // Outside the proposed network: do not learn.
+            assertEquals("192.168.17.5",registry.address(id).ip());
+            registry.pulled(id,"192.168.17.9",true,"0.1.1");
+            registry.pulled(id,"192.168.17.9",true,"0.1.1","255.255.240.0"); // Same peer/time: must still persist the upgrade.
+            var reloaded=new ClientRegistry(dir.toString(),json,Clock.systemUTC());
+            reloaded.pulled(id,"192.168.31.254",true,"0.1.1");assertEquals("192.168.31.254",reloaded.address(id).ip());
+            reloaded.pulled(id,"192.168.32.1",true,"0.2.0","255.255.0.0");assertEquals("192.168.17.5",reloaded.address(id).ip());
+            reloaded.pulled(id,"192.168.20.1",true,"0.2.0","255.255.255.0");assertEquals("192.168.20.1",reloaded.address(id).ip());
+            registry=new ClientRegistry(dir.toString(),json,Clock.systemUTC());
+        }
+    }
     @Test void legacyPushRegistryIsIgnoredAndSettingsAreValidated(@TempDir Path dir) throws Exception {
         Files.writeString(dir.resolve("clients.json"),"[]");
         var registry=new ClientRegistry(dir.toString(),json,Clock.systemUTC());
