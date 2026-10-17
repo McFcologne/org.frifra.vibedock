@@ -36,7 +36,14 @@ class WebSecurity {
     @Bean org.springframework.security.web.session.HttpSessionEventPublisher sessionEvents(){
         return new org.springframework.security.web.session.HttpSessionEventPublisher();
     }
-    @Bean SecurityFilterChain security(HttpSecurity http,org.springframework.security.core.session.SessionRegistry sessions) throws Exception {
+    @Bean SecurityFilterChain security(HttpSecurity http,org.springframework.security.core.session.SessionRegistry sessions,
+            @Value("${vibedock.admin-auth:password}") String auth,@Value("${vibedock.admin-user}") String admin) throws Exception {
+        // ADMIN_AUTH=none (quick tests): every visitor of the administration port counts as the administrator. The port
+        // guard still keeps the administration off the public port; publish the administration port on this host only.
+        if("none".equals(auth)){
+            org.slf4j.LoggerFactory.getLogger(WebSecurity.class).warn("ADMIN_AUTH=none: the administration needs no sign-in");
+            http.anonymous(a -> a.principal(admin).authorities("ROLE_ADMIN"));
+        }
         // Behind a TLS reverse proxy (e.g. Synology Web Station) absolute http:// redirects would break; browsers get
         // a relative redirect to the login page instead. Other clients keep HTTP Basic.
         var login=new LoginUrlAuthenticationEntryPoint("/login");login.setFavorRelativeUris(true);

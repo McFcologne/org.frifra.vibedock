@@ -30,5 +30,13 @@ class ApplicationInfo {
     /** The user manual as PDF, if this installation has one (the Docker image does; a local Maven run does not). */
     Optional<Path> manual(){return Files.isRegularFile(manual)?Optional.of(manual):Optional.empty();}
     @ModelAttribute("manualAvailable") public boolean getManualAvailable(){return manual().isPresent();}
+    @org.springframework.beans.factory.annotation.Value("${vibedock.admin-auth:password}") private String auth;
+    @org.springframework.beans.factory.annotation.Value("${vibedock.demo-usage:false}") private boolean demo;
+    /** Test modes, shown as a banner: no sign-in (ADMIN_AUTH=none), made-up usage (DEMO_USAGE). */
+    @ModelAttribute("testMode") public String getTestMode(){
+        var parts=new java.util.ArrayList<String>();
+        if("none".equals(auth))parts.add("no sign-in");if(demo)parts.add("made-up usage");
+        return parts.isEmpty()?null:"Test mode: "+String.join(", ",parts);
+    }
     @ModelAttribute("readmeUrl") public String getReadmeUrl(){return "https://github.com/McFcologne/org.frifra.vibedock#readme";}
 }

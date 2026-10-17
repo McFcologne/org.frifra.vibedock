@@ -1,4 +1,7 @@
 ARG TWEMOJI_VERSION=17.0.3
+# MANUAL=skip leaves out the manual (PDF and its screenshots), for quick local builds; the administration then shows no
+# manual link.
+ARG MANUAL=full
 # The version comes from the Git tag of the sources (scripts/version.sh). Compose and scripts/image.sh pass the
 # repository's .git as the build context "git"; a plain "docker build" gets this empty stage and builds 0.0.0-SNAPSHOT.
 FROM scratch AS git
@@ -67,7 +70,7 @@ RUN TWEMOJI_VERSION="$TWEMOJI_VERSION" node /app/license-inventory.mjs
 # these sources with the demo data (scripts/docs.sh), then pandoc makes the PDF, ending with the
 # licenses of the runtime stage's inventory. Like the firmware, the text comes
 # from the "git" context; without it the image has no manual. Built natively, also when building for another platform.
-FROM build AS manual
+FROM build AS manual-full
 RUN apt-get update && apt-get install -y --no-install-recommends git pandoc texlive-xetex texlive-latex-recommended \
       texlive-latex-extra texlive-fonts-recommended lmodern fonts-dejavu-core && rm -rf /var/lib/apt/lists/* \
     && git config --global safe.directory '*'
@@ -86,6 +89,11 @@ RUN --mount=type=bind,from=git,target=/repo.git mkdir -p /out && if git --git-di
       && DOCS_COMMIT=$(git --git-dir=/repo.git rev-parse HEAD) DOCS_STAMP=$(git --git-dir=/repo.git show -s --format=%ct HEAD) \
          EMOJI_DIR=/twemoji DOCS_VERSION="$(cat /version)" DOCS_PDF=/out/vibedock-manual.pdf LICENSE_INVENTORY=/legal/components.json sh scripts/docs.sh; \
     fi
+
+FROM alpine:3.22 AS manual-skip
+RUN mkdir /out
+
+FROM manual-${MANUAL} AS manual
 
 FROM runtime
 WORKDIR /app
