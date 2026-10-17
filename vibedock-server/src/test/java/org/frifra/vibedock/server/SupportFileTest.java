@@ -41,7 +41,9 @@ class SupportFileTest {
         clients.paired(id,"Desk",key,"192.168.1.40",80,"waveshare-s3-touch-lcd-147");
         try{
             deviceLogs.save(id,"usb","0.2.0","waveshare-s3-touch-lcd-147",List.of("Start v0.2.0","Server https://home.example.com: HTTP 200"));
-            var created=json.readTree(mvc.perform(post("/admin/support/file").param("days","7").param("hideHosts","true").with(csrf()).with(r->{r.setLocalPort(10001);return r;}))
+            var created=json.readTree(mvc.perform(post("/admin/support/file").param("days","7").param("hideHosts","true")
+                    .param("title","Desk stays dark").param("happened","Black since the update.\r\nMail me@example.org\u0007").param("since","yesterday")
+                    .param("displays",id,"vibedock-unknown").with(csrf()).with(r->{r.setLocalPort(10001);return r;}))
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
             String file=new String(Base64.getDecoder().decode(created.path("data").asText()));
             Assertions.assertTrue(created.path("name").asText().endsWith(".vdsupport"));
@@ -55,6 +57,10 @@ class SupportFileTest {
                     .andExpect(jsonPath("$.summary.days").value(7)).andExpect(jsonPath("$.summary.hostsHidden").value(true))
                     .andExpect(jsonPath("$.displays[?(@.identifier=='"+id+"')].board").value("waveshare-s3-touch-lcd-147"))
                     .andExpect(jsonPath("$.deviceLogs[0].lines[0]").value("Start v0.2.0"))
+                    // The description: redacted, control characters removed, only known displays, empty fields absent.
+                    .andExpect(jsonPath("$.report.title").value("Desk stays dark")).andExpect(jsonPath("$.report.happened").value("Black since the update.\nMail [e-mail]"))
+                    .andExpect(jsonPath("$.report.since").value("yesterday")).andExpect(jsonPath("$.report.expected").doesNotExist())
+                    .andExpect(jsonPath("$.report.displays.length()").value(1)).andExpect(jsonPath("$.report.displays[0]").value(id))
                     .andReturn().getResponse().getContentAsString();
             for(String secret:List.of("abcdefabcdef","hunter22hunter","s3cretSecretValue","me@example.org","home.example.com","203.0.113.9","/old"))
                 Assertions.assertFalse(opened.contains(secret),secret+" must not be in the support file");

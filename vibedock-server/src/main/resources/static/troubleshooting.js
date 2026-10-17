@@ -71,8 +71,22 @@ const section = (title, text, open = false) => {
   const pre = element('pre', text); pre.className = 'log-lines'; details.append(pre); return details;
 };
 const when = millis => millis ? new Date(millis).toLocaleString() : '-';
+const rawActions = document.querySelector('[data-support-raw-actions]');
+let raw = null, rawName = 'vibedock-support.json';
+document.querySelector('[data-support-download]').addEventListener('click', () => {
+  if (!raw) return;
+  const link = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([raw], { type: 'application/json' })), download: rawName });
+  link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 10000);
+});
+// The user's description first; "-" where a field was left empty.
+const reportText = (report, displays) => {
+  if (!report) return 'No description (created before VibeDock 0.2.0).';
+  const names = (report.displays || []).map(id => { const d = displays.find(x => x.identifier === id); return d ? `${d.name} (${id})` : id; });
+  return [`${report.title ?? '-'}`, '', `What happened:\n${report.happened ?? '-'}`, '', `Expected:\n${report.expected ?? '-'}`, '',
+    `Steps:\n${report.steps ?? '-'}`, '', `Since: ${report.since ?? '-'}`, `Displays: ${names.length ? names.join(', ') : '-'}`].join('\n');
+};
 opener.addEventListener('submit', async event => {
-  event.preventDefault(); openError.hidden = true; contents.hidden = true; const button = opener.querySelector('button'); button.disabled = true;
+  event.preventDefault(); openError.hidden = true; contents.hidden = true; rawActions.hidden = true; raw = null; const button = opener.querySelector('button'); button.disabled = true;
   try {
     const file = opener.elements.file.files[0]; if (!file) throw new Error('Choose a support file');
     const response = await fetch('/admin/support/open', { method: 'POST', credentials: 'same-origin',
@@ -80,7 +94,10 @@ opener.addEventListener('submit', async event => {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || 'HTTP ' + response.status);
     const s = data.summary;
+    raw = JSON.stringify(data, null, 2); rawName = file.name.replace(/\.vdsupport$/, '') + '.json';
+    const rawSection = section('Raw (JSON)', raw); rawSection.querySelector('pre').dataset.supportRaw = '';
     contents.replaceChildren(
+      section('Problem', reportText(data.report, data.displays), true),
       section('Summary', `VibeDock ${s.version} · Java ${s.java} · ${s.platform}${s.docker ? ' · Docker' : ''} · ${s.timeZone}\n`
         + `Created ${when(s.createdAt)}, logs of ${s.days} day(s)${s.hostsHidden ? ', host names hidden' : ''} · up ${Math.round(s.uptimeSeconds / 3600)} h\n`
         + `Poll ${s.pollSeconds} s · ${s.ipRules} IP rules · ${s.sources} data sources · ${s.displays} displays${s.testMode ? ' · ' + s.testMode : ''}`, true),
@@ -89,8 +106,8 @@ opener.addEventListener('submit', async event => {
         + `${d.web ? ' · web display' : ''}${d.ota ? ' · Wi-Fi updates' : ''}${d.updating ? ' · updating' : ''}${d.updateError ? ' · update error: ' + d.updateError : ''}${d.flipped ? ' · flipped' : ''}`).join('\n'), true),
       ...data.deviceLogs.map(l => section(`Display log ${l.identifier} · ${when(l.savedAt)} · ${l.source} · ${l.firmware ?? '-'} · ${l.board ?? '-'}`, l.lines.join('\n'))),
       section(`Server log (${data.serverLog.length} lines)`, data.serverLog.join('\n')),
-      section(`Access log (${data.accessLog.length} lines)`, data.accessLog.join('\n')));
-    contents.hidden = false;
+      section(`Access log (${data.accessLog.length} lines)`, data.accessLog.join('\n')), rawSection);
+    contents.hidden = false; rawActions.hidden = false;
   } catch (error) { openError.textContent = 'Opening failed: ' + error.message; openError.hidden = false; }
   button.disabled = false;
 });

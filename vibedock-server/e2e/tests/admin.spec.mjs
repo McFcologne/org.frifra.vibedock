@@ -78,6 +78,8 @@ test('flip image saves in place and only touch boards offer it',async ({page,app
 test('support file is created with a key shown once and opens again with it',async ({page,app}) => {
   await page.goto(app.baseURL+'/admin/troubleshooting');
   const download=page.waitForEvent('download');
+  await page.getByLabel('In one line').fill('Shelf stays dark');await page.getByLabel('What happened').fill('Black after the update');
+  await page.getByLabel(/Shelf/).check();
   await page.getByRole('button',{name:'Create support file',exact:true}).click();
   const file=await (await download).path();
   const key=await page.locator('[data-support-key-value]').textContent();
@@ -89,6 +91,13 @@ test('support file is created with a key shown once and opens again with it',asy
   await open.getByLabel('Key').fill(key);await open.getByRole('button',{name:'Open',exact:true}).click();
   const contents=page.locator('[data-support-contents]');
   await expect(contents).toContainText('Displays (2)');await expect(contents).toContainText('Shelf');
+  await expect(contents).toContainText('Shelf stays dark');await expect(contents).toContainText('Black after the update');
+  // Raw: the whole content as JSON, to copy or download.
+  const raw=JSON.parse(await page.locator('[data-support-raw]').textContent());
+  expect(raw.report.title).toBe('Shelf stays dark');expect(raw.report.displays).toHaveLength(1);
+  const json=page.waitForEvent('download');await page.getByRole('button',{name:'Download JSON'}).click();
+  expect((await json).suggestedFilename()).toMatch(/\.json$/);  // named after the opened file
+  await page.getByRole('button',{name:'Copy as JSON'}).click();
 });
 
 test('a device shows uploaded photos, saved right away with the time of day',async ({page,app}) => {

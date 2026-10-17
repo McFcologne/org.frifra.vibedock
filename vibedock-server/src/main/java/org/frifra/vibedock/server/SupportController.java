@@ -16,9 +16,11 @@ class SupportController {
     SupportController(SupportFile support){this.support=support;}
 
     @PostMapping(value="/admin/support/file",produces="application/json") @ResponseBody
-    ResponseEntity<Map<String,Object>> create(@RequestParam(defaultValue="7") int days,@RequestParam(defaultValue="false") boolean hideHosts) throws IOException {
+    ResponseEntity<Map<String,Object>> create(@RequestParam(defaultValue="7") int days,@RequestParam(defaultValue="false") boolean hideHosts,
+            @RequestParam(required=false) String title,@RequestParam(required=false) String happened,@RequestParam(required=false) String expected,
+            @RequestParam(required=false) String steps,@RequestParam(required=false) String since,@RequestParam(required=false) List<String> displays) throws IOException {
         try{
-            var created=support.create(days,hideHosts);
+            var created=support.create(days,hideHosts,new SupportFile.Report(title,happened,expected,steps,since,displays));
             log.info("Support file {} created ({} days{}, {} bytes)",created.name(),days,hideHosts?", host names hidden":"",created.bytes().length);
             return ResponseEntity.ok(Map.of("name",created.name(),"key",created.key(),"data",Base64.getEncoder().encodeToString(created.bytes())));
         }catch(IllegalArgumentException e){return ResponseEntity.badRequest().body(Map.of("error",e.getMessage()));}

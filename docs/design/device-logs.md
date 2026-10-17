@@ -50,6 +50,9 @@ Needs firmware newer than 0.1.1; displays with older firmware keep the USB way. 
   (AES-256-GCM, key derived with PBKDF2 like the data source export in `SourceTransfer`, its own format name as
   associated data). The key is shown once, with a copy button, and not stored. The file (`.vdsupport`) can be
   attached to a public issue; the key goes to the maintainer separately, never into the issue.
+- **Description:** the user describes the problem when creating the file (`report`: one line, what happened,
+  expected, steps, since when, the displays concerned); it passes the redactor like everything else.
 - **Opening a support file:** *Troubleshooting › Open a support file* takes the file and the key, decrypts it in
-  memory and shows its contents (summary, sources, displays, logs) for analysis; nothing of it is stored.
+  memory and shows its contents (description, summary, sources, displays, logs) for analysis, also as raw JSON to
+  copy or download; nothing of it is stored.
 - Open: a GitHub issue template that asks for version, board, description and whether a support file is attached.

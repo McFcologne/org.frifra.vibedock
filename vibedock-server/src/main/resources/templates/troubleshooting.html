@@ -40,10 +40,20 @@
   <p>One file with what a problem needs: version and platform, the data sources (no sign-ins or keys), the displays, the server and
     access log of the chosen days and the saved display logs. Keys, tokens, links and e-mail addresses are removed. It is encrypted with
     a key that is shown once here: attach the file to the issue, and send the key separately, never in the issue.</p>
-  <form class="flash-row" data-support-create>
-    <label>Logs of the last<select name="days"><option value="1">day</option><option value="3">3 days</option><option value="7" selected>7 days</option><option value="14">14 days</option></select></label>
+  <form class="support-form" data-support-create>
+    <fieldset><legend>The problem</legend>
+      <label for="support-title">In one line</label><input id="support-title" name="title" maxlength="200" placeholder="Display stays on “Waiting for first pull”" required>
+      <label for="support-happened">What happened</label><textarea id="support-happened" name="happened" rows="3" maxlength="4000" placeholder="What you saw, error messages, what the display shows"></textarea>
+      <label for="support-expected">What you expected</label><textarea id="support-expected" name="expected" rows="2" maxlength="4000"></textarea>
+      <label for="support-steps">Steps to see it again</label><textarea id="support-steps" name="steps" rows="3" maxlength="4000" placeholder="1. …"></textarea>
+      <label for="support-since">Since when</label><input id="support-since" name="since" maxlength="200" placeholder="e.g. since the update yesterday, about 14:30">
+      <div th:unless="${#lists.isEmpty(displays)}"><span class="field-label">Displays concerned</span>
+        <div class="support-displays"><label class="check" th:each="d:${displays}"><input type="checkbox" name="displays" th:value="${d.identifier}">
+          <span th:text="${d.name + ' · ' + (d.web != null ? 'web display' : d.board.label)}"></span></label></div></div>
+    </fieldset>
+    <div class="flash-row"><label>Logs of the last<select name="days"><option value="1">day</option><option value="3">3 days</option><option value="7" selected>7 days</option><option value="14">14 days</option></select></label>
     <label class="check"><input type="checkbox" name="hideHosts" value="true"> Also hide host names and public IP addresses</label>
-    <button>Create support file</button></form>
+    <button>Create support file</button></div></form>
   <div class="notice" data-support-key hidden><p><strong>Key of <span data-support-name></span></strong> (shown only now):</p>
     <div class="web-link"><code data-support-key-value></code>
       <button type="button" class="icon-button" data-copy-from="[data-support-key-value]" title="Copy key" aria-label="Copy key"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg></button></div></div>
@@ -52,12 +62,16 @@
 
 <section class="card" id="support-open">
   <div class="card-head"><h3 class="grow">Open a support file</h3></div>
-  <p class="meta">For the analysis: the file is decrypted here and shown; nothing of it is stored on this server.</p>
+  <p class="meta">For the analysis: the file is decrypted here and shown; nothing of it is stored on this server. <em>Raw</em> shows
+    all of it as one JSON document to copy or download, e.g. for an analysis tool.</p>
   <form class="flash-row" data-support-open>
     <input type="file" name="file" accept=".vdsupport,application/json" required aria-label="Support file">
     <input name="key" required placeholder="Key (xxxxxxxx-xxxx-…)" autocomplete="off" spellcheck="false" aria-label="Key">
     <button class="secondary">Open</button></form>
   <p class="notice error" data-support-open-error hidden></p>
+  <div class="flash-row" data-support-raw-actions hidden>
+    <button type="button" class="secondary" data-copy-from="[data-support-raw]" title="Copy the whole content as JSON">Copy as JSON</button>
+    <button type="button" class="secondary" data-support-download>Download JSON</button></div>
   <div data-support-contents hidden></div>
 </section>
 </main>

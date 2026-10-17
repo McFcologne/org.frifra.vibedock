@@ -899,13 +899,16 @@ To test a fix before a release, build the firmware from your checkout and instal
 
 ## Report a problem
 
-**Devices → Troubleshooting → Create support file** puts what a problem needs into one file: version and platform,
+**Devices → Troubleshooting → Create support file** puts what a problem needs into one file: your description of the
+problem (one line, what happened, what you expected, the steps to see it again, since when, the displays concerned),
+version and platform,
 the data sources (without sign-ins or keys), the displays, the server and access log of the chosen days and the
 saved display logs. Keys, tokens, display links and e-mail addresses are removed; *Also hide host names and public IP
 addresses* removes those as well (addresses in the home network stay). The file is encrypted with a key that the page
 shows once and does not keep: attach the file to the issue and send the key separately, never in the issue.
-**Open a support file** on the same page decrypts such a file with its key and shows its contents; nothing of it is
-stored.
+**Open a support file** on the same page decrypts such a file with its key and shows its contents, the description
+first; nothing of it is stored. *Raw (JSON)* shows the whole content as one document, *Copy as JSON* and *Download
+JSON* hand it on, e.g. to an analysis tool.
 
 Without a support file: copy the display log, and note the server version (page footer), the board and the firmware
 version, and what the display showed.

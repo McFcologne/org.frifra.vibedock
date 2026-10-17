@@ -376,3 +376,7 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 .photo-delete.armed{background:#c42b1c}
 .photo-add{display:inline-block;margin:2px 0 6px;cursor:pointer}.photo-add input{display:none}
 .photo-times{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px}.photo-times input{width:auto;margin:0}.photo-times small{width:100%;color:var(--muted)}
+/* Support file: the problem description. */
+.support-form fieldset{margin-top:0}.support-form textarea{width:100%;resize:vertical;font:inherit}
+.field-label{display:block;margin:14px 0 6px;font-weight:550;font-size:14px}
+.support-displays{display:flex;flex-wrap:wrap;gap:4px 18px}.support-displays label{margin:0}

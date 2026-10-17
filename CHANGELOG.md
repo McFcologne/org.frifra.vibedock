@@ -22,7 +22,8 @@ the administration (over Wi-Fi where their firmware can, otherwise once over USB
 - **Administration:** previews in the case of each board, live updates after a swipe, the preview builds up like the
   display, the design editor saves every change right away, a link to each display's own page.
 - **Troubleshooting page:** read a display's log over USB from any board (no board to choose) or over the network,
-  logs refresh by themselves, and an **encrypted support file** (summary, data sources, displays, logs; secrets
+  logs refresh by themselves, and an **encrypted support file** (the user's description of the problem, summary,
+  data sources, displays, logs; opened again as sections or raw JSON to copy; secrets
   removed) for problem reports, with the key shown once.
 - **Colours:** calibrated defaults for the VibeTV M1 (gamma 3.20, 100/74/40 %) and the Waveshare boards (1.50,
   100/91/76 %); the device page shows the uncorrected image beside the sliders and applies changes without reloading.

@@ -27,7 +27,14 @@
     const copy = event.target.closest('[data-copy],[data-copy-from]'); if (!copy) return;
     const text = copy.dataset.copyFrom ? document.querySelector(copy.dataset.copyFrom)?.textContent ?? '' : copy.dataset.copy;
     const title = copy.title;
-    navigator.clipboard.writeText(text).then(() => { copy.classList.add('copied'); copy.title = 'Copied'; setTimeout(() => { copy.classList.remove('copied'); copy.title = title; }, 1500); });
+    const copied = () => { copy.classList.add('copied'); copy.title = 'Copied'; setTimeout(() => { copy.classList.remove('copied'); copy.title = title; }, 1500); };
+    // Over plain HTTP (not localhost) browsers have no clipboard API: copy through a hidden text field instead.
+    const fallback = () => {
+      const field = Object.assign(document.createElement('textarea'), { value: text, readOnly: true });
+      field.style.cssText = 'position:fixed;top:0;left:0;opacity:0'; document.body.append(field); field.select();
+      try { if (document.execCommand('copy')) copied(); } finally { field.remove(); }
+    };
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(copied, fallback); else fallback();
   });
   // Posting a form reloads the page; remember the scroll position for it (theme.js restores it).
   document.addEventListener('submit', event => {

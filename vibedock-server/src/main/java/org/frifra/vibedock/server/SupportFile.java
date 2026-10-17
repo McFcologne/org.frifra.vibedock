@@ -19,7 +19,7 @@ import java.util.zip.GZIPInputStream;
 
 /**
  * The support file (Troubleshooting): everything needed to analyse a problem, server and displays alike, in one file
- * that is safe to attach to a public ticket. It holds a summary of the installation, the data sources without
+ * that is safe to attach to a public ticket. It holds the user's description of the problem, a summary of the installation, the data sources without
  * credentials, the displays, the server and access log of the chosen days and the saved display logs; all of it
  * passes {@link SupportRedactor}. The file is encrypted (AES-256-GCM, PBKDF2 key like the data source export) with a
  * random key in GUID form that is shown once and not stored; the key goes to the maintainer separately.
@@ -35,7 +35,22 @@ class SupportFile {
     record Display(String identifier,String name,String board,String display,String firmware,String status,Long lastPullAt,String ip,
                    boolean web,boolean ota,boolean otaNeedsPairing,boolean updating,String updateError,boolean flipped,boolean serverFooter) {}
     record DeviceLog(String identifier,long savedAt,String source,String firmware,String board,List<String> lines) {}
-    record Contents(Summary summary,List<Source> sources,List<Display> displays,List<String> serverLog,List<String> accessLog,List<DeviceLog> deviceLogs) {}
+    /** The problem in the user's words (all optional); displays: the identifiers of the displays it concerns. */
+    record Report(String title,String happened,String expected,String steps,String since,List<String> displays) {
+        static final int MAX_TITLE=200,MAX_TEXT=4000;
+        Report {
+            title=clip(title,MAX_TITLE);happened=clip(happened,MAX_TEXT);expected=clip(expected,MAX_TEXT);steps=clip(steps,MAX_TEXT);since=clip(since,MAX_TITLE);
+            displays=displays==null?List.of():displays.stream().filter(Objects::nonNull).distinct().limit(100).toList();
+        }
+        static final Report NONE=new Report(null,null,null,null,null,null);
+        private static String clip(String text,int max){
+            if(text==null)return null;
+            // Line breaks and tabs stay, other control characters go.
+            text=text.replace("\r\n","\n").replaceAll("[\\p{Cntrl}&&[^\n\t]]","").strip();
+            return text.isEmpty()?null:text.length()>max?text.substring(0,max)+" …":text;
+        }
+    }
+    record Contents(Report report,Summary summary,List<Source> sources,List<Display> displays,List<String> serverLog,List<String> accessLog,List<DeviceLog> deviceLogs) {}
     record Created(String name,String key,byte[] bytes) {}
 
     private final ApplicationInfo info;private final SettingsStore settings;private final UsageService usage;private final ClientRegistry registry;
@@ -46,11 +61,19 @@ class SupportFile {
         this.info=info;this.settings=settings;this.usage=usage;this.registry=registry;this.logs=logs;this.json=json;this.clock=clock;this.logDir=Path.of(logDir);
     }
 
-    /** A new support file of the last {@code days} days (1–14); hideHosts also removes host names and public addresses. */
-    Created create(int days,boolean hideHosts) throws IOException {
+    Created create(int days,boolean hideHosts) throws IOException {return create(days,hideHosts,Report.NONE);}
+    /**
+     * A new support file of the last {@code days} days (1–14) with the user's description; hideHosts also removes host
+     * names and public addresses. The description passes the redactor too; unknown display identifiers are dropped.
+     */
+    Created create(int days,boolean hideHosts,Report report) throws IOException {
         if(days<1||days>14)throw new IllegalArgumentException("Choose 1 to 14 days");
         var redactor=new SupportRedactor(secrets(),hideHosts);
-        var contents=contents(days,hideHosts,redactor);
+        var known=registry.views().stream().map(ClientRegistry.View::identifier).collect(java.util.stream.Collectors.toSet());
+        var r=report==null?Report.NONE:report;
+        r=new Report(redactor.text(r.title()),redactor.text(r.happened()),redactor.text(r.expected()),redactor.text(r.steps()),redactor.text(r.since()),
+                r.displays().stream().filter(known::contains).toList());
+        var contents=contents(days,hideHosts,redactor,r);
         String key=UUID.randomUUID().toString();
         byte[] salt=new byte[16],nonce=new byte[12];random.nextBytes(salt);random.nextBytes(nonce);
         byte[] plain=json.writeValueAsBytes(contents);
@@ -87,7 +110,7 @@ class SupportFile {
         }finally{if(plain!=null)Arrays.fill(plain,(byte)0);}
     }
 
-    private Contents contents(int days,boolean hideHosts,SupportRedactor redactor) throws IOException {
+    private Contents contents(int days,boolean hideHosts,SupportRedactor redactor,Report report) throws IOException {
         long now=clock.millis();Instant since=clock.instant().minus(Duration.ofDays(days));
         var s=settings.get();var snapshot=usage.snapshot();
         var sources=new ArrayList<Source>();
@@ -109,7 +132,7 @@ class SupportFile {
         var summary=new Summary(info.getVersion(),System.getProperty("java.version"),System.getProperty("os.name")+" "+System.getProperty("os.arch"),
                 Files.exists(Path.of("/.dockerenv")),ZoneId.systemDefault().getId(),runtime.getUptime()/1000,now,days,registry.pollSeconds(),
                 s.allowedIps().size(),s.accounts().size(),displays.size(),info.getTestMode(),hideHosts);
-        return new Contents(summary,sources,displays,logLines("vibedock.log",since,redactor),logLines("access.",since,redactor),deviceLogs);
+        return new Contents(report,summary,sources,displays,logLines("vibedock.log",since,redactor),logLines("access.",since,redactor),deviceLogs);
     }
 
     private static final Pattern STAMP=Pattern.compile("^(\\d{4}-\\d{2}-\\d{2})[T ](\\d{2}:\\d{2}:\\d{2})");

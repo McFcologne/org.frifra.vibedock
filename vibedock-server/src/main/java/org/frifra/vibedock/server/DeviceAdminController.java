@@ -50,7 +50,7 @@ class DeviceAdminController {
     @GetMapping("/admin/troubleshooting") String troubleshooting(org.springframework.ui.Model model) throws IOException {
         var targets=new java.util.ArrayList<LogTarget>();
         for(var c:registry.views())if(c.web()==null)targets.add(new LogTarget(c,logs.count(c.identifier()),sendsLog(c.firmware())));
-        model.addAttribute("targets",targets);model.addAttribute("keep",DeviceLogs.KEEP);
+        model.addAttribute("targets",targets);model.addAttribute("keep",DeviceLogs.KEEP);model.addAttribute("displays",registry.views());
         return "troubleshooting";
     }
     record LogUpload(String firmware,String board,List<String> lines) {}
