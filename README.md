@@ -110,7 +110,7 @@ The administration's light/dark appearance is independent of the display theme. 
 
 ## Display themes
 
-<p align="center"><img src="docs/themes.png" width="820" alt="The sixteen display colour schemes with example data"></p>
+<p align="center"><img src="docs/manual/themes.png" width="820" alt="The sixteen display colour schemes with example data"></p>
 
 The default layout remains available unchanged: two full-width usage bands followed by weather/mood, update time and IP. Half-width widgets and a different band order are optional. Current firmware supports moving the entire weather/mood band; the editor warns when older firmware needs it at the bottom.
 

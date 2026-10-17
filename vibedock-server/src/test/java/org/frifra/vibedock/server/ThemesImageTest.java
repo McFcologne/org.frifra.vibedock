@@ -11,8 +11,10 @@ import java.util.*;
 import java.util.List;
 
 /**
- * Draws docs/themes.png, every colour scheme with example data, with the server's renderer. Runs only with the emoji
- * set at hand: {@code VIBEDOCK_TWEMOJI=<twemoji>/assets/72x72 mvn test -Dtest=ThemesImageTest} (from vibedock-server).
+ * Draws docs/manual/themes.png (README and manual; outside images/, which scripts/docs.sh makes again): every colour
+ * scheme with example data, with the server's renderer at twice the size (sharp on high-resolution screens). Runs only
+ * with the emoji set at hand:
+ * {@code VIBEDOCK_TWEMOJI=<twemoji>/assets/svg mvn test -Dtest=ThemesImageTest} (from vibedock-server).
  */
 class ThemesImageTest {
     record Example(Scheme scheme,String mood,String weather,String temperature) {}
@@ -34,20 +36,20 @@ class ThemesImageTest {
                 "codex",new UsageService.Provider("ok",updated,new ProviderClient.Window(0,updated+5*3600,5*3600),new ProviderClient.Window(22,updated+6*86400+1560,7*86400)),
                 "claude",new UsageService.Provider("ok",updated,new ProviderClient.Window(5,updated+9000,5*3600),new ProviderClient.Window(14,updated+5*86400-2040,7*86400)))),
                 Map.of("codex","Codex","claude","Claude"));
-        int columns=5,cell=256,label=22,gap=16,rows=(EXAMPLES.size()+columns-1)/columns;
-        var sheet=new BufferedImage(gap+columns*cell,gap/2+rows*(label+240+gap)+gap/2,BufferedImage.TYPE_INT_RGB);
+        int k=2,columns=5,cell=256*k,label=22*k,gap=16*k,rows=(EXAMPLES.size()+columns-1)/columns;
+        var sheet=new BufferedImage(gap+columns*cell,gap/2+rows*(label+240*k+gap)+gap/2,BufferedImage.TYPE_INT_RGB);
         var g=sheet.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         g.setColor(new Color(0xf6f7f9));g.fillRect(0,0,sheet.getWidth(),sheet.getHeight());
-        g.setFont(new Font(Font.SANS_SERIF,Font.PLAIN,14));
+        g.setFont(new Font(Font.SANS_SERIF,Font.PLAIN,14*k));
         for(int i=0;i<EXAMPLES.size();i++){
-            var e=EXAMPLES.get(i);int x=gap+(i%columns)*cell,y=gap/2+(i/columns)*(label+240+gap);
-            var look=new StatusImage.Look(twemoji.image(e.mood()).orElseThrow(),e.scheme(),twemoji.image(e.weather(),24).orElseThrow(),e.temperature(),Layout.DEFAULT);
-            var image=ImageIO.read(new ByteArrayInputStream(renderer.render(snapshot,"192.168.1.50",look).png()));
-            g.setColor(new Color(0x3c4048));g.drawString(e.scheme().label,x,y+15);
+            var e=EXAMPLES.get(i);int x=gap+(i%columns)*cell,y=gap/2+(i/columns)*(label+240*k+gap);
+            var look=new StatusImage.Look(twemoji.image(e.mood(),Twemoji.SIZE*k).orElseThrow(),e.scheme(),twemoji.image(e.weather(),24*k).orElseThrow(),e.temperature(),Layout.DEFAULT);
+            var image=ImageIO.read(new ByteArrayInputStream(renderer.render(snapshot,"192.168.1.50",look,DisplayType.M1,k).png()));
+            g.setColor(new Color(0x3c4048));g.drawString(e.scheme().label,x,y+15*k);
             g.drawImage(image,x,y+label,null);
         }
         g.dispose();
-        Path out=Path.of("../docs/themes.png");Files.createDirectories(out.getParent());ImageIO.write(sheet,"png",out.toFile());
+        Path out=Path.of("../docs/manual/themes.png");Files.createDirectories(out.getParent());ImageIO.write(sheet,"png",out.toFile());
     }
 }

@@ -550,8 +550,11 @@ the aspect ratio:
 
 ## Appearance and mood
 
-**Style / theme** sets colours and look (e.g. *Midnight*, *Classic Windows*, *Classic Mac*, *Paper*, *Windows 11*, *macOS*, *Starship console*). The mood
-button opens the emoji picker with quick picks, search and all emoji; *None* leaves the slot empty.
+**Style / theme** sets colours and look of the usage monitor; the sixteen themes:
+
+<img src="themes.png" width="100%" alt="The sixteen display themes with example data">
+
+The mood button opens the emoji picker with quick picks, search and all emoji; *None* leaves the slot empty.
 
 <img src="images/34-emoji-picker.png" width="100%" alt="Emoji picker">
 
