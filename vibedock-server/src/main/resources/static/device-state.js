@@ -11,15 +11,17 @@
     if (part.dataset.live === 'preview') { drawn(part, fresh); return; }
     if (fresh.outerHTML !== part.outerHTML) part.replaceWith(document.importNode(fresh, true));
   };
-  // A new preview builds up row by row from the top like on the device, over the previous image (rows that did not
-  // change look the same, as there). --draw on the glass: the board's time for a whole image (Board.drawSeconds).
-  // The new image loads first; then it builds up over the old one, which stays behind it as the glass's background.
+  // A new theme or photo builds up row by row from the top like on the device, over the previous image. --draw on the glass:
+  // the board's time for a whole image (Board.drawSeconds). The new image loads first; then it builds up over the old
+  // one, which stays behind it as the glass's background. Other changes (new values, the same theme) appear at once,
+  // as the device only redraws the few rows that changed.
   const drawn = (part, fresh) => {
     const image = part.querySelector('img'), next = fresh.querySelector('img');
     if (!image || !next || image.getAttribute('src') === next.getAttribute('src')) return;
     const loaded = new Image(); loaded.src = next.src;
     loaded.decode().catch(() => {}).then(() => {
-      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      const whole = next.dataset.look !== image.dataset.look; image.dataset.look = next.dataset.look || '';
+      if (whole && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
         part.style.backgroundImage = `url("${image.currentSrc || image.src}")`; part.classList.add('drawing');
       }
       image.src = next.getAttribute('src');

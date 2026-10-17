@@ -94,6 +94,10 @@ class Controllers {
         var previews=new java.util.HashMap<String,String>();
         for(var c:clients.views())previews.put(c.identifier(),c.design().hashCode()+designs.currentPhoto(c.design(),c.identifier()).map(p->"-"+p).orElse(""));
         model.addAttribute("previewVersions",previews);
+        // What makes the whole picture new (the preview then builds up like the device): the theme or the photo.
+        var looks=new java.util.HashMap<String,String>();
+        for(var c:clients.views())looks.put(c.identifier(),designs.currentPhoto(c.design(),c.identifier()).orElse(c.design().scheme().id()));
+        model.addAttribute("previewLooks",looks);
         var versions=firmware.versions();  // per board: an uploaded build has its own version
         model.addAttribute("firmwareVersions",versions);model.addAttribute("boards",Board.INVENTORY);
         model.addAttribute("updatable",clients.views().stream().filter(c->c.ota()&&!c.updating()&&versions.containsKey(c.board().id())

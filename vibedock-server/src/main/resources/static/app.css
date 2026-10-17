@@ -83,7 +83,7 @@ button:disabled{opacity:.55;cursor:default}
   background:linear-gradient(180deg,#fbfaf7,#eeece6 70%,#e3e0d8);box-shadow:inset 0 max(1px,calc(var(--s)*.006)) 0 #fff,inset 0 calc(var(--s)*-.012) calc(var(--s)*.018) rgba(0,0,0,.06),0 0 0 max(1px,calc(var(--s)*.004)) #cfccc3,0 calc(var(--s)*.055) calc(var(--s)*.13) rgba(20,25,35,.16)}
 .device-glass{padding:min(calc(var(--s)*.018),1px);background:#0b0c0e}
 /* A new preview builds up from the top like the device draws it (device-state.js), over the previous image. */
-.device-glass.drawing{background-size:var(--s) calc(var(--s) * var(--ratio,1));background-repeat:no-repeat;background-origin:content-box;background-position:center}
+.device-glass.drawing{background-size:100% 100%;background-repeat:no-repeat;background-origin:content-box;background-clip:content-box}
 .device-glass.drawing img{background:transparent;animation:device-draw var(--draw,.6s) steps(24,end) both}
 @keyframes device-draw{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0 0 0 0)}}
 /* The black cases of the Waveshare touch boards (Board.previewCase), measured on the devices; --s is the screen width.
@@ -374,7 +374,8 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 .mode-dot{width:7px;height:7px;border-radius:50%;background:#22a06b}
 .photo-options{display:flex;gap:14px;align-items:end;flex-wrap:wrap}.photo-options>div{flex:1;min-width:160px}.photo-options .check{margin-bottom:12px}
 .photo-schedule{margin-top:12px;padding:10px 12px;border:1px dashed var(--line);border-radius:10px}.photo-schedule>.check{margin:0}
-.usage-heading{margin:22px 0 4px;font-size:14px}.usage-hint{margin-top:0}
+.usage-heading{margin:22px 0 4px;font-size:14px}.usage-hint{display:flex;justify-content:space-between;align-items:center;gap:8px 16px;flex-wrap:wrap;margin:0 0 10px}.usage-hint p{margin:0}
+.align-choice{display:flex;align-items:center;gap:8px;margin:0;font-weight:400;font-size:13px}.align-choice select{width:auto;margin:0}
 .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;margin:8px 0}
 .photo-tile{position:relative}.photo-pick{display:block;width:100%;aspect-ratio:1;padding:0;margin:0;border:2px solid transparent;border-radius:9px;overflow:hidden;background:var(--line);cursor:pointer}
 .photo-pick img{display:block;width:100%;height:100%;object-fit:cover;opacity:.55}.photo-tile.selected .photo-pick{border-color:var(--accent)}.photo-tile.selected .photo-pick img{opacity:1}
