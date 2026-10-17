@@ -223,17 +223,23 @@
     emojiButton.dispatchEvent(new Event('vibedock-emoji-render'));
     renderPhotos(); renderBands(); displayNote(); controls();
   }
-  // ---- photos: the box below Appearance ----
-  const photoDefaults = () => ({images: [], seconds: 30, shuffle: false, from: null, to: null});
-  let lastPhotos = photoDefaults();  // kept while Status is chosen, back with Photos
+  // ---- content: usage monitor or photos (a paused selection is kept for switching back) ----
+  const photoDefaults = () => ({images: [], seconds: 30, shuffle: false, from: null, to: null, paused: false});
   let armed = null;  // a photo whose delete button was pressed once
   function renderPhotos() {
-    const p = draft.photos, on = !!p;
-    $('#design-show').value = on ? 'photos' : 'status'; $('#design-photo-settings').hidden = !on;
+    const p = draft.photos, on = !!p && !p.paused, timed = on && !!p.from;
+    root.querySelectorAll('[data-content-mode]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.contentMode === 'photos') === on)));
+    $('#design-photo-timed').hidden = !timed;
+    $('#design-photo-settings').hidden = !on;
+    // The usage monitor: on its own, or below the photos for the times outside their schedule.
+    $('#design-usage').hidden = on && !timed;
+    $('#design-usage-heading').hidden = !timed;
+    if (timed) $('#design-usage-heading').textContent = 'Usage monitor · outside ' + p.from + '–' + p.to;
+    $('#design-photos-kept').hidden = on || !p || !p.images.length;
     if (!on) return;
     $('#design-photo-seconds').value = String(p.seconds); $('#design-photo-shuffle').checked = p.shuffle;
-    const timed = !!p.from; $('#design-photo-when').value = timed ? 'time' : 'always'; $('#design-photo-times').hidden = !timed;
-    if (timed) { $('#design-photo-from').value = p.from; $('#design-photo-to').value = p.to; }
+    $('#design-photo-timed-check').checked = !!p.from; $('#design-photo-times').hidden = !p.from;
+    if (p.from) { $('#design-photo-from').value = p.from; $('#design-photo-to').value = p.to; }
     const grid = $('#design-photos'); grid.replaceChildren();
     if (!library.length) grid.append(element('p', 'meta', 'No photos yet: add some.'));
     for (const photo of library) {
@@ -261,20 +267,22 @@
       tile.append(pick, remove); grid.append(tile);
     }
   }
-  $('#design-show').addEventListener('change', event => {
-    if (event.target.value === 'photos') draft.photos = copy(lastPhotos);
-    else { if (draft.photos) lastPhotos = copy(draft.photos); draft.photos = null; }
+  root.querySelectorAll('[data-content-mode]').forEach(button => button.addEventListener('click', () => {
+    const photos = button.dataset.contentMode === 'photos';
+    if (photos === (!!draft.photos && !draft.photos.paused)) return;
+    if (!draft.photos) draft.photos = photoDefaults();
+    draft.photos.paused = !photos;
     renderPhotos(); changed();
-  });
+  }));
   $('#design-photo-seconds').addEventListener('change', event => { draft.photos.seconds = Number(event.target.value); changed(); });
   $('#design-photo-shuffle').addEventListener('change', event => { draft.photos.shuffle = event.target.checked; changed(); });
-  $('#design-photo-when').addEventListener('change', event => {
-    if (event.target.value === 'time') { draft.photos.from = '22:00'; draft.photos.to = '07:00'; } else { draft.photos.from = draft.photos.to = null; }
+  $('#design-photo-timed-check').addEventListener('change', event => {
+    if (event.target.checked) { draft.photos.from = '22:00'; draft.photos.to = '07:00'; } else { draft.photos.from = draft.photos.to = null; }
     renderPhotos(); changed();
   });
   for (const id of ['#design-photo-from', '#design-photo-to']) $(id).addEventListener('change', () => {
     const from = $('#design-photo-from').value, to = $('#design-photo-to').value;
-    if (from && to && from !== to) { draft.photos.from = from; draft.photos.to = to; changed(); }
+    if (from && to && from !== to) { draft.photos.from = from; draft.photos.to = to; renderPhotos(); changed(); }
   });
   // One request per photo, as its bytes; the server keeps a reduced copy. New photos are chosen right away.
   $('#design-photo-upload').addEventListener('change', async event => {

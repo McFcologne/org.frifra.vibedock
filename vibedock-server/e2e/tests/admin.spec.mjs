@@ -104,16 +104,28 @@ test('a device shows uploaded photos, saved right away with the time of day',asy
   await editor(page,app);
   await page.locator('#design-target').selectOption('vibedock-e2e-shelf');
   await page.locator('#design-override').check();
-  await page.locator('#design-show').selectOption('photos');
+  await expect(page.locator('#design-usage')).toBeVisible();
+  await page.getByRole('button',{name:'Photos',exact:true}).click();
+  await expect(page.locator('#design-usage')).toBeHidden();
   await expect(page.locator('#design-photos')).toContainText('No photos yet');
   await page.locator('#design-photo-upload').setInputFiles({name:'red.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAACgAAAAeCAIAAADRv8uKAAAAK0lEQVR4nO3NMQ0AAAgDsMmZfxXIQgYcTfo3056IWCwWi8VisVgsFov/xguJMCDM2TzTeAAAAABJRU5ErkJggg==','base64')});
   await expect(page.locator('#design-photo-state')).toContainText('1 of 1 photos added');
   await expect(page.locator('.photo-tile.selected')).toHaveCount(1);
-  await page.locator('#design-photo-when').selectOption('time');
+  await page.getByLabel('Only at certain times').check();
   await expect(page.locator('#design-photo-from')).toHaveValue('22:00');
+  // The usage monitor for the other times shows below the photos.
+  await expect(page.locator('#design-usage-heading')).toHaveText('Usage monitor · outside 22:00–07:00');
   await expect(page.locator('#design-message')).toContainText('Device design saved');
   await page.reload();await expect(page.locator('#design-scheme')).toBeEnabled();
-  await expect(page.locator('#design-show')).toHaveValue('photos');await expect(page.locator('#design-photo-when')).toHaveValue('time');
+  await expect(page.getByRole('button',{name:'Photos',exact:true})).toHaveAttribute('aria-pressed','true');await expect(page.locator('#design-photo-timed-check')).toBeChecked();
+  await expect(page.locator('.photo-tile.selected .photo-order')).toHaveText('1');
+  // Back to the usage monitor: the photo selection is kept for switching back.
+  await page.getByRole('button',{name:'Usage monitor',exact:true}).click();
+  await expect(page.locator('#design-photo-settings')).toBeHidden();await expect(page.locator('#design-photos-kept')).toBeVisible();
+  await expect(page.locator('#design-message')).toContainText('Device design saved');
+  await page.reload();await expect(page.locator('#design-scheme')).toBeEnabled();
+  await expect(page.getByRole('button',{name:'Usage monitor',exact:true})).toHaveAttribute('aria-pressed','true');
+  await page.getByRole('button',{name:'Photos',exact:true}).click();
   await expect(page.locator('.photo-tile.selected .photo-order')).toHaveText('1');
 });
 

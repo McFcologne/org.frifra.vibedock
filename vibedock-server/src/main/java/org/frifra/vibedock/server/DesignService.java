@@ -85,8 +85,9 @@ class DesignService {
         if(!Objects.equals(input.mood(),previous.mood()))twemoji.validate(input.mood());
         String place=input.weatherLocation().strip();
         var resolved=previous.weather()!=null&&place.equals(previous.weather().name())?previous.weather():weather.locate(place);
-        var selected=input.photos();
-        if(selected!=null&&selected.images().stream().anyMatch(id->!photos.exists(id)))throw new IllegalArgumentException("A chosen photo was removed; choose again");
+        // Photos removed from the library meanwhile drop out of the selection.
+        var chosen=input.photos();
+        var selected=chosen==null?null:new Design.Photos(chosen.images().stream().filter(photos::exists).toList(),chosen.seconds(),chosen.shuffle(),chosen.from(),chosen.to(),chosen.paused());
         return new Design(Scheme.parse(input.scheme()),input.mood(),resolved,input.layout(),selected);
     }
 }

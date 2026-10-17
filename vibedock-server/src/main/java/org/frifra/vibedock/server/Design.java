@@ -10,7 +10,12 @@ public record Design(Scheme scheme,String mood,WeatherService.Place weather,Layo
      * A slideshow of photos of the {@link PhotoLibrary}, each shown for seconds, in their order or shuffled. from/to
      * ("HH:mm", both or neither): the photos only in that time of day (e.g. 22:00 to 07:00), the status otherwise.
      */
-    public record Photos(java.util.List<String> images,int seconds,boolean shuffle,String from,String to) {
+    /**
+     * Photos instead of the usage monitor. paused: the usage monitor is chosen; the selection and settings are kept
+     * for switching back.
+     */
+    public record Photos(java.util.List<String> images,int seconds,boolean shuffle,String from,String to,boolean paused) {
+        public Photos(java.util.List<String> images,int seconds,boolean shuffle,String from,String to){this(images,seconds,shuffle,from,to,false);}
         public static final java.util.List<Integer> DURATIONS=java.util.List.of(10,30,60,300,900,3600);
         public Photos {
             images=images==null?java.util.List.of():java.util.List.copyOf(images);
@@ -21,9 +26,9 @@ public record Design(Scheme scheme,String mood,WeatherService.Place weather,Layo
             if(from!=null&&(!from.matches("([01]\\d|2[0-3]):[0-5]\\d")||!to.matches("([01]\\d|2[0-3]):[0-5]\\d")||from.equals(to)))
                 throw new IllegalArgumentException("Times of day as HH:mm, from and to different");
         }
-        /** Whether the photos are shown at this time of day (otherwise the status). */
+        /** Whether the photos are shown at this time of day (otherwise the usage monitor). */
         public boolean active(java.time.LocalTime now){
-            if(images.isEmpty())return false;
+            if(paused||images.isEmpty())return false;
             if(from==null)return true;
             var a=java.time.LocalTime.parse(from);var b=java.time.LocalTime.parse(to);
             return a.isBefore(b)?!now.isBefore(a)&&now.isBefore(b):!now.isBefore(a)||now.isBefore(b);

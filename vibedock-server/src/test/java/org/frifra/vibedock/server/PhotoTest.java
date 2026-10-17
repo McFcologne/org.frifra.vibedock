@@ -74,6 +74,10 @@ class PhotoTest {
         Assertions.assertEquals(300,designs.pollSeconds(night,300));
         clock.now=LocalDate.of(2026,10,18).atTime(23,0).atZone(ZoneId.systemDefault()).toInstant();
         Assertions.assertTrue(designs.currentPhoto(night,"d1").isPresent());
+        // Paused (the usage monitor chosen): no photo, the selection kept.
+        var paused=new Design(design.scheme(),design.mood(),null,design.layout(),new Design.Photos(List.of(a,b,c),60,false,null,null,true));
+        Assertions.assertTrue(designs.currentPhoto(paused,"d1").isEmpty());Assertions.assertEquals(3,paused.photos().images().size());
+        Assertions.assertEquals(300,designs.pollSeconds(paused,300));
         // A removed photo is skipped.
         library.delete(a);library.delete(b);library.delete(c);
         Assertions.assertTrue(designs.currentPhoto(design,"d1").isEmpty());

@@ -367,7 +367,14 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 [data-sortable]>.dragging{opacity:.4}[data-sortable]>.drag-over{outline:2px solid var(--accent);outline-offset:2px}
 
 /* Photos in the design editor: the library as tiles, the chosen ones numbered in their order. */
-.design-photos{margin-top:16px}.design-photos select{width:100%}
+.design-photos select{width:100%}
+.mode-toggle{display:inline-flex;border:1px solid var(--line);border-radius:10px;padding:3px;background:var(--card-2);gap:2px}
+.mode-toggle button{border:0;background:none;padding:6px 13px;border-radius:8px;font-weight:550;font-size:13px;color:var(--muted);margin:0;display:inline-flex;gap:6px;align-items:center;box-shadow:none;min-height:0}
+.mode-toggle button[aria-pressed=true]{background:var(--card);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.14)}
+.mode-dot{width:7px;height:7px;border-radius:50%;background:#22a06b}
+.photo-options{display:flex;gap:14px;align-items:end;flex-wrap:wrap}.photo-options>div{flex:1;min-width:160px}.photo-options .check{margin-bottom:12px}
+.photo-schedule{margin-top:12px;padding:10px 12px;border:1px dashed var(--line);border-radius:10px}.photo-schedule>.check{margin:0}
+.usage-heading{margin:22px 0 4px;font-size:14px}.usage-hint{margin-top:0}
 .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;margin:8px 0}
 .photo-tile{position:relative}.photo-pick{display:block;width:100%;aspect-ratio:1;padding:0;margin:0;border:2px solid transparent;border-radius:9px;overflow:hidden;background:var(--line);cursor:pointer}
 .photo-pick img{display:block;width:100%;height:100%;object-fit:cover;opacity:.55}.photo-tile.selected .photo-pick{border-color:var(--accent)}.photo-tile.selected .photo-pick img{opacity:1}
@@ -375,7 +382,7 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 .photo-delete{position:absolute;right:3px;top:3px;margin:0;padding:0 5px;min-height:0;height:18px;font-size:11px;line-height:18px;border-radius:9px;border:0;background:rgba(0,0,0,.55);color:#fff;cursor:pointer}
 .photo-delete.armed{background:#c42b1c}
 .photo-add{display:inline-block;margin:2px 0 6px;cursor:pointer}.photo-add input{display:none}
-.photo-times{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px}.photo-times input{width:auto;margin:0}.photo-times small{width:100%;color:var(--muted)}
+.photo-times{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}.photo-times label{flex:1;min-width:120px;margin:0}.photo-times input{margin-top:5px}.photo-times small{width:100%;color:var(--muted)}
 /* Support file: the problem description. */
 .support-form fieldset{margin-top:0}.support-form textarea{width:100%;resize:vertical;font:inherit}
 .field-label{display:block;margin:14px 0 6px;font-weight:550;font-size:14px}

@@ -511,7 +511,8 @@ change is saved right away). Here the display *Home office* shows one full band 
 
 ## Photos and slideshows
 
-Below *Appearance*, **Show → Photos** makes the display show photos instead of the status:
+The switch **Usage monitor | Photos** at the top of the *Content* box chooses what the display shows. **Photos** shows
+photos instead of the usage monitor:
 
 - **Add photos** uploads JPEG, PNG, GIF or BMP files (not HEIC). The server keeps only a copy reduced to 600 × 600
   pixels at most, turned upright like the photo app shows it; the original is not stored. All designs share these
@@ -519,8 +520,10 @@ Below *Appearance*, **Show → Photos** makes the display show photos instead of
 - Click the photos to show, in the order clicked (the number on each); click again to leave one out.
 - **Each photo** sets how long one stays (10 seconds to an hour), **Shuffle** a new order every round. Displays with
   the same slideshow change together; the display pulls once per photo then.
-- **When → Only at certain times** shows the photos only in that time of day (e.g. 22:00 to 07:00) and the status
-  at other times; the times are those of the server (Docker: `TIME_ZONE`).
+- **Only at certain times** shows the photos only in that time of day (e.g. 22:00 to 07:00) and the usage monitor
+  at other times; the times are those of the server (Docker: `TIME_ZONE`). The switch then shows a green dot, and the
+  bands of the usage monitor for the other times appear below the photo settings.
+- Switching back to **Usage monitor** keeps the photo selection and its settings for later.
 - On a touch display a swipe left or right shows the next or previous photo.
 
 The server cuts every photo to the display's shape from its middle, so a portrait photo fills a narrow display.
