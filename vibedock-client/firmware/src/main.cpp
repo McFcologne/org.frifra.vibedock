@@ -1070,6 +1070,11 @@ void colourCard() {
       + "<p class=\"muted\">Applied to this display only: move a slider until the display looks like the image beside it.</p>"
         "<button name=\"reset\" value=\"1\">Reset to defaults</button></div></div></section></form>");
 }
+// Settings changed in quick series (brightness swipes, colour sliders): written to flash once, 3 s after the last
+// change, between pulls. Writing at once with every slider move restarted the ESP32-C6 ("Exception").
+uint32_t configChangedAt = 0; bool configDirty = false;
+void saveLater() { configDirty = true; configChangedAt = millis(); }
+void savePending() { if (configDirty && millis() - configChangedAt >= 3000) { configDirty = false; saveConfig(); } }
 void saveColours() {
   using namespace client_policy;
   if (web.hasArg("reset")) toneSettings = ToneSettings();
@@ -1077,7 +1082,7 @@ void saveColours() {
     toneSettings.gamma = clampGamma(web.arg("gamma").toInt()); toneSettings.red = clampGain(web.arg("red").toInt());
     toneSettings.green = clampGain(web.arg("green").toInt()); toneSettings.blue = clampGain(web.arg("blue").toInt());
   }
-  panelTone.build(toneSettings); saveConfig();
+  panelTone.build(toneSettings); saveLater();
   // Redraw everything with the new correction: unconditional request on the next loop.
   forgetRows(); etag = ""; lastPull = millis() - clampPoll(pollSeconds) * 1000u;
   if (web.hasArg("live")) { web.send(204, "text/plain", ""); return; }  // slider moved, the page stays
@@ -1308,10 +1313,9 @@ void setup() {
 }
 #if VIBEDOCK_TOUCH
 // Swipes: left and right switch the colour scheme on the server (paired displays only), up and down the brightness.
-uint32_t lastTouchPoll = 0, brightnessChangedAt = 0; bool brightnessDirty = false;
+uint32_t lastTouchPoll = 0;
 void touchPoll() {
   static bool touching = false; static int16_t startX, startY, lastX, lastY; static uint8_t idle = 0;
-  if (brightnessDirty && millis() - brightnessChangedAt >= 3000) { brightnessDirty = false; saveConfig(); }  // flash once per series
   if (millis() - lastTouchPoll < 20) return;
   lastTouchPoll = millis();
   int16_t x, y;
@@ -1328,7 +1332,7 @@ void touchPoll() {
   if (swipe == client_policy::Swipe::Up || swipe == client_policy::Swipe::Down) {
     brightness = client_policy::nextBrightness(brightness, swipe == client_policy::Swipe::Up);
     platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness);
-    brightnessDirty = true; brightnessChangedAt = millis();
+    saveLater();
   } else if (swipe != client_policy::Swipe::None && mode == Mode::Paired) {
     pendingGesture = swipe == client_policy::Swipe::Left ? "scheme-next" : "scheme-previous";
     logEvent("Touch: " + pendingGesture, true);
@@ -1348,6 +1352,7 @@ void applyOrientation(bool flipped) {
 
 void loop() {
   serialPoll();
+  savePending();
 #if VIBEDOCK_TOUCH
   touchPoll();
 #endif
