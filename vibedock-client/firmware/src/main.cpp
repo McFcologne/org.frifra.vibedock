@@ -765,10 +765,12 @@ struct ImageRequest {
   bool verified = false;
   ~ImageRequest() { http.end(); }
 };
+// While the log is sent (uploadLog): the file streamed as the request body and the server's request id.
+File *uploadFile = nullptr; String uploadRequest;
 int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
   if (!r.http.begin(*r.client, url)) return HTTPC_ERROR_CONNECTION_FAILED;
-  const char *wanted[] = {"ETag", "X-VibeDock-Image-Format", "X-VibeDock-Poll-Seconds", "X-VibeDock-Tls-Pin", "X-VibeDock-Redraw", "X-VibeDock-Update", "x-MD5", "X-VibeDock-Length"};
-  r.http.collectHeaders(wanted, 8);
+  const char *wanted[] = {"ETag", "X-VibeDock-Image-Format", "X-VibeDock-Poll-Seconds", "X-VibeDock-Tls-Pin", "X-VibeDock-Redraw", "X-VibeDock-Update", "x-MD5", "X-VibeDock-Length", "X-VibeDock-Send-Log"};
+  r.http.collectHeaders(wanted, 9);
   // HTTP/1.0: a reverse proxy (Synology) then cannot answer chunked; the body ends with the connection or its length.
   r.http.useHTTP10(true);
   r.http.setTimeout(r.verified ? 15000 : 5000);
@@ -785,6 +787,12 @@ int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
   if (!updateError.isEmpty()) r.http.addHeader("X-VibeDock-Update-Error", updateError);
   if (r.verified) r.http.addHeader("X-VibeDock-Tls-Check", "full");
   if (conditional && !etag.isEmpty() && haveImage) r.http.addHeader("If-None-Match", etag);
+  if (uploadFile) {  // the log, straight from flash: no copy on the heap the TLS handshake needs
+    r.http.addHeader("Content-Type", "text/plain; charset=utf-8");
+    r.http.addHeader("X-VibeDock-Log-Request", uploadRequest);
+    uploadFile->seek(0);  // again from the start when a second TLS attempt follows
+    return r.http.sendRequest("POST", uploadFile, uploadFile->size());
+  }
   if (!conditional) r.http.addHeader("X-VibeDock-Preview", "1");  // the status page's copy; leaves a forced redraw for the screen
   return r.http.GET();
 }
@@ -885,6 +893,17 @@ void installUpdate(const String &version) {
   updateProgress(1, 1); message("Update installed, restarting", Step::None); logEvent("Update to v" + version + " installed");
   delay(800); ESP.restart();
 }
+// Sends /log.txt to the server that asked for it (X-VibeDock-Send-Log), over the same address and TLS as the images.
+void uploadLog(const String &requestId) {
+  saveLog();  // the file holds every line; while parked it is complete already
+  File file = LittleFS.open("/log.txt", "r");
+  if (!file) return;
+  uploadFile = &file; uploadRequest = requestId;
+  int code;
+  { ImageRequest request; code = requestImage(request, false, "log"); }
+  uploadFile = nullptr; uploadRequest = ""; file.close();
+  logEvent(code == 204 ? String("Log sent to the server") : "Log not sent: " + (code > 0 ? "HTTP " + String(code) : HTTPClient::errorToString(code)), true);
+}
 // The start of an error answer, e.g. the server's reason for a 400, as one printable line.
 String answerStart(HTTPClient &http) {
   WiFiClient *stream = http.getStreamPtr(); if (!stream) return String();
@@ -916,6 +935,7 @@ void pull() {
   }
   if (code == 200 || code == 304) { learnPin(request); updateError = ""; }
   String offered = code == 200 || code == 304 ? http.header("X-VibeDock-Update") : "";
+  String logRequest = code == 200 || code == 304 ? http.header("X-VibeDock-Send-Log") : "";
   if (code > 0 && http.hasHeader("X-VibeDock-Poll-Seconds")) {
     uint32_t poll = client_policy::clampPoll(http.header("X-VibeDock-Poll-Seconds").toInt());
     if (poll != pollSeconds) { pollSeconds = poll; saveConfig(); }
@@ -973,6 +993,8 @@ void pull() {
     }
   }
   http.end();
+  holder.reset();  // the image connection's memory back before the next one
+  if (client_policy::validLogRequest(logRequest.c_str())) uploadLog(logRequest);
   if (!offered.isEmpty() && offered != VIBEDOCK_VERSION && offered != failedUpdate && platform::hasOtaKey()) installUpdate(offered);
 }
 

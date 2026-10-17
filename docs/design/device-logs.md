@@ -2,7 +2,7 @@
 
 # Device logs and support files
 
-Status: step 1 implemented on branch `0.2.0`; steps 2 and 3 planned.
+Status: steps 1 and 2 implemented on branch `0.2.0`; step 3 planned.
 
 Goal: everything needed to analyse a problem of a user, server and displays alike, in one file that is safe to
 attach to a public ticket.
@@ -19,7 +19,7 @@ attach to a public ticket.
 - Endpoints (administration port, signed in, CSRF): `POST /admin/clients/{id}/logs`, `GET /admin/clients/{id}/logs`,
   `GET /admin/clients/{id}/logs/{name}.txt`, `POST /admin/clients/{id}/logs/{name}/delete`.
 
-## Step 2 – the display sends its log itself
+## Step 2 – the display sends its log itself (implemented)
 
 1. *Devices › Read log* marks the display (a one-time request id with an expiry) and asks it to pull now
    (`POST /pull`, only inside the network fixed at pairing).
@@ -29,7 +29,7 @@ attach to a public ticket.
    source `net`.
 4. A display that cannot be asked directly (e.g. away from home) sends it with its next regular pull.
 
-Needs new firmware; displays with older firmware keep the USB way.
+Needs firmware newer than 0.1.1; displays with older firmware keep the USB way. Protocol: `CLIENT-PROTOCOL.md`, section 3c.
 
 ## Step 3 – encrypted support file
 

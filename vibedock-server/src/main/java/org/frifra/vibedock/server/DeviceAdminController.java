@@ -54,6 +54,19 @@ class DeviceAdminController {
             return org.springframework.http.ResponseEntity.ok(java.util.Map.of("name",entry.name(),"count",logs.count(identifier),"keep",DeviceLogs.KEEP));
         }catch(IllegalArgumentException e){return org.springframework.http.ResponseEntity.badRequest().body(java.util.Map.of("error",e.getMessage()));}
     }
+    /** Firmware that sends its log over the network when asked; older firmware only over USB. */
+    static boolean sendsLog(String firmware){return FirmwareVersion.knownNewer(firmware,"0.1.1");}
+    /** Asks the display to send its log: with its next pull, right away when the server may ask it to pull now. */
+    @PostMapping("/admin/clients/{identifier}/logs/request") String requestLog(@PathVariable String identifier,RedirectAttributes flash) {
+        String page="redirect:/admin/clients/"+java.net.URLEncoder.encode(identifier,java.nio.charset.StandardCharsets.UTF_8)+"/logs";
+        try{
+            var view=registry.get(identifier);
+            if(view.web()!=null||!sendsLog(view.firmware())){flash.addFlashAttribute("logMessage","This display can send its log only over USB. Update its firmware to read it over the network.");return page;}
+            logs.request(identifier);poke.pullNow(List.of(registry.address(identifier)));
+            flash.addFlashAttribute("logMessage","Requested. The log appears here within seconds, or with the display's next pull (reload this page).");
+        }catch(IllegalArgumentException e){flash.addFlashAttribute("logMessage","The device was already removed.");}
+        return page;
+    }
     @GetMapping("/admin/clients/{identifier}/logs") String logs(@PathVariable String identifier,org.springframework.ui.Model model) throws IOException {
         java.util.List<java.util.Map<String,Object>> entries=new java.util.ArrayList<>();
         try{
@@ -61,8 +74,12 @@ class DeviceAdminController {
                 entries.add(java.util.Map.of("entry",entry,"text",String.join("\n",logs.read(identifier,entry.name()).map(DeviceLogs.Log::lines).orElse(List.of()))));
         }catch(IllegalArgumentException e){throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND);}
         String name=identifier;
-        try{name=registry.get(identifier).name();}catch(IllegalArgumentException notPaired){ /* logs of a display that is not paired */ }
+        boolean paired=false,network=false;
+        try{var view=registry.get(identifier);name=view.name();paired=view.web()==null;network=paired&&sendsLog(view.firmware());}
+        catch(IllegalArgumentException notPaired){ /* logs of a display that is not paired */ }
         model.addAttribute("identifier",identifier);model.addAttribute("deviceName",name);
+        model.addAttribute("paired",paired);model.addAttribute("networkLog",network);
+        model.addAttribute("logRequested",logs.pendingRequest(identifier).isPresent());
         model.addAttribute("entries",entries);model.addAttribute("keep",DeviceLogs.KEEP);
         return "device-logs";
     }

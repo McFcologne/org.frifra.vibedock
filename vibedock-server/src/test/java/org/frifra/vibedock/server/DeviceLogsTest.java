@@ -57,6 +57,24 @@ class DeviceLogsTest {
         assertFalse(logs.delete("vibedock-0a1b2c000004","../settings.json"));
         assertEquals(0,logs.count("../../etc"));
     }
+    @Test void logRequestsAreUsedOnceAndExpire(@TempDir Path dir) throws Exception {
+        var now=new long[]{0};
+        var clock=new Clock(){
+            @Override public ZoneId getZone(){return ZoneOffset.UTC;}
+            @Override public Clock withZone(ZoneId zone){return this;}
+            @Override public Instant instant(){return Instant.ofEpochMilli(now[0]);}
+        };
+        var logs=new DeviceLogs(dir.toString(),json,clock);String id="vibedock-0a1b2c000006";
+        assertTrue(logs.pendingRequest(id).isEmpty());assertFalse(logs.takeRequest(id,null));
+        String first=logs.request(id),second=logs.request(id);
+        assertNotEquals(first,second);assertTrue(second.matches("[0-9a-f]{32}"));
+        assertFalse(logs.takeRequest(id,first),"a new request replaces the open one");
+        assertEquals(Optional.of(second),logs.pendingRequest(id));
+        assertTrue(logs.takeRequest(id,second));assertFalse(logs.takeRequest(id,second));
+        String late=logs.request(id);now[0]+=DeviceLogs.REQUEST_VALID.toMillis()+1;
+        assertTrue(logs.pendingRequest(id).isEmpty());assertFalse(logs.takeRequest(id,late));
+        assertThrows(IllegalArgumentException.class,()->logs.request("../x"));
+    }
     @Test void deletingOneOrAllLogs(@TempDir Path dir) throws Exception {
         var logs=new DeviceLogs(dir.toString(),json,ticking());
         var first=logs.save("vibedock-0a1b2c000005","usb",null,null,List.of("a"));

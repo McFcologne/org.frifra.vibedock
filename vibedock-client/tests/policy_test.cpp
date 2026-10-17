@@ -21,6 +21,9 @@ int main(){
   uint8_t fp[20];assert(parseFingerprint("00112233445566778899aabbccddeeff01234567",fp));assert(fp[0]==0x00&&fp[1]==0x11&&fp[19]==0x67);
   assert(!parseFingerprint("00112233445566778899AABBCCDDEEFF01234567",fp));assert(!parseFingerprint("0011",fp));
   assert(!parseFingerprint("00112233445566778899aabbccddeeff012345678",fp));
+  assert(validLogRequest("0123456789abcdef0123456789abcdef"));assert(!validLogRequest(""));
+  assert(!validLogRequest("0123456789ABCDEF0123456789abcdef"));assert(!validLogRequest("0123456789abcdef0123456789abcdef0"));
+  assert(!validLogRequest("0123456789abcdef0123456789abcde"));assert(!validLogRequest("0123456789abcdef0123456789abcd\n0"));
   assert(pixel(0xf8,0)==0xf800);assert(pixel(0x07,0xe0)==0x07e0);assert(pixel(0,0x1f)==0x001f);
   ToneSettings neutral;neutral.gamma=100;neutral.red=neutral.green=neutral.blue=100;Tone same(neutral);
   for(uint32_t c=0;c<65536;c++)assert(same.apply(uint16_t(c))==c);

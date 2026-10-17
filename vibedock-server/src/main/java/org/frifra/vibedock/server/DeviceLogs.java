@@ -30,6 +30,11 @@ class DeviceLogs {
     record Log(Entry entry,List<String> lines) {}
     private record Stored(long savedAt,String source,String firmware,String board,List<String> lines) {}
 
+    /** How long a display may answer a request to send its log over the network. */
+    static final java.time.Duration REQUEST_VALID=java.time.Duration.ofMinutes(10);
+    private record Request(String id,long until) {}
+    private final Map<String,Request> requests=new HashMap<>();
+    private final java.security.SecureRandom random=new java.security.SecureRandom();
     private final Path root;private final ObjectMapper json;private final Clock clock;
     DeviceLogs(@Value("${vibedock.data-dir}") String dataDir,ObjectMapper json,Clock clock){
         this.root=Path.of(dataDir).resolve("device-logs");this.json=json;this.clock=clock;
@@ -82,9 +87,35 @@ class DeviceLogs {
     }
     /** Removes every log of a device, e.g. when the device is removed. */
     synchronized void deleteAll(String identifier) throws IOException {
-        Path dir=directory(identifier);
+        Path dir=directory(identifier);requests.remove(identifier);
         for(String name:names(dir))Files.deleteIfExists(dir.resolve(name));
         try{Files.deleteIfExists(dir);}catch(DirectoryNotEmptyException ignored){}
+    }
+
+    /**
+     * Asks a display to send its log: the id goes to the display with its next image (X-VibeDock-Send-Log) and is
+     * valid for one upload within {@link #REQUEST_VALID}. A new request replaces an open one.
+     */
+    synchronized String request(String identifier){
+        directory(identifier);
+        byte[] bytes=new byte[16];random.nextBytes(bytes);
+        String id=HexFormat.of().formatHex(bytes);
+        requests.put(identifier,new Request(id,clock.millis()+REQUEST_VALID.toMillis()));
+        return id;
+    }
+    /** The open request of a display, if any. */
+    synchronized Optional<String> pendingRequest(String identifier){
+        var open=requests.get(identifier);
+        if(open==null)return Optional.empty();
+        if(open.until()<clock.millis()){requests.remove(identifier);return Optional.empty();}
+        return Optional.of(open.id());
+    }
+    /** Uses up the open request when the id matches; false for a wrong, used or expired id. */
+    synchronized boolean takeRequest(String identifier,String id){
+        var open=requests.get(identifier);
+        if(open==null||id==null||open.until()<clock.millis()
+                ||!java.security.MessageDigest.isEqual(open.id().getBytes(java.nio.charset.StandardCharsets.US_ASCII),id.getBytes(java.nio.charset.StandardCharsets.US_ASCII)))return false;
+        requests.remove(identifier);return true;
     }
 
     /** Key-like values and web display links never stay in a saved log. */

@@ -35,6 +35,7 @@ class AccessTest {
     @Autowired UsageService usage;
     @Autowired ClientRegistry clients;
     @Autowired OtaSigning otaSigning;
+    @Autowired DeviceLogs deviceLogs;
     @MockitoBean ProviderClient providers;
     @MockitoBean BrowserLogin login;
     @BeforeEach void resetSettings() throws Exception {
@@ -419,6 +420,55 @@ class AccessTest {
         mvc.perform(post("/admin/clients/"+id+"/remove").with(admin).with(csrf()).with(r->{r.setLocalPort(10001);return r;}))
                 .andExpect(status().is3xxRedirection());
         mvc.perform(get("/admin/clients/"+id+"/logs/"+name+".txt").with(admin).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isNotFound());
+    }
+    @Test void displaysSendTheirLogOnceWhenAskedOverTheNetwork() throws Exception {
+        String key="ef".repeat(32),id="vibedock-log-network",image="/api/v1/clients/"+id+"/image",upload="/api/v1/clients/"+id+"/log";
+        var admin=user("admin").roles("ADMIN");
+        clients.paired(id,"Shelf",key,"192.168.1.31",80);
+        try{
+            // Firmware 0.1.0 cannot send its log: no request, a hint instead.
+            mvc.perform(get(image).header("Authorization","Bearer "+key).header("X-VibeDock-Firmware","0.1.0")
+                    .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk()).andExpect(header().doesNotExist("X-VibeDock-Send-Log"));
+            mvc.perform(post("/admin/clients/"+id+"/logs/request").with(admin).with(csrf()).with(r->{r.setLocalPort(10001);return r;}))
+                    .andExpect(flash().attribute("logMessage",org.hamcrest.Matchers.containsString("only over USB")));
+            Assertions.assertTrue(deviceLogs.pendingRequest(id).isEmpty());
+            // Newer firmware: the request reaches the display with its next image, also on a 304.
+            var pull=mvc.perform(get(image).header("Authorization","Bearer "+key).header("X-VibeDock-Firmware","0.2.0")
+                    .with(r->{r.setLocalPort(8080);return r;})).andReturn();
+            mvc.perform(post("/admin/clients/"+id+"/logs/request").with(admin).with(csrf()).with(r->{r.setLocalPort(10001);return r;}))
+                    .andExpect(flash().attribute("logMessage",org.hamcrest.Matchers.startsWith("Requested")));
+            String request=mvc.perform(get(image).header("Authorization","Bearer "+key).header("X-VibeDock-Firmware","0.2.0")
+                    .header("If-None-Match",pull.getResponse().getHeader("ETag")).with(r->{r.setLocalPort(8080);return r;}))
+                    .andExpect(status().isNotModified()).andReturn().getResponse().getHeader("X-VibeDock-Send-Log");
+            Assertions.assertTrue(request!=null&&request.matches("[0-9a-f]{32}"),String.valueOf(request));
+            String body="+5s Start\n+9s Wi-Fi Home: 192.168.1.31\nBearer "+key+"\n";
+            // Wrong key, wrong request, admin port, GET and too large are refused; nothing is saved.
+            mvc.perform(post(upload).header("Authorization","Bearer "+"0".repeat(64)).header("X-VibeDock-Log-Request",request).content(body)
+                    .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isUnauthorized());
+            mvc.perform(post(upload).header("Authorization","Bearer "+key).header("X-VibeDock-Log-Request","1".repeat(32)).content(body)
+                    .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isConflict());
+            mvc.perform(post(upload).header("Authorization","Bearer "+key).header("X-VibeDock-Log-Request",request).content(body)
+                    .with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isNotFound());
+            mvc.perform(get(upload).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isMethodNotAllowed());
+            mvc.perform(post(upload).header("Authorization","Bearer "+key).header("X-VibeDock-Log-Request",request).content("x".repeat(DeviceLogs.MAX_BYTES+1))
+                    .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isPayloadTooLarge());
+            Assertions.assertEquals(0,deviceLogs.count(id));
+            // The right one is saved once, without the key; the request is used up.
+            mvc.perform(post(upload).header("Authorization","Bearer "+key).header("X-VibeDock-Log-Request",request)
+                    .header("X-VibeDock-Firmware","0.2.0").header("X-VibeDock-Board","vibedock-m1").content(body)
+                    .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNoContent());
+            mvc.perform(post(upload).header("Authorization","Bearer "+key).header("X-VibeDock-Log-Request",request).content(body)
+                    .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isConflict());
+            var saved=deviceLogs.list(id);
+            Assertions.assertEquals(1,saved.size());Assertions.assertEquals("net",saved.getFirst().source());Assertions.assertEquals("0.2.0",saved.getFirst().firmware());
+            var lines=deviceLogs.read(id,saved.getFirst().name()).orElseThrow().lines();
+            Assertions.assertEquals(3,lines.size());Assertions.assertFalse(String.join("\n",lines).contains(key));
+            mvc.perform(get(image).header("Authorization","Bearer "+key).header("X-VibeDock-Firmware","0.2.0").with(r->{r.setLocalPort(8080);return r;}))
+                    .andExpect(header().doesNotExist("X-VibeDock-Send-Log"));
+            mvc.perform(get("/admin/clients/"+id+"/logs").with(admin).with(r->{r.setLocalPort(10001);return r;}))
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString("Read log over the network")))
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString("Network")));
+        }finally{clients.remove(id);deviceLogs.deleteAll(id);}
     }
     @Test void firmwareIsOfferedForDownloadAndDevicesReportTheirVersion() throws Exception {
         String key="ab".repeat(32);

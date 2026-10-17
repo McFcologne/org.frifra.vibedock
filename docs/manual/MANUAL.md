@@ -782,6 +782,15 @@ polls.
 starts and their reason, Wi-Fi, pairing, every change of the server's answer and why a connection failed. It holds
 no keys or passwords. The copy button next to the log copies it for a report.
 
+Every log read this way is also saved on the server. **Devices → Logs (n)** on the device card lists the last 10 logs
+of the display with the time they were read and how (USB or network), to show, download as text or delete. Removing
+the display removes its logs.
+
+**Read log over the network** on that page asks the display to send its log without a cable: it sends it right
+after its next image pull, over the same address and encryption as its images, within seconds when the server can
+ask it to pull now. This needs firmware newer than 0.1.1; older firmware sends its log only over USB. The request is
+valid for 10 minutes and for one log.
+
 > Opening the USB port restarts the VibeTV M1. Read the log only after the display has finished what you want to
 > see: it shows an image or *Server unreachable*. An https connection takes the M1 a few seconds, and the first
 > attempt at an address can come only with the next poll (30 seconds by default).

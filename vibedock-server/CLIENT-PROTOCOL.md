@@ -129,6 +129,33 @@ A web display is created in the administration and has no firmware. It fetches w
 
 The secret is 64 lowercase hex characters; unknown secrets get **404**, other methods **405**, the administration port **404**. Each image fetch counts as a pull for the status in the administration. Where a device's image shows `IP: …`, a web display's image shows `VibeDock server v<version>`.
 
+## 3c. Device log (device → server)
+
+The administration can ask a display for its log (*Devices › Logs › Read log over the network*). The server then
+answers the display's next image pull (200 or 304) with `X-VibeDock-Send-Log: <request id>` (32 lowercase hex
+characters, valid for 10 minutes and one upload; a new request replaces an open one) and asks a reachable display to
+pull right away (`POST /pull`). The display then sends its log:
+
+```
+POST /api/v1/clients/{identifier}/log
+Authorization: Bearer <device key>
+X-VibeDock-Log-Request: <request id>
+Content-Type: text/plain; charset=utf-8
+
+<one event per line, oldest first>
+```
+
+| Answer | Meaning |
+| --- | --- |
+| **204** | saved as a log of the display with the source `net` (the last 10 per display are kept) |
+| **401** | unknown device or wrong key |
+| **409** | no open request with this id (wrong, used or expired) |
+| **413** | larger than 64 kB |
+
+Only the public port accepts it, and only `POST`. The server removes key-like values and web display links from the
+lines, and keeps at most 500 lines of 400 characters. The same is saved for logs the browser reads over USB on the
+firmware page. Firmware up to 0.1.1 does not know the header and keeps sending its log only over USB.
+
 ## Boards
 
 One firmware source builds for several boards (PlatformIO environments in `vibedock-client/firmware/platformio.ini`, the server's inventory in `Board.java`):

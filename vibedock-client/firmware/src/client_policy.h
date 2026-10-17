@@ -55,6 +55,14 @@ inline bool parseFingerprint(const char *text, uint8_t out[20]) {
   for (int i = 0; i < 20; i++) out[i] = uint8_t(value(text[2 * i]) << 4 | value(text[2 * i + 1]));
   return true;
 }
+// The server's request to send the log (X-VibeDock-Send-Log): 32 lowercase hex characters, nothing else.
+inline bool validLogRequest(const char *text) {
+  for (int i = 0; i < 32; i++) {
+    char c = text[i];
+    if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) return false;
+  }
+  return text[32] == 0;
+}
 // Server images come as "rgb565-be-<width>x<height>", rendered for the display type chosen in the administration.
 // Any size within the limits is accepted and scaled to the screen.
 constexpr uint16_t maxImageSide = 480;
