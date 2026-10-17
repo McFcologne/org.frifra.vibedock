@@ -1,6 +1,7 @@
 // Flashes the VibeDock firmware over Web Serial with esptool-js: connect, back up the whole flash, write the image of the
 // chosen board at 0x0 (on ESP32 chips bootloader, partition table and app in one; the LittleFS settings stay), then
 // restart the device.
+import { openConsole as openSerialConsole, restart, csrf, sleep } from './serial-console.js';
 const card = document.getElementById('web-flasher');
 const $ = selector => card.querySelector(selector);
 const button = name => $(`[data-flash="${name}"]`);
@@ -85,123 +86,30 @@ function chipFamily(description) {
   return variant ? 'ESP32-' + variant[1] : text.startsWith('ESP32') ? 'ESP32' : text.split(' ')[0];
 }
 
-// ---- pairing over USB right after the installation ----
-// The firmware reads one command per line at 115200 baud: VIBEDOCK-HELLO (answer VIBEDOCK-READY {identifier,...}),
-// VIBEDOCK-SCAN (VIBEDOCK-NETWORKS [...]) and VIBEDOCK-SETUP {Wi-Fi + pairing} (VIBEDOCK-SETUP OK, then it restarts).
+// ---- pairing over USB right after the installation (the console: serial-console.js) ----
 const pair = card.querySelector('[data-pair]');
 const pairForm = pair.querySelector('[data-pair-form]'), pairAsk = pair.querySelector('[data-pair-ask]');
 const pairState = pair.querySelector('[data-pair-state]');
-const csrf = { [document.querySelector('meta[name="csrf-header"]').content]: document.querySelector('meta[name="csrf-token"]').content };
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 let console_, device;
 function say(text, error = false) { pairState.textContent = text; pairState.classList.toggle('error-text', error); }
 function askToPair() { pair.hidden = false; pairAsk.hidden = false; pairForm.hidden = true; say(''); }
 
-// Line console on the device's serial port.
-async function openConsole() {
-  await serialPort.open({ baudRate: 115200, bufferSize: 8192 });
-  // Run, not the bootloader. RTS first: with DTR still set, a released RTS cannot pull the chip's reset (EN) low on
-  // the usual auto-reset wiring, so opening the console does not restart a running display.
-  await serialPort.setSignals({ requestToSend: false });
-  await serialPort.setSignals({ dataTerminalReady: false });
-  const reader = serialPort.readable.getReader(), waiters = [];
-  let open = true;
-  (async () => {
-    const decoder = new TextDecoder(); let buffer = '';
-    try {
-      while (open) {
-        const { value, done } = await reader.read(); if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        for (let i; (i = buffer.indexOf('\n')) >= 0; buffer = buffer.slice(i + 1)) {
-          const at = buffer.slice(0, i).indexOf('VIBEDOCK-'); if (at < 0) continue;  // boot messages of the chip
-          const line = buffer.slice(at, i).trim();
-          for (const w of [...waiters]) if (line.startsWith(w.prefix)) { waiters.splice(waiters.indexOf(w), 1); w.resolve(line); }
-        }
-        if (buffer.length > 16384) buffer = '';
-      }
-    } catch { /* port closed */ }
-  })();
-  return {
-    wait(prefix, ms) {
-      return new Promise((resolve, reject) => {
-        const w = { prefix, resolve: line => { clearTimeout(timer); resolve(line); } };
-        const timer = setTimeout(() => { waiters.splice(waiters.indexOf(w), 1); reject(new Error('timeout')); }, ms);
-        waiters.push(w);
-      });
-    },
-    async send(text) {  // in small paced pieces: the device reads its 1 kB buffer between other work
-      const writer = serialPort.writable.getWriter(), bytes = new TextEncoder().encode(text + '\n');
-      try { for (let i = 0; i < bytes.length; i += 128) { await writer.write(bytes.slice(i, i + 128)); await sleep(40); } }
-      finally { writer.releaseLock(); }
-    },
-    async close() { open = false; try { await reader.cancel(); } catch {} reader.releaseLock(); try { await serialPort.close(); } catch {} }
-  };
-}
-// Asks until the device answers; it may still be starting or trying its old Wi-Fi.
-async function hello() {
-  for (let attempt = 0; attempt < 20; attempt++) {
-    const answer = console_.wait('VIBEDOCK-READY ', 1500);
-    await console_.send('VIBEDOCK-HELLO');
-    try { return JSON.parse((await answer).slice('VIBEDOCK-READY '.length)); } catch (e) { if (e.message !== 'timeout') throw e; }
-  }
-  throw new Error('The display does not answer over USB. Its firmware may be older than this page; install it first.');
-}
+const openConsole = () => openSerialConsole(serialPort);
+const hello = () => console_.hello();
 async function closeConsole() { if (console_) { const c = console_; console_ = undefined; await c.close(); } }
 
 pair.querySelectorAll('[data-pair-skip]').forEach(b => b.addEventListener('click', async () => { await closeConsole(); pair.hidden = true; }));
-// Restarts the display like the reset button: the USB adapter's RTS line pulls the chip's reset (EN) low while DTR
-// keeps GPIO0 high, so it starts its firmware and not the bootloader. Works with any firmware.
+// Restarts the display like its reset button (serial-console.js); esptool restarts it itself while connected.
 card.querySelector('[data-restart]').addEventListener('click', async () => {
   if (busy) return;
   try {
     if (loader) { await loader.after('hard_reset'); await disconnect(); say(''); terminal.writeLine('Display restarted.'); return; }
     await closeConsole();
     serialPort ??= await navigator.serial.requestPort();
-    await serialPort.open({ baudRate: 115200 });
-    try {
-      await serialPort.setSignals({ dataTerminalReady: false, requestToSend: true }); await sleep(150);
-      await serialPort.setSignals({ dataTerminalReady: false, requestToSend: false });
-    } finally { await serialPort.close(); }
+    await restart(serialPort);
     terminal.writeLine('Display restarted.');
   } catch (error) { terminal.writeLine('Restart failed: ' + (error?.message || error)); }
 });
-// The display's own log over the cable (VIBEDOCK-LOG): starts, Wi-Fi, pairing, server answers and why a connection
-// failed (e.g. a TLS error). It holds no keys or passwords. Opening the port does not restart the display.
-card.querySelector('[data-read-log]').addEventListener('click', async () => {
-  if (busy) return;
-  try {
-    if (loader) await disconnect();  // esptool holds the port
-    await closeConsole();
-    serialPort ??= await navigator.serial.requestPort();
-    try { console_ = await openConsole(); }
-    catch { serialPort = await navigator.serial.requestPort(); console_ = await openConsole(); }
-    const info = await hello();
-    const answer = console_.wait('VIBEDOCK-LOG ', 20000);  // older firmware answers only after a TLS handshake
-    await console_.send('VIBEDOCK-LOG');
-    let lines;
-    try { lines = JSON.parse((await answer).slice('VIBEDOCK-LOG '.length)); }
-    catch (error) { throw new Error(error.message === 'timeout' ? `no answer from firmware ${info.version}; try again` : error.message); }
-    terminal.writeLine(`Log of ${info.name || info.identifier} (${info.identifier}, firmware ${info.version}), oldest first:`);
-    if (/External System|External reset/.test(lines.at(-1) ?? '') && lines.at(-1).includes(' Start '))
-      terminal.writeLine('  (The display restarted when the port was opened; the lines before the last start are from its earlier runs.)');
-    for (const line of lines) terminal.writeLine('  ' + line);
-    if (!lines.length) terminal.writeLine('  (empty)');
-    await saveLog(info, lines);
-  } catch (error) { terminal.writeLine('Reading the display log failed: ' + (error?.message || error)); }
-  finally { await closeConsole(); }
-});
-// Every log read is kept on the server (the last ones per display), for its log page and support requests.
-async function saveLog(info, lines) {
-  if (!info?.identifier) return;
-  const page = '/admin/clients/' + encodeURIComponent(info.identifier) + '/logs';
-  try {
-    const response = await fetch(page, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...csrf },
-      body: JSON.stringify({ firmware: info.version ?? null, board: info.board ?? null, lines }) });
-    const saved = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(saved.error || 'HTTP ' + response.status);
-    terminal.writeLine(`Saved on the server (${saved.count} of the last ${saved.keep} logs of this display): ${location.origin}${page}`);
-  } catch (error) { terminal.writeLine('The log could not be saved on the server: ' + (error?.message || error)); }
-}
 card.querySelector('[data-pair-only]').addEventListener('click', async () => {
   if (busy) return;
   if (loader) await disconnect();  // esptool holds the port

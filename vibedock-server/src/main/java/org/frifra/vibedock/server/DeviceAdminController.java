@@ -44,7 +44,15 @@ class DeviceAdminController {
         return "redirect:/admin/devices";
     }
 
-    // ---- logs read from a display (over USB on the firmware page) ----
+    // ---- troubleshooting: logs read from a display, over USB (any board) or the network ----
+    /** A paired display on the troubleshooting page: its saved logs and whether it can send one over the network. */
+    record LogTarget(ClientRegistry.View device,int logs,boolean network) {}
+    @GetMapping("/admin/troubleshooting") String troubleshooting(org.springframework.ui.Model model) throws IOException {
+        var targets=new java.util.ArrayList<LogTarget>();
+        for(var c:registry.views())if(c.web()==null)targets.add(new LogTarget(c,logs.count(c.identifier()),sendsLog(c.firmware())));
+        model.addAttribute("targets",targets);model.addAttribute("keep",DeviceLogs.KEEP);
+        return "troubleshooting";
+    }
     record LogUpload(String firmware,String board,List<String> lines) {}
     @PostMapping(value="/admin/clients/{identifier}/logs",produces="application/json") @ResponseBody
     org.springframework.http.ResponseEntity<java.util.Map<String,Object>> saveLog(@PathVariable String identifier,@RequestBody LogUpload upload) throws IOException {
@@ -168,6 +176,14 @@ class DeviceAdminController {
             String page=WebDisplayController.base(view,addresses,request)+"/web/"+view.web().secret();
             return org.springframework.http.ResponseEntity.ok(java.util.Map.of("page",page,"image",page+"/image.png"));}
         catch(IllegalArgumentException e){return org.springframework.http.ResponseEntity.badRequest().body(java.util.Map.of("error","The web display was already removed."));}
+    }
+    /** The switch on the card: turns the device's picture by 180 degrees; the device is asked to pull right away. */
+    @PostMapping(value="/admin/clients/{identifier}/flip",produces="application/json") @ResponseBody org.springframework.http.ResponseEntity<java.util.Map<String,Object>> flip(
+            @PathVariable String identifier,@RequestParam(defaultValue="false") boolean flipped) throws IOException {
+        try{registry.setFlipped(identifier,flipped);
+            try{poke.pullNow(List.of(registry.address(identifier)));}catch(IllegalArgumentException ignored){ /* learns it at its next poll */ }
+            return org.springframework.http.ResponseEntity.ok(java.util.Map.of("flipped",registry.flipped(identifier)));}
+        catch(IllegalArgumentException e){return org.springframework.http.ResponseEntity.badRequest().body(java.util.Map.of("error","The device was already removed."));}
     }
     record Order(List<String> ids) {}
     /** Order of the device cards after dragging one by its grip. */

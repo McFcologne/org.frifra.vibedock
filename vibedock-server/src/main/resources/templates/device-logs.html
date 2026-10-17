@@ -6,13 +6,13 @@
 <main>
 <div class="page-heading"><div><h2 th:text="${'Logs of ' + deviceName}">Logs</h2>
   <p>The last <span th:text="${keep}">10</span> logs read from this display, newest first. Logs read over USB
-  (<a th:href="@{/admin/firmware}">Firmware</a>) or sent by the display over the network are saved here. <code th:text="${identifier}"></code></p></div>
-  <div class="heading-actions"><a class="button secondary" th:href="@{/admin/devices}">Devices</a>
+  (<a th:href="@{/admin/troubleshooting}">Troubleshooting</a>) or sent by the display over the network are saved here. <code th:text="${identifier}"></code></p></div>
+  <div class="heading-actions"><a class="button secondary" th:href="@{/admin/troubleshooting}">Troubleshooting</a>
     <form th:if="${networkLog}" th:action="@{/admin/clients/{id}/logs/request(id=${identifier})}" method="post">
       <button title="The display sends its log over its server connection">Read log over the network</button></form></div></div>
 <p class="notice" th:if="${logMessage}" th:text="${logMessage}" role="status"></p>
 <p class="notice" th:if="${logRequested and logMessage == null}">A log has been requested; the display sends it with its next pull. Reload this page.</p>
-<p class="meta" th:if="${paired and !networkLog}">This display's firmware sends its log only over USB (Firmware page). Newer firmware can send it over the network.</p>
+<p class="meta" th:if="${paired and !networkLog}">This display's firmware sends its log only over USB (Troubleshooting). Newer firmware can send it over the network.</p>
 <p class="meta" th:if="${entries.isEmpty()}">No logs saved yet.</p>
 <section class="card device-log" th:each="item:${entries}" th:with="entry=${item.entry}">
   <div class="card-head"><h3 class="grow" th:text="${#dates.format(new java.util.Date(entry.savedAt), 'yyyy-MM-dd HH:mm:ss')}">time</h3>

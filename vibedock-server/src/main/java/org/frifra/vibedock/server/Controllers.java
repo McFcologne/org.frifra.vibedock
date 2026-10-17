@@ -28,13 +28,14 @@ class Controllers {
     private final Firmware firmware;
     private final ApplicationInfo info;
     private final AdminAccount admin;
-    private final DeviceLogs deviceLogs;
     Controllers(SettingsStore store,UsageService usage,DeviceSender devices,ClientRegistry clients,ServerAddresses addresses,StorageErrors storage,
-                Firmware firmware,ApplicationInfo info,AdminAccount admin,DeviceLogs deviceLogs,@Value("${vibedock.data-dir}") String dataDir,@Value("${vibedock.log-dir}") String logDir) {
+                Firmware firmware,ApplicationInfo info,AdminAccount admin,@Value("${vibedock.data-dir}") String dataDir,@Value("${vibedock.log-dir}") String logDir) {
         this.store=store; this.usage=usage; this.devices=devices;this.clients=clients;this.addresses=addresses;
-        this.storage=storage;this.firmware=firmware;this.info=info;this.admin=admin;this.deviceLogs=deviceLogs;this.dataDir=dataDir;this.logDir=logDir;
+        this.storage=storage;this.firmware=firmware;this.info=info;this.admin=admin;this.dataDir=dataDir;this.logDir=logDir;
     }
-    @GetMapping("/login") String login() { return "login"; }
+    @org.springframework.beans.factory.annotation.Value("${vibedock.admin-auth:password}") private String auth;
+    /** Without sign-in (ADMIN_AUTH=none) the login page, e.g. a bookmark or after "Sign out", leads to the administration. */
+    @GetMapping("/login") String login() { return "none".equals(auth) ? "redirect:/admin" : "login"; }
     @GetMapping("/api/v1/usage") @ResponseBody
     UsageService.Snapshot api() { return usage.snapshot(); }
     /** The user manual, opened in the browser's PDF viewer. */
@@ -88,13 +89,10 @@ class Controllers {
     private static String left(ProviderClient.Window w){return String.format(Locale.ROOT,"%.0f %%",Math.max(0,Math.min(100,100-w.usedPercent())));}
     @GetMapping("/admin/devices") String devices(Model model,HttpServletRequest request) {
         model.addAttribute("clients",clients.views());
-        java.util.Map<String,Integer> logCounts=new java.util.HashMap<>();
-        for(var c:clients.views())logCounts.put(c.identifier(),deviceLogs.count(c.identifier()));
-        model.addAttribute("logCounts",logCounts);
         var versions=firmware.versions();  // per board: an uploaded build has its own version
         model.addAttribute("firmwareVersions",versions);model.addAttribute("boards",Board.INVENTORY);
         model.addAttribute("updatable",clients.views().stream().filter(c->c.ota()&&!c.updating()&&versions.containsKey(c.board().id())
-                &&FirmwareVersion.newer(versions.get(c.board().id()),c.firmware())).count());
+                &&FirmwareVersion.offered(versions.get(c.board().id()),c.firmware())).count());
         model.addAttribute("announced",addresses.announced(request));
         model.addAttribute("internalLoopback",addresses.internalIsLoopback(request));
         // Web displays: the server address of their links per display, and the choices for a new one.

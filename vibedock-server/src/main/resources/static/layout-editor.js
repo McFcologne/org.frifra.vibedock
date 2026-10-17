@@ -1,4 +1,4 @@
-// Shared default/device editor. Previews are server-rendered; all edits remain local until Save.
+// Shared default/device editor. Previews are server-rendered; every edit is saved right away (debounced).
 (() => {
   const root = document.getElementById('layout-editor');
   if (!root) return;
@@ -8,6 +8,7 @@
   const csrf = document.querySelector('meta[name="csrf-token"]').content;
   const csrfHeader = document.querySelector('meta[name="csrf-header"]').content;
   let catalog, target = 'default', draft, inherit = false, dirty = false, busy = false, previewPending = true;
+  let saveTimer, saving = Promise.resolve(), edits = 0;
   let timer, request, previewVersion = 0, previewUrl, dragged = null;
   const isContext = band => band.type === 'context';
   const bandName = band => isContext(band) ? 'Weather & mood' : 'Usage · ' + band.sources.map(title).join(' + ');
@@ -19,17 +20,34 @@
     weatherLocation: design.weather ? design.weather.name : '', layout: copy(design.layout), inherit: false});
   const error = message => { $('#design-error').textContent = message; $('#design-error').hidden = !message; };
   function controls() {
-    $('#design-controls').disabled = busy || inherit || !catalog;
-    $('#design-style-controls').disabled = busy || inherit || !catalog;
-    $('#design-target').disabled = busy || !catalog;
-    $('#design-override').disabled = busy;
-    $('#design-save').disabled = busy || !dirty || previewPending;
-    $('#design-discard').disabled = busy || !dirty;
-    $('#design-save').closest('.savebar').hidden = !dirty && !busy;
-    $('#design-save').textContent = target === 'default' ? 'Save default design' : inherit ? 'Use default design' : 'Save device design';
-    $('#design-save-state').textContent = busy ? 'Saving…' : dirty ? 'Unsaved changes' : 'No unsaved changes';
+    $('#design-controls').disabled = inherit || !catalog;
+    $('#design-style-controls').disabled = inherit || !catalog;
+    $('#design-target').disabled = !catalog;
   }
-  function changed(delay = 250) { dirty = true; error(''); schedulePreview(delay); controls(); }
+  function changed(delay = 250) {
+    dirty = true; edits++; error(''); schedulePreview(delay); controls();
+    clearTimeout(saveTimer); saveTimer = setTimeout(save, delay + 400);
+  }
+  // Saves the draft of the current target; edits made meanwhile are saved by the next run.
+  function save() {
+    clearTimeout(saveTimer);
+    saving = saving.then(async () => {
+      if (!dirty || !catalog) return;
+      const savedTarget = target, savedInherit = inherit, version = edits; busy = true;
+      $('#design-message').textContent = 'Saving…';
+      try {
+        await post('/admin/designs/' + encodeURIComponent(savedTarget), {...draft, inherit: savedInherit});
+        if (version === edits) dirty = false;
+        const response = await fetch('/admin/designs', {credentials: 'same-origin'});
+        if (!response.ok) throw new Error('Saved, but designs could not be reloaded. Reload this page.');
+        catalog = await response.json(); labels();
+        $('#design-message').textContent = savedTarget === 'default' ? 'Default design saved. Devices that follow it use it with their next image pull.'
+          : savedInherit ? 'The device follows the default design again.' : 'Device design saved. It applies with the next image pull.';
+      } catch (failure) { error(failure.message); $('#design-message').textContent = 'Not saved.'; }
+      finally { busy = false; }
+    });
+    return saving;
+  }
   function element(tag, className, text) { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; }
   function select(options, value, label, change) {
     const node = element('select'); node.setAttribute('aria-label', label);
@@ -38,7 +56,7 @@
   }
   function move(i, delta) {
     const bands = draft.layout.bands, j = i + delta;
-    if (inherit || busy || j < 0 || j >= bands.length) return;
+    if (inherit || j < 0 || j >= bands.length) return;
     [bands[i], bands[j]] = [bands[j], bands[i]];
     renderBands(); changed();
   }
@@ -70,7 +88,7 @@
       if (!isContext(band) && usageCount() > 1) {
         const remove = element('button', 'secondary small', '×'); remove.type = 'button'; remove.disabled = inherit;
         remove.setAttribute('aria-label', 'Remove ' + name); remove.title = 'Remove band';
-        remove.addEventListener('click', () => { if (inherit || busy) return; draft.layout.bands.splice(index, 1); renderBands(); changed(); });
+        remove.addEventListener('click', () => { if (inherit) return; draft.layout.bands.splice(index, 1); renderBands(); changed(); });
         actions.append(remove);
       }
       if (!isContext(band)) {
@@ -88,7 +106,7 @@
         if (!expanded.has(band)) {
           article.classList.add('folded'); head.replaceChildren(head.firstChild, head.querySelector('h3'));
           if (fix && !fixShown) { fixShown = true; const button = element('button', 'secondary small design-band-fix', fix.label); button.type = 'button'; button.disabled = inherit;
-            button.addEventListener('click', event => { event.stopPropagation(); if (inherit || busy) return; fix.apply(); renderBands(); changed(); }); head.append(button); }
+            button.addEventListener('click', event => { event.stopPropagation(); if (inherit) return; fix.apply(); renderBands(); changed(); }); head.append(button); }
           const remove = actions.querySelector('button[aria-label^="Remove"]'); actions.replaceChildren(...(remove ? [remove] : []));
           head.title = 'Click to edit'; head.addEventListener('click', event => { if (event.target.closest('button')) return; expanded.add(band); renderBands(); });
           head.append(actions); article.append(head); addDrag(article, index); container.append(article); return;
@@ -121,19 +139,19 @@
   }
   function addDrag(article, index) {
     const container = $('#design-bands');
-      article.addEventListener('dragstart', event => { if (inherit || busy || event.target.closest('button,select,input')) { event.preventDefault(); return; }
+      article.addEventListener('dragstart', event => { if (inherit || event.target.closest('button,select,input')) { event.preventDefault(); return; }
         dragged = index; event.dataTransfer.setData('text/plain', String(index)); event.dataTransfer.effectAllowed = 'move'; });
       article.addEventListener('dragover', event => { if (dragged !== null && dragged !== index && !inherit) { event.preventDefault(); article.classList.add('drag-over'); } });
       article.addEventListener('dragleave', () => article.classList.remove('drag-over'));
       article.addEventListener('dragend', () => { dragged = null; container.querySelectorAll('.drag-over').forEach(n => n.classList.remove('drag-over')); });
-      article.addEventListener('drop', event => { event.preventDefault(); if (dragged === null || inherit || busy) return;
+      article.addEventListener('drop', event => { event.preventDefault(); if (dragged === null || inherit) return;
         const bands = draft.layout.bands; bands.splice(index, 0, bands.splice(dragged, 1)[0]); dragged = null; renderBands(); changed(); });
   }
   function addButton(container) {
     // Up to four usage bands; the display shows as many as fit its height (compact rows take half the height).
     if (usageCount() < MAX_USAGE) {
       const add = element('button', 'secondary small design-band-add', '+ Add usage band'); add.type = 'button'; add.disabled = inherit;
-      add.addEventListener('click', () => { if (inherit || busy) return;
+      add.addEventListener('click', () => { if (inherit) return;
         const bands = draft.layout.bands, last = bands.map(isContext).lastIndexOf(false);
         bands.splice(last + 1, 0, { type: 'usage', sources: [sourceIds()[0] || 'codex'], compact: true }); renderBands(); changed(); });
       container.append(add);
@@ -166,19 +184,31 @@
     if (!type.halfWidth && usage.some(b => b.sources.length > 1)) parts.push('split bands show their first source');
     note.textContent = parts.join(' · ');
   }
-  function loadTarget() {
+  function labels() {
     [...$('#design-target').options].forEach(option => {
       const entry = catalog.devices.find(d => d.identifier === option.value);
       if (entry) option.textContent = entry.name + (entry.overridden ? ' · own design' : ' · default');
     });
-    const design = target === 'default' ? catalog.defaults : device().design;
     $('#design-title').textContent = target === 'default' ? 'Default design' : device().name + (device().overridden ? ' · own design' : ' · follows the default');
+  }
+  // The case takes the display's shape before the new image arrives (it would otherwise follow it late).
+  function fitCase() {
+    const type = target === 'default' ? {width: 240, height: 240} : displayOf(draft.display), preview = document.querySelector('.design-preview .device');
+    if (preview && type) preview.style.setProperty('--ratio', String(type.height / type.width));
+  }
+  function loadTarget() {
+    labels();
+    const design = target === 'default' ? catalog.defaults : device().design;
     inherit = target !== 'default' && !device().overridden; draft = inputFor(inherit ? catalog.defaults : design);
     $('#design-default-summary').hidden = target !== 'default';
     dirty = false; $('#design-inheritance').hidden = target === 'default'; $('#design-override').checked = !inherit;
-    $('#inheritance-description').textContent = inherit ? 'Follows the default design, including future changes.' : 'This device has its own complete design. Turn off the override and save to follow the default again.';
+    $('#inheritance-description').textContent = inherit ? 'Follows the default design, including future changes.' : 'This device has its own complete design. Turn off the override to follow the default again.';
+    // The preview in the device's case (Board.previewCase), the default design in the VibeTV M1's.
+    const front = document.querySelector('.design-preview .device-front');
+    if (front) { front.classList.remove('case-147', 'case-c6'); if (target !== 'default' && device().previewCase) front.classList.add(device().previewCase); }
     if (target !== 'default') { draft.display = device().display; $('#design-display').value = draft.display; }
     else { const image = $('#design-preview-image'); image.width = 240; image.height = 240; }
+    fitCase();
     render(); schedulePreview();
   }
   function render() {
@@ -211,49 +241,37 @@
       } catch (failure) { if (failure.name !== 'AbortError' && version === previewVersion) { $('#preview-status').textContent = 'Preview unavailable'; error(failure.message); } }
     }, delay);
   }
-  const targetName = id => id === 'default' ? 'the default design' : catalog.devices.find(d => d.identifier === id).name;
-  let pendingTarget = null;
   function switchTo(next) {
-    target = next; $('#design-target').value = next; $('#design-switch').hidden = true; error(''); loadTarget();
+    target = next; $('#design-target').value = next; error(''); loadTarget();
     const url = new URL(location.href); if (target === 'default') url.searchParams.delete('device'); else url.searchParams.set('device', target); history.replaceState(null, '', url);
   }
-  // Unsaved changes: ask in the page instead of a browser dialog, which browsers may suppress.
-  $('#design-target').addEventListener('change', event => {
-    if (!dirty) { switchTo(event.target.value); return; }
-    pendingTarget = event.target.value; event.target.value = target;
-    $('#design-switch span').textContent = 'Unsaved changes to ' + targetName(target) + '. Switch to ' + targetName(pendingTarget) + '?';
-    $('#design-switch').hidden = false;
-  });
-  $('#design-switch').addEventListener('click', event => {
-    const choice = event.target.dataset.switch; if (!choice) return;
-    if (choice === 'discard') switchTo(pendingTarget); else $('#design-switch').hidden = true;
-    pendingTarget = null;
+  // A pending save of the previous target finishes first; a failed one keeps the editor on it.
+  $('#design-target').addEventListener('change', async event => {
+    const next = event.target.value; event.target.value = target;
+    await save(); if (dirty) return;
+    switchTo(next);
   });
   $('#design-override').addEventListener('change', event => {
     inherit = !event.target.checked;
     if (inherit) draft = {...inputFor(catalog.defaults), display: draft.display};
-    $('#inheritance-description').textContent = inherit ? 'Save to remove this device’s overrides and follow all future default changes.' : 'Editing a complete device-specific copy of the design.';
+    $('#inheritance-description').textContent = inherit ? 'This device follows the default design, including future changes.' : 'Editing a complete device-specific copy of the design.';
     render(); changed();
   });
   $('#design-scheme').addEventListener('change', event => { draft.scheme = event.target.value; changed(); });
-  $('#design-display').addEventListener('change', event => { draft.display = event.target.value; renderBands(); changed(); });
+  $('#design-display').addEventListener('change', event => { draft.display = event.target.value; fitCase(); renderBands(); changed(); });
   $('#design-weather').addEventListener('change', event => { draft.weatherLocation = event.target.value.trim(); changed(); });
   $('#design-weather').addEventListener('input', event => {
     // Capture typing before moving these same DOM nodes to the other slot; blur/change is not guaranteed then.
     draft.weatherLocation = event.target.value.trim(); changed(700);
   });
   $('#layout-emoji').addEventListener('change', event => { draft.mood = event.target.value === '-' ? '' : event.target.value; changed(); });
-  $('#design-form').addEventListener('submit', async event => {
-    event.preventDefault(); if (!dirty || busy || previewPending) return; busy = true; controls(); error('');
-    try {
-      await post('/admin/designs/' + encodeURIComponent(target), {...draft, inherit});
-      const response = await fetch('/admin/designs', {credentials: 'same-origin'}); if (!response.ok) throw new Error('Saved, but designs could not be reloaded. Reload this page.');
-      catalog = await response.json(); loadTarget(); $('#design-message').textContent = target === 'default' ? 'Default design saved. Devices that inherit it use it on their next image pull.' : inherit ? 'Device now follows the default design.' : 'Device design saved. It applies on the next image pull.';
-    } catch (failure) { error(failure.message); }
-    finally { busy = false; controls(); }
+  $('#design-form').addEventListener('submit', event => { event.preventDefault(); save(); });
+  // Leaving within the save delay: send the last edit along (keepalive outlives the page).
+  window.addEventListener('pagehide', () => {
+    if (!dirty || busy || !catalog) return;
+    fetch('/admin/designs/' + encodeURIComponent(target), {method: 'POST', credentials: 'same-origin', keepalive: true,
+      headers: {'Content-Type': 'application/json', [csrfHeader]: csrf}, body: JSON.stringify({...draft, inherit})});
   });
-  $('#design-discard').addEventListener('click', () => { if (!busy && catalog) { error(''); loadTarget(); } });
-  window.addEventListener('beforeunload', event => { if (dirty) { event.preventDefault(); event.returnValue = ''; } });
   fetch('/admin/designs', {credentials: 'same-origin'}).then(async response => {
     if (!response.ok) throw new Error('Designs could not be loaded. Reload and sign in again.');
     catalog = await response.json();
@@ -261,6 +279,6 @@
     catalog.devices.forEach(d => { const option = element('option', '', d.name + (d.overridden ? ' · own design' : ' · default')); option.value = d.identifier; $('#design-target').append(option); });
     catalog.schemes.forEach(s => { const option = element('option', '', s.label); option.value = s.id; $('#design-scheme').append(option); });
     const requested = new URLSearchParams(location.search).get('device'); if (catalog.devices.some(d => d.identifier === requested)) target = requested;
-    $('#design-target').value = target; $('#design-message').textContent = 'Changes stay here until you save.'; loadTarget();
+    $('#design-target').value = target; $('#design-message').textContent = 'Changes are saved right away.'; loadTarget();
   }).catch(failure => error(failure.message));
 })();

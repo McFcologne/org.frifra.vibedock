@@ -19,6 +19,16 @@ public final class FirmwareVersion {
         for(int i=0;i<a.length;i++)if(a[i]!=b[i])return a[i]>b[i];
         return false;
     }
+    /**
+     * True if the server's build should be offered: newer, or another build of the same version (a local build with
+     * uncommitted changes, {@code -dirty}, against the server's), never an older one.
+     */
+    public static boolean offered(String candidate,String installed){
+        if(newer(candidate,installed))return true;
+        if(candidate==null||candidate.equals(installed))return false;
+        long[] a=parse(candidate),b=parse(installed);
+        return a!=null&&b!=null&&java.util.Arrays.equals(a,b);
+    }
     /** Unknown or malformed version strings cannot opt into protocol upgrades. */
     static boolean knownNewer(String candidate,String installed){
         try{return candidate!=null&&installed!=null&&parse(candidate)!=null&&parse(installed)!=null&&newer(candidate,installed);}

@@ -9,7 +9,7 @@ import java.util.*;
 @Controller
 class DesignController {
     /** serverFooter: the device's firmware can show the weather/mood band anywhere; older firmware keeps it at the bottom. */
-    record Target(String identifier,String name,String ip,boolean overridden,Design design,boolean serverFooter,String display) {}
+    record Target(String identifier,String name,String ip,boolean overridden,Design design,boolean serverFooter,String display,String previewCase) {}
     record Catalog(Design defaults,List<Target> devices,List<SourceOption> providers,List<SchemeOption> schemes,List<DisplayOption> displays) {}
     /** A display type: bandRoom (px for usage bands) and halfWidth tell the editor what the type shows of a design. */
     record DisplayOption(String id,String label,int width,int height,int bandRoom,boolean halfWidth) {}
@@ -26,7 +26,7 @@ class DesignController {
     @GetMapping("/admin/design") String editor(){return "design";}
     @GetMapping("/admin/designs") @ResponseBody Catalog catalog(){
         return new Catalog(registry.defaultDesign(),registry.views().stream()
-                .map(v->new Target(v.identifier(),v.name(),v.ip(),v.overridden(),v.design(),v.serverFooter(),v.display().id())).toList(),
+                .map(v->new Target(v.identifier(),v.name(),v.ip(),v.overridden(),v.design(),v.serverFooter(),v.display().id(),v.board().previewCase())).toList(),
                 usage.snapshot().providers().keySet().stream().map(id->new SourceOption(id,usage.snapshot().label(id))).toList(),
                 Arrays.stream(Scheme.values()).map(s->new SchemeOption(s.id(),s.label)).toList(),
                 DisplayType.INVENTORY.stream().map(t->new DisplayOption(t.id(),t.label(),t.width(),t.height(),t.bandRoom(),t.halfWidth())).toList());

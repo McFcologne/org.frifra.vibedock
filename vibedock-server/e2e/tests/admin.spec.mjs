@@ -39,40 +39,40 @@ test('source save appears only for changes and a saved rename survives reload',a
   await expect(page.getByRole('heading',{name:'Renamed account',exact:false})).toBeVisible();await expect(save).toBeHidden();
 });
 
-test('default design supports Discard and persists Save',async ({page,app}) => {
+test('default design is saved right away',async ({page,app}) => {
   await editor(page,app);
-  const scheme=page.locator('#design-scheme'), save=page.locator('#design-save'), discard=page.locator('#design-discard');
-  await expect(save).toBeHidden();await scheme.selectOption('ocean');await expect(save).toBeEnabled();
-  await discard.click();await expect(scheme).toHaveValue('midnight');await expect(save).toBeHidden();
-  await scheme.selectOption('ocean');await expect(save).toBeEnabled();await save.click();
-  await expect(save).toBeHidden();await page.reload();await expect(scheme).toHaveValue('ocean');
+  const scheme=page.locator('#design-scheme'), message=page.locator('#design-message');
+  await expect(page.locator('#design-save')).toHaveCount(0);
+  await scheme.selectOption('ocean');await expect(message).toContainText('Default design saved');
+  await page.reload();await expect(scheme).toHaveValue('ocean');
 });
 
 test('device inherits the default, can override it, and can return to inheritance',async ({page,app}) => {
-  await editor(page,app);
-  await page.locator('#design-scheme').selectOption('ocean');await expect(page.locator('#design-save')).toBeEnabled();await page.locator('#design-save').click();
-  await expect(page.locator('#design-save')).toBeHidden();
+  await editor(page,app);const message=page.locator('#design-message');
+  await page.locator('#design-scheme').selectOption('ocean');await expect(message).toContainText('Default design saved');
   await page.locator('#design-target').selectOption('vibedock-e2e-office');
   const scheme=page.locator('#design-scheme'), override=page.locator('#design-override');
   await expect(scheme).toHaveValue('ocean');await expect(scheme).toBeDisabled();
-  await override.check();await scheme.selectOption('forest');await expect(page.locator('#design-save')).toBeEnabled();await page.locator('#design-save').click();
-  await expect(page.locator('#design-save')).toBeHidden();await page.reload();
+  await override.check();await scheme.selectOption('forest');await expect(message).toContainText('Device design saved');
+  await page.reload();
   await expect(scheme).toHaveValue('forest');await expect(override).toBeChecked();
-  await override.uncheck();await expect(page.locator('#design-save')).toBeEnabled();await page.locator('#design-save').click();
-  await expect(page.locator('#design-save')).toBeHidden();await page.reload();
+  await override.uncheck();await expect(message).toContainText('follows the default design again');await page.reload();
   await expect(override).not.toBeChecked();await expect(scheme).toHaveValue('ocean');await expect(scheme).toBeDisabled();
 });
 
-test('switching targets protects unsaved changes with Keep editing or Discard',async ({page,app}) => {
+test('switching targets right after an edit saves it first',async ({page,app}) => {
   await editor(page,app);await page.locator('#design-scheme').selectOption('forest');
   await page.locator('#design-target').selectOption('vibedock-e2e-office');
-  await expect(page.locator('#design-switch')).toBeVisible();
-  await page.getByRole('button',{name:'Keep editing',exact:true}).click();
-  await expect(page.locator('#design-target')).toHaveValue('default');await expect(page.locator('#design-scheme')).toHaveValue('forest');
-  await page.locator('#design-target').selectOption('vibedock-e2e-office');
-  await page.getByRole('button',{name:'Discard and switch',exact:true}).click();
-  await expect(page.locator('#design-target')).toHaveValue('vibedock-e2e-office');await expect(page.locator('#design-scheme')).toHaveValue('midnight');
+  await expect(page.locator('#design-target')).toHaveValue('vibedock-e2e-office');await expect(page.locator('#design-scheme')).toHaveValue('forest');
   await expect(page.locator('#design-scheme')).toBeDisabled();
+});
+
+test('flip image saves in place and only touch boards offer it',async ({page,app}) => {
+  await page.goto(app.baseURL+'/admin/devices');
+  const shelf=page.locator('#device-vibedock-e2e-shelf'), flip=shelf.getByLabel('Flip image');
+  await expect(page.locator('#device-vibedock-e2e-office').getByLabel('Flip image')).toHaveCount(0);
+  await expect(flip).not.toBeChecked();await shelf.getByText('Flip image',{exact:true}).click();await expect(flip).toBeChecked();await expect(flip).toBeEnabled();
+  await page.reload();await expect(flip).toBeChecked();
 });
 
 test('footer links to the generated license page and uses the packaged version',async ({page}) => {
@@ -93,7 +93,7 @@ for(const width of [1024,360]) for(const dark of [false,true]) {
       await expect(toggle).toHaveAttribute('aria-pressed','false');await toggle.click();
       await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
     }
-    for(const route of ['/admin','/admin/devices','/admin/sources','/admin/design','/admin/server','/admin/licenses','/admin/firmware']) {
+    for(const route of ['/admin','/admin/devices','/admin/sources','/admin/design','/admin/server','/admin/licenses','/admin/firmware','/admin/troubleshooting']) {
       await page.goto(app.baseURL+route);
       if(route==='/admin/design') await expect(page.locator('#design-target')).toBeEnabled();
       await expect(page.locator('main h2').first()).toBeVisible();

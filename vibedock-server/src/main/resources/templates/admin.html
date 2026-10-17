@@ -29,7 +29,7 @@
   <p th:if="${#lists.isEmpty(clients)}"><em>No device paired yet.</em> Pair one under <a th:href="@{/admin/devices}">Devices</a>.</p>
   <ul class="status-list" th:unless="${#lists.isEmpty(clients)}">
     <li th:each="client:${clients}" th:attr="data-device=${client.identifier},data-updating=${client.updating}"><span><strong th:text="${client.name}">VibeDock</strong> <span class="meta" data-live="ip" th:text="${client.ip}"></span></span>
-      <span class="status-actions" data-live="status" th:with="firmwareVersion=${firmwareVersions.get(client.board.id)}"><th:block th:if="${client.web == null and T(org.frifra.vibedock.server.FirmwareVersion).newer(firmwareVersion, client.firmware)}">
+      <span class="status-actions" data-live="status" th:with="firmwareVersion=${firmwareVersions.get(client.board.id)}"><th:block th:if="${client.web == null and T(org.frifra.vibedock.server.FirmwareVersion).offered(firmwareVersion, client.firmware)}">
         <span class="badge update" th:if="${client.updating}" th:text="${'Updating to ' + firmwareVersion + ' …'}">Updating</span>
         <form class="inline-form" th:if="${client.ota and !client.updating}" th:action="@{/admin/clients/{id}/update(id=${client.identifier})}" method="post">
           <input type="hidden" name="back" value="overview"><button class="badge update" th:text="${'Update to ' + firmwareVersion}">Update</button></form>

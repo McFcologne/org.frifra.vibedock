@@ -57,7 +57,7 @@ const clients = {
       display: '320x240', web: {secret: webSecret, external: false, reloadSeconds: 30}, lastPullAt: now - 3600, lastPullIp: '192.168.1.40'})
   ]
 };
-const boards = ['vibedock-m1', 'esp32-cyd', 'lilygo-t-display', 'lilygo-t-display-s3', 'waveshare-s3-lcd-169', 'esp32-c3-st7789'];
+const boards = ['vibedock-m1', 'esp32-cyd', 'lilygo-t-display', 'lilygo-t-display-s3', 'waveshare-s3-lcd-169', 'waveshare-s3-touch-lcd-147', 'waveshare-c6-touch-lcd-169', 'esp32-c3-st7789'];
 
 // ---- server ----
 const dir = own || await mkdtemp(path.join(tmpdir(), 'vibedock-docs-'));

@@ -5,7 +5,7 @@
 <header th:replace="~{fragments :: appbar('devices')}"></header>
 <main>
 <div class="page-heading"><div><h2>Device firmware</h2><p>The firmware built from the same sources as this server, one build per supported board, or an own build you upload.
-  Something not working? See <a href="https://github.com/McFcologne/org.frifra.vibedock/blob/main/docs/manual/MANUAL.md#troubleshooting-a-display" target="_blank" rel="noopener noreferrer">Troubleshooting a display</a>.</p></div>
+  Something not working? See <a th:href="@{/admin/troubleshooting}">Troubleshooting</a>.</p></div>
   <a class="button secondary" th:href="@{/admin/devices}">← Devices</a></div>
 
 <form class="card board-pick" method="get" th:action="@{/admin/firmware}">
@@ -57,7 +57,7 @@
     <thead><tr><th>Device</th><th>Installed</th><th></th></tr></thead>
     <tbody><tr th:each="client:${clients}" th:attr="data-device=${client.identifier},data-updating=${client.updating}"><td th:text="${client.name}"></td>
       <td data-live="firmware" th:text="${client.firmware != null ? client.firmware : 'unknown'}"></td>
-      <td data-live="update" th:with="newer=${T(org.frifra.vibedock.server.FirmwareVersion).newer(firmware.version, client.firmware)}"><span class="badge ok" th:if="${client.firmware == firmware.version}">Current</span>
+      <td data-live="update" th:with="newer=${T(org.frifra.vibedock.server.FirmwareVersion).offered(firmware.version, client.firmware)}"><span class="badge ok" th:if="${client.firmware == firmware.version}">Current</span>
         <span class="badge ok" th:if="${!newer and client.firmware != firmware.version}" title="The device runs a newer build than this server offers; no downgrade is offered">Newer</span>
         <th:block th:if="${newer}">
           <span class="badge update" th:if="${client.updating}" th:text="${'Updating to ' + firmware.version + ' …'}">Updating</span>
@@ -166,7 +166,7 @@
         <select id="flash-baud"><option value="115200" selected>115200 (most reliable)</option><option value="460800">460800 (faster, not with every USB adapter)</option><option value="921600">921600</option></select>
         <button type="button" data-flash="connect">Connect</button><button type="button" class="secondary" data-flash="disconnect" disabled>Disconnect</button>
         <button type="button" class="secondary" data-restart>Restart display</button>
-        <button type="button" class="secondary" data-read-log title="What the display did since its last starts, e.g. why a server connection failed">Display log</button></div>
+        <a class="button secondary" th:href="@{/admin/troubleshooting}" title="Read the display's log over USB, for any board">Display log</a></div>
       <p class="meta" data-flash-device>Not connected.</p></li>
     <li><strong>Back up the whole flash</strong> of this device and keep the file private: it is the only way back to its current firmware and contains its Wi-Fi and pairing data.
       <div class="flash-row"><button type="button" class="secondary" data-flash="backup" disabled>Download backup</button>

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Troubleshooting')}"></head>
+<body>
+<header th:replace="~{fragments :: appbar('devices')}"></header>
+<main>
+<div class="page-heading"><div><h2>Troubleshooting</h2><p>The display's log shows what it did since its last starts: Wi-Fi, pairing, server answers and why a
+  connection failed. It holds no keys or passwords. What the lines mean:
+  <a href="https://github.com/McFcologne/org.frifra.vibedock/blob/main/docs/manual/MANUAL.md#troubleshooting-a-display" target="_blank" rel="noopener noreferrer">Troubleshooting a display</a>.</p></div>
+  <div class="heading-actions"><a class="button secondary" th:href="@{/admin/devices}">← Devices</a></div></div>
+
+<section class="card" id="usb-log">
+  <div class="card-head"><h3 class="grow">Display log over USB</h3></div>
+  <p>Connect the display by USB and close other programs that use its serial port. Works with every board and every display, paired or not;
+    opening the port does not restart it. The log is kept on the server with the display's other logs.</p>
+  <p class="notice error" data-usb-unsupported hidden>Reading over USB needs Chrome or Edge on a computer and the administration opened over
+    <strong>HTTPS</strong> or on <strong>localhost</strong> (Web Serial).</p>
+  <div class="flash-row"><button type="button" data-usb-log>Read log over USB</button>
+    <button type="button" class="secondary" data-usb-restart title="Like the reset button on the display">Restart display</button></div>
+  <div class="flash-log-box"><pre class="flash-log" data-usb-output aria-live="polite" hidden></pre>
+    <button type="button" class="icon-button" data-copy-from="[data-usb-output]" title="Copy log" aria-label="Copy log"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg></button></div>
+</section>
+
+<section class="card">
+  <div class="card-head"><h3 class="grow">Paired displays</h3></div>
+  <p class="meta" th:if="${#lists.isEmpty(targets)}">No displays paired yet. A log read over USB is kept anyway.</p>
+  <table class="firmware-devices" th:unless="${#lists.isEmpty(targets)}">
+    <thead><tr><th>Display</th><th>Board · firmware</th><th>Saved logs</th><th></th></tr></thead>
+    <tbody><tr th:each="t:${targets}" th:with="c=${t.device}">
+      <td><strong th:text="${c.name}"></strong><br><span class="meta" th:text="${c.status}"></span></td>
+      <td th:text="${c.board.label + ' · ' + (c.firmware ?: 'unknown')}"></td>
+      <td><a th:href="@{/admin/clients/{id}/logs(id=${c.identifier})}" th:text="${t.logs + ' of ' + keep}"></a></td>
+      <td><form th:if="${t.network}" th:action="@{/admin/clients/{id}/logs/request(id=${c.identifier})}" method="post">
+          <button class="secondary" title="The display sends its log over its server connection">Read over the network</button></form>
+        <span th:unless="${t.network}" class="meta" title="This firmware sends its log only over USB; update it to read it over the network">USB only</span></td></tr></tbody>
+  </table>
+</section>
+</main>
+<footer th:replace="~{fragments :: footer}"></footer>
+<script type="module" src="../static/troubleshooting.js" th:src="@{/troubleshooting.js}"></script>
+</body></html>

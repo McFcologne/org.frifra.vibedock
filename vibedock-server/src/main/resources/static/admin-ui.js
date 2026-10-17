@@ -51,6 +51,19 @@
     } catch { box.checked = !box.checked; }
     box.disabled = false;
   });
+  // Devices: the flip switch saves in place; the device turns its picture with its next pull (asked right away).
+  document.addEventListener('change', async event => {
+    const box = event.target.closest('[data-device-flip]'); if (!box) return;
+    const body = new URLSearchParams({ flipped: String(box.checked) });
+    const token = document.querySelector('meta[name="csrf-token"]').content, header = document.querySelector('meta[name="csrf-header"]').content;
+    box.disabled = true;
+    try {
+      const response = await fetch(box.form.action, { method: 'POST', body, headers: { Accept: 'application/json', [header]: token } });
+      if (!response.ok) throw new Error(String(response.status));
+      box.checked = (await response.json()).flipped;
+    } catch { box.checked = !box.checked; }
+    box.disabled = false;
+  });
   // Cards with a grip (devices, data sources) are reordered like the bands in the design editor: drag the card (not
   // from a button, field or link), the card under it is outlined, dropping places it there. The arrow keys on the grip
   // move a card as well. The new order is saved at once.
@@ -103,7 +116,17 @@
   document.addEventListener('load', event => { if (event.target instanceof HTMLImageElement) fitRatio(event.target); }, true);
   document.querySelectorAll('.device img').forEach(image => { if (image.complete) fitRatio(image); });
   // Previews: click (or Enter) shows the whole device, case and screen, enlarged; a click or Escape closes it.
-  let lightbox;
+  let lightbox, shown;
+  // A copy of the device as it is now; again when the page swaps in a new preview while it is open (device-state.js).
+  const enlarged = device => {
+    const copy = device.cloneNode(true);
+    for (const attribute of ['tabindex', 'title', 'role', 'aria-haspopup', 'aria-label']) copy.removeAttribute(attribute);
+    copy.querySelectorAll('[id]').forEach(element => element.removeAttribute('id'));
+    return copy;
+  };
+  document.addEventListener('vibedock:devices-refreshed', () => {
+    if (lightbox && lightbox.open && shown && shown.isConnected) lightbox.replaceChildren(enlarged(shown));
+  });
   for (const device of document.querySelectorAll('.device')) {
     if (!device.querySelector('img')) continue;
     device.tabIndex = 0; device.title = 'Click to enlarge';
@@ -118,10 +141,7 @@
         lightbox.addEventListener('close', () => { if (!lightbox.open) lightbox.replaceChildren(); });
         document.body.append(lightbox);
       }
-      const copy = device.cloneNode(true);
-      for (const attribute of ['tabindex', 'title', 'role', 'aria-haspopup', 'aria-label']) copy.removeAttribute(attribute);
-      copy.querySelectorAll('[id]').forEach(element => element.removeAttribute('id'));
-      lightbox.replaceChildren(copy); lightbox.showModal();
+      shown = device; lightbox.replaceChildren(enlarged(device)); lightbox.showModal();
     };
     device.addEventListener('click', open);
     device.addEventListener('keydown', event => {

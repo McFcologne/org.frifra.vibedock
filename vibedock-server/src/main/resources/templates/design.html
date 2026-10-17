@@ -7,7 +7,6 @@
 <div class="layout-heading page-heading"><div><h2>Display design</h2><p>One editor for the default and device-specific designs.</p></div>
 <label>Design for<select id="design-target" disabled><option value="default">All devices · default design</option></select></label></div>
 <p id="design-message" role="status" aria-live="polite">Loading designs…</p>
-<div id="design-switch" class="notice" role="alert" hidden><span></span> <button type="button" class="secondary small" data-switch="discard">Discard and switch</button> <button type="button" class="secondary small" data-switch="stay">Keep editing</button></div>
 <p id="design-error" class="notice error" role="alert" hidden></p>
 <div class="design-context"><span class="badge custom" id="design-title">Default design</span><span id="design-default-summary">Applies to devices using the default.</span>
 <div id="design-inheritance" class="design-inheritance" hidden><label><input id="design-override" type="checkbox"> Custom design</label><p id="inheritance-description"></p>
@@ -31,7 +30,6 @@
 <fieldset id="design-style-controls" disabled><section class="card"><h3 class="section-label"><svg th:replace="~{fragments :: icon('palette')}"></svg>Appearance</h3><label for="design-scheme">Style / theme</label><select id="design-scheme"></select></section></fieldset>
 </div>
 </div>
-<div class="savebar"><span id="design-save-state">No unsaved changes</span><button id="design-discard" type="button" class="secondary">Discard</button><button id="design-save" type="submit" disabled>Save default design</button></div>
 </form>
 </main>
 <footer th:replace="~{fragments :: footer}"></footer>
