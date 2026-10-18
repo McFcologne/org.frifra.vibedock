@@ -215,3 +215,29 @@ test('previews open the whole device enlarged and close again',async ({page,app}
     await dialog.click();await expect(dialog).toBeHidden();
   }
 });
+
+
+test('TLS pin status shows a known fingerprint and pairing can omit it',async ({page,app}) => {
+  let known=true;
+  await page.route('**/admin/tls-pin',route=>route.fulfill({json:known
+    ? {known:true,fingerprint:'ab'.repeat(20),message:'TLS pin available for https://external.example.org'}
+    : {known:false,fingerprint:null,message:'TLS pin unavailable: proxy not reachable'}}));
+  await page.goto(app.baseURL+'/admin/devices');
+  await page.locator('[data-create-open="invite"]').click();
+  await expect(page.locator('[data-tls-pin-value]')).toHaveText('ab'.repeat(20));
+  const omit=page.getByLabel('Do not send TLS pin', {exact:false});
+  await expect(omit).not.toBeChecked();await omit.check();
+  known=false;await page.getByRole('button',{name:'Check pin again'}).click();
+  await expect(page.locator('[data-tls-pin-message]')).toHaveText('TLS pin unavailable: proxy not reachable');
+  await expect(page.locator('[data-tls-pin-value]')).toBeHidden();
+  await page.getByLabel('Device IP',{exact:true}).fill('192.168.1.99');
+  await page.getByLabel('Pairing code',{exact:true}).fill('123456');
+  let submitted;
+  await page.route('**/admin/clients/invite',async route=>{
+    submitted=new URLSearchParams(route.request().postData());
+    await route.fulfill({status:200,body:'Pairing request captured'});
+  });
+  await page.locator('#invite').getByRole('button',{name:'Pair device',exact:true}).click();
+  await expect(page.getByText('Pairing request captured')).toBeVisible();
+  expect(submitted.get('omitTlsPin')).toBe('on');
+});

@@ -157,6 +157,37 @@ By default the data lives in `vibedock-server/docker.data/`. To keep it elsewher
 
 **Logs:** `/data/logs/` (set `LOG_DIR` to move them). `vibedock.log` holds start-up settings, pairings, device pulls (first pull, address changes, rejected keys), provider status changes with the HTTP code and weather problems; `access-YYYY-MM-DD.log` lists every request with port, status and duration. Both rotate daily (application log also at 10 MB) and are kept 14 days, the application log at most 200 MB. Web-display paths are replaced with `/web/[redacted]` and query strings are omitted. They contain IP addresses but no keys, tokens, cookies or passwords. Logs made by older versions may contain reusable web-display links: rotate those links with **New links** and restrict or remove the old logs. `ACCESS_LOG=false` turns the access log off.
 
+### HTTPS pinning behind a reverse proxy
+
+The server validates the external HTTPS certificate and sends its fingerprint and root certificate during pairing
+(over the device's pairing portal or USB). Existing firmware can use this pin for its first HTTPS connection.
+Use a trusted LAN for HTTP pairing, or USB: the pairing channel carries the device key and TLS trust data.
+
+If the router does not support NAT loopback, the server first tries the public address and then connects to the
+**configured internal address's host on the external HTTPS port**. The port of the internal HTTP backend is not
+used. SNI and certificate hostname verification still use the external hostname, and the chain must be trusted by
+Java. Neither address announced to devices changes.
+
+If the TLS proxy has a different LAN address or port, set, for example:
+
+```yaml
+environment:
+  EXTERNAL_TLS_PROBE_URL: "https://192.168.1.10:10002"
+```
+
+With the supplied Compose file, the same variable can be set in `.env`. Point it at the reverse proxy's **HTTPS
+listener**, not the server's plain HTTP backend. An explicit probe URL is used directly for the configured external
+address. The TLS certificate must still match that external hostname; the probe URL's hostname is only a transport
+address. Recreate the container after changing the environment, then pair the device again (USB **Only pair** does
+not reinstall firmware) to transfer the pin. A failed certificate check never supplies an unverified pin. If no TLS
+route is reachable, the existing certificate-log fallback can supply a root only; the device must then complete
+its own full certificate check before learning a pin.
+
+The saved external address's pin status and fingerprint are shown under **Settings → Network** and in both pairing
+forms. **Check pin again** repeats the lookup (successful inspections are cached for one minute). In network and USB
+pairing, **Do not send TLS pin** omits the pin while retaining the root certificate. It is off by default and applies
+only to that pairing; use it to test the display's full certificate check and subsequent local pin learning.
+
 ## Client management and image display
 
 Devices are invited by the server and then pull their image; see [CLIENT-PROTOCOL.md](CLIENT-PROTOCOL.md) for the details.

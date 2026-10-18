@@ -30,6 +30,8 @@ services:
       # Addresses announced to devices when they are invited; can also be set in the administration UI.
       INTERNAL_URL: ${INTERNAL_URL:-}
       EXTERNAL_URL: ${EXTERNAL_URL:-}
+      # Optional LAN TLS listener of that same reverse proxy, for routers without NAT loopback.
+      EXTERNAL_TLS_PROBE_URL: ${EXTERNAL_TLS_PROBE_URL:-}
     volumes:
       # Data (settings, provider logins, clients) stays on the host and survives image rebuilds.
       # docker.data/ is excluded from Git and the image build; it contains credentials.

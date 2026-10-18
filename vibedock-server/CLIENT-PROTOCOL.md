@@ -246,3 +246,12 @@ Older firmware (no `X-VibeDock-Footer` header) still draws its IP footer over ro
 ## Validation
 
 Pairing (correct and wrong code), key hashing, pull authentication, `ETag`/**304**, removal and port separation are covered by Java tests with a local device simulator. The ESP8266 firmware in `vibedock-client/` implements version 2 and runs on real devices.
+
+### Server-side certificate inspection without NAT loopback
+
+For its configured external HTTPS address, the server can connect to the configured internal host on the external
+HTTPS port when the public route is unreachable. `EXTERNAL_TLS_PROBE_URL` optionally selects a different LAN TLS
+listener and bypasses the public route. In both cases SNI, hostname validation and the Java certificate-chain check
+use the external identity. The live leaf certificate's existing SHA-1 `pin` and the validated `anchor` are included
+in the unchanged pairing payload. The LAN probe address is never announced to devices. The certificate-log fallback
+still supplies no leaf pin. Existing devices receive the initial pin when paired again; no firmware change is needed.

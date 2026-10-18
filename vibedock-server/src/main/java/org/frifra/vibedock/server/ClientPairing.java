@@ -33,10 +33,13 @@ public class ClientPairing {
     public Invitation invite(String ip,int port,String code,String name,List<String> servers) throws Exception {return invite(ip,port,code,name,"",servers);}
     /** @param board the board chosen in the administration; current firmware names its own, which wins. */
     public Invitation invite(String ip,int port,String code,String name,String board,List<String> servers) throws Exception {
+        return invite(ip,port,code,name,board,servers,true);
+    }
+    public Invitation invite(String ip,int port,String code,String name,String board,List<String> servers,boolean sendTlsPin) throws Exception {
         String target=ip==null?"":ip.trim();IpNetworks.literal(target);
         if(port<1||port>65535)throw new IllegalArgumentException("Invalid device port");
         if(code==null||!code.trim().matches("[0-9]{6}"))throw new IllegalArgumentException("The pairing code has 6 digits");
-        var pairing=pairing(name,servers);
+        var pairing=pairing(name,servers,sendTlsPin);
         Map<String,Object> body=new LinkedHashMap<>();body.put("code",code.trim());body.putAll(pairing.body());
         String host=target.contains(":")?"["+target+"]":target;
         var request=HttpRequest.newBuilder(URI.create("http://"+host+":"+port+"/pair")).timeout(Duration.ofSeconds(8))
@@ -73,16 +76,19 @@ public class ClientPairing {
     public Setup setUp(String identifier,String name,List<String> servers) throws Exception {return setUp(identifier,name,null,servers);}
     /** @param board the board the display reports over USB, or the one chosen on the firmware page. */
     public Setup setUp(String identifier,String name,String board,List<String> servers) throws Exception {
+        return setUp(identifier,name,board,servers,true);
+    }
+    public Setup setUp(String identifier,String name,String board,List<String> servers,boolean sendTlsPin) throws Exception {
         if(identifier==null||!identifier.matches("vibedock-[0-9a-f]{12}"))throw new IllegalArgumentException("Unexpected device identifier");
         String deviceName=name==null||name.isBlank()?"VibeDock "+identifier.substring(identifier.length()-6):name.trim();
-        var pairing=pairing(deviceName,servers);
+        var pairing=pairing(deviceName,servers,sendTlsPin);
         registry.paired(identifier,deviceName,pairing.key(),UNKNOWN_IP,80,Board.find(board).map(Board::id).orElse(null));
         return new Setup(pairing.body(),pairing.warnings());
     }
 
     /** What the device takes over when paired (the firmware's applyPairing), its key and warnings about https addresses. */
     private record Pairing(Map<String,Object> body,String key,List<String> warnings) {}
-    private Pairing pairing(String name,List<String> servers) {
+    private Pairing pairing(String name,List<String> servers,boolean sendTlsPin) {
         if(servers.isEmpty())throw new IllegalArgumentException("No server address to announce");
         servers.forEach(ClientRegistry::validateServerUrl);
         List<String> announced=new ArrayList<>(servers),warnings=new ArrayList<>();byte[] anchor=null;String pin=null;
@@ -100,7 +106,7 @@ public class ClientPairing {
         byte[] raw=new byte[32];random.nextBytes(raw);String key=HexFormat.of().formatHex(raw);
         Map<String,Object> body=new LinkedHashMap<>();
         body.put("servers",announced);
-        if(anchor!=null){body.put("anchor",Base64.getEncoder().encodeToString(anchor));if(pin!=null)body.put("pin",pin);}body.put("key",key);body.put("pollSeconds",registry.pollSeconds());
+        if(anchor!=null){body.put("anchor",Base64.getEncoder().encodeToString(anchor));if(sendTlsPin&&pin!=null)body.put("pin",pin);}body.put("key",key);body.put("pollSeconds",registry.pollSeconds());
         if(name!=null&&!name.isBlank())body.put("name",name.trim());
         // The device installs updates over Wi-Fi only when they are signed with this server's key.
         body.put("otaKey",signing.publicKeyPem());

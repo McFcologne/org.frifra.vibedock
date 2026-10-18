@@ -21,9 +21,9 @@ class DeviceAdminController {
         this.registry=registry;this.pairing=pairing;this.designs=designs;this.addresses=addresses;this.poke=poke;this.firmware=firmware;
     }
     @PostMapping("/admin/clients/invite") String invite(@RequestParam String ip,@RequestParam(defaultValue="80") int port,
-            @RequestParam String code,@RequestParam(defaultValue="") String name,@RequestParam(defaultValue="") String board,HttpServletRequest request,RedirectAttributes flash) {
+            @RequestParam String code,@RequestParam(defaultValue="") String name,@RequestParam(defaultValue="") String board,@RequestParam(defaultValue="false") boolean omitTlsPin,HttpServletRequest request,RedirectAttributes flash) {
         try{
-            var invitation=pairing.invite(ip,port,code,name,board,addresses.announced(request));var view=invitation.view();
+            var invitation=pairing.invite(ip,port,code,name,board,addresses.announced(request),!omitTlsPin);var view=invitation.view();
             log.info("Paired {} ({}) at {}:{}; announced {}{}",view.name(),view.identifier(),ip,port,addresses.announced(request),
                     invitation.warnings().isEmpty()?"":"; warning: "+String.join("; ",invitation.warnings()));
             flash.addFlashAttribute("clientMessage","Paired "+view.name()+" ("+view.identifier()+").");

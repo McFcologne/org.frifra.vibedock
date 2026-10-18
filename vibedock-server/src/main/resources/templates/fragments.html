@@ -1,6 +1,18 @@
 <!doctype html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <!-- Shared parts of the administration pages. -->
+<th:block th:fragment="tlsPin">
+  <div class="tls-pin-status" data-tls-pin-status>
+    <p class="meta" role="status" aria-live="polite" data-tls-pin-message>Checking external HTTPS pin …</p>
+    <code data-tls-pin-value hidden style="overflow-wrap:anywhere"></code>
+    <button type="button" class="link-button" data-tls-pin-refresh>Check pin again</button>
+  </div>
+</th:block>
+<th:block th:fragment="tlsPinOption">
+  <th:block th:replace="~{fragments :: tlsPin}"></th:block>
+  <label class="check"><input type="checkbox" name="omitTlsPin"> Do not send TLS pin (test full certificate verification)</label>
+  <small class="meta">The root certificate is still sent. The display verifies HTTPS itself and can learn its own pin after a successful connection.</small>
+</th:block>
 <head th:fragment="head(title)">
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="csrf-token" th:content="${_csrf.token}"><meta name="csrf-header" th:content="${_csrf.headerName}">
@@ -12,6 +24,7 @@
 <script src="../static/theme.js" th:src="@{/theme.js}"></script>
 <script src="../static/admin-session.js" th:src="@{/admin-session.js}"></script>
 <script defer src="../static/admin-ui.js" th:src="@{/admin-ui.js}"></script>
+<script defer src="../static/tls-pinning.js" th:src="@{/tls-pinning.js}"></script>
 </head>
 <body>
 <header class="appbar" th:fragment="appbar(page)"><div class="appbar-inner">

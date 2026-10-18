@@ -24,6 +24,8 @@ public class TlsTrust {
         public Inspection(byte[] root,String fingerprint){this(root,fingerprint,false);}
     }
     @org.springframework.beans.factory.annotation.Autowired(required=false) private CertificateLog certificateLog;
+    @org.springframework.beans.factory.annotation.Autowired(required=false) private org.springframework.beans.factory.ObjectProvider<ServerAddresses> addresses;
+    @org.springframework.beans.factory.annotation.Value("${vibedock.external-tls-probe-url:}") private String probeUrl="";
     private final Map<String,Inspection> recent=new java.util.concurrent.ConcurrentHashMap<>();
     private final Map<String,Long> checkedAt=new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -52,23 +54,60 @@ public class TlsTrust {
         URI uri=URI.create(url);
         if(!"https".equals(uri.getScheme())||uri.getHost()==null)throw new IllegalArgumentException("Not an https address: "+url);
         int port=uri.getPort()>0?uri.getPort():443;
+        URI probe=probeFor(url,port);
         Certificate[] chain;
+        // An explicit LAN proxy address avoids the public route entirely (routers without NAT loopback).
+        if(probe!=null&&!probeUrl.isBlank())chain=chain(uri,probe);
+        else{
+            try{chain=chain(uri,uri);}
+            catch(IllegalArgumentException e){
+                // Never turn a rejected certificate into a successful fallback.
+                if(probe==null||!e.getMessage().endsWith("is not reachable from the server"))throw e;
+                chain=chain(uri,probe);
+            }
+        }
         try{
-            var context=SSLContext.getInstance("TLS");context.init(null,null,null);
-            try(var socket=(SSLSocket)context.getSocketFactory().createSocket()){
-                var parameters=socket.getSSLParameters();parameters.setEndpointIdentificationAlgorithm("HTTPS");
-                parameters.setServerNames(List.of(new SNIHostName(uri.getHost())));socket.setSSLParameters(parameters);
-                socket.connect(new InetSocketAddress(uri.getHost(),port),5000);socket.setSoTimeout(5000);
-                socket.startHandshake();
-                chain=socket.getSession().getPeerCertificates();
+            String fingerprint=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-1").digest(chain[0].getEncoded()));
+            return new Inspection(trustRoot(chain),fingerprint);
+        }catch(IllegalArgumentException e){throw e;}
+        catch(Exception e){throw new IllegalArgumentException("Certificate of "+url+" could not be read");}
+    }
+    /** Only the configured external address may use this transport override; it is never announced to devices. */
+    private URI probeFor(String url,int port){
+        var configured=addresses==null?null:addresses.getIfAvailable();
+        if(configured==null||!url.equals(configured.external()))return null;
+        if(!probeUrl.isBlank()){
+            ClientRegistry.validateServerUrl(probeUrl);
+            URI probe=URI.create(probeUrl);
+            if(!"https".equals(probe.getScheme()))throw new IllegalArgumentException("External TLS probe URL must use https");
+            return probe;
+        }
+        String internal=configured.configuredInternal();
+        if(internal.isBlank())return null;
+        String host=URI.create(internal).getHost();
+        if(host==null)return null;
+        return URI.create("https://"+(host.contains(":")&&!host.startsWith("[")?"["+host+"]":host)+":"+port);
+    }
+    // The socket connects to the LAN address; SNI and certificate identity always refer to the external host.
+    private Certificate[] chain(URI identity,URI target){
+        String url=identity.toString();
+        try{
+            try(var transport=new java.net.Socket()){
+                transport.connect(new InetSocketAddress(target.getHost(),target.getPort()>0?target.getPort():443),5000);
+                try(var socket=(SSLSocket)tlsContext().getSocketFactory().createSocket(transport,identity.getHost(),
+                        identity.getPort()>0?identity.getPort():443,true)){
+                    var parameters=socket.getSSLParameters();parameters.setEndpointIdentificationAlgorithm("HTTPS");
+                    parameters.setServerNames(List.of(new SNIHostName(identity.getHost())));socket.setSSLParameters(parameters);
+                    socket.setSoTimeout(5000);socket.startHandshake();
+                    return socket.getSession().getPeerCertificates();
+                }
             }
         }catch(SSLException e){throw new IllegalArgumentException("Certificate of "+url+" is not trusted");}
         catch(Exception e){throw new IllegalArgumentException(url+" is not reachable from the server");}
-        try{
-            String fingerprint=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-1").digest(chain[0].getEncoded()));
-            return new Inspection(root(chain),fingerprint);
-        }catch(IllegalArgumentException e){throw e;}
-        catch(Exception e){throw new IllegalArgumentException("Certificate of "+url+" could not be read");}
+    }
+    byte[] trustRoot(Certificate[] chain){return root(chain);}
+    SSLContext tlsContext() throws java.security.GeneralSecurityException {
+        var context=SSLContext.getInstance("TLS");context.init(null,null,null);return context;
     }
     /** The trust anchor of a chain the default trust store accepts. */
     static byte[] root(Certificate[] chain){

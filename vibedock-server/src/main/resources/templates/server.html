@@ -14,6 +14,7 @@
     <input id="internal-url" name="internalUrl" th:value="${internalUrl}" th:placeholder="${derivedInternal}" placeholder="http://192.168.1.10:10002">
     <label for="external-url">External address (optional, e.g. a public host name)</label>
     <input id="external-url" name="externalUrl" th:value="${externalUrl}" placeholder="https://vibedock.example.com">
+    <th:block th:replace="~{fragments :: tlsPin}"></th:block>
     <label for="poll-seconds">Poll interval in seconds (10–3600)</label>
     <input id="poll-seconds" name="pollSeconds" type="number" min="10" max="3600" th:value="${pollSeconds}">
     <small>Devices try the address that answered last, then the other one. Addresses are sent when a device is invited; the poll interval reaches paired devices with their next pull. An empty internal address is derived from the host used to open this page.</small>

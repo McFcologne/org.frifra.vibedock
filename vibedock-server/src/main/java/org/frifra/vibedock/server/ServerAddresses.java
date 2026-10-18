@@ -21,10 +21,11 @@ public class ServerAddresses {
         String host=request.getServerName();if(host.contains(":"))host="["+host+"]";
         return "http://"+host+":"+publicPort;
     }
+    /** Explicitly configured LAN address; no request-derived Host header is used for TLS probes. */
+    public String configuredInternal(){return !registry.internalUrl().isBlank()?registry.internalUrl():internalDefault;}
     public String internal(HttpServletRequest request){
-        if(!registry.internalUrl().isBlank())return registry.internalUrl();
-        if(!internalDefault.isBlank())return internalDefault;
-        return derivedInternal(request);
+        String configured=configuredInternal();
+        return configured.isBlank()?derivedInternal(request):configured;
     }
     public String external(){return !registry.externalUrl().isBlank()?registry.externalUrl():externalDefault;}
     /** Internal first, external second; the device tries them in this order. */
