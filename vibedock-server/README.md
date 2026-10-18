@@ -155,7 +155,53 @@ Sources: [Codex App Server](https://learn.chatgpt.com/docs/app-server), [Codex a
 By default the data lives in `vibedock-server/docker.data/`. To keep it elsewhere, set `VIBEDOCK_DATA_PATH` in `.env` to a confidential directory writable by UID 10001. Data is not transferred automatically between directories or from an earlier Docker volume; copy it with `docker cp vibedock-server:/data/. <directory>/` before switching. The directory contains credentials and must not be published or committed.
 
 
-**Logs:** `/data/logs/` (set `LOG_DIR` to move them). `vibedock.log` holds start-up settings, pairings, device pulls (first pull, address changes, rejected keys), provider status changes with the HTTP code and weather problems; `access-YYYY-MM-DD.log` lists every request with port, status and duration. Both rotate daily (application log also at 10 MB) and are kept 14 days, the application log at most 200 MB. Web-display paths are replaced with `/web/[redacted]` and query strings are omitted. They contain IP addresses but no keys, tokens, cookies or passwords. Logs made by older versions may contain reusable web-display links: rotate those links with **New links** and restrict or remove the old logs. `ACCESS_LOG=false` turns the access log off.
+**Logs:** `/data/logs/` (set `LOG_DIR` to move them). `vibedock.log` holds start-up settings, pairings, device pulls (first pull, address changes, rejected keys), provider status changes with the HTTP code and weather problems; `access-YYYY-MM-DD.log` lists every request with port, status and duration. Both rotate daily (application log also at 10 MB) and are kept 14 days, the application log at most 200 MB. Web-display paths are replaced with `/web/[redacted]` and query strings are omitted. They contain IP addresses but no keys, tokens, cookies or passwords. Logs made by older versions may contain reusable web-display links: rotate those links with **New links** and restrict or remove the old logs. `ACCESS_LOG=false` turns the access log off. **Devices → Troubleshooting → Server log** shows the latest 500 application-log lines (bounded to 256 KiB), with manual refresh and a text view. It opens at the latest entry and, by default, refreshes every five seconds while expanded and visible. Scroll up to keep your reading position; scroll to the bottom to follow new entries again, or disable **Live updates** to pause. TLS probe failures include the target host and port, exception type and reason in this log.
+
+### HTTPS pinning behind a reverse proxy
+
+The server validates the external HTTPS certificate and sends its fingerprint and root certificate during pairing
+(over the device's pairing portal or USB). The M1 firmware can use this pin for its first HTTPS connection; ESP32 boards currently always use the full check.
+Use a trusted LAN for HTTP pairing, or USB: the pairing channel carries the device key and TLS trust data.
+
+If the router does not support NAT loopback, the server first tries the public address and then connects to the
+**configured internal address's host on the external HTTPS port**. The port of the internal HTTP backend is not
+used. If both routes fail to establish TLS, the server queries public DNS at `8.8.8.8` and `1.1.1.1` for the
+configured external hostname and tries those IPs on its external HTTPS port. This bypasses a local DNS rewrite;
+it does not change system DNS or the addresses announced to devices. SNI and certificate hostname verification
+still use the external hostname, and the chain must be trusted by Java. Wrong hostnames and rejected certificates
+stop the inspection. Public DNS only changes the route: it cannot bypass a firewall or missing NAT loopback.
+Neither address announced to devices changes.
+
+If the TLS proxy has a different LAN address or port, set, for example:
+
+```yaml
+environment:
+  EXTERNAL_TLS_PROBE_URL: "https://192.168.1.10:10002"
+```
+
+With the supplied Compose file, the same variable can be set in `.env`. Point it at the reverse proxy's **HTTPS
+listener**, not the server's plain HTTP backend. An explicit probe URL is used directly for the configured external
+address. The TLS certificate must still match that external hostname; the probe URL's hostname is only a transport
+address. Recreate the container after changing the environment, then pair the device again (USB **Only pair** does
+not reinstall firmware) to transfer the pin. A failed certificate check never supplies an unverified pin. If no TLS
+route is reachable, the existing certificate-log fallback can supply a root only; the device must then complete
+its own full certificate check before learning a pin.
+
+The saved external address's pin status and fingerprint are shown under **Settings → Network** and in both pairing
+forms. The route and connected IP/port are shown, including **Public DNS fallback**. **Certificate details** shows
+subject, issuer, validity dates, TLS version and SHA-256 fingerprint; cached results retain the original route and
+are marked **cached**. **Check pin again** repeats the lookup (successful inspections are cached for one minute). In network and USB
+pairing, **Do not send TLS pin** omits the pin while retaining the root certificate. It is off by default and applies
+only to that pairing; use it to test the M1's full certificate check and subsequent local pin learning.
+
+For diagnosis, open **Devices → Troubleshooting → Server log**, trigger **Check pin again**, then refresh the log.
+Each status query writes a short `TLS pin refresh for …: available/unavailable (… ms)` summary, including when the
+cached inspection is reused. The UI also shows the time, outcome and request duration of the last refresh below
+the refresh button, including failed requests.
+`Public DNS … resolved …` shows the public answers; `TLS certificate for … verified through public DNS address …`
+confirms successful verification. `Unsupported or unrecognized SSL message` usually means an HTTP listener was
+reached on a port expected to speak TLS. Public resolver queries require access to DNS port 53; the TLS target must
+also be reachable. The full lookup order and pairing fields are documented in [CLIENT-PROTOCOL.md](CLIENT-PROTOCOL.md#server-side-certificate-inspection).
 
 ## Client management and image display
 

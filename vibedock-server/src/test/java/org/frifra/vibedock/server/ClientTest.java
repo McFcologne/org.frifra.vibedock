@@ -209,6 +209,8 @@ class ClientTest {
             assertEquals(30,body.path("pollSeconds").asInt());
             assertTrue(body.path("otaKey").asText().startsWith("-----BEGIN PUBLIC KEY-----\n"));
             assertTrue(registry.authenticate("vibedock-simulator",body.path("key").asText()));
+            pairing.invite("127.0.0.1",port,"123456","Office","",List.of("https://vibedock.example.com"),false);
+            assertEquals("AQID",received.get().path("anchor").asText());assertTrue(received.get().path("pin").isMissingNode());
             var untrusted=pairing.invite("127.0.0.1",port,"123456","Office",List.of("http://192.168.1.10:10002","https://untrusted.example.com"));
             // Announced anyway, without a certificate, and the administration warns about it.
             assertEquals(2,received.get().path("servers").size());assertEquals("https://untrusted.example.com",received.get().path("servers").get(1).asText());

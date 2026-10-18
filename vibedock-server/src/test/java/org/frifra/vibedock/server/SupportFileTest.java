@@ -70,7 +70,26 @@ class SupportFileTest {
             String file=new String(Base64.getDecoder().decode(created.path("data").asText()));
             Assertions.assertTrue(created.path("name").asText().endsWith(".vdsupport"));
             Assertions.assertTrue(created.path("key").asText().matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"));
-            Assertions.assertFalse(file.contains("Desk")||file.contains("GET"),"the file is encrypted");
+            // Base64 ciphertext can contain words by chance; verify the envelope instead.
+            var envelope=json.readTree(file);
+            Set<String> fields=new HashSet<>();
+            envelope.fieldNames().forEachRemaining(fields::add);
+            Assertions.assertEquals(Set.of("format","version","kdf","iterations","salt","cipher","nonce","data"),fields);
+            Assertions.assertEquals("vibedock-support",envelope.path("format").asText());
+            Assertions.assertEquals(1,envelope.path("version").asInt());
+            Assertions.assertEquals("AES-256-GCM",envelope.path("cipher").asText());
+            Assertions.assertEquals("PBKDF2-HMAC-SHA256",envelope.path("kdf").asText());
+            Assertions.assertEquals(600_000,envelope.path("iterations").asInt());
+            Assertions.assertEquals(16,Base64.getDecoder().decode(envelope.path("salt").asText()).length);
+            Assertions.assertEquals(12,Base64.getDecoder().decode(envelope.path("nonce").asText()).length);
+            byte[] ciphertext=Base64.getDecoder().decode(envelope.path("data").asText());
+            Assertions.assertTrue(ciphertext.length>16,"encrypted payload includes the GCM authentication tag");
+            // A changed ciphertext must fail authentication even with the correct key.
+            ciphertext[0]^=1;
+            var tampered=envelope.deepCopy();
+            ((com.fasterxml.jackson.databind.node.ObjectNode)tampered).put("data",Base64.getEncoder().encodeToString(ciphertext));
+            mvc.perform(post("/admin/support/open").contentType("application/json").content(json.writeValueAsString(Map.of("content",json.writeValueAsString(tampered),"key",created.path("key").asText())))
+                    .with(csrf()).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").value("Wrong key, or the file was changed"));
             // The wrong key opens nothing.
             mvc.perform(post("/admin/support/open").contentType("application/json").content(json.writeValueAsString(Map.of("content",file,"key","00000000-0000-0000-0000-000000000000")))
                     .with(csrf()).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").value("Wrong key, or the file was changed"));

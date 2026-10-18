@@ -224,7 +224,7 @@ pairForm.addEventListener('submit', async event => {
   try {
     say('Pairing on the server …');
     const response = await fetch('/admin/firmware/setup', { method: 'POST', credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', ...csrf }, body: JSON.stringify({ identifier: device.identifier, name: pairForm.elements.name.value, board: device.board || card.dataset.board }) });
+      headers: { 'Content-Type': 'application/json', ...csrf }, body: JSON.stringify({ identifier: device.identifier, name: pairForm.elements.name.value, board: device.board || card.dataset.board, omitTlsPin: pairForm.elements.omitTlsPin.checked }) });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || 'Pairing failed: HTTP ' + response.status);
     const setup = { ...result.pairing, ssid: pairForm.elements.ssid.value, password: pairForm.elements.password.value };

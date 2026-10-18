@@ -215,3 +215,79 @@ test('previews open the whole device enlarged and close again',async ({page,app}
     await dialog.click();await expect(dialog).toBeHidden();
   }
 });
+
+
+test('TLS pin status shows a known fingerprint and pairing can omit it',async ({page,app}) => {
+  let known=true,failed=false;
+  await page.route('**/admin/tls-pin',route=>failed ? route.fulfill({status:503,body:'Unavailable'}) : route.fulfill({json:known
+    ? {known:true,fingerprint:'ab'.repeat(20),message:'TLS pin available for https://external.example.org',route:'public-dns',target:'203.0.113.5:443',cached:true,certificate:{subject:'CN=external.example.org',issuer:'CN=Test issuer',notBefore:'2026-10-01T00:00:00Z',notAfter:'2026-12-01T00:00:00Z',sha256:'cd'.repeat(32),protocol:'TLSv1.3'}}
+    : {known:false,fingerprint:null,message:'TLS pin unavailable: proxy not reachable'}}));
+  await page.goto(app.baseURL+'/admin/devices');
+  await page.locator('[data-create-open="invite"]').click();
+  await expect(page.locator('[data-tls-pin-value]')).toHaveText('ab'.repeat(20));
+  const refresh=page.getByRole('button',{name:'Check pin again'});
+  await expect(refresh.locator('svg')).toBeVisible();
+  await expect(page.locator('[data-tls-pin-route]')).toContainText('Public DNS fallback');
+  await expect(page.locator('[data-tls-pin-route]')).toContainText('203.0.113.5:443');
+  await expect(page.locator('[data-tls-pin-route]')).toContainText('cached');
+  await page.locator('[data-tls-cert] summary').click();
+  await expect(page.locator('[data-cert-issuer]')).toHaveText('CN=Test issuer');
+  await expect(page.locator('[data-cert-sha256]')).toHaveText('cd'.repeat(32));
+  await expect(page.locator('[data-tls-pin-action]')).toHaveText(/Last refresh: .* · Pin available · \d+ ms/);
+  const omit=page.getByLabel('Do not send TLS pin', {exact:false});
+  await expect(omit).not.toBeChecked();await omit.check();
+  known=false;await page.getByRole('button',{name:'Check pin again'}).click();
+  await expect(page.locator('[data-tls-pin-message]')).toHaveText('TLS pin unavailable: proxy not reachable');
+  await expect(page.locator('[data-tls-pin-route]')).toBeHidden();
+  await expect(page.locator('[data-tls-cert]')).toBeHidden();
+  await expect(page.locator('[data-tls-pin-value]')).toBeHidden();
+  await expect(page.locator('[data-tls-pin-action]')).toHaveText(/Last refresh: .* · Pin unavailable · \d+ ms/);
+  failed=true;await refresh.click();
+  await expect(page.locator('[data-tls-pin-action]')).toHaveText(/Last refresh: .* · Failed · \d+ ms/);
+  await expect(page.locator('[data-tls-pin-value]')).toBeHidden();await expect(refresh).toBeEnabled();
+  await page.getByLabel('Device IP',{exact:true}).fill('192.168.1.99');
+  await page.getByLabel('Pairing code',{exact:true}).fill('123456');
+  let submitted;
+  await page.route('**/admin/clients/invite',async route=>{
+    submitted=new URLSearchParams(route.request().postData());
+    await route.fulfill({status:200,body:'Pairing request captured'});
+  });
+  await page.locator('#invite').getByRole('button',{name:'Pair device',exact:true}).click();
+  await expect(page.getByText('Pairing request captured')).toBeVisible();
+  expect(submitted.get('omitTlsPin')).toBe('on');
+});
+
+test('troubleshooting loads and refreshes server logs only for an administrator',async ({page,app}) => {
+  const denied=await fetch(app.baseURL+'/admin/server-log',{redirect:'manual'});
+  expect(denied.status).toBe(401);
+  await page.goto(app.baseURL+'/admin/troubleshooting');
+  const section=page.locator('[data-server-log]');
+  await section.locator('summary').click();
+  await expect(section.locator('[data-server-log-output]')).toContainText('VibeDock server started');
+  await expect(section.locator('[data-server-log-status]')).toContainText('Loaded at');
+  await section.getByRole('button',{name:'Refresh server log'}).click();
+  await expect(section.locator('[data-server-log-status]')).toContainText('Loaded at');
+});
+
+
+test('server log follows the end, preserves reading position and pauses live updates',async ({page,app}) => {
+  let loads=0;
+  await page.route('**/admin/server-log',route=>route.fulfill({contentType:'text/plain',body:
+    Array.from({length:400},(_,i)=>'Server log line '+i).join('\n')+'\nLatest entry '+(++loads)}));
+  await page.goto(app.baseURL+'/admin/troubleshooting');
+  await page.clock.install();await page.clock.pauseAt(new Date());
+  const panel=page.locator('[data-server-log]'),output=panel.locator('[data-server-log-output]');
+  await panel.locator('summary').click();
+  await expect(output).toContainText('Latest entry 1');
+  await expect.poll(()=>output.evaluate(el=>el.scrollHeight-el.clientHeight-el.scrollTop)).toBeLessThan(2);
+  await page.clock.runFor(5100);await expect(output).toContainText('Latest entry 2');
+  await expect.poll(()=>output.evaluate(el=>el.scrollHeight-el.clientHeight-el.scrollTop)).toBeLessThan(2);
+  await output.evaluate(el=>{el.scrollTop=0;});
+  await page.clock.runFor(5100);await expect(output).toContainText('Latest entry 3');
+  expect(await output.evaluate(el=>el.scrollTop)).toBe(0);
+  const live=panel.getByLabel('Live updates (every 5 seconds)');
+  await live.uncheck();const paused=loads;await page.clock.runFor(10000);expect(loads).toBe(paused);
+  await live.check();await expect(output).toContainText('Latest entry 4');
+  await panel.locator('summary').click();await expect(panel).not.toHaveAttribute('open','');const closed=loads;
+  await page.clock.runFor(10000);expect(loads).toBe(closed);
+});

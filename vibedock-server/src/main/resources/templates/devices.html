@@ -29,6 +29,7 @@
     <div><label for="invite-board">Board</label><select id="invite-board" name="board">
       <option th:each="b:${boards}" th:value="${b.id}" th:text="${b.label + ' · ' + b.chip}"></option></select>
       <small class="meta">Current firmware names its board itself; this choice counts for firmware that does not report it.</small></div>
+    <th:block th:replace="~{fragments :: tlsPinOption}"></th:block>
     <details><summary>Device port</summary><label for="invite-port">HTTP port of the device</label><input id="invite-port" name="port" type="number" min="1" max="65535" value="80"></details>
     <div class="form-actions"><button type="button" class="secondary" data-create-close="invite">Cancel</button><button>Pair device</button></div>
   </form>

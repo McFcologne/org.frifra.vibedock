@@ -15,15 +15,22 @@ import java.util.*;
  */
 @Component
 public class TlsTrust {
+    private static final org.slf4j.Logger log=org.slf4j.LoggerFactory.getLogger(TlsTrust.class);
     /**
      * Root certificate (DER) a trusted chain leads to, and the SHA-1 fingerprint of the server certificate itself.
      * fromLog: the root comes from the public certificate log because the server cannot reach the address; then
      * there is no fingerprint.
      */
-    public record Inspection(byte[] root,String fingerprint,boolean fromLog) {
+    public record CertificateInfo(String subject,String issuer,String notBefore,String notAfter,String sha256,String protocol) {}
+    public record Inspection(byte[] root,String fingerprint,boolean fromLog,String route,String target,CertificateInfo certificate) {
         public Inspection(byte[] root,String fingerprint){this(root,fingerprint,false);}
+        public Inspection(byte[] root,String fingerprint,boolean fromLog){this(root,fingerprint,fromLog,null,null,null);}
     }
+    private record Connection(Certificate[] certificates,String route,String target,String protocol) {}
     @org.springframework.beans.factory.annotation.Autowired(required=false) private CertificateLog certificateLog;
+    @org.springframework.beans.factory.annotation.Autowired(required=false) private org.springframework.beans.factory.ObjectProvider<ServerAddresses> addresses;
+    @org.springframework.beans.factory.annotation.Value("${vibedock.external-tls-probe-url:}") private String probeUrl="";
+    @org.springframework.beans.factory.annotation.Autowired(required=false) private PublicDns publicDns;
     private final Map<String,Inspection> recent=new java.util.concurrent.ConcurrentHashMap<>();
     private final Map<String,Long> checkedAt=new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -31,9 +38,11 @@ public class TlsTrust {
     public byte[] rootFor(String url){return inspect(url).root();}
     /** Like {@link #inspect} but reuses a result younger than a minute, for devices doing their full check. */
     public Inspection recentInspection(String url){
-        Long at=checkedAt.get(url);
-        if(at!=null&&System.currentTimeMillis()-at<60_000&&recent.containsKey(url))return recent.get(url);
+        if(isRecent(url))return recent.get(url);
         var result=inspect(url);recent.put(url,result);checkedAt.put(url,System.currentTimeMillis());return result;
+    }
+    boolean isRecent(String url){
+        Long at=checkedAt.get(url);return at!=null&&System.currentTimeMillis()-at<60_000&&recent.containsKey(url);
     }
     /**
      * The root for pairing a device: from the address itself, or from the public certificate log when the server
@@ -52,23 +61,98 @@ public class TlsTrust {
         URI uri=URI.create(url);
         if(!"https".equals(uri.getScheme())||uri.getHost()==null)throw new IllegalArgumentException("Not an https address: "+url);
         int port=uri.getPort()>0?uri.getPort():443;
-        Certificate[] chain;
-        try{
-            var context=SSLContext.getInstance("TLS");context.init(null,null,null);
-            try(var socket=(SSLSocket)context.getSocketFactory().createSocket()){
-                var parameters=socket.getSSLParameters();parameters.setEndpointIdentificationAlgorithm("HTTPS");
-                parameters.setServerNames(List.of(new SNIHostName(uri.getHost())));socket.setSSLParameters(parameters);
-                socket.connect(new InetSocketAddress(uri.getHost(),port),5000);socket.setSoTimeout(5000);
-                socket.startHandshake();
-                chain=socket.getSession().getPeerCertificates();
+        URI probe=probeFor(url,port);
+        Connection connection;
+        // An explicit LAN proxy address avoids the public route entirely (routers without NAT loopback).
+        if(probe!=null&&!probeUrl.isBlank())connection=chain(uri,probe,"configured-probe");
+        else{
+            try{connection=chain(uri,uri,"system-dns");}
+            catch(IllegalArgumentException e){
+                // Never turn a rejected certificate into a successful fallback.
+                if(!unreachable(e))throw e;
+                connection=alternativeChain(uri,probe,e);
             }
-        }catch(SSLException e){throw new IllegalArgumentException("Certificate of "+url+" is not trusted");}
-        catch(Exception e){throw new IllegalArgumentException(url+" is not reachable from the server");}
+        }
         try{
-            String fingerprint=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-1").digest(chain[0].getEncoded()));
-            return new Inspection(root(chain),fingerprint);
+            Certificate[] chain=connection.certificates();var leaf=(X509Certificate)chain[0];
+            String fingerprint=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-1").digest(leaf.getEncoded()));
+            String sha256=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(leaf.getEncoded()));
+            var details=new CertificateInfo(leaf.getSubjectX500Principal().getName(),leaf.getIssuerX500Principal().getName(),
+                    leaf.getNotBefore().toInstant().toString(),leaf.getNotAfter().toInstant().toString(),sha256,connection.protocol());
+            return new Inspection(trustRoot(chain),fingerprint,false,connection.route(),connection.target(),details);
         }catch(IllegalArgumentException e){throw e;}
         catch(Exception e){throw new IllegalArgumentException("Certificate of "+url+" could not be read");}
+    }
+    private static boolean unreachable(IllegalArgumentException e){return e.getMessage().endsWith("is not reachable from the server");}
+    private Connection alternativeChain(URI identity,URI probe,IllegalArgumentException failure){
+        if(probe!=null){
+            try{return chain(identity,probe,"lan-fallback");}
+            catch(IllegalArgumentException e){if(!unreachable(e))throw e;failure=e;}
+        }
+        var configured=addresses==null?null:addresses.getIfAvailable();
+        // Only an administrator-configured external hostname is sent to public resolvers, never a device IP.
+        if(publicDns!=null&&configured!=null&&identity.toString().equals(configured.external())&&!ipLiteral(identity.getHost())){
+            int port=identity.getPort()>0?identity.getPort():443;
+            for(String ip:publicDns.resolve(identity.getHost())){
+                String host=ip.contains(":")?"["+ip+"]":ip;
+                URI target=URI.create("https://"+host+":"+port);
+                try{
+                    var result=chain(identity,target,"public-dns");
+                    log.info("TLS certificate for {} verified through public DNS address {}",identity,ip);return result;
+                }catch(IllegalArgumentException e){if(!unreachable(e))throw e;failure=e;}
+            }
+        }
+        throw failure;
+    }
+    private static boolean ipLiteral(String host){
+        try{IpNetworks.literal(host.startsWith("[")?host.substring(1,host.length()-1):host);return true;}
+        catch(IllegalArgumentException e){return false;}
+    }
+    /** Only the configured external address may use this transport override; it is never announced to devices. */
+    private URI probeFor(String url,int port){
+        var configured=addresses==null?null:addresses.getIfAvailable();
+        if(configured==null||!url.equals(configured.external()))return null;
+        if(!probeUrl.isBlank()){
+            ClientRegistry.validateServerUrl(probeUrl);
+            URI probe=URI.create(probeUrl);
+            if(!"https".equals(probe.getScheme()))throw new IllegalArgumentException("External TLS probe URL must use https");
+            return probe;
+        }
+        String internal=configured.configuredInternal();
+        if(internal.isBlank())return null;
+        String host=URI.create(internal).getHost();
+        if(host==null)return null;
+        return URI.create("https://"+(host.contains(":")&&!host.startsWith("[")?"["+host+"]":host)+":"+port);
+    }
+    // The socket connects to the LAN address; SNI and certificate identity always refer to the external host.
+    private Connection chain(URI identity,URI target,String route){
+        String url=identity.toString();
+        try{
+            try(var transport=new java.net.Socket()){
+                transport.connect(new InetSocketAddress(target.getHost(),target.getPort()>0?target.getPort():443),5000);
+                try(var socket=(SSLSocket)tlsContext().getSocketFactory().createSocket(transport,identity.getHost(),
+                        identity.getPort()>0?identity.getPort():443,true)){
+                    var parameters=socket.getSSLParameters();parameters.setEndpointIdentificationAlgorithm("HTTPS");
+                    parameters.setServerNames(List.of(new SNIHostName(identity.getHost())));socket.setSSLParameters(parameters);
+                    socket.setSoTimeout(5000);socket.startHandshake();
+                    String ip=transport.getInetAddress().getHostAddress();
+                    String endpoint=(ip.contains(":")?"["+ip+"]":ip)+":"+transport.getPort();
+                    return new Connection(socket.getSession().getPeerCertificates(),route,endpoint,socket.getSession().getProtocol());
+                }
+            }
+        }catch(SSLHandshakeException|SSLPeerUnverifiedException e){
+            log.warn("TLS certificate check for {} via {}:{} failed: {}: {}",url,target.getHost(),target.getPort()>0?target.getPort():443,e.getClass().getSimpleName(),e.getMessage());
+            throw new IllegalArgumentException("Certificate of "+url+" is not trusted");
+        }catch(Exception e){
+            log.warn("TLS connection to {} via {}:{} failed: {}: {}",url,target.getHost(),target.getPort()>0?target.getPort():443,e.getClass().getSimpleName(),e.getMessage());
+            // An HTTP listener can answer TLS with HTTP 400 (SSLException): a protocol mismatch, not a rejected
+            // certificate. Keep the root-only certificate-log fallback; it never supplies an unverified pin.
+            throw new IllegalArgumentException(url+" is not reachable from the server");
+        }
+    }
+    byte[] trustRoot(Certificate[] chain){return root(chain);}
+    SSLContext tlsContext() throws java.security.GeneralSecurityException {
+        var context=SSLContext.getInstance("TLS");context.init(null,null,null);return context;
     }
     /** The trust anchor of a chain the default trust store accepts. */
     static byte[] root(Certificate[] chain){

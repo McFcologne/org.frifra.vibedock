@@ -188,6 +188,7 @@
         <div class="net-pick-pop" hidden><input type="search" placeholder="Search networks …" aria-label="Search networks" autocomplete="off" maxlength="32">
           <ul role="listbox"></ul></div>
         <input type="hidden" name="ssid"></div>
+      <th:block th:replace="~{fragments :: tlsPinOption}"></th:block>
       <label>Wi-Fi password<input name="password" type="password" maxlength="64" autocomplete="new-password"></label>
       <div class="flash-row"><button type="submit">Send to the display</button><button type="button" class="secondary" data-pair-skip>Cancel</button></div>
     </form>

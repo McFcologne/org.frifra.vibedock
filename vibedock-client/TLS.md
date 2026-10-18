@@ -10,8 +10,29 @@ while making TLS 1.3 work on the ESP8266. The trust model (root from pairing, pi
 
 | Board | TLS library | Versions | Notes |
 | --- | --- | --- | --- |
-| VibeTV M1 (ESP8266) | Mbed TLS 3.6.2 (`kochcodes/mbedtls@3.6.2`, Apache-2.0) | TLS 1.3; TLS 1.2 (BearSSL) only when the server refuses 1.3 | The first pull and every pull after a certificate change do the full check against the root from pairing, the others the simple check against the pinned certificate. Tested against local OpenSSL servers; on the device against a Synology reverse proxy (TLS 1.3 only), at home and over a phone hotspot. |
+| VibeTV M1 (ESP8266) | Mbed TLS 3.6.2 (`kochcodes/mbedtls@3.6.2`, Apache-2.0) | TLS 1.3; TLS 1.2 (BearSSL) only when the server refuses 1.3 | A pin supplied at pairing allows the first pull to use the simple check. Without a pin, or after a certificate change, the M1 does the full check against the root from pairing; later pulls use the pinned certificate. Tested against local OpenSSL servers; on the device against a Synology reverse proxy (TLS 1.3 only), at home and over a phone hotspot. |
 | ESP32 boards | mbedTLS 2.28 of arduino-esp32 2.x (`espressif32@6.9.0`) | TLS 1.2 | No TLS 1.3 yet: needs a newer core (arduino-esp32 3.x / ESP-IDF 5 with mbedTLS 3) or the same Mbed TLS 3.6 approach. A server that offers only TLS 1.3 is not reachable from these boards. |
+
+## How the server supplies the initial pin
+
+At network or USB pairing, the server can supply both the trusted root (`anchor`) and the live leaf certificate's
+SHA-1 fingerprint (`pin`). The M1 can use that pin immediately, avoiding the first full chain check on the display.
+Without a pin it performs the full check and learns the verified certificate itself. ESP32 boards currently always
+perform the full check. A certificate change triggers another full check; a root change requires re-pairing.
+
+For an external HTTPS address, the server tries system DNS, the configured internal host on the external HTTPS
+port, then public DNS at **8.8.8.8** and **1.1.1.1**. It connects directly to the public answer IPs but keeps the
+external hostname for **SNI and certificate hostname verification**, with the chain checked against Java's trust
+store. This is a server-side alternative for local DNS rewrites; it changes no client DNS or server addresses.
+An explicit `EXTERNAL_TLS_PROBE_URL` takes precedence. If no live route is reachable, the certificate-log fallback
+can supply a root only, without a pin. Invalid certificates and hostname mismatches remain errors.
+
+**Settings → Network** and both pairing forms show whether the server knows a pin. **Do not send TLS pin** keeps
+the root but omits the pin for that pairing, allowing the M1's full-check path to be tested. Re-pairing clears the
+old pin when none is supplied; USB **Only pair** keeps the installed firmware. Resolver results and TLS probe
+errors are available under **Devices → Troubleshooting → Server log**. See the
+[server-side lookup protocol](../vibedock-server/CLIENT-PROTOCOL.md#server-side-certificate-inspection) and
+[reverse-proxy configuration](../vibedock-server/README.md#https-pinning-behind-a-reverse-proxy).
 
 ## Why Mbed TLS on the M1
 

@@ -37,7 +37,7 @@ Content-Type: application/json
 
 - `servers` are the addresses the device may pull from, in order of preference: the **internal** address (LAN) first, then the optional **external** address (for example a public host name behind a reverse proxy). Both are set in the administration UI under *Server addresses and poll interval*; `INTERNAL_URL` and `EXTERNAL_URL` provide defaults. Without any setting the internal address is derived from the host used to open the administration UI and the public port. The UI warns when that would be `localhost`.
 - Addresses have the form `http(s)://HOST[:PORT]` without path, query or credentials.
-- **https:** the device has no certificate store. When an https address is announced, the server connects to it, validates its chain and host name against the Java trust store and sends the root certificate of that chain as `anchor`. The device trusts only this root for https, checks host name and validity (time from NTP) and never falls back to unchecked TLS. When the server cannot reach an https address itself (typically its own public host name behind a router without NAT loopback), it takes the newest valid certificate for the host name from the Certificate Transparency log (crt.sh), loads its issuer from the address in the certificate and validates that; the result is cached for a day and refreshed daily (`vibedock.certificate-log`, `CERTIFICATE_LOG`). The device still checks host name and chain itself when it connects; it gets no `pin` then and does the full check. Every configured address is announced. When the server cannot get a certificate for an https address (not reachable from the server, self-signed, wrong host), the address goes without `anchor` and the administration shows a warning; the device then cannot use that address and keeps to the others. One https root per device.
+- **https:** the device has no certificate store. The server validates the HTTPS chain and hostname against the Java trust store and sends the root as `anchor`; a successful live inspection can also supply the leaf certificate's `pin`. The device never falls back to unchecked TLS. The server's lookup routes and root-only certificate-log fallback are described under [Server-side certificate inspection](#server-side-certificate-inspection). Every configured address is announced. If no suitable root is available (unreachable, untrusted certificate or wrong hostname), the administration warns and the device cannot use that HTTPS address. One HTTPS root per device.
 - **TLS versions:** the VibeTV M1 connects with TLS 1.3 (Mbed TLS) and falls back to TLS 1.2 only when the server refuses 1.3; the ESP32 boards use TLS 1.2 so far. Details, memory layout and diagnostics: [vibedock-client/TLS.md](../vibedock-client/TLS.md).
 - **Simple and full check:** normally the device only compares the server certificate with `pin` (no clock needed). When that fails, typically after the certificate was renewed, it does one full check against `anchor` (chain, host name, validity) and sends `X-VibeDock-Tls-Check: full`. Only on such a request the server adds `X-VibeDock-Tls-Pin` with the fingerprint of the current certificate of the external address, and the device only accepts that header over a fully verified connection. A renewed leaf or intermediate certificate therefore needs no new invitation; a change of root does. On the M1 (TLS 1.3) the simple check requires exactly the pinned certificate and the server's proof of its key (CertificateVerify) and skips chain, root and validity; when the server sends no `X-VibeDock-Tls-Pin`, the M1 pins the certificate its own full check verified.
 - `key` is the device's secret. The server stores only its SHA-256 hash in `/data/clients.json` (permissions 0600).
@@ -246,3 +246,36 @@ Older firmware (no `X-VibeDock-Footer` header) still draws its IP footer over ro
 ## Validation
 
 Pairing (correct and wrong code), key hashing, pull authentication, `ETag`/**304**, removal and port separation are covered by Java tests with a local device simulator. The ESP8266 firmware in `vibedock-client/` implements version 2 and runs on real devices.
+
+## Server-side certificate inspection
+
+For the configured external HTTPS address, without an explicit probe override, the server tries:
+
+1. The external hostname using the system resolver.
+2. The explicitly configured internal hostname/IP on the **external HTTPS port**. The internal HTTP port is not used; a request-derived administration hostname is not a probe target.
+3. A/AAAA records from public resolvers **8.8.8.8** and **1.1.1.1**, deduplicated and limited to eight candidate IPs. The server connects to those IPs on the external HTTPS port.
+4. If these routes cannot establish TLS, the existing `crt.sh` fallback can supply a validated root certificate only; it supplies **no leaf pin**. The device must complete its own full certificate check before learning a pin.
+
+This handles local DNS rewrites as well as alternative LAN routes. Public DNS cannot make an unreachable public
+port reachable or bypass missing NAT loopback. DNS lookup failures and TLS targets/reasons are logged; successful
+public-DNS inspection logs `TLS certificate for … verified through public DNS address …`.
+
+On every live route, **SNI and hostname verification use the original external hostname**, and the chain must be
+trusted by Java. A connection to an IP does not change the certificate identity. No HTTP request is required to
+inspect the TLS certificate, so there is no HTTP `Host` header. Rejected certificates and wrong hostnames stop the
+inspection; public DNS and the certificate log do not supply an unchecked pin.
+
+`EXTERNAL_TLS_PROBE_URL`, e.g. `https://192.168.1.10:10002`, explicitly selects the reverse proxy's LAN **TLS**
+listener and takes precedence over the automatic routes. It is a transport override for the configured external
+address only. It must not point to the plain HTTP backend. Neither this override nor public DNS changes system
+DNS, the device's DNS or the addresses announced to devices.
+
+Both pairing paths include the validated `anchor` and, by default when available, the live certificate's `pin` in
+the existing payload. The **Do not send TLS pin** checkbox sets `omitTlsPin=true` in the network pairing form or
+USB setup JSON request. It omits only `pin`; `anchor` stays. Missing/false preserves the default for older callers.
+Re-pairing replaces an existing device pin; USB **Only pair** does not reinstall firmware. The M1 can start with
+the supplied pin, or learn its own after a full check; ESP32 boards currently always use the full check.
+
+The UI shows the external pin status and fingerprint under **Settings → Network** and in both pairing forms.
+Successful status inspections are cached for one minute. **Devices → Troubleshooting → Server log** shows the
+recent application log, including resolver results, TLS errors and successful public-DNS routes.

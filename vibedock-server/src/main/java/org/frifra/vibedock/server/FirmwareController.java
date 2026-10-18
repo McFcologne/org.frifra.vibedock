@@ -87,7 +87,7 @@ class FirmwareController {
     }
 
     /** board: what the display reports over USB, or the board chosen on the page for firmware that reports none. */
-    record SetupRequest(String identifier,String name,String board) {}
+    record SetupRequest(String identifier,String name,String board,boolean omitTlsPin) {}
     /**
      * Pairs the device the browser has just flashed; the page sends the result over USB together with the Wi-Fi.
      * Addresses on this machine itself (localhost, as Web Serial needs it without https) are of no use to a device.
@@ -100,7 +100,7 @@ class FirmwareController {
         if(servers.isEmpty())return ResponseEntity.badRequest().body(Map.of("error",
                 "The administration is opened on localhost, so the server's LAN address is unknown. Set the internal address under Settings."));
         try{
-            var setup=pairing.setUp(body.identifier(),body.name(),body.board(),servers);
+            var setup=pairing.setUp(body.identifier(),body.name(),body.board(),servers,!body.omitTlsPin());
             log.info("Set up {} over USB; announced {}{}",body.identifier(),setup.pairing().get("servers"),
                     setup.warnings().isEmpty()?"":"; warning: "+String.join("; ",setup.warnings()));
             return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(Map.of("pairing",setup.pairing(),"warnings",setup.warnings()));

@@ -175,6 +175,7 @@ Open `http://<host>:10001/admin` and sign in with `admin` and your password (see
 | `TIME_ZONE` | `Europe/Berlin` | Time zone of reset times and the update time on the displays |
 | `INTERNAL_URL` | host of the admin page, port 10002 | Address the displays use in the LAN, e.g. `http://192.168.1.10:10002` |
 | `EXTERNAL_URL` | empty | Optional fallback address from outside, e.g. `https://vibedock.example.com` |
+| `EXTERNAL_TLS_PROBE_URL` | empty | Optional LAN HTTPS listener used to inspect the external certificate; keeps the external hostname for verification (see [HTTPS pinning](#https-pinning-and-dns-fallback)) |
 | `VIBEDOCK_DATA_PATH` | `./docker.data` | Host directory with all data (see below) |
 
 `INTERNAL_URL` and `EXTERNAL_URL` can also be set later under [Settings](#settings); set the internal address
@@ -378,7 +379,8 @@ docker compose up -d --force-recreate   # update: same data, new image
 | Data source stays *unavailable* | Sign in again under **Data sources › Manage**; details in `docker compose logs` |
 
 Logs: `docker compose logs --tail 200` for the console, `/data/logs/vibedock.log` for pairings, device pulls and
-provider errors. Neither contains keys, tokens or passwords.
+provider errors. **Devices → Troubleshooting → Server log** also shows recent application-log entries, with manual
+refresh and a text view; it includes TLS/DNS probe diagnostics. Neither log contains keys, tokens or passwords.
 
 **Removing** the server: `docker compose down` stops and removes the container; the data directory stays until you
 delete it yourself.
@@ -455,6 +457,46 @@ firmware updates or IP reports cannot change an already learned network.
 The server sends its addresses (internal first, external as fallback) to the display; the display then shows its
 image. **Device port** is only needed when the display does not listen on port 80. Displays installed from the
 browser are paired over the USB cable instead (see [Installing the firmware](#installing-the-firmware)).
+
+### HTTPS pinning and DNS fallback
+
+The server checks the HTTPS certificate and sends its root certificate and, when available, its fingerprint
+(**TLS pin**) during pairing. The M1 can use this pin for its first HTTPS connection. Without a pin, it checks the
+certificate fully against the supplied root and learns its own pin. ESP32 boards currently always use the full
+check. After a certificate renewal the M1 does another full check; a root change requires pairing again.
+
+**Settings → Network** and both pairing forms show whether the server knows a pin and display its fingerprint.
+The route and target IP/port are shown explicitly, including **Public DNS fallback** and a **cached** marker when
+an earlier check is reused. **Certificate details** shows subject, issuer, validity dates, TLS version and SHA-256.
+**Check pin again** repeats the status query; successful checks are cached for one minute. The refresh button has
+a refresh icon; the line below shows the last refresh time, result and request duration, including failures. To test the M1 without
+a server-supplied pin, enable **Do not send TLS pin** when pairing over the network or USB. The root certificate
+is still sent. Re-pairing replaces the previous pin; **Only pair** over USB keeps the installed firmware.
+
+Without a probe override, the server tries these routes to inspect the external certificate:
+
+1. The external hostname with the server's usual DNS resolver.
+2. The configured internal host on the external HTTPS port, using the external hostname for TLS.
+3. Public DNS answers from **8.8.8.8** and **1.1.1.1**, connecting directly to the returned IPs.
+4. If no route is reachable, the public certificate log (`crt.sh`) may supply a root only. The display then needs its own full check before learning a pin.
+
+A local DNS rewrite can send the public hostname to a plain HTTP service. The public-DNS alternative avoids that
+rewrite while preserving the original external hostname for SNI and certificate verification. The server still
+rejects untrusted certificates and wrong hostnames. It changes neither system DNS nor device DNS; the HTTPS port
+must still be reachable, and public DNS cannot bypass missing NAT loopback or firewall rules.
+
+If the reverse proxy uses a different LAN address or port, set `EXTERNAL_TLS_PROBE_URL`, for example
+`https://192.168.1.10:10002`, in the container environment (or `.env` with the supplied Compose file). This explicit
+route takes precedence. Use the proxy's **HTTPS listener**, not the plain HTTP backend. Recreate the container after
+changing its environment, or restart a local Spring Boot instance.
+
+To diagnose a missing pin, open **Devices → Troubleshooting → Server log**, trigger **Check pin again**, then refresh
+the log. `Public DNS … resolved …` records the public answers; `TLS certificate for … verified through public DNS
+address …` confirms verification. `Unsupported or unrecognized SSL message` usually means the selected port
+answered with plain HTTP instead of TLS. The view shows up to 500 lines from the last 256 KiB, with refresh and a
+text view. It opens at the latest entry and updates every five seconds while expanded and visible. Scroll up to
+read older entries without being moved to the end; scroll back to the bottom to follow new entries again.
+**Live updates** can be switched off.
 
 ## Web displays
 
@@ -948,6 +990,13 @@ the data sources (without sign-ins or keys), the displays, the server and access
 saved display logs. Keys, tokens, display links and e-mail addresses are removed; *Also hide host names and public IP
 addresses* removes those as well (addresses in the home network stay). The file is encrypted with a key that the page
 shows once and does not keep: attach the file to the issue and send the key separately, never in the issue.
+Server and access logs are collected automatically for the chosen period (1–14 days), including available rotated
+server logs. Each of these two blocks keeps at most the newest 3,000,000 characters; it is independent of the
+500-line troubleshooting preview. Missing log files produce empty blocks. Saved device logs are included when
+their save time falls within the chosen period; the export does not read a new log from a display automatically.
+**Displays concerned** marks which displays the problem affects; it does **not** filter the exported logs. The file
+currently includes saved logs from all displays in that period, not only those selected.
+
 **Open a support file** on the same page decrypts such a file with its key and shows its contents, the description
 first; nothing of it is stored. *Raw (JSON)* shows the whole content as one document, *Copy as JSON* and *Download
 JSON* hand it on, e.g. to an analysis tool.
