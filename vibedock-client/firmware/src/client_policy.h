@@ -141,6 +141,43 @@ constexpr Swipe swipeOf(int dx, int dy) {
 constexpr uint8_t minBrightness = 10, brightnessStep = 15;
 constexpr uint8_t clampBrightness(long v) { return v < minBrightness ? minBrightness : v > 100 ? 100 : uint8_t(v); }
 constexpr uint8_t nextBrightness(uint8_t percent, bool up) { return clampBrightness(long(percent) + (up ? brightnessStep : -long(brightnessStep))); }
+// ---- diagnosis: why the display started, and the last state of the run before (kept across a reset) ----
+// What the firmware meant to do when it restarted itself; a restart without one is unexpected.
+enum class Intent : uint8_t { None = 0, Update = 1, Setup = 2, FactoryReset = 3 };
+// The reset as the platform reports it, reduced to what tells planned from unexpected.
+enum class ResetKind : uint8_t { PowerOn, External, Software, Panic, Watchdog, Brownout, DeepSleep, Other };
+// The start kind for the server (DeviceDiagnostics.KINDS): a software restart with an intent is that intent, any
+// other software restart, a panic, a watchdog or a brownout is unexpected.
+constexpr const char *startKind(ResetKind reset, Intent intent) {
+  return reset == ResetKind::Software && intent == Intent::Update ? "update"
+       : reset == ResetKind::Software && intent == Intent::Setup ? "setup"
+       : reset == ResetKind::Software && intent == Intent::FactoryReset ? "factory-reset"
+       : reset == ResetKind::PowerOn ? "power-on" : reset == ResetKind::External ? "external" : reset == ResetKind::Software ? "software"
+       : reset == ResetKind::Panic ? "crash" : reset == ResetKind::Watchdog ? "watchdog" : reset == ResetKind::Brownout ? "brownout"
+       : reset == ResetKind::DeepSleep ? "deep-sleep" : "other";
+}
+// What the display was doing; the names the server knows (DeviceDiagnostics.PHASES).
+enum class Phase : uint8_t { Start = 1, WiFi, Connect, Tls, Image, Draw, Config, Log, Ota, Idle, Portal };
+constexpr const char *phaseName(uint8_t phase) {
+  return phase == 1 ? "start" : phase == 2 ? "wifi" : phase == 3 ? "connect" : phase == 4 ? "tls" : phase == 5 ? "image" : phase == 6 ? "draw"
+       : phase == 7 ? "config" : phase == 8 ? "log" : phase == 9 ? "ota" : phase == 10 ? "idle" : phase == 11 ? "portal" : nullptr;
+}
+// The state kept in memory that survives a reset but not a power cut (RTC memory). check covers the other fields:
+// memory that holds anything else after a power cut, or a record of another firmware layout, counts as unknown.
+struct DiagRecord {
+  uint32_t magic, boot, uptime, heapFree, heapMin;
+  int8_t rssi; uint8_t phase, intent, drops;
+  uint32_t check;
+};
+constexpr uint32_t diagMagic = 0x56444732;  // "VDG2"
+inline uint32_t diagCheck(const DiagRecord &r) {
+  const uint8_t *bytes = reinterpret_cast<const uint8_t *>(&r); uint32_t hash = 2166136261u;
+  for (size_t i = 0; i < offsetof(DiagRecord, check); i++) { hash ^= bytes[i]; hash *= 16777619u; }
+  return hash ^ 0x5a5a5a5au;
+}
+inline bool diagValid(const DiagRecord &r) {
+  return r.magic == diagMagic && r.check == diagCheck(r) && r.boot != 0 && phaseName(r.phase) != nullptr && r.intent <= 3;
+}
 // X-VibeDock-Orientation: "flipped" turns the picture by 180 degrees, "upright" turns it back; anything else keeps it.
 constexpr bool flippedOf(const char *orientation, bool current) {
   return orientation[0] == 'f' && orientation[1] == 'l' ? true : orientation[0] == 'u' && orientation[1] == 'p' ? false : current;

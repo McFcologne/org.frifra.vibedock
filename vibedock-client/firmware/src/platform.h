@@ -75,6 +75,20 @@ inline bool powerCycleStart() {
 #if defined(ESP8266)
 String lastCrash();  // crash.cpp
 #endif
+// crash.cpp: the reset as a number (ESP8266: rst_info reason or the crash record's; ESP32: esp_reset_reason) and
+// its kind, and the diagnosis record in memory that survives a reset.
+uint32_t resetCode();
+client_policy::ResetKind resetKind();
+bool loadDiag(client_policy::DiagRecord &record);
+void storeDiag(const client_policy::DiagRecord &record);
+// The lowest free heap since the start, where the platform keeps it (0: unknown).
+inline uint32_t minFreeHeap() {
+#if defined(ESP8266)
+  return 0;
+#else
+  return ESP.getMinFreeHeap();
+#endif
+}
 inline String resetReason() {
 #if defined(ESP8266)
   String crash = lastCrash();

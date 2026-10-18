@@ -1,3 +1,4 @@
+#include <string>
 #include "../firmware/src/client_policy.h"
 #include <cassert>
 #include <limits>
@@ -36,5 +37,16 @@ int main(){
   assert(flippedOf("flipped",false));assert(!flippedOf("upright",true));assert(flippedOf("",true));assert(!flippedOf("",false));assert(!flippedOf("x",false));
   assert(clampBrightness(0)==10);assert(clampBrightness(255)==100);
   assert(!legacyCalibration(250,91,94,73));assert(legacyCalibration(240,91,94,73));assert(ToneSettings()==ToneSettings());
+  // Starts: planned restarts are named by their intent, only software restarts take one.
+  assert(std::string(startKind(ResetKind::Software,Intent::Update))=="update");assert(std::string(startKind(ResetKind::Software,Intent::None))=="software");
+  assert(std::string(startKind(ResetKind::Panic,Intent::Update))=="crash");assert(std::string(startKind(ResetKind::PowerOn,Intent::Setup))=="power-on");
+  assert(std::string(startKind(ResetKind::Watchdog,Intent::None))=="watchdog");assert(std::string(startKind(ResetKind::External,Intent::None))=="external");
+  assert(std::string(phaseName(uint8_t(Phase::Ota)))=="ota");assert(phaseName(0)==nullptr);assert(phaseName(12)==nullptr);
+  // Diagnosis records: valid only with magic and check; any changed byte (memory after a power cut) is unknown.
+  DiagRecord r{diagMagic,0x1a2b3c4d,100,20000,15000,-60,uint8_t(Phase::Image),0,1,0};r.check=diagCheck(r);assert(diagValid(r));
+  DiagRecord garbage=r;garbage.uptime^=1;assert(!diagValid(garbage));
+  DiagRecord zero{};assert(!diagValid(zero));
+  DiagRecord badPhase=r;badPhase.phase=99;badPhase.check=diagCheck(badPhase);assert(!diagValid(badPhase));
+  static_assert(sizeof(DiagRecord)%4==0,"RTC memory is written in 4-byte words");
   assert(clampGamma(10)==50);assert(clampGamma(999)==350);assert(clampGain(0)==40);assert(clampGain(200)==100);
 }

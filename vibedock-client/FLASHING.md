@@ -233,6 +233,35 @@ Verify the complete restored contents before booting the application:
 
 After successful verification, power-cycle and confirm the original firmware's display and behavior. Saved Wi-Fi and pairing state return to the backup snapshot; settings created later are not retained. A filesystem restore may also revert a standalone client's identifier/key state, so check its server approval if restoring a standalone snapshot.
 
+## Decoding a crash
+
+A display that restarted unexpectedly reports it with its next pull and in its log: the start line says
+`start=crash` (or `watchdog`, `brownout`, `software`), the platform's reset code and, when the memory kept it, the
+phase and run time of the run before (`prev=… phase=image up=5400 heap=…/…`). A power cut leaves `prev=unknown`;
+an update, the Wi-Fi setup or a factory reset is named as such and is not counted as unexpected. The support file
+(Troubleshooting) collects this per display.
+
+Turning an address back into a source line needs the symbols of exactly that build (board and version, including a
+`-dirty` or `-N-g<commit>` suffix): `.pio/build/<board>/firmware.elf` of the same commit, or
+`ELF_OUT=<folder> scripts/images.sh <out>`, which keeps `<board>-<version>.elf` for every board.
+
+- **VibeTV M1 (ESP8266):** the start line also holds the crash record, e.g.
+  `exception (reason 2, cause 28 at 0x40212345, address 0x00000000)`. The address after `at` is the program counter:
+
+  ```sh
+  ~/.platformio/packages/toolchain-xtensa/bin/xtensa-lx106-elf-addr2line -pfiaC -e vibedock-m1-<version>.elf 0x40212345
+  ```
+- **ESP32 boards (S3, C6, …):** the display reports the reset (`start=crash reset=4`) and the phase before, but the
+  backtrace of a panic is only printed on the USB serial port. Keep the display connected and read it with the decoder,
+  which needs the ELF of the running build:
+
+  ```sh
+  pio device monitor -d firmware -e <board> -f esp32_exception_decoder
+  ```
+
+  Keeping the backtrace across the restart would need a core dump partition in flash, which this firmware does not
+  have (changing the partition table is a separate step, not done by an update).
+
 ## Troubleshooting and scope of validation
 
 - **Serial port busy:** close the process reported by `lsof`. Do not kill unrelated processes or try a different device at random.

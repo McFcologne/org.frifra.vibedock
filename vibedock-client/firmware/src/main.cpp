@@ -60,6 +60,60 @@ String currentIp() {
   if (mode == Mode::Portal) return WiFi.softAPIP().toString();
   return WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : "-- (no Wi-Fi)";
 }
+// ---- diagnosis: the current start and its last phase, in memory that survives a reset (crash.cpp) ----
+// Written to that memory (no flash) when the phase changes and once per pull; read after the next reset as the state
+// of the run before. After a power cut, or when the record does not check out, the run before is unknown.
+using client_policy::Phase; using client_policy::Intent;
+client_policy::DiagRecord diag{}, previousDiag{};
+bool previousKnown = false; const char *startKind = "other"; uint32_t heapLow = UINT32_MAX;
+void diagWrite() { diag.check = client_policy::diagCheck(diag); platform::storeDiag(diag); }
+void diagPhase(Phase phase) { if (diag.phase != uint8_t(phase)) { diag.phase = uint8_t(phase); diagWrite(); } }
+// Sets a phase for a scope and goes back to the one before (a saved configuration inside a pull, ...).
+struct PhaseScope { uint8_t before; explicit PhaseScope(Phase phase) : before(diag.phase) { diagPhase(phase); } ~PhaseScope() { diagPhase(Phase(before)); } };
+// Before restarting on purpose: the next start is then this intent, not an unexpected restart.
+void diagIntent(Intent intent) { diag.intent = uint8_t(intent); diagWrite(); }
+void diagSample() {
+  uint32_t heap = ESP.getFreeHeap(); if (heap < heapLow) heapLow = heap;
+  uint32_t low = platform::minFreeHeap();
+  diag.uptime = millis() / 1000; diag.heapFree = heap; diag.heapMin = low ? low : heapLow;
+  diag.rssi = WiFi.status() == WL_CONNECTED ? int8_t(constrain(WiFi.RSSI(), -127, 0)) : 0;
+  diagWrite();
+}
+void diagBegin() {
+  client_policy::DiagRecord stored{};
+  auto reset = platform::resetKind();
+  // After a power cut the memory holds anything, even a record that seems to check out.
+  previousKnown = reset != client_policy::ResetKind::PowerOn && platform::loadDiag(stored) && client_policy::diagValid(stored);
+  if (previousKnown) previousDiag = stored;
+  startKind = client_policy::startKind(reset, previousKnown ? Intent(previousDiag.intent) : Intent::None);
+  uint32_t boot = 0;
+  while (boot == 0) { if (!platform::randomBytes(reinterpret_cast<uint8_t *>(&boot), sizeof(boot))) boot = micros() | 1; }
+  diag = client_policy::DiagRecord{client_policy::diagMagic, boot, 0, ESP.getFreeHeap(), ESP.getFreeHeap(), 0, uint8_t(Phase::Start), 0, 0, 0};
+  diagWrite();
+}
+// "boot=… reset=… start=… prev=… phase=… up=… heap=…/… rssi=… drops=…" for the start line of the log.
+String diagStart() {
+  char text[200];
+  int n = snprintf(text, sizeof(text), "boot=%08lx reset=%lu start=%s", (unsigned long)diag.boot, (unsigned long)platform::resetCode(), startKind);
+  if (previousKnown)
+    snprintf(text + n, sizeof(text) - n, " prev=%08lx phase=%s up=%lu heap=%lu/%lu rssi=%d drops=%u", (unsigned long)previousDiag.boot,
+             client_policy::phaseName(previousDiag.phase), (unsigned long)previousDiag.uptime, (unsigned long)previousDiag.heapFree,
+             (unsigned long)previousDiag.heapMin, int(previousDiag.rssi), unsigned(previousDiag.drops));
+  else snprintf(text + n, sizeof(text) - n, " prev=unknown");
+  return text;
+}
+// X-VibeDock-Diag with every request: the current start and, as far as known, the run before (DeviceDiagnostics).
+String diagHeader() {
+  char text[300];
+  int n = snprintf(text, sizeof(text), "boot=%08lx;up=%lu;heap=%lu;min=%lu;rssi=%d;drops=%u;start=%s;reset=%lu", (unsigned long)diag.boot,
+                   (unsigned long)(millis() / 1000), (unsigned long)diag.heapFree, (unsigned long)diag.heapMin, int(diag.rssi), unsigned(diag.drops),
+                   startKind, (unsigned long)platform::resetCode());
+  if (previousKnown)
+    snprintf(text + n, sizeof(text) - n, ";prev=%08lx;phase=%s;prevup=%lu;prevheap=%lu;prevmin=%lu;prevrssi=%d;prevdrops=%u", (unsigned long)previousDiag.boot,
+             client_policy::phaseName(previousDiag.phase), (unsigned long)previousDiag.uptime, (unsigned long)previousDiag.heapFree,
+             (unsigned long)previousDiag.heapMin, int(previousDiag.rssi), unsigned(previousDiag.drops));
+  return text;
+}
 // ---- device log: the last events, kept in /log.txt across restarts and read over USB (VIBEDOCK-LOG) ----
 // What the display did and why a connection failed; no keys, passwords or tokens.
 bool clockSet();
@@ -285,6 +339,7 @@ void showWrapped(const String &text, int top, int lines, uint16_t colour, uint8_
 bool reasonOnScreen = false;  // "Server unreachable" with its reason: the address line shows the next attempt
 uint8_t failedInRow = 0, imageFailures = 0;      // connection failures since the last answer, to try every address once right away
 void message(const String &value, Step step = Step::None, bool problem = false) {
+  PhaseScope drawing(Phase::Draw);
   reasonOnScreen = false;
   display.fillRect(0, 0, 240, client_policy::footerTop, TFT_BLACK);
   spinningStep = -1;
@@ -313,7 +368,9 @@ String randomHex(size_t bytes) {
 }
 
 // ---- configuration ----
-bool saveConfig() {
+bool writeConfig();
+bool saveConfig() { PhaseScope saving(Phase::Config); return writeConfig(); }
+bool writeConfig() {
   JsonDocument doc;
   doc["identifier"] = identifier; doc["name"] = deviceName;
   doc["ssid"] = ssid; doc["password"] = password; doc["key"] = key; doc["poll"] = pollSeconds; doc["pin"] = pin;
@@ -462,7 +519,7 @@ void handleQuickBoots() {
     message("Factory reset", Step::None, true); logEvent("Factory reset after " + String(boots) + " quick power cycles");
     LittleFS.remove("/boots"); LittleFS.remove("/standalone.json"); LittleFS.remove("/standalone.tmp"); LittleFS.remove("/anchor.der");
     platform::eraseWifi();
-    delay(1500); ESP.restart();
+    diagIntent(Intent::FactoryReset); delay(1500); ESP.restart();
   } else if (boots == client_policy::resetPowerCycles - 1) {
     // Second quick start: unplugging once more resets everything, waiting opens the Wi-Fi setup (pairing stays).
     message("Unplug now for factory reset", Step::None, true); logEvent("Second quick power cycle: Wi-Fi setup unless unplugged");
@@ -572,6 +629,7 @@ void showSetupCode(const String &name, const String &secret) {
   present();
 }
 void startPortal() {
+  diagPhase(Phase::Portal);
   mode = Mode::Portal; logEvent("Wi-Fi setup opened" + (wifiProblem.isEmpty() ? String() : ": " + wifiProblem));
   WiFi.mode(WIFI_AP_STA);
   message("Searching Wi-Fi", Step::WiFi);
@@ -594,7 +652,7 @@ void startPortal() {
     pageStart(F("Saved"));
     web.sendContent("<section class=\"card\"><p class=\"state ok\">Wi-Fi saved</p><p>VibeDock restarts and connects to <b>" + html(ssid)
         + "</b>. Reconnect this phone or computer to your normal network; the display then shows its IP address and a pairing code.</p></section>");
-    pageEnd(); delay(500); ESP.restart();
+    pageEnd(); diagIntent(Intent::Setup); delay(500); ESP.restart();
   });
   web.onNotFound([] { web.sendHeader("Location", "http://192.168.4.1/", true); web.send(302, "text/plain", ""); });
   web.begin();
@@ -754,6 +812,7 @@ template <typename Row> bool readRows(WiFiClient *stream, const client_policy::I
 // Draws the image straight to the display, scaled to the whole screen (1:1 when the server renders for this
 // display); the server draws the IP into it.
 bool readImage(WiFiClient *stream, const client_policy::ImageSize &size, uint32_t timeout) {
+  PhaseScope receiving(Phase::Image);  // rows are read and drawn in turn
   static uint16_t pixels[TFT_WIDTH > TFT_HEIGHT ? TFT_WIDTH : TFT_HEIGHT];
   const uint16_t width = panel.width(), height = panel.height();
   imageOnScreen = true;
@@ -796,6 +855,7 @@ int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
   r.http.addHeader("X-VibeDock-Firmware", VIBEDOCK_VERSION);  // lets the administration offer updates
   r.http.addHeader("X-VibeDock-Display", String(panel.width()) + "x" + String(panel.height()));  // suggests the display type
   r.http.addHeader("X-VibeDock-Board", VIBEDOCK_BOARD);  // which firmware build an update needs
+  r.http.addHeader("X-VibeDock-Diag", diagHeader());  // start, run time, memory, Wi-Fi (older servers ignore it)
   // Updates over Wi-Fi: "1" with the server's signing key, "no-key" when paired before the server sent one.
   r.http.addHeader("X-VibeDock-Ota", platform::hasOtaKey() ? "1" : "no-key");
   if (!updateError.isEmpty()) r.http.addHeader("X-VibeDock-Update-Error", updateError);
@@ -828,6 +888,7 @@ String connectionDetail(const String &url) {
 }
 int requestImage(ImageRequest &r, bool conditional, const char *resource = "image") {
   String url = servers[serverIndex] + "/api/v1/clients/" + identifier + "/" + resource;
+  PhaseScope connecting(url.startsWith("https://") ? Phase::Tls : Phase::Connect);
   lastConnectionProblem = "";
   if (!url.startsWith("https://")) {
     r.client.reset(new WiFiClient()); int code = sendImageRequest(r, url, conditional);
@@ -890,6 +951,7 @@ void updateProgress(size_t done, size_t total) {
   present();
 }
 void installUpdate(const String &version) {
+  PhaseScope updating(Phase::Ota);
   message("Updating to v" + version, Step::None); updateProgress(0, 1); logEvent("Update to v" + version + " started");
   auto fail = [&](const String &reason) {
     updateError = version + ": " + reason; failedUpdate = version; logEvent("Update failed: " + reason);
@@ -906,10 +968,11 @@ void installUpdate(const String &version) {
   http.end();
   if (!installed) { fail(error); return; }
   updateProgress(1, 1); message("Update installed, restarting", Step::None); logEvent("Update to v" + version + " installed");
-  delay(800); ESP.restart();
+  diagIntent(Intent::Update); delay(800); ESP.restart();
 }
 // Sends /log.txt to the server that asked for it (X-VibeDock-Send-Log), over the same address and TLS as the images.
 void uploadLog(const String &requestId) {
+  PhaseScope sending(Phase::Log);
   saveLog();  // the file holds every line; while parked it is complete already
   File file = LittleFS.open("/log.txt", "r");
   if (!file) return;
@@ -929,6 +992,7 @@ String answerStart(HTTPClient &http) {
 void pull() {
   lastPull = millis();
   if (WiFi.status() != WL_CONNECTED) return;
+  diagSample();
   if (reasonOnScreen && (!haveImage || staleScreen)) {  // the reason stays, the address line says what runs now
     display.fillRect(0, 210, 240, 10, TFT_BLACK);
     showWrapped("trying " + servers[serverIndex], 211, 1, MUTED, 1); present();
@@ -1015,6 +1079,7 @@ void pull() {
   holder.reset();  // the image connection's memory back before the next one
   if (client_policy::validLogRequest(logRequest.c_str())) uploadLog(logRequest);
   if (!offered.isEmpty() && offered != VIBEDOCK_VERSION && offered != failedUpdate && platform::hasOtaKey()) installUpdate(offered);
+  diagPhase(Phase::Idle);
 }
 
 // ---- status page on port 80 (local network) ----
@@ -1038,7 +1103,7 @@ void statusPage() {
         + (haveImage ? String((millis() - lastImage) / 1000) + " s ago" : String("-")) + "</dd><dt>Poll interval</dt><dd>"
         + String(pollSeconds) + " s</dd>";
   }
-  body += "<dt>Device ID</dt><dd>" + identifier + "</dd><dt>Last start</dt><dd>" + html(platform::resetReason()) + "</dd><dt>Firmware</dt><dd>" VIBEDOCK_VERSION "</dd></dl>";
+  body += "<dt>Device ID</dt><dd>" + identifier + "</dd><dt>Last start</dt><dd>" + html(String(startKind) + " (" + platform::resetReason() + ")") + "</dd><dt>Firmware</dt><dd>" VIBEDOCK_VERSION "</dd></dl>";
   if (!paired) body += F("<p class=\"muted\">Enter this IP address and the pairing code shown on the display in the VibeDock administration.</p>");
   body += "</section>";
   web.sendContent(body);
@@ -1170,7 +1235,7 @@ void serialSetup(const String &body) {
   if (status != 200 || !saveConfig()) { Serial.println("VIBEDOCK-SETUP ERROR storage"); return; }
   Serial.println("VIBEDOCK-SETUP OK"); Serial.flush();
   message("Set up, restarting", Step::None);
-  delay(500); ESP.restart();
+  diagIntent(Intent::Setup); delay(500); ESP.restart();
 }
 // duringTls: called from inside a TLS handshake, which takes seconds on the ESP8266; only reading the log and the
 // hello answer then, nothing that scans, restarts or changes the configuration.
@@ -1236,6 +1301,7 @@ void initJd9853() {
 #define BOOT_TRACE(step) do {} while (0)
 #endif
 void setup() {
+  diagBegin();  // first: anything before would overwrite the state of the run before
   Serial.setRxBufferSize(1024); Serial.begin(115200);  // the flasher sends in paced chunks
 #ifdef VIBEDOCK_BOOT_TRACE
   pinMode(TFT_BL, OUTPUT); digitalWrite(TFT_BL, TFT_BACKLIGHT_ON); delay(3000);
@@ -1287,7 +1353,8 @@ void setup() {
 #endif
   message("Starting network", Step::WiFi);
   BOOT_TRACE("first screen drawn");
-  logEvent("Start v" VIBEDOCK_VERSION " " VIBEDOCK_BOARD ", " + platform::resetReason());
+  // The start with its boot id, kind and the run before first, then the platform's reset text (it may be long).
+  logEvent("Start v" VIBEDOCK_VERSION " " VIBEDOCK_BOARD ": " + diagStart() + "; " + platform::resetReason());
   if (!platform::mountStorage() || !loadConfig()) { message("Storage error", Step::None, true); return; }
   if (brightness < 100) platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness);
   if (upsideDown) applyOrientation(true);
@@ -1296,6 +1363,7 @@ void setup() {
   serialReady();
   handleQuickBoots();
   if (ssid.isEmpty() || setupRequested) { startPortal(); return; }
+  diagPhase(Phase::WiFi);
   WiFi.setAutoReconnect(true); WiFi.begin(ssid.c_str(), password.c_str()); uint32_t began = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - began < 20000) { footer(); settleQuickBoot(); serialPoll(); delay(250); }
   bool online = WiFi.status() == WL_CONNECTED;
@@ -1304,7 +1372,7 @@ void setup() {
   if (!online && !networkVerified) { WiFi.setAutoReconnect(false); WiFi.disconnect(); startPortal(); return; }
   if (online && !networkVerified) { networkVerified = true; saveConfig(); }
   configTime(0, 0, "pool.ntp.org", "time.cloudflare.com");  // UTC; only needed to check https certificates
-  shownIp = currentIp(); startPairingServer(); lastReconnect = millis();
+  shownIp = currentIp(); startPairingServer(); lastReconnect = millis(); diagPhase(Phase::Idle);
   if (key.isEmpty()) enterPairing();
   else {
     mode = Mode::Paired; lastImage = millis(); lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u;
@@ -1380,7 +1448,11 @@ void loop() {
       } else showWaiting();
     }
   }
-  if (WiFi.status() != WL_CONNECTED && millis() - lastReconnect >= 15000) { lastReconnect = millis(); WiFi.reconnect(); }
+  // Wi-Fi lost: counted for the diagnosis (the log has the IP change).
+  static bool wasOnline = false; bool online = WiFi.status() == WL_CONNECTED;
+  if (wasOnline && !online && diag.drops < 255) { diag.drops++; diagWrite(); }
+  wasOnline = online;
+  if (!online && millis() - lastReconnect >= 15000) { lastReconnect = millis(); WiFi.reconnect(); }
   if (WiFi.status() == WL_CONNECTED && !networkVerified) { networkVerified = true; saveConfig(); }
   if (mode == Mode::Paired) {
     if (client_policy::pullDue(millis(), lastPull, pollSeconds)) pull();

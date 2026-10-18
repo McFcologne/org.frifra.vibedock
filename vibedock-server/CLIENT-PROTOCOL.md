@@ -125,7 +125,10 @@ A web display is created in the administration and has no firmware. It fetches w
 | Request | Answer |
 | --- | --- |
 | `GET /web/<secret>` | HTML page that shows the image full screen (black background, scaled to fit) and fetches it again every reload interval |
-| `GET /web/<secret>/image.png` | the image as PNG in the resolution of the web display's type, `Cache-Control: no-store` |
+| `GET /web/<secret>/image.png` | the image as PNG in the resolution of the web display's type, `Cache-Control: no-store`; with `?w=<width>&h=<height>&r=<pixel ratio>` (CSS pixels of the window) drawn at that resolution, *Fit the browser* in the window's shape |
+| `GET /web/<secret>/state` | `{"tag":"…"}`, a tag of the current image; the page polls it every 3 s and loads a new image when it changes |
+| `POST /web/<secret>/swipe?direction=next\|previous` | a swipe on the page: the next or previous colour scheme, in a running slideshow the photo (as 3d); **204** |
+| `GET /web/<secret>/icon.png` | the home screen icon (180 × 180) |
 
 The secret is 64 lowercase hex characters; unknown secrets get **404**, other methods **405**, the administration port **404**. Each image fetch counts as a pull for the status in the administration. Where a device's image shows `IP: …`, a web display's image shows `VibeDock server v<version>`.
 
@@ -170,6 +173,30 @@ Every board except the VibeTV M1 (its case decides how it stands) gets `X-VibeDo
 with every 200 and 304 answer, set with *Flip image* on the device card. A display mounted upside down turns its panel
 by 180 degrees, so the image, its own screens and the swipes are turned as well; it stores the setting and draws the
 next image completely. The image itself is the same in both cases. Firmware before 0.2.0 ignores the header.
+
+## 3f. Diagnosis (device → server)
+
+Firmware newer than 0.1.1 sends with every request (image, firmware and log) what it knows about its own start:
+
+```
+X-VibeDock-Diag: boot=1a2b3c4d;up=754;heap=21344;min=18012;rssi=-61;drops=0;start=crash;reset=4;prev=0f0e0d0c;phase=image;prevup=5400;prevheap=9120;prevmin=4100;prevrssi=-70;prevdrops=2
+```
+
+| Key | Meaning |
+| --- | --- |
+| `boot` | random id of this start (8 hex digits); one start counts once, however often it is reported |
+| `up` | seconds since this start (device run time, not a clock time) |
+| `heap`, `min` | free heap at the last pull and its lowest value seen (ESP8266: at the pulls; ESP32: the platform's minimum) |
+| `rssi`, `drops` | Wi-Fi signal at the last pull (0 when not connected) and how often the connection was lost |
+| `start` | `power-on`, `update`, `setup`, `factory-reset`, `external` (button or USB reset), `crash`, `watchdog`, `brownout`, `software` (a restart the firmware did not plan), `deep-sleep`, `other` |
+| `reset` | the platform's reset code (ESP8266: `rst_info` reason or the crash record's; ESP32: `esp_reset_reason()`) |
+| `prev`, `phase`, `prev…` | the run before as kept in memory that survives a reset (not a power cut): its boot id, its last phase (`start`, `wifi`, `connect`, `tls`, `image`, `draw`, `config`, `log`, `ota`, `idle`, `portal`) and its values; missing when unknown |
+
+The firmware writes the record to RTC memory, not to flash: when the phase changes and once per pull. The log's start
+line carries the same (`Start v… <board>: boot=… reset=… start=… prev=… phase=… up=… heap=…/…; <reset text>`), so a log
+read over USB names its starts too. The server checks every value, keeps the current values in memory and each new
+start per display (the last 20); a header from older firmware is simply absent. A panic's backtrace stays on the
+serial port (see `vibedock-client/FLASHING.md`, *Decoding a crash*).
 
 ## Boards
 
