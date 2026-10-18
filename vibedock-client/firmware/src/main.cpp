@@ -95,26 +95,26 @@ void diagBegin() {
 // "boot=… reset=… start=… prev=… phase=… up=… heap=…/… rssi=… drops=…" for the start line of the log.
 String diagStart() {
   char text[200];
-  int n = snprintf(text, sizeof(text), "boot=%08lx reset=%lu start=%s", (unsigned long)diag.boot, (unsigned long)platform::resetCode(), startKind);
+  int n = snprintf_P(text, sizeof(text), PSTR("boot=%08lx reset=%lu start=%s"), (unsigned long)diag.boot, (unsigned long)platform::resetCode(), startKind);
   if (previousKnown)
-    snprintf(text + n, sizeof(text) - n, " prev=%08lx phase=%s up=%lu heap=%lu/%lu rssi=%d drops=%u", (unsigned long)previousDiag.boot,
+    snprintf_P(text + n, sizeof(text) - n, PSTR(" prev=%08lx phase=%s up=%lu heap=%lu/%lu rssi=%d drops=%u"), (unsigned long)previousDiag.boot,
              client_policy::phaseName(previousDiag.phase), (unsigned long)previousDiag.uptime, (unsigned long)previousDiag.heapFree,
              (unsigned long)previousDiag.heapMin, int(previousDiag.rssi), unsigned(previousDiag.drops));
-  else snprintf(text + n, sizeof(text) - n, " prev=unknown");
+  else snprintf_P(text + n, sizeof(text) - n, PSTR(" prev=unknown"));
   return text;
 }
 // X-VibeDock-Diag with every request: the current start and, as far as known, the run before (DeviceDiagnostics).
 String diagHeader() {
   char text[400];
-  int n = snprintf(text, sizeof(text), "boot=%08lx;up=%lu;heap=%lu;min=%lu;rssi=%d;drops=%u;start=%s;reset=%lu", (unsigned long)diag.boot,
+  int n = snprintf_P(text, sizeof(text), PSTR("boot=%08lx;up=%lu;heap=%lu;min=%lu;rssi=%d;drops=%u;start=%s;reset=%lu"), (unsigned long)diag.boot,
                    (unsigned long)(millis() / 1000), (unsigned long)diag.heapFree, (unsigned long)diag.heapMin, int(diag.rssi), unsigned(diag.drops),
                    startKind, (unsigned long)platform::resetCode());
   if (previousKnown)
-    snprintf(text + n, sizeof(text) - n, ";prev=%08lx;phase=%s;prevup=%lu;prevheap=%lu;prevmin=%lu;prevrssi=%d;prevdrops=%u", (unsigned long)previousDiag.boot,
+    snprintf_P(text + n, sizeof(text) - n, PSTR(";prev=%08lx;phase=%s;prevup=%lu;prevheap=%lu;prevmin=%lu;prevrssi=%d;prevdrops=%u"), (unsigned long)previousDiag.boot,
              client_policy::phaseName(previousDiag.phase), (unsigned long)previousDiag.uptime, (unsigned long)previousDiag.heapFree,
              (unsigned long)previousDiag.heapMin, int(previousDiag.rssi), unsigned(previousDiag.drops));
   String crash = platform::crashHeader();
-  return crash.isEmpty() ? String(text) : String(text) + ";panic=" + crash;
+  return crash.isEmpty() ? String(text) : String(text) + F(";panic=") + crash;
 }
 // ---- device log: the last events, kept in /log.txt across restarts and read over USB (VIBEDOCK-LOG) ----
 // What the display did and why a connection failed; no keys, passwords or tokens.
@@ -197,7 +197,7 @@ void serialLog() {
   if (logDirty) saveLog();
   // Written as JSON line by line, without a JsonDocument: the log is also read during a TLS handshake, when the
   // heap is nearly used up.
-  Serial.print("VIBEDOCK-LOG [");
+  Serial.print(F("VIBEDOCK-LOG ["));
   bool first = true;
   auto line = [&first](const String &text) {
     if (!first) Serial.print(',');
@@ -425,8 +425,8 @@ bool loadConfig() {
   panelTone.build(toneSettings);
   // Devices of the project's earlier name keep their settings but get the identifier of this one.
   if (identifier.startsWith("vibetv-")) identifier = "";
-  if (identifier.isEmpty() || identifier == "null") { identifier = "vibedock-" + WiFi.macAddress(); identifier.replace(":", ""); identifier.toLowerCase(); }
-  if (deviceName.isEmpty()) deviceName = "VibeDock " + identifier.substring(identifier.length() - 6);
+  if (identifier.isEmpty() || identifier == "null") { identifier = String(F("vibedock-")) + WiFi.macAddress(); identifier.replace(":", ""); identifier.toLowerCase(); }
+  if (deviceName.isEmpty()) deviceName = String(F("VibeDock ")) + identifier.substring(identifier.length() - 6);
   LittleFS.remove("/setup.key");  // setup passwords are no longer stored, see startPortal()
   // Configurations of protocol v1 carried a device-generated key and no server list: they are not paired.
   if (key.length() != 64 || serverCount == 0) { key = ""; serverCount = 0; }
@@ -469,11 +469,11 @@ void pageStart(const String &subtitle) {
   web.sendHeader("Cache-Control", "no-store");
   platform::chunkedStart(web, "text/html; charset=utf-8");
   web.sendContent_P(PAGE_HEAD);
-  web.sendContent("<title>VibeDock - " + subtitle + "</title><link rel=\"icon\" href=\"/favicon.ico\" sizes=\"32x32\">"
+  web.sendContent(String(F("<title>VibeDock - ")) + subtitle + F("</title><link rel=\"icon\" href=\"/favicon.ico\" sizes=\"32x32\">"
       "<link rel=\"icon\" href=\"/favicon.svg\" type=\"image/svg+xml\"><link rel=\"apple-touch-icon\" href=\"/apple-touch-icon.png\">"
-      "</head><body><main><header>");
+      "</head><body><main><header>"));
   web.sendContent_P(PAGE_LOGO);
-  web.sendContent("<div><h1>VibeDock</h1><p>" + subtitle + "</p></div></header>");
+  web.sendContent(String(F("<div><h1>VibeDock</h1><p>")) + subtitle + F("</p></div></header>"));
 }
 // Browser icons, the same as the administration's; registered in the setup portal and on the status page.
 void serveIcons() {
@@ -506,7 +506,7 @@ bool newFirmware() {
 }
 uint8_t countQuickBoot() {
   bool updated = newFirmware();
-  if (updated) logEvent("New firmware: this start is not counted as a power cycle");
+  if (updated) logEvent(F("New firmware: this start is not counted as a power cycle"));
   if (updated || !platform::powerCycleStart()) { LittleFS.remove("/boots"); return 0; }
   int count = 0;
   auto in = LittleFS.open("/boots", "r");
@@ -526,13 +526,13 @@ void handleQuickBoots() {
   if (client_policy::factoryResetDue(boots)) {
     // Factory reset: our whole configuration (Wi-Fi, pairing key, servers) and the Wi-Fi credentials the ESP8266
     // SDK keeps in its own flash sectors. The identifier is derived from the MAC again; the setup password stays.
-    message("Factory reset", Step::None, true); logEvent("Factory reset after " + String(boots) + " quick power cycles");
+    message("Factory reset", Step::None, true); logEvent(String(F("Factory reset after ")) + String(boots) + F(" quick power cycles"));
     LittleFS.remove("/boots"); LittleFS.remove("/standalone.json"); LittleFS.remove("/standalone.tmp"); LittleFS.remove("/anchor.der");
     platform::eraseWifi();
     diagIntent(Intent::FactoryReset); delay(1500); ESP.restart();
   } else if (boots == client_policy::resetPowerCycles - 1) {
     // Second quick start: unplugging once more resets everything, waiting opens the Wi-Fi setup (pairing stays).
-    message("Unplug now for factory reset", Step::None, true); logEvent("Second quick power cycle: Wi-Fi setup unless unplugged");
+    message("Unplug now for factory reset", Step::None, true); logEvent(F("Second quick power cycle: Wi-Fi setup unless unplugged"));
     showDetail("or wait: Wi-Fi setup");
     while (quickBootPending) { settleQuickBoot(); delay(50); }
     setupRequested = true;
@@ -573,7 +573,7 @@ String shortProblem(wl_status_t status) {
 // setup; the loop keeps reconnecting and the screen switches back as soon as the network returns.
 void showWaiting() {
   message(shortProblem(WiFi.status()), Step::WiFi, true);
-  showDetail("Waiting for " + ssid);
+  showDetail(String(F("Waiting for ")) + ssid);
   display.setTextColor(MUTED, TFT_BLACK);
   display.drawCentreString("Trying again every 15 s", 120, 164, 1);
   present();
@@ -581,27 +581,27 @@ void showWaiting() {
 // ESP8266 limits: 2.4 GHz only, WPA2 (or WPA2/WPA3 mixed), no WPA3-only, no required PMF, no WPA Enterprise.
 String connectionProblem(wl_status_t status) {
   String name = "\"" + ssid + "\"";
-  if (platform::wrongPassword(status)) return "Wrong password for " + name + ".";
+  if (platform::wrongPassword(status)) return String(F("Wrong password for ")) + name + ".";
   switch (status) {
-    case WL_NO_SSID_AVAIL: return "Network " + name + " was not found. VibeDock only uses 2.4 GHz: the network must offer 2.4 GHz and must not be hidden.";
-    case WL_CONNECT_FAILED: return "Connecting to " + name + " failed. VibeDock needs WPA2 (WPA2/WPA3 mixed works, WPA3 only does not) and no required PMF (802.11w).";
-    default: return "No connection to " + name + " within 20 seconds. Check 2.4 GHz, WPA2 and the signal.";
+    case WL_NO_SSID_AVAIL: return String(F("Network ")) + name + F(" was not found. VibeDock only uses 2.4 GHz: the network must offer 2.4 GHz and must not be hidden.");
+    case WL_CONNECT_FAILED: return String(F("Connecting to ")) + name + F(" failed. VibeDock needs WPA2 (WPA2/WPA3 mixed works, WPA3 only does not) and no required PMF (802.11w).");
+    default: return String(F("No connection to ")) + name + F(" within 20 seconds. Check 2.4 GHz, WPA2 and the signal.");
   }
 }
 void portalPage() {
   if (web.hasArg("rescan")) scanWifi();
   pageStart(F("Set up Wi-Fi"));
-  if (!wifiProblem.isEmpty()) web.sendContent("<p class=\"problem\">" + html(wifiProblem) + "</p>");
+  if (!wifiProblem.isEmpty()) web.sendContent(String(F("<p class=\"problem\">")) + html(wifiProblem) + F("</p>"));
   web.sendContent(F("<form action=\"/save\" method=\"post\"><section class=\"card\"><h2>Networks nearby</h2>"));
   if (networkCount == 0) web.sendContent(F("<p class=\"muted\">No networks found.</p>"));
   for (uint8_t i = 0; i < networkCount; i++) {
     const WifiNetwork &n = networks[i];
     String name = html(n.ssid);
     int level = n.rssi > -60 ? 3 : n.rssi > -72 ? 2 : 1;
-    web.sendContent("<label class=\"net\"><input type=\"radio\" name=\"net\" value=\"" + name
-        + "\" onchange=\"this.form.ssid.value=this.value;this.form.password.focus()\"><span>" + name + "</span>"
+    web.sendContent(String(F("<label class=\"net\"><input type=\"radio\" name=\"net\" value=\"")) + name
+        + F("\" onchange=\"this.form.ssid.value=this.value;this.form.password.focus()\"><span>") + name + F("</span>")
         + (n.open ? "" : "<span class=\"lock\" title=\"Secured\">&#128274;</span>")
-        + "<b class=\"sig l" + String(level) + "\" title=\"" + String(n.rssi) + " dBm\"><i></i><i></i><i></i></b></label>");
+        + F("<b class=\"sig l") + String(level) + F("\" title=\"") + String(n.rssi) + F(" dBm\"><i></i><i></i><i></i></b></label>"));
   }
   web.sendContent(F("<p class=\"muted\"><a href=\"/?rescan=1\">Scan again</a></p></section><section class=\"card\">"
       "<label class=\"f\" for=\"ssid\">Network name</label><input type=\"text\" id=\"ssid\" name=\"ssid\" maxlength=\"32\" required autocomplete=\"off\" autocapitalize=\"none\" spellcheck=\"false\">"
@@ -612,7 +612,7 @@ void portalPage() {
 // Wi-Fi QR code for the setup network: a phone camera joins it and the captive portal opens. The browser
 // address remains as the fallback when the portal does not open by itself.
 void showSetupCode(const String &name, const String &secret) {
-  String payload = "WIFI:T:WPA;S:" + name + ";P:" + secret + ";;";
+  String payload = String(F("WIFI:T:WPA;S:")) + name + ";P:" + secret + ";;";
   // Version 4 with quartile error correction (25 %) leaves room for the device icon in the middle.
   QRCode qr; uint8_t data[qrcode_getBufferSize(4)];
   qrcode_initText(&qr, data, 4, ECC_QUARTILE, payload.c_str());
@@ -625,7 +625,7 @@ void showSetupCode(const String &name, const String &secret) {
     display.drawCentreString("Scan to set up Wi-Fi", 120, 5, 2);
   } else {
     display.setTextColor(TFT_ORANGE, TFT_BLACK);
-    display.drawCentreString(shortProblem(WiFi.status()) + " - see page", 120, 5, 2);
+    display.drawCentreString(shortProblem(WiFi.status()) + F(" - see page"), 120, 5, 2);
     display.setTextColor(TFT_WHITE, TFT_BLACK);
   }
   display.fillRect(left, top, size, size, TFT_WHITE);
@@ -640,12 +640,12 @@ void showSetupCode(const String &name, const String &secret) {
 }
 void startPortal() {
   diagPhase(Phase::Portal);
-  mode = Mode::Portal; logEvent("Wi-Fi setup opened" + (wifiProblem.isEmpty() ? String() : ": " + wifiProblem));
+  mode = Mode::Portal; logEvent(String(F("Wi-Fi setup opened")) + (wifiProblem.isEmpty() ? String() : ": " + wifiProblem));
   WiFi.mode(WIFI_AP_STA);
   message("Searching Wi-Fi", Step::WiFi);
   scanWifi();
   // A fresh random WPA2 password every time the setup opens; it only appears inside the QR code on the screen.
-  String apName = "VibeDock-" + identifier.substring(identifier.length() - 6);
+  String apName = String(F("VibeDock-")) + identifier.substring(identifier.length() - 6);
   apPassword = randomHex(6);
   if (apPassword.length() != 12) { message("Random source error", Step::None, true); return; }  // never open an unprotected network
   WiFi.softAP(apName.c_str(), apPassword.c_str());
@@ -658,10 +658,10 @@ void startPortal() {
       web.sendHeader("Location", "/", true); web.send(303, "text/plain", ""); return;
     }
     ssid = web.arg("ssid"); password = web.arg("password"); networkVerified = false;
-    if (!saveConfig()) { web.send(500, "text/plain", "Saving failed"); return; }
+    if (!saveConfig()) { web.send(500, "text/plain", String(F("Saving failed"))); return; }
     pageStart(F("Saved"));
-    web.sendContent("<section class=\"card\"><p class=\"state ok\">Wi-Fi saved</p><p>VibeDock restarts and connects to <b>" + html(ssid)
-        + "</b>. Reconnect this phone or computer to your normal network; the display then shows its IP address and a pairing code.</p></section>");
+    web.sendContent(String(F("<section class=\"card\"><p class=\"state ok\">Wi-Fi saved</p><p>VibeDock restarts and connects to <b>")) + html(ssid)
+        + F("</b>. Reconnect this phone or computer to your normal network; the display then shows its IP address and a pairing code.</p></section>"));
     pageEnd(); diagIntent(Intent::Setup); delay(500); ESP.restart();
   });
   web.onNotFound([] { web.sendHeader("Location", "http://192.168.4.1/", true); web.send(302, "text/plain", ""); });
@@ -751,7 +751,7 @@ int applyPairing(JsonDocument &doc) {
   for (JsonVariant url : doc["servers"].as<JsonArray>()) {
     String value = url.as<String>(); while (value.endsWith("/")) value.remove(value.length() - 1);
     if (count < 2 && validServer(value, tls)) { anyTls |= value.startsWith("https://"); list[count++] = value; }
-    else if (value.startsWith("https://") && !tls) logEvent("Pairing: " + value + " ignored, no root certificate sent");
+    else if (value.startsWith("https://") && !tls) logEvent(String(F("Pairing: ")) + value + F(" ignored, no root certificate sent"));
   }
   if (!hexKey || count == 0) return 400;
   if (anyTls) {
@@ -769,19 +769,19 @@ int applyPairing(JsonDocument &doc) {
   String name = doc["name"] | ""; if (!name.isEmpty() && name.length() <= 40) deviceName = name;
   if (!saveConfig()) { key = ""; serverCount = 0; return 500; }
   String names; for (uint8_t i = 0; i < count; i++) names += (i ? ", " : "") + list[i];
-  logEvent("Paired with " + names + (anyTls ? "; https root certificate" : "") + (pin.isEmpty() ? "" : ", pin"));
+  logEvent(String(F("Paired with ")) + names + (anyTls ? "; https root certificate" : "") + (pin.isEmpty() ? "" : ", pin"));
   return 200;
 }
 void handlePair() {
-  if (mode != Mode::Pairing) { web.send(409, "application/json", "{\"error\":\"already paired\"}"); return; }
-  if (client_policy::pairingLocked(wrongCodes)) { web.send(429, "application/json", "{\"error\":\"restart the device\"}"); return; }
+  if (mode != Mode::Pairing) { web.send(409, "application/json", String(F("{\"error\":\"already paired\"}"))); return; }
+  if (client_policy::pairingLocked(wrongCodes)) { web.send(429, "application/json", String(F("{\"error\":\"restart the device\"}"))); return; }
   String body = web.arg("plain");
   JsonDocument doc;
-  if (body.length() > 4096 || deserializeJson(doc, body)) { web.send(400, "application/json", "{\"error\":\"invalid request\"}"); return; }
-  if (!sameCode(doc["code"] | "")) { wrongCodes++; web.send(403, "application/json", "{\"error\":\"wrong code\"}"); return; }
+  if (body.length() > 4096 || deserializeJson(doc, body)) { web.send(400, "application/json", String(F("{\"error\":\"invalid request\"}"))); return; }
+  if (!sameCode(doc["code"] | "")) { wrongCodes++; web.send(403, "application/json", String(F("{\"error\":\"wrong code\"}"))); return; }
   int status = applyPairing(doc);
-  if (status == 400) { web.send(400, "application/json", "{\"error\":\"no usable server address or invalid key\"}"); return; }
-  if (status != 200) { web.send(500, "application/json", "{\"error\":\"storage\"}"); return; }
+  if (status == 400) { web.send(400, "application/json", String(F("{\"error\":\"no usable server address or invalid key\"}"))); return; }
+  if (status != 200) { web.send(500, "application/json", String(F("{\"error\":\"storage\"}"))); return; }
   JsonDocument reply; reply["identifier"] = identifier; reply["name"] = deviceName; reply["board"] = VIBEDOCK_BOARD;
   reply["subnetMask"] = WiFi.subnetMask().toString();  // fixed by the server at pairing; pulls only fill it in once if it is missing
   String out; serializeJson(reply, out);
@@ -806,8 +806,8 @@ template <typename Row> bool readRows(WiFiClient *stream, const client_policy::I
     while (received < length) {
       bool idle = millis() - progress > timeout, closed = !stream->connected() && !stream->available();
       if (idle || closed) {
-        imageProblem = String(idle ? "no data for " + String(timeout / 1000) + " s" : "connection closed") + " at row " + String(y) + "/"
-            + String(size.height) + " after " + String(millis() - began) + " ms";
+        imageProblem = String(idle ? String(F("no data for ")) + String(timeout / 1000) + " s" : "connection closed") + F(" at row ") + String(y) + "/"
+            + String(size.height) + F(" after ") + String(millis() - began) + " ms";
         return false;
       }
       int count = stream->read(bytes + received, length - received);
@@ -865,7 +865,7 @@ int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
   r.http.useHTTP10(true);
   r.http.setTimeout(r.verified ? 15000 : 5000);
   r.http.addHeader("Accept-Encoding", "identity");  // never compressed: the image is read byte for byte  // over TLS 1.3 a 16 kB record has to arrive whole before any byte reads r.http.setReuse(false);
-  r.http.addHeader("Authorization", "Bearer " + key);
+  r.http.addHeader("Authorization", String(F("Bearer ")) + key);
   r.http.addHeader("X-VibeDock-Device-IP", WiFi.localIP().toString());  // the server may only see a NAT gateway
   r.http.addHeader("X-VibeDock-Subnet-Mask", WiFi.subnetMask().toString());  // USB and legacy registrations learn their mask once
   r.http.addHeader("X-VibeDock-Footer", "server");  // this firmware shows the IP the server draws into the image
@@ -895,16 +895,16 @@ String connectionDetail(const String &url) {
   int colon = host.lastIndexOf(':'); String port = colon > 0 ? host.substring(colon + 1) : (url.startsWith("https") ? "443" : "80");
   if (colon > 0) host.remove(colon);
   IPAddress address;
-  if (!WiFi.hostByName(host.c_str(), address)) return "name " + host + " not resolved (DNS)";
+  if (!WiFi.hostByName(host.c_str(), address)) return String(F("name ")) + host + F(" not resolved (DNS)");
   String target = address.toString() + ":" + port;
   WiFiClient probe; probe.setTimeout(4000);
-  if (!probe.connect(address, port.toInt())) return "no TCP connection to " + target;
+  if (!probe.connect(address, port.toInt())) return String(F("no TCP connection to ")) + target;
   probe.stop();
   // TCP works, so TLS or the HTTP exchange failed.
-  return url.startsWith("https") ? "TCP to " + target + " works, TLS or HTTP failed" : "TCP to " + target + " works, no HTTP answer";
+  return url.startsWith("https") ? String(F("TCP to ")) + target + F(" works, TLS or HTTP failed") : String(F("TCP to ")) + target + F(" works, no HTTP answer");
 }
 int requestImage(ImageRequest &r, bool conditional, const char *resource = "image") {
-  String url = servers[serverIndex] + "/api/v1/clients/" + identifier + "/" + resource;
+  String url = servers[serverIndex] + F("/api/v1/clients/") + identifier + "/" + resource;
   PhaseScope connecting(url.startsWith("https://") ? Phase::Tls : Phase::Connect);
   lastConnectionProblem = "";
   if (!url.startsWith("https://")) {
@@ -920,10 +920,10 @@ int requestImage(ImageRequest &r, bool conditional, const char *resource = "imag
     if (code > 0) return code;
     // The pinned handshake worked and the request failed afterwards: the network, not the certificate.
     if (platform::tlsError(r.client.get()).isEmpty() && !platform::tlsSummary().isEmpty()) {
-      lastConnectionProblem = HTTPClient::errorToString(code) + " (" + String(code) + ") after TLS; " + platform::tlsTraffic() + "; " + platform::tlsSummary();
+      lastConnectionProblem = HTTPClient::errorToString(code) + " (" + String(code) + F(") after TLS; ") + platform::tlsTraffic() + "; " + platform::tlsSummary();
       return code;
     }
-    logEvent("Pinned certificate check failed: " + HTTPClient::errorToString(code) + " " + platform::tlsError(r.client.get()), true);
+    logEvent(String(F("Pinned certificate check failed: ")) + HTTPClient::errorToString(code) + " " + platform::tlsError(r.client.get()), true);
     r.retry(nullptr);
   }
   // Full check: chain up to the root from pairing, host name and validity; never an unchecked connection.
@@ -935,11 +935,11 @@ int requestImage(ImageRequest &r, bool conditional, const char *resource = "imag
   if (code < 0) lastConnectionProblem = platform::tlsError(r.client.get());
   // Handshake done, then the HTTP exchange failed: say so instead of guessing at TLS below.
   if (code < 0 && lastConnectionProblem.isEmpty() && !platform::tlsSummary().isEmpty())
-    lastConnectionProblem = HTTPClient::errorToString(code) + " (" + String(code) + ") after TLS; " + platform::tlsTraffic() + "; " + platform::tlsSummary();
+    lastConnectionProblem = HTTPClient::errorToString(code) + " (" + String(code) + F(") after TLS; ") + platform::tlsTraffic() + "; " + platform::tlsSummary();
   // A server that only speaks TLS 1.2: the same full check over TLS 1.2, where the board supports it.
   WiFiClient *legacy;
   if (code < 0 && platform::versionRefused() && (legacy = platform::legacyClient())) {
-    logEvent("Server refuses TLS 1.3, using TLS 1.2", true);
+    logEvent(F("Server refuses TLS 1.3, using TLS 1.2"), true);
     r.retry(legacy);
     code = sendImageRequest(r, url, conditional);
     if (code < 0) lastConnectionProblem = platform::tlsError(r.client.get(), true);
@@ -969,9 +969,9 @@ void updateProgress(size_t done, size_t total) {
 }
 void installUpdate(const String &version) {
   PhaseScope updating(Phase::Ota);
-  message("Updating to v" + version, Step::None); updateProgress(0, 1); logEvent("Update to v" + version + " started");
+  message(String(F("Updating to v")) + version, Step::None); updateProgress(0, 1); logEvent(String(F("Update to v")) + version + F(" started"));
   auto fail = [&](const String &reason) {
-    updateError = version + ": " + reason; failedUpdate = version; logEvent("Update failed: " + reason);
+    updateError = version + ": " + reason; failedUpdate = version; logEvent(String(F("Update failed: ")) + reason);
     message("Update failed", Step::None, true); showDetail(reason.substring(0, 34), PROBLEM); delay(4000);
     haveImage = false; staleScreen = true; etag = ""; forgetRows(); lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u;
   };
@@ -979,12 +979,12 @@ void installUpdate(const String &version) {
   int code = requestImage(request, false, "firmware");
   int size = http.getSize();
   if (size <= 0) size = http.header("X-VibeDock-Length").toInt();  // behind a reverse proxy that drops Content-Length
-  if (code != 200 || size <= 0) { fail(code > 0 ? "download HTTP " + String(code) : String("download failed")); return; }
+  if (code != 200 || size <= 0) { fail(code > 0 ? String(F("download HTTP ")) + String(code) : String("download failed")); return; }
   String error;
   bool installed = platform::installSigned(http.getStreamPtr(), size_t(size), http.header("x-MD5"), error, updateProgress);
   http.end();
   if (!installed) { fail(error); return; }
-  updateProgress(1, 1); message("Update installed, restarting", Step::None); logEvent("Update to v" + version + " installed");
+  updateProgress(1, 1); message("Update installed, restarting", Step::None); logEvent(String(F("Update to v")) + version + F(" installed"));
   diagIntent(Intent::Update); delay(800); ESP.restart();
 }
 // Sends /log.txt to the server that asked for it (X-VibeDock-Send-Log), over the same address and TLS as the images.
@@ -997,7 +997,7 @@ void uploadLog(const String &requestId) {
   int code;
   { ImageRequest request; code = requestImage(request, false, "log"); }
   uploadFile = nullptr; uploadRequest = ""; file.close();
-  logEvent(code == 204 ? String("Log sent to the server") : "Log not sent: " + (code > 0 ? "HTTP " + String(code) : HTTPClient::errorToString(code)), true);
+  logEvent(code == 204 ? String("Log sent to the server") : String(F("Log not sent: ")) + (code > 0 ? String(F("HTTP ")) + String(code) : HTTPClient::errorToString(code)), true);
 }
 // The start of an error answer, e.g. the server's reason for a 400, as one printable line.
 String answerStart(HTTPClient &http) {
@@ -1012,7 +1012,7 @@ void pull() {
   diagSample();
   if (reasonOnScreen && (!haveImage || staleScreen)) {  // the reason stays, the address line says what runs now
     display.fillRect(0, 210, 240, 10, TFT_BLACK);
-    showWrapped("trying " + servers[serverIndex], 211, 1, MUTED, 1); present();
+    showWrapped(String(F("trying ")) + servers[serverIndex], 211, 1, MUTED, 1); present();
   }
   // On the heap: the TLS handshake below needs most of the ESP8266's 4 kB stack.
   std::unique_ptr<ImageRequest> holder(new ImageRequest()); ImageRequest &request = *holder; HTTPClient &http = request.http;
@@ -1020,7 +1020,7 @@ void pull() {
   if (code != lastStatus || code < 0) {
     String server = servers[serverIndex];
     String answer = code >= 400 && code != 401 ? answerStart(http) : String();
-    if (code > 0) logEvent(server + ": HTTP " + String(code) + (answer.isEmpty() ? "" : " \"" + answer + "\"")
+    if (code > 0) logEvent(server + F(": HTTP ") + String(code) + (answer.isEmpty() ? "" : " \"" + answer + "\"")
         + (server.startsWith("https") ? ", " + platform::tlsSummary() : String()), true);
     else logEvent(server + ": " + HTTPClient::errorToString(code) + (lastConnectionProblem.isEmpty() ? "" : ", " + lastConnectionProblem), true);
   }
@@ -1042,7 +1042,7 @@ void pull() {
   }
   client_policy::ImageSize size;
   if (code == 200 && !validImage(http, size))
-    logEvent("Image not accepted: format \"" + http.header("X-VibeDock-Image-Format") + "\", " + String(http.getSize()) + " bytes announced", true);
+    logEvent(String(F("Image not accepted: format \"")) + http.header("X-VibeDock-Image-Format") + F("\", ") + String(http.getSize()) + F(" bytes announced"), true);
   if (code == 200 && validImage(http, size)) {
     // Force refresh from the administration (or a new image size): draw every row, not only the ones that changed.
     if (http.header("X-VibeDock-Redraw") == "1" || size.width != lastImageSize.width || size.height != lastImageSize.height) forgetRows();
@@ -1051,10 +1051,10 @@ void pull() {
     // Over https 15 s without data before giving up: on lossy links (phone hotspots) TCP resends after growing pauses.
     if (readImage(http.getStreamPtr(), size, https ? 15000 : 8000)) {
       etag = http.header("ETag"); lastImage = millis(); haveImage = true; staleScreen = false; footer(); imageFailures = 0;
-      if (first) logEvent("Image shown, read in " + String(millis() - reading) + " ms", true);
+      if (first) logEvent(String(F("Image shown, read in ")) + String(millis() - reading) + " ms", true);
     } else {
       etag = "";  // the next pull fetches the whole image; rows already drawn stay and are not drawn again
-      logEvent("Image aborted: " + imageProblem + (https ? ", " + platform::tlsTraffic() : String()), true);
+      logEvent(String(F("Image aborted: ")) + imageProblem + (https ? ", " + platform::tlsTraffic() : String()), true);
       // Once right away and without the error screen when an image is showing: the screen keeps the image, partly
       // new. The error screen only when that fails too.
       if (++imageFailures == 1 && haveImage) lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u + 1000u;
@@ -1066,15 +1066,15 @@ void pull() {
   } else if (code == 304) {
     lastImage = millis(); staleScreen = false;
   } else if (code == 401) {
-    logEvent("Server rejected the device key (401): pairing removed");
+    logEvent(F("Server rejected the device key (401): pairing removed"));
     http.end(); unpair(); return;
   } else if (code < 0) {
     // Connection failed: try the other announced address next time. An answer that stalled after a successful TLS
     // handshake (lost packets on the way) is first retried at the same address.
     bool stalled = lastConnectionProblem.indexOf(" after TLS;") >= 0;
     uint8_t next = stalled && failedInRow == 0 ? serverIndex : client_policy::nextServer(serverIndex, serverCount);
-    if (next != serverIndex) logEvent("Trying " + servers[next] + " next", true);
-    else if (stalled) logEvent("Retrying " + servers[next], true);
+    if (next != serverIndex) logEvent(String(F("Trying ")) + servers[next] + F(" next"), true);
+    else if (stalled) logEvent(String(F("Retrying ")) + servers[next], true);
     String failed = servers[serverIndex];
     serverIndex = next;
     // The next attempt right away (as many as there are addresses), not only after the poll interval.
@@ -1104,7 +1104,7 @@ String statusLine(String &css) {
   if (mode == Mode::Pairing) { css = "warn"; return "Waiting for invitation"; }
   if (lastStatus == 0) { css = "warn"; return "Connecting to server"; }
   if (lastStatus < 0) { css = "bad"; return "Server unreachable"; }
-  if (lastStatus != 200 && lastStatus != 304) { css = "bad"; return "Server answered HTTP " + String(lastStatus); }
+  if (lastStatus != 200 && lastStatus != 304) { css = "bad"; return String(F("Server answered HTTP ")) + String(lastStatus); }
   if (staleScreen) { css = "warn"; return "Updates missing"; }
   css = "ok"; return "Connected";
 }
@@ -1113,44 +1113,51 @@ void statusPage() {
   bool paired = mode == Mode::Paired;
   pageStart(html(deviceName));
   String css, state = statusLine(css);
-  String body = "<section class=\"card\"><h2>Status</h2><p class=\"state " + css + "\">" + state + "</p><dl>"
-      "<dt>IP address</dt><dd>" + currentIp() + "</dd><dt>Wi-Fi</dt><dd>" + html(WiFi.SSID()) + " (" + String(WiFi.RSSI()) + " dBm)</dd>";
+  String body = String(F("<section class=\"card\"><h2>Status</h2><p class=\"state ")) + css + "\">" + state + F("</p><dl>"
+      "<dt>IP address</dt><dd>") + currentIp() + F("</dd><dt>Wi-Fi</dt><dd>") + html(WiFi.SSID()) + " (" + String(WiFi.RSSI()) + F(" dBm)</dd>");
   if (paired) {
-    body += "<dt>Server</dt><dd>" + html(servers[serverIndex]) + "</dd><dt>Last update</dt><dd>"
-        + (haveImage ? String((millis() - lastImage) / 1000) + " s ago" : String("-")) + "</dd><dt>Poll interval</dt><dd>"
-        + String(pollSeconds) + " s</dd>";
+    body += String(F("<dt>Server</dt><dd>")) + html(servers[serverIndex]) + F("</dd><dt>Last update</dt><dd>")
+        + (haveImage ? String((millis() - lastImage) / 1000) + F(" s ago") : String("-")) + F("</dd><dt>Poll interval</dt><dd>")
+        + String(pollSeconds) + F(" s</dd>");
   }
-  body += "<dt>Device ID</dt><dd>" + identifier + "</dd><dt>Last start</dt><dd>" + html(String(startKind) + " (" + platform::resetReason() + ")") + "</dd><dt>Firmware</dt><dd>" VIBEDOCK_VERSION "</dd></dl>";
+  body += String(F("<dt>Device ID</dt><dd>")) + identifier + F("</dd><dt>Last start</dt><dd>") + html(String(startKind) + " (" + platform::resetReason() + ")") + F("</dd><dt>Firmware</dt><dd>" VIBEDOCK_VERSION "</dd></dl>");
   if (!paired) body += F("<p class=\"muted\">Enter this IP address and the pairing code shown on the display in the VibeDock administration.</p>");
-  body += "</section>";
+  body += F("</section>");
   web.sendContent(body);
   if (paired) colourCard();
   pageEnd();
 }
 // Colour correction of this panel. Every change is applied when a slider is released and the image is redrawn,
 // so the display can be compared with the server preview right away; the BMP above stays uncorrected.
-String slider(const char *name, const char *label, int value, int low, int high, int step, bool gamma) {
-  String shown = gamma ? String(value / 100.0, 2) : String(value) + " %";
-  String show = gamma ? "(this.value/100).toFixed(2)" : "this.value+' %'";
-  return "<label class=\"f\" for=\"" + String(name) + "\">" + label + " <b>" + shown + "</b></label><input type=\"range\" id=\""
-      + name + "\" name=\"" + name + "\" min=\"" + low + "\" max=\"" + high + "\" step=\"" + step + "\" value=\"" + value
-      + "\" oninput=\"this.previousSibling.lastChild.textContent=" + show + "\" onchange=\"const b=new URLSearchParams(new FormData(this.form));b.set('live','1');fetch('/colours',{method:'POST',body:b}).catch(()=>this.form.submit())\">";
+String slider(const char *name, const __FlashStringHelper *label, int value, int low, int high, int step, bool gamma) {
+  // Text in flash (F): on the ESP8266 plain literals take RAM the TLS handshake needs.
+  String s = F("<label class=\"f\" for=\""); s += name; s += F("\">"); s += label; s += F(" <b>");
+  s += gamma ? String(value / 100.0, 2) : String(value) + F(" %");
+  s += F("</b></label><input type=\"range\" id=\""); s += name; s += F("\" name=\""); s += name;
+  s += F("\" min=\""); s += low; s += F("\" max=\""); s += high; s += F("\" step=\""); s += step; s += F("\" value=\""); s += value;
+  s += F("\" oninput=\"this.previousSibling.lastChild.textContent=");
+  s += gamma ? F("(this.value/100).toFixed(2)") : F("this.value+' %'");
+  s += F("\" onchange=\"const b=new URLSearchParams(new FormData(this.form));b.set('live','1');fetch('/colours',{method:'POST',body:b}).catch(()=>this.form.submit())\">");
+  return s;
 }
 // The image as the server sends it, uncorrected, next to the sliders: the reference the display is matched to. A
 // slider change goes to the display in the background; the page and the image stay as they are.
 void colourCard() {
   using namespace client_policy;
   uint16_t w = lastImageSize.width ? lastImageSize.width : 240, h = lastImageSize.height ? lastImageSize.height : 240;
-  web.sendContent("<form action=\"/colours\" method=\"post\"><section class=\"card\"><h2>Display colours</h2>"
-      "<div style=\"display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start\"><figure style=\"margin:0;flex:none\"><img class=\"screen\" src=\"/image.bmp?t="
-      + String(millis()) + "\" width=\"" + w + "\" height=\"" + h + "\" style=\"width:" + w + "px;height:" + h + "px;max-width:100%;object-fit:contain;image-rendering:pixelated\" alt=\"Current image\">"
-        "<figcaption class=\"muted\">Uncorrected, as the server sends it. <a href=\"/\">Reload</a></figcaption></figure><div style=\"flex:1;min-width:200px\">"
-      + slider("gamma", "Gamma (higher: darker mid tones)", toneSettings.gamma, minGamma, maxGamma, 5, true)
-      + slider("red", "Red", toneSettings.red, minGain, maxGain, 1, false)
-      + slider("green", "Green", toneSettings.green, minGain, maxGain, 1, false)
-      + slider("blue", "Blue", toneSettings.blue, minGain, maxGain, 1, false)
-      + "<p class=\"muted\">Applied to this display only: move a slider until the display looks like the image beside it.</p>"
-        "<button name=\"reset\" value=\"1\">Reset to defaults</button></div></div></section></form>");
+  String card = F("<form action=\"/colours\" method=\"post\"><section class=\"card\"><h2>Display colours</h2>"
+      "<div style=\"display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start\"><figure style=\"margin:0;flex:none\"><img class=\"screen\" src=\"/image.bmp?t=");
+  card += millis(); card += F("\" width=\""); card += w; card += F("\" height=\""); card += h; card += F("\" style=\"width:"); card += w;
+  card += F("px;height:"); card += h;
+  card += F("px;max-width:100%;object-fit:contain;image-rendering:pixelated\" alt=\"Current image\">"
+      "<figcaption class=\"muted\">Uncorrected, as the server sends it. <a href=\"/\">Reload</a></figcaption></figure><div style=\"flex:1;min-width:200px\">");
+  card += slider("gamma", F("Gamma (higher: darker mid tones)"), toneSettings.gamma, minGamma, maxGamma, 5, true);
+  card += slider("red", F("Red"), toneSettings.red, minGain, maxGain, 1, false);
+  card += slider("green", F("Green"), toneSettings.green, minGain, maxGain, 1, false);
+  card += slider("blue", F("Blue"), toneSettings.blue, minGain, maxGain, 1, false);
+  card += F("<p class=\"muted\">Applied to this display only: move a slider until the display looks like the image beside it.</p>"
+      "<button name=\"reset\" value=\"1\">Reset to defaults</button></div></div></section></form>");
+  web.sendContent(card);
 }
 // Settings changed in quick series (brightness swipes, colour sliders): written to flash once, 3 s after the last
 // change, between pulls. Writing at once with every slider move restarted the ESP32-C6 ("Exception").
@@ -1173,10 +1180,10 @@ void saveColours() {
 // The device keeps no copy of the image (too little RAM), so it fetches a fresh one from the server and
 // passes it on as a top-down 16-bit BMP (RGB565 bit fields); the server sends big-endian, BMP wants little-endian.
 void imagePage() {
-  if (mode != Mode::Paired) { web.send(404, "text/plain", "Not paired"); return; }
+  if (mode != Mode::Paired) { web.send(404, "text/plain", String(F("Not paired"))); return; }
   ImageRequest request; HTTPClient &http = request.http;
   client_policy::ImageSize size;
-  if (requestImage(request, false) != 200 || !validImage(http, size)) { web.send(502, "text/plain", "No image from the server"); return; }
+  if (requestImage(request, false) != 200 || !validImage(http, size)) { web.send(502, "text/plain", String(F("No image from the server"))); return; }
   uint8_t head[66] = {'B', 'M'};
   auto put = [&](int offset, uint32_t value, int bytes) { for (int i = 0; i < bytes; i++) head[offset + i] = value >> (8 * i); };
   // BMP rows are padded to 4 bytes: odd widths get 2 extra bytes per row.
@@ -1231,7 +1238,7 @@ String serialLine;
 void serialReady() {
   JsonDocument doc; doc["identifier"] = identifier; doc["name"] = deviceName; doc["version"] = VIBEDOCK_VERSION; doc["paired"] = !key.isEmpty();
   doc["board"] = VIBEDOCK_BOARD; doc["chip"] = VIBEDOCK_CHIP;
-  Serial.print("VIBEDOCK-READY "); serializeJson(doc, Serial); Serial.println();
+  Serial.print(F("VIBEDOCK-READY ")); serializeJson(doc, Serial); Serial.println();
 }
 void serialNetworks() {
   scanWifi();
@@ -1239,18 +1246,18 @@ void serialNetworks() {
   for (uint8_t i = 0; i < networkCount; i++) {
     JsonObject n = list.add<JsonObject>(); n["ssid"] = networks[i].ssid; n["rssi"] = networks[i].rssi; n["open"] = networks[i].open;
   }
-  Serial.print("VIBEDOCK-NETWORKS "); serializeJson(doc, Serial); Serial.println();
+  Serial.print(F("VIBEDOCK-NETWORKS ")); serializeJson(doc, Serial); Serial.println();
 }
 void serialSetup(const String &body) {
   JsonDocument doc;
-  if (deserializeJson(doc, body)) { Serial.println("VIBEDOCK-SETUP ERROR invalid request"); return; }
+  if (deserializeJson(doc, body)) { Serial.println(F("VIBEDOCK-SETUP ERROR invalid request")); return; }
   String newSsid = doc["ssid"] | "", newPassword = doc["password"] | "";
-  if (newSsid.isEmpty() || newSsid.length() > 32 || newPassword.length() > 64) { Serial.println("VIBEDOCK-SETUP ERROR invalid Wi-Fi"); return; }
+  if (newSsid.isEmpty() || newSsid.length() > 32 || newPassword.length() > 64) { Serial.println(F("VIBEDOCK-SETUP ERROR invalid Wi-Fi")); return; }
   int status = applyPairing(doc);
-  if (status == 400) { Serial.println("VIBEDOCK-SETUP ERROR no usable server address or invalid key"); return; }
+  if (status == 400) { Serial.println(F("VIBEDOCK-SETUP ERROR no usable server address or invalid key")); return; }
   ssid = newSsid; password = newPassword; networkVerified = false;
-  if (status != 200 || !saveConfig()) { Serial.println("VIBEDOCK-SETUP ERROR storage"); return; }
-  Serial.println("VIBEDOCK-SETUP OK"); Serial.flush();
+  if (status != 200 || !saveConfig()) { Serial.println(F("VIBEDOCK-SETUP ERROR storage")); return; }
+  Serial.println(F("VIBEDOCK-SETUP OK")); Serial.flush();
   message("Set up, restarting", Step::None);
   diagIntent(Intent::Setup); delay(500); ESP.restart();
 }
@@ -1259,7 +1266,7 @@ void serialSetup(const String &body) {
 bool usbDuringTls = false;
 void serialPoll(bool duringTls = false) {
   if (!duringTls && usbDuringTls) {
-    usbDuringTls = false; quickBootPending = false; LittleFS.remove("/boots"); logEvent("USB console: this start is not counted as a power cycle");
+    usbDuringTls = false; quickBootPending = false; LittleFS.remove("/boots"); logEvent(F("USB console: this start is not counted as a power cycle"));
   }
   while (Serial.available()) {
     char c = Serial.read();
@@ -1270,7 +1277,7 @@ void serialPoll(bool duringTls = false) {
       // adds up to the Wi-Fi setup or a factory reset.
       if (line.startsWith("VIBEDOCK-") && quickBootPending && duringTls) usbDuringTls = true;  // logged afterwards: little stack here
       else if (line.startsWith("VIBEDOCK-") && quickBootPending) {
-        quickBootPending = false; LittleFS.remove("/boots"); logEvent("USB console: this start is not counted as a power cycle");
+        quickBootPending = false; LittleFS.remove("/boots"); logEvent(F("USB console: this start is not counted as a power cycle"));
       }
       if (duringTls && line != "VIBEDOCK-HELLO" && line != "VIBEDOCK-LOG") continue;
       if (line == "VIBEDOCK-HELLO") serialReady();
@@ -1372,7 +1379,7 @@ void setup() {
   message("Starting network", Step::WiFi);
   BOOT_TRACE("first screen drawn");
   // The start with its boot id, kind and the run before first, then the platform's reset text (it may be long).
-  logEvent("Start v" VIBEDOCK_VERSION " " VIBEDOCK_BOARD ": " + diagStart() + "; " + platform::resetReason());
+  logEvent(String(F("Start v" VIBEDOCK_VERSION " " VIBEDOCK_BOARD ": ")) + diagStart() + "; " + platform::resetReason());
   if (!platform::mountStorage() || !loadConfig()) { message("Storage error", Step::None, true); return; }
   if (brightness < 100) platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness);
   if (upsideDown) applyOrientation(true);
@@ -1386,7 +1393,7 @@ void setup() {
   while (WiFi.status() != WL_CONNECTED && millis() - began < 20000) { footer(); settleQuickBoot(); serialPoll(); delay(250); }
   bool online = WiFi.status() == WL_CONNECTED;
   if (!online) wifiProblem = connectionProblem(WiFi.status());
-  logEvent(online ? "Wi-Fi " + ssid + ": " + WiFi.localIP().toString() + ", " + String(WiFi.RSSI()) + " dBm, heap " + platform::freeHeap() : "Wi-Fi: " + wifiProblem);
+  logEvent(online ? String(F("Wi-Fi ")) + ssid + ": " + WiFi.localIP().toString() + ", " + String(WiFi.RSSI()) + F(" dBm, heap ") + platform::freeHeap() : String(F("Wi-Fi: ")) + wifiProblem);
   if (!online && !networkVerified) { WiFi.setAutoReconnect(false); WiFi.disconnect(); startPortal(); return; }
   if (online && !networkVerified) { networkVerified = true; saveConfig(); }
   configTime(0, 0, "pool.ntp.org", "time.cloudflare.com");  // UTC; only needed to check https certificates
@@ -1422,7 +1429,7 @@ void touchPoll() {
     if (!client_policy::doubleTap(lastTap, millis())) { lastTap = millis(); return; }
     lastTap = 0;
     if (mode != Mode::Paired) return;
-    pendingGesture = "photos-toggle"; logEvent("Touch: double tap, photos on or off", true);
+    pendingGesture = "photos-toggle"; logEvent(F("Touch: double tap, photos on or off"), true);
     lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u;  // the new image right away
     return;
   }
@@ -1432,7 +1439,7 @@ void touchPoll() {
     saveLater();
   } else if (swipe != client_policy::Swipe::None && mode == Mode::Paired) {
     pendingGesture = swipe == client_policy::Swipe::Left ? "scheme-next" : "scheme-previous";
-    logEvent("Touch: " + pendingGesture, true);
+    logEvent(String(F("Touch: ")) + pendingGesture, true);
     lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u;  // the new image right away
   }
 }
@@ -1455,7 +1462,7 @@ void loop() {
 #endif
   if (logDirty && millis() - logSavedAt >= 60000) saveLog();
   static bool clockLogged = false;
-  if (!clockLogged && clockSet()) { clockLogged = true; logEvent("Clock set (NTP)"); }
+  if (!clockLogged && clockSet()) { clockLogged = true; logEvent(F("Clock set (NTP)")); }
   settleQuickBoot();
   if (millis() - lastFooter >= 250) footer();
   if (mode == Mode::Portal) {
