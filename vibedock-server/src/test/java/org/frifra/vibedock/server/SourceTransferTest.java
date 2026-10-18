@@ -72,8 +72,8 @@ class SourceTransferTest {
         Path dir=Files.createTempDirectory("vibedock-import-");server(dir,"Private");
         var failing=new java.util.concurrent.atomic.AtomicBoolean(false);
         var target=new SettingsStore(dir.toString(),json){
-            @Override public synchronized void save(Settings settings) throws java.io.IOException {
-                if(failing.get())throw new java.io.IOException("disk full");super.save(settings);
+            @Override synchronized void save(Settings settings,String transaction) throws java.io.IOException {
+                if(failing.get())throw new java.io.IOException("disk full");super.save(settings,transaction);
             }
         };
         var before=target.get();var privat=before.accounts().get(0);
@@ -97,8 +97,8 @@ class SourceTransferTest {
         String file=new String(new SourceTransfer(source,json).export(PASSWORD),StandardCharsets.UTF_8);
         Path dir=Files.createTempDirectory("vibedock-import-");server(dir,"Private");
         var target=new SettingsStore(dir.toString(),json){
-            @Override public synchronized void save(Settings settings) throws java.io.IOException {
-                if(saved)super.save(settings);throw new Error("process stopped");
+            @Override synchronized void save(Settings settings,String transaction) throws java.io.IOException {
+                if(saved)super.save(settings,transaction);throw new Error("process stopped");
             }
         };
         var transfer=new SourceTransfer(target,json);var bundle=transfer.read(file,PASSWORD);
@@ -119,6 +119,22 @@ class SourceTransferTest {
         var restarted=new SettingsStore(dir.toString(),json);
         var work=restarted.get().accounts().get(0);assertEquals("Work",work.label());
         assertEquals("synthetic-Work",json.readTree(restarted.secrets.read(restarted.authDirectory(work).resolve("auth.json"))).path("tokens").path("access_token").asText());
+        try(var entries=Files.list(dir.resolve("auth"))){assertTrue(entries.noneMatch(p->p.getFileName().toString().startsWith(".replaced-")));}
+    }
+    @Test void aStoppedImportOfTheServersOwnExportKeepsItsSignIns() throws Exception {
+        // Its own backup: the same source ids before and after, so only the import's id tells whether it was saved.
+        Path dir=Files.createTempDirectory("vibedock-own-");var store=server(dir,"Private");
+        var privat=store.get().accounts().get(0);
+        String file=new String(new SourceTransfer(store,json).export(PASSWORD),StandardCharsets.UTF_8);
+        var target=new SettingsStore(dir.toString(),json){
+            @Override synchronized void save(Settings settings,String transaction){throw new Error("process stopped");}
+        };
+        var transfer=new SourceTransfer(target,json);var bundle=transfer.read(file,PASSWORD);
+        assertEquals(privat.id(),bundle.accounts().get(0).id());
+        assertThrows(Error.class,()->transfer.apply(bundle,Set.of(privat.id()),true));
+        var restarted=new SettingsStore(dir.toString(),json);
+        assertEquals("synthetic-Private",json.readTree(restarted.secrets.read(restarted.authDirectory(privat).resolve("auth.json"))).path("tokens").path("access_token").asText());
+        assertTrue(Files.exists(restarted.authDirectory(privat).resolve("history.jsonl")),"the whole sign-in folder is back, not only the exported file");
         try(var entries=Files.list(dir.resolve("auth"))){assertTrue(entries.noneMatch(p->p.getFileName().toString().startsWith(".replaced-")));}
     }
 }

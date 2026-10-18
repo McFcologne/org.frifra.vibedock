@@ -81,7 +81,10 @@ public class SettingsStore {
     }
     /** Earlier files had exactly one Codex and one Claude credential; they become the two default sources. */
     private Settings read(com.fasterxml.jackson.databind.JsonNode root) throws IOException {
-        if(root.has("accounts"))return json.treeToValue(root,Settings.class);
+        if(root.has("accounts")){
+            if(root instanceof com.fasterxml.jackson.databind.node.ObjectNode object)object.remove(IMPORT_TRANSACTION);
+            return json.treeToValue(root,Settings.class);
+        }
         List<String> ips=new ArrayList<>();root.path("allowedIps").forEach(n->ips.add(n.asText()));
         var devices=Arrays.asList(json.treeToValue(root.path("devices").isMissingNode()?json.createArrayNode():root.path("devices"),Device[].class));
         return new Settings(ips,credential(root.path("codex")),credential(root.path("claude")),devices);
@@ -159,9 +162,17 @@ public class SettingsStore {
             for(var path:paths.sorted(Comparator.reverseOrder()).toList())Files.deleteIfExists(path);
         }
     }
-    public synchronized void save(Settings settings) throws IOException {
+    public synchronized void save(Settings settings) throws IOException {save(settings,null);}
+    /**
+     * importTransaction: the import that writes these settings (SourceTransfer.apply). It is saved in the same atomic
+     * write, so after a stop a restart can tell whether that import was saved; the next save drops it.
+     */
+    static final String IMPORT_TRANSACTION="importTransaction";
+    synchronized void save(Settings settings,String importTransaction) throws IOException {
         validate(settings);
-        secrets.write(file,json.writeValueAsBytes(settings));
+        var node=json.valueToTree(settings);
+        if(importTransaction!=null)((com.fasterxml.jackson.databind.node.ObjectNode)node).put(IMPORT_TRANSACTION,importTransaction);
+        secrets.write(file,json.writeValueAsBytes(node));
         current=settings;
     }
 

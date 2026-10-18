@@ -111,6 +111,7 @@ class SourceTransfer {
         // Replacing moves the current sign-ins aside first; they are deleted only once everything is saved and are
         // put back if anything fails, so a failed import never leaves the old sources without their credentials.
         Path aside=null;Map<Path,Path> moved=new LinkedHashMap<>();List<Path> written=new ArrayList<>(),created=new ArrayList<>();
+        String transaction=UUID.randomUUID().toString();
         try{
             if(replace){
                 var present=old.accounts().stream().map(this::signIn).filter(p->Files.exists(p,LinkOption.NOFOLLOW_LINKS)).distinct().toList();
@@ -118,9 +119,8 @@ class SourceTransfer {
                     aside=store.authRoot().resolve(ASIDE+UUID.randomUUID());
                     Files.createDirectories(aside);Files.setPosixFilePermissions(aside,PosixFilePermissions.fromString("rwx------"));
                     // What a restart needs if the process ends half-way: where each parked folder belongs, and the
-                    // sources of the new settings, which tell whether the import was saved (recoverReplacements).
-                    var manifest=json.createObjectNode();
-                    var sources=manifest.putArray("accounts");next.forEach(a->sources.add(a.id()));
+                    // import's id, which settings.json carries once the import is saved (recoverReplacements).
+                    var manifest=json.createObjectNode();manifest.put("transaction",transaction);
                     var places=manifest.putArray("moved");present.forEach(p->places.add(store.authRoot().relativize(p).toString()));
                     Files.write(aside.resolve(MANIFEST),json.writeValueAsBytes(manifest));
                     int n=0;
@@ -132,7 +132,7 @@ class SourceTransfer {
                 Path signIn=signIn(entry.getKey());if(!Files.exists(signIn,LinkOption.NOFOLLOW_LINKS))created.add(signIn);
                 written.add(write(entry.getKey(),Base64.getDecoder().decode(entry.getValue())));
             }
-            store.save(settings);
+            store.save(settings,transaction);
         }catch(IOException|RuntimeException e){
             for(Path file:written)Files.deleteIfExists(file);
             for(Path signIn:created)deleteTree(signIn);
@@ -150,8 +150,9 @@ class SourceTransfer {
     /**
      * Finishes a replacing import that a stopped process left half-way, before the credential store reads auth/: the
      * parked sign-ins are encrypted for their own place and cannot be read where they are parked. When settings.json
-     * already holds the imported sources, the import was saved and the parked sign-ins are removed; otherwise they go
-     * back to their places, replacing what the import had written there.
+     * carries the import's id, the import was saved and the parked sign-ins are removed; otherwise they go back to
+     * their places, replacing what the import had written there. The source ids cannot tell: an import of the
+     * server's own export has the same ones before and after.
      */
     static void recoverReplacements(Path data) throws IOException {
         Path auth=data.resolve("auth");
@@ -162,11 +163,11 @@ class SourceTransfer {
         for(Path aside:asides){
             Path manifest=aside.resolve(MANIFEST);
             if(Files.isRegularFile(manifest,LinkOption.NOFOLLOW_LINKS)){
-                var plan=json.readTree(manifest.toFile());
-                var imported=new ArrayList<String>();plan.path("accounts").forEach(n->imported.add(n.asText()));
-                var current=new ArrayList<String>();Path settings=data.resolve("settings.json");
-                if(Files.isRegularFile(settings,LinkOption.NOFOLLOW_LINKS))json.readTree(settings.toFile()).path("accounts").forEach(n->current.add(n.path("id").asText()));
-                if(!current.equals(imported)){
+                var plan=json.readTree(manifest.toFile());String transaction=plan.path("transaction").asText("");
+                Path settings=data.resolve("settings.json");
+                boolean saved=!transaction.isEmpty()&&Files.isRegularFile(settings,LinkOption.NOFOLLOW_LINKS)
+                        &&transaction.equals(json.readTree(settings.toFile()).path(SettingsStore.IMPORT_TRANSACTION).asText());
+                if(!saved){
                     int n=0;
                     for(var place:plan.path("moved")){
                         Path parked=aside.resolve(String.valueOf(n++)),target=auth.resolve(place.asText()).normalize();
