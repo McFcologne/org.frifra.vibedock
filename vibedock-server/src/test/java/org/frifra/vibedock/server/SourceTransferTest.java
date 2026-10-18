@@ -91,4 +91,34 @@ class SourceTransferTest {
         assertFalse(Files.exists(target.authDirectory(privat)));
         try(var entries=Files.list(dir.resolve("auth"))){assertTrue(entries.noneMatch(p->p.getFileName().toString().startsWith(".replaced-")));}
     }
+    /** The process stops inside apply (an Error is not rolled back, like a killed server) before or after saving. */
+    private Path stoppedImport(boolean saved) throws Exception {
+        var source=server(Files.createTempDirectory("vibedock-export-"),"Work");
+        String file=new String(new SourceTransfer(source,json).export(PASSWORD),StandardCharsets.UTF_8);
+        Path dir=Files.createTempDirectory("vibedock-import-");server(dir,"Private");
+        var target=new SettingsStore(dir.toString(),json){
+            @Override public synchronized void save(Settings settings) throws java.io.IOException {
+                if(saved)super.save(settings);throw new Error("process stopped");
+            }
+        };
+        var transfer=new SourceTransfer(target,json);var bundle=transfer.read(file,PASSWORD);
+        assertThrows(Error.class,()->transfer.apply(bundle,Set.of(bundle.accounts().get(0).id()),true));
+        try(var entries=Files.list(dir.resolve("auth"))){assertTrue(entries.anyMatch(p->p.getFileName().toString().startsWith(".replaced-")),"the parked sign-ins are left behind");}
+        return dir;
+    }
+    @Test void aServerStoppedBeforeSavingAnImportStartsWithTheOldSignIns() throws Exception {
+        Path dir=stoppedImport(false);
+        var restarted=new SettingsStore(dir.toString(),json);
+        var privat=restarted.get().accounts().get(0);assertEquals("Private",privat.label());
+        assertEquals("synthetic-Private",json.readTree(restarted.secrets.read(restarted.authDirectory(privat).resolve("auth.json"))).path("tokens").path("access_token").asText());
+        assertTrue(Files.exists(restarted.authDirectory(privat).resolve("history.jsonl")));
+        try(var entries=Files.list(dir.resolve("auth"))){assertTrue(entries.noneMatch(p->p.getFileName().toString().startsWith(".replaced-")));}
+    }
+    @Test void aServerStoppedAfterSavingAnImportStartsWithTheImportedSignIns() throws Exception {
+        Path dir=stoppedImport(true);
+        var restarted=new SettingsStore(dir.toString(),json);
+        var work=restarted.get().accounts().get(0);assertEquals("Work",work.label());
+        assertEquals("synthetic-Work",json.readTree(restarted.secrets.read(restarted.authDirectory(work).resolve("auth.json"))).path("tokens").path("access_token").asText());
+        try(var entries=Files.list(dir.resolve("auth"))){assertTrue(entries.noneMatch(p->p.getFileName().toString().startsWith(".replaced-")));}
+    }
 }

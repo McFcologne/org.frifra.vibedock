@@ -47,6 +47,7 @@ final class SecretStore {
         this.keyFile=(keyFile.isBlank()?this.data.resolve(".installation-id"):Path.of(keyFile)).toAbsolutePath().normalize();
         this.runtime=Path.of(runtime.isBlank()?"/dev/shm":runtime).toAbsolutePath().normalize();this.checkRam=checkRam;
         if(this.runtime.startsWith(this.data))throw new IOException("AUTH_RUNTIME_DIR must be outside DATA_DIR");
+        SourceTransfer.recoverReplacements(this.data);
         var files=files();
         boolean encrypted=false;for(Path file:files){byte[] b=bytes(file);if(sealed(b)||new String(b,StandardCharsets.UTF_8).contains(FIELD_PREFIX)){encrypted=true;break;}}
         key=loadKey(encrypted);

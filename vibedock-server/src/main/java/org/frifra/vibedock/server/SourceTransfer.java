@@ -113,12 +113,18 @@ class SourceTransfer {
         Path aside=null;Map<Path,Path> moved=new LinkedHashMap<>();List<Path> written=new ArrayList<>(),created=new ArrayList<>();
         try{
             if(replace){
-                aside=store.authRoot().resolve(".replaced-"+UUID.randomUUID());int n=0;
-                for(var account:old.accounts()){
-                    Path signIn=signIn(account);
-                    if(!Files.exists(signIn,LinkOption.NOFOLLOW_LINKS))continue;
-                    if(moved.isEmpty()){Files.createDirectories(aside);Files.setPosixFilePermissions(aside,PosixFilePermissions.fromString("rwx------"));}
-                    Path parked=aside.resolve(String.valueOf(n++));Files.move(signIn,parked,StandardCopyOption.ATOMIC_MOVE);moved.put(signIn,parked);
+                var present=old.accounts().stream().map(this::signIn).filter(p->Files.exists(p,LinkOption.NOFOLLOW_LINKS)).distinct().toList();
+                if(!present.isEmpty()){
+                    aside=store.authRoot().resolve(ASIDE+UUID.randomUUID());
+                    Files.createDirectories(aside);Files.setPosixFilePermissions(aside,PosixFilePermissions.fromString("rwx------"));
+                    // What a restart needs if the process ends half-way: where each parked folder belongs, and the
+                    // sources of the new settings, which tell whether the import was saved (recoverReplacements).
+                    var manifest=json.createObjectNode();
+                    var sources=manifest.putArray("accounts");next.forEach(a->sources.add(a.id()));
+                    var places=manifest.putArray("moved");present.forEach(p->places.add(store.authRoot().relativize(p).toString()));
+                    Files.write(aside.resolve(MANIFEST),json.writeValueAsBytes(manifest));
+                    int n=0;
+                    for(Path signIn:present){Path parked=aside.resolve(String.valueOf(n++));Files.move(signIn,parked,StandardCopyOption.ATOMIC_MOVE);moved.put(signIn,parked);}
                 }
             }
             for(var entry:content.entrySet()){
@@ -139,6 +145,41 @@ class SourceTransfer {
         }
         if(aside!=null)deleteTree(aside);
         return next;
+    }
+    static final String ASIDE=".replaced-",MANIFEST="manifest.json";
+    /**
+     * Finishes a replacing import that a stopped process left half-way, before the credential store reads auth/: the
+     * parked sign-ins are encrypted for their own place and cannot be read where they are parked. When settings.json
+     * already holds the imported sources, the import was saved and the parked sign-ins are removed; otherwise they go
+     * back to their places, replacing what the import had written there.
+     */
+    static void recoverReplacements(Path data) throws IOException {
+        Path auth=data.resolve("auth");
+        if(!Files.isDirectory(auth,LinkOption.NOFOLLOW_LINKS))return;
+        List<Path> asides;
+        try(var list=Files.list(auth)){asides=list.filter(p->p.getFileName().toString().startsWith(ASIDE)&&Files.isDirectory(p,LinkOption.NOFOLLOW_LINKS)).toList();}
+        var json=new ObjectMapper();
+        for(Path aside:asides){
+            Path manifest=aside.resolve(MANIFEST);
+            if(Files.isRegularFile(manifest,LinkOption.NOFOLLOW_LINKS)){
+                var plan=json.readTree(manifest.toFile());
+                var imported=new ArrayList<String>();plan.path("accounts").forEach(n->imported.add(n.asText()));
+                var current=new ArrayList<String>();Path settings=data.resolve("settings.json");
+                if(Files.isRegularFile(settings,LinkOption.NOFOLLOW_LINKS))json.readTree(settings.toFile()).path("accounts").forEach(n->current.add(n.path("id").asText()));
+                if(!current.equals(imported)){
+                    int n=0;
+                    for(var place:plan.path("moved")){
+                        Path parked=aside.resolve(String.valueOf(n++)),target=auth.resolve(place.asText()).normalize();
+                        if(!target.startsWith(auth)||target.equals(auth))throw new IOException("Invalid place in "+data.relativize(manifest));
+                        if(!Files.exists(parked,LinkOption.NOFOLLOW_LINKS))continue;
+                        deleteTree(target);Files.createDirectories(target.getParent());
+                        Files.move(parked,target,StandardCopyOption.ATOMIC_MOVE);
+                    }
+                }
+            }
+            // Without a manifest nothing had been moved yet.
+            deleteTree(aside);
+        }
     }
     /** What a replacement removes: the whole sign-in folder, or only the credential file of an earlier default source. */
     private Path signIn(SettingsStore.Account account){
