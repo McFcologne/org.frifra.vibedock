@@ -218,7 +218,7 @@ Everything the server keeps lives in the data directory, by default `vibedock-se
 | `firmware/` | Own firmware builds uploaded under **Devices → Firmware**, one folder per board (only when used) |
 | `logs/` | `vibedock.log` and the daily request logs (kept 14 days) |
 
-The directory contains **encrypted credentials and the private `.installation-id` needed to read them**: keep it private, never commit or publish it. Include hidden files in a backup; an existing plaintext installation is migrated automatically on startup. Password-protected data-source exports remain independent of that installation identity. It survives
+The directory contains **encrypted credentials and the private `.installation-id` needed to read them**: keep it private, never commit or publish it. Settings and sign-in caches remain readable JSON; only credential fields such as tokens, refresh tokens and API keys are encrypted. The portal password remains a BCrypt hash, without additional encryption. Include hidden files in a backup; existing plaintext credentials and the earlier whole-file encryption format are migrated automatically on startup. Password-protected data-source exports remain independent of that installation identity. It survives
 restarts, rebuilds and updates of the image.
 
 To keep the data elsewhere, prepare a directory for user 10001 and name it in `.env`:

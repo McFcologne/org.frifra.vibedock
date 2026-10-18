@@ -1,5 +1,12 @@
 package org.frifra.vibedock.server;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+
 import javax.crypto.Cipher;
 import javax.crypto.Mac;
 import javax.crypto.spec.GCMParameterSpec;
@@ -11,15 +18,19 @@ import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Authenticated encryption of settings and CLI caches; plaintext CLI workspaces live on a RAM filesystem only. */
+/** Encrypts secret JSON fields, keeping configuration and metadata readable; CLI plaintext stays in RAM. */
 final class SecretStore {
     private static final String MAGIC="VIBEDOCK-SEALED-1\n";
     private static final byte[] PREFIX=MAGIC.getBytes(StandardCharsets.US_ASCII);
+    static final String FIELD_PREFIX="vibedock:sealed:v1:";
+    private static final ObjectMapper JSON=new ObjectMapper().enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
+    private static final Set<String> SECRET_NAMES=Set.of("token","accesstoken","refreshtoken","idtoken","apikey","openaikey","openaiapikey","anthropicapikey","authtoken","clientsecret","password");
     private static final long MAX_FILE=32L*1024*1024;
     private final Path data,keyFile,runtime;
     private final boolean checkRam;
@@ -37,10 +48,10 @@ final class SecretStore {
         this.runtime=Path.of(runtime.isBlank()?"/dev/shm":runtime).toAbsolutePath().normalize();this.checkRam=checkRam;
         if(this.runtime.startsWith(this.data))throw new IOException("AUTH_RUNTIME_DIR must be outside DATA_DIR");
         var files=files();
-        boolean encrypted=false;for(Path file:files)if(sealed(bytes(file))){encrypted=true;break;}
+        boolean encrypted=false;for(Path file:files){byte[] b=bytes(file);if(sealed(b)||new String(b,StandardCharsets.UTF_8).contains(FIELD_PREFIX)){encrypted=true;break;}}
         key=loadKey(encrypted);
         // Check every existing ciphertext before changing anything: a wrong key must never replace old data.
-        for(Path file:files){byte[] b=bytes(file);if(sealed(b))Arrays.fill(open(file,b),(byte)0);}
+        for(Path file:files){byte[] clear=clear(file,bytes(file));Arrays.fill(clear,(byte)0);}
         for(Path file:files)migrate(file);
     }
     private List<Path> files() throws IOException {
@@ -48,15 +59,32 @@ final class SecretStore {
         if(Files.exists(settings,LinkOption.NOFOLLOW_LINKS))files.add(settings);
         Path auth=data.resolve("auth");
         if(Files.exists(auth,LinkOption.NOFOLLOW_LINKS)){
-            if(Files.isSymbolicLink(auth))throw new IOException("Symbolic links are not supported in the credential store");
-            try(var paths=Files.walk(auth)){
-                for(Path p:paths.toList()){
-                    if(Files.isSymbolicLink(p))throw new IOException("Symbolic links are not supported in the credential store");
-                    if(Files.isRegularFile(p,LinkOption.NOFOLLOW_LINKS))files.add(p);
-                }
-            }
+            for(Path p:entries(auth,true))if(Files.isRegularFile(p,LinkOption.NOFOLLOW_LINKS))files.add(p);
         }
         return files;
+    }
+    /** Codex creates executable links under each account's tmp/arg0. They are disposable launcher files, not credentials. */
+    private boolean launcherScratch(Path root,Path path,boolean authRoot){
+        Path relative=root.relativize(path);int prefix=0;
+        if(authRoot)prefix=relative.getNameCount()>0&&relative.getName(0).toString().equals("accounts")?2:1;
+        return relative.getNameCount()>=prefix+2&&relative.getName(prefix).toString().equals("tmp")
+                &&relative.getName(prefix+1).toString().equals("arg0");
+    }
+    /** Never follow links; skip launcher scratch trees before visiting their contents. */
+    private List<Path> entries(Path root,boolean authRoot) throws IOException {
+        var result=new ArrayList<Path>();
+        Files.walkFileTree(root,new SimpleFileVisitor<>(){
+            @Override public FileVisitResult preVisitDirectory(Path dir,BasicFileAttributes attrs){
+                if(launcherScratch(root,dir,authRoot))return FileVisitResult.SKIP_SUBTREE;
+                result.add(dir);return FileVisitResult.CONTINUE;
+            }
+            @Override public FileVisitResult visitFile(Path file,BasicFileAttributes attrs) throws IOException {
+                if(launcherScratch(root,file,authRoot))return FileVisitResult.CONTINUE;
+                if(attrs.isSymbolicLink())throw new IOException("Symbolic links are not supported in credential files: "+data.relativize(file.toAbsolutePath().normalize()));
+                if(attrs.isRegularFile())result.add(file);return FileVisitResult.CONTINUE;
+            }
+        });
+        return result;
     }
     private byte[] loadKey(boolean required) throws IOException {
         if(!Files.exists(keyFile,LinkOption.NOFOLLOW_LINKS)){
@@ -89,14 +117,81 @@ final class SecretStore {
         try(var in=Files.newInputStream(file,LinkOption.NOFOLLOW_LINKS)){byte[] b=in.readNBytes((int)MAX_FILE+1);if(b.length>MAX_FILE)throw new IOException("Credential file too large");return b;}
     }
     synchronized byte[] read(Path file) throws IOException {
-        byte[] stored=bytes(file);
-        if(sealed(stored))return open(file,stored);
-        // Also cover an old CLI file installed while the server was running.
-        write(file,stored);return stored;
+        byte[] stored=bytes(file),plain=clear(file,stored);
+        if(sealed(stored)||needsMigration(file,stored))write(file,plain);
+        return plain;
     }
     private void migrate(Path file) throws IOException {
-        byte[] plain=bytes(file);
-        try{if(!sealed(plain))write(file,plain);}finally{Arrays.fill(plain,(byte)0);}
+        byte[] stored=bytes(file);
+        if(!sealed(stored)&&!needsMigration(file,stored))return;
+        byte[] plain=clear(file,stored);
+        try{write(file,plain);}finally{Arrays.fill(plain,(byte)0);}
+    }
+    private JsonNode tree(byte[] bytes){
+        try{return JSON.readTree(bytes);}catch(IOException e){return null;}
+    }
+    private boolean secret(Path file,String name){
+        String normalized=name.replace("_","").replace("-","").toLowerCase(Locale.ROOT);
+        return SECRET_NAMES.contains(normalized)||(name.equals("key")&&file.getFileName().toString().equals("auth.json"));
+    }
+    private boolean needsMigration(Path file,byte[] bytes){return plainSecrets(file,tree(bytes));}
+    private boolean plainSecrets(Path file,JsonNode node){
+        if(node==null)return false;
+        if(node.isObject()){
+            var fields=node.fields();while(fields.hasNext()){
+                var field=fields.next();var value=field.getValue();
+                if(secret(file,field.getKey())&&value.isTextual()&&!value.textValue().isBlank()&&!value.textValue().startsWith(FIELD_PREFIX))return true;
+                if(plainSecrets(file,value))return true;
+            }
+        }else if(node.isArray())for(var value:node)if(plainSecrets(file,value))return true;
+        return false;
+    }
+    private byte[] clear(Path file,byte[] stored) throws IOException {
+        byte[] plain=sealed(stored)?open(file,stored):stored;
+        if(!new String(plain,StandardCharsets.UTF_8).contains(FIELD_PREFIX))return plain.clone();
+        JsonNode node=tree(plain);
+        if(node==null)throw new IOException("Invalid JSON containing encrypted credential fields");
+        return JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(fields(file,node,"",false,false));
+    }
+    private JsonNode fields(Path file,JsonNode node,String pointer,boolean encrypt,boolean protectedField) throws IOException {
+        if(node.isObject()){
+            var result=(ObjectNode)node.deepCopy();var names=node.fieldNames();
+            while(names.hasNext()){
+                String name=names.next(),part=name.replace("~","~0").replace("/","~1");
+                result.set(name,fields(file,node.get(name),pointer+"/"+part,encrypt,secret(file,name)));
+            }
+            return result;
+        }
+        if(node.isArray()){
+            var result=(ArrayNode)node.deepCopy();for(int i=0;i<node.size();i++)result.set(i,fields(file,node.get(i),pointer+"/"+i,encrypt,false));return result;
+        }
+        if(!node.isTextual())return node;
+        String value=node.textValue();
+        if(value.startsWith(FIELD_PREFIX)){
+            String decoded=openField(file,pointer,value);return encrypt?node:TextNode.valueOf(decoded);
+        }
+        return encrypt&&protectedField&&!value.isBlank()?TextNode.valueOf(sealField(file,pointer,value)):node;
+    }
+    private byte[] fieldAad(Path file,String pointer) throws IOException {
+        return (new String(aad(file),StandardCharsets.UTF_8)+"\nfield:"+pointer).getBytes(StandardCharsets.UTF_8);
+    }
+    private String openField(Path file,String pointer,String value) throws IOException {
+        try{
+            byte[] encoded=Base64.getDecoder().decode(value.substring(FIELD_PREFIX.length()));if(encoded.length<28)throw new IllegalArgumentException();
+            var cipher=Cipher.getInstance("AES/GCM/NoPadding");cipher.init(Cipher.DECRYPT_MODE,new SecretKeySpec(key,"AES"),new GCMParameterSpec(128,encoded,0,12));
+            cipher.updateAAD(fieldAad(file,pointer));byte[] plain=cipher.doFinal(encoded,12,encoded.length-12);
+            try{return new String(plain,StandardCharsets.UTF_8);}finally{Arrays.fill(plain,(byte)0);}
+        }catch(GeneralSecurityException|IllegalArgumentException e){throw new IOException("Cannot decrypt credential field: wrong installation ID, moved field or damaged value. Existing data was not changed.");}
+    }
+    private String sealField(Path file,String pointer,String value) throws IOException {
+        try{
+            byte[] nonce=new byte[12];random.nextBytes(nonce);var cipher=Cipher.getInstance("AES/GCM/NoPadding");
+            cipher.init(Cipher.ENCRYPT_MODE,new SecretKeySpec(key,"AES"),new GCMParameterSpec(128,nonce));cipher.updateAAD(fieldAad(file,pointer));
+            byte[] plain=value.getBytes(StandardCharsets.UTF_8),encrypted;
+            try{encrypted=cipher.doFinal(plain);}finally{Arrays.fill(plain,(byte)0);}
+            String stored=FIELD_PREFIX+Base64.getEncoder().encodeToString(ByteBuffer.allocate(12+encrypted.length).put(nonce).put(encrypted).array());
+            if(!value.equals(openField(file,pointer,stored)))throw new IOException("Credential field encryption verification failed");return stored;
+        }catch(GeneralSecurityException e){throw new IOException("Token encryption unavailable",e);}
     }
     private byte[] aad(Path file) throws IOException {
         Path path=file.toAbsolutePath().normalize();
@@ -113,15 +208,11 @@ final class SecretStore {
         }catch(GeneralSecurityException|IllegalArgumentException e){throw new IOException("Cannot decrypt stored credentials: wrong key or damaged file. Existing data was not changed.");}
     }
     synchronized void write(Path file,byte[] plain) throws IOException {
-        try{
-            byte[] nonce=new byte[12];random.nextBytes(nonce);var cipher=Cipher.getInstance("AES/GCM/NoPadding");
-            cipher.init(Cipher.ENCRYPT_MODE,new SecretKeySpec(key,"AES"),new GCMParameterSpec(128,nonce));cipher.updateAAD(aad(file));
-            byte[] encrypted=cipher.doFinal(plain),encoded=Base64.getEncoder().encode(ByteBuffer.allocate(12+encrypted.length).put(nonce).put(encrypted).array());
-            byte[] stored=ByteBuffer.allocate(PREFIX.length+encoded.length).put(PREFIX).put(encoded).array();
-            // Verify the complete new ciphertext before atomically replacing a legacy or current file.
-            byte[] verified=open(file,stored);try{if(!Arrays.equals(plain,verified))throw new IOException("Credential encryption verification failed");}finally{Arrays.fill(verified,(byte)0);}
-            atomic(file,stored);
-        }catch(GeneralSecurityException e){throw new IOException("Token encryption unavailable",e);}
+        // Non-secret fields and non-JSON auxiliary files stay readable and are never wrapped as a whole file.
+        JsonNode node=tree(plain);byte[] stored=plain;
+        if(node!=null&&plainSecrets(file,node))stored=JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(fields(file,node,"",true,false));
+        else if(node!=null&&new String(plain,StandardCharsets.UTF_8).contains(FIELD_PREFIX))fields(file,node,"",false,false);
+        atomic(file,stored);
     }
     private static void atomic(Path target,byte[] bytes) throws IOException {
         Files.createDirectories(target.toAbsolutePath().getParent());
@@ -146,13 +237,10 @@ final class SecretStore {
             if(checkRam&&!Set.of("tmpfs","ramfs").contains(Files.getFileStore(runtime).type()))throw new IOException("AUTH_RUNTIME_DIR must be a RAM filesystem (tmpfs or ramfs)");
             path=Files.createTempDirectory(runtime,"vibedock-auth-",PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
             if(Files.exists(original,LinkOption.NOFOLLOW_LINKS)){
-                try(var paths=Files.walk(original)){
-                    for(Path p:paths.toList()){
-                        if(Files.isSymbolicLink(p))throw new IOException("Symbolic links are not supported in sign-in folders");
-                        Path dest=path.resolve(original.relativize(p));
-                        if(Files.isDirectory(p))Files.createDirectories(dest);
-                        else {byte[] clear=read(p);try{Files.write(dest,clear,StandardOpenOption.CREATE_NEW);Files.setPosixFilePermissions(dest,PosixFilePermissions.fromString("rw-------"));}finally{Arrays.fill(clear,(byte)0);}}
-                    }
+                for(Path p:entries(original,false)){
+                    Path dest=path.resolve(original.relativize(p));
+                    if(Files.isDirectory(p,LinkOption.NOFOLLOW_LINKS))Files.createDirectories(dest);
+                    else {byte[] clear=read(p);try{Files.write(dest,clear,StandardOpenOption.CREATE_NEW);Files.setPosixFilePermissions(dest,PosixFilePermissions.fromString("rw-------"));}finally{Arrays.fill(clear,(byte)0);}}
                 }
             }
             return new Workspace(original,path,lockChannel,lock);
@@ -167,14 +255,11 @@ final class SecretStore {
         private final Set<Path> initial=new HashSet<>();
         Workspace(Path original,Path path,FileChannel lockChannel,FileLock lock) throws IOException {
             this.original=original;this.path=path;this.lockChannel=lockChannel;this.lock=lock;
-            try(var files=Files.walk(path)){files.filter(p->Files.isRegularFile(p,LinkOption.NOFOLLOW_LINKS)).forEach(p->initial.add(path.relativize(p)));}
+            for(Path p:entries(path,false))if(Files.isRegularFile(p,LinkOption.NOFOLLOW_LINKS))initial.add(path.relativize(p));
         }
         synchronized void commit() throws IOException {
-            try(var paths=Files.walk(path)){
-                for(Path p:paths.filter(p->!Files.isDirectory(p,LinkOption.NOFOLLOW_LINKS)).toList()){
-                    if(Files.isSymbolicLink(p))throw new IOException("CLI produced a symbolic link in its sign-in folder");
-                    byte[] clear=bytes(p);try{write(original.resolve(path.relativize(p)),clear);}finally{Arrays.fill(clear,(byte)0);}
-                }
+            for(Path p:entries(path,false))if(Files.isRegularFile(p,LinkOption.NOFOLLOW_LINKS)){
+                byte[] clear=bytes(p);try{write(original.resolve(path.relativize(p)),clear);}finally{Arrays.fill(clear,(byte)0);}
             }
             for(Path relative:initial)if(!Files.exists(path.resolve(relative),LinkOption.NOFOLLOW_LINKS))Files.deleteIfExists(original.resolve(relative));
         }
