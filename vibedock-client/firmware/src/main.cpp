@@ -11,6 +11,16 @@
 #include <TFT_eSPI.h>
 #include "client_policy.h"
 #include "touch.h"
+#ifdef VIBEDOCK_WIFI_NO_AMPDU_TX
+// ESP32-C6: the Wi-Fi driver crashed in ppResortTxAMPDU (aggregated sending) when swipes sent requests in quick
+// succession. Sending without aggregation; receiving keeps it. Linked in front of esp_wifi_init (platformio.ini).
+#include <esp_wifi.h>
+extern "C" esp_err_t __real_esp_wifi_init(const wifi_init_config_t *config);
+extern "C" esp_err_t __wrap_esp_wifi_init(const wifi_init_config_t *config) {
+  wifi_init_config_t changed = *config; changed.ampdu_tx_enable = 0;
+  return __real_esp_wifi_init(&changed);
+}
+#endif
 #if defined(VIBEDOCK_BOOT_TRACE) && defined(ESP32) && ESP_ARDUINO_VERSION_MAJOR >= 3
 #include "esp32-hal-periman.h"  // the pin owners in the start diagnosis
 #endif
