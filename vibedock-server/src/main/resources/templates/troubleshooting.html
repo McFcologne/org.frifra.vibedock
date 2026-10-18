@@ -30,7 +30,7 @@
       <td><strong th:text="${c.name}"></strong><br><span class="meta" th:text="${c.status}"></span>
         <th:block th:if="${t.live != null}"><br><span class="meta" th:text="${t.liveSummary()}"></span></th:block>
         <th:block th:if="${t.start != null}"><br><span class="badge" th:classappend="${t.start.unexpected()} ? 'warn' : 'ok'"
-            th:text="${'Last start: ' + t.start.kind + (t.start.unexpected() and t.start.previousPhase != null ? ', before in ' + t.start.previousPhase : '')}"></span></th:block></td>
+            th:text="${'Last start: ' + t.start.kind + (t.start.unexpected() and t.start.previousPhase != null ? ', before in ' + t.start.previousPhase : '') + (t.start.crashCode != null ? ', crash at ' + t.start.crashAddresses() : '')}"></span></th:block></td>
       <td th:text="${c.board.label + ' · ' + (c.firmware ?: 'unknown')}"></td>
       <td data-log-fresh><th:block th:if="${t.latest != null}">
           <span th:text="${t.age}" th:title="${'Received ' + t.received + ' (server time); its lines can be older'}"></span>

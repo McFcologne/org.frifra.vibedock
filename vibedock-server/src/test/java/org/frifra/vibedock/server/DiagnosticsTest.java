@@ -79,9 +79,26 @@ class DiagnosticsTest {
         for(int i=0;i<30;i++)diagnostics.report(id,String.format("boot=%08x;start=software",0x1000+i),"0.2.1",null);
         assertEquals(DeviceDiagnostics.KEEP,diagnostics.starts(id).size());assertEquals("0000101d",diagnostics.starts(id).get(0).bootId());
     }
+    @Test void theCrashOfTheRunBeforeIsKeptAndNamedForDecoding(@TempDir Path dir) throws Exception {
+        var diagnostics=new DeviceDiagnostics(dir.toString(),json,new TestClock());String id="vibedock-0a1b2c000014";
+        diagnostics.report(id,"boot=0000c0de;up=4;start=crash;reset=4;prev=0000c0dd;phase=idle;prevup=43;panic=4200a1b2,4200c3d4,40800100;cause=5;fault=0;abort=assert failed: x.c 12 (ok)",
+                "0.2.0","waveshare-c6-touch-lcd-169");
+        var s=diagnostics.starts(id).get(0);
+        assertEquals("4200a1b2,4200c3d4,40800100",s.crashCode());assertEquals(5L,s.crashCause());assertEquals("0",s.crashAddress());
+        assertEquals("assert failed: x.c 12 (ok)",s.crashText());assertEquals("0x4200a1b2 0x4200c3d4 0x40800100",s.crashAddresses());
+        var registry=new ClientRegistry(dir.toString(),json,Clock.systemUTC());
+        registry.paired(id,"Shelf","ab".repeat(32),"192.168.1.22",80,"waveshare-c6-touch-lcd-169");
+        var d=SupportDiagnosis.display(registry.get(id),null,null,List.of(s),null,System.currentTimeMillis(),ZoneId.of("UTC"),NONE);
+        assertTrue(d.observed().contains("Crash of the run before at 0x4200a1b2 0x4200c3d4 0x40800100, cause 5, address 0x0: assert failed: x.c 12 (ok)"));
+        assertTrue(d.missing().stream().anyMatch(t->t.startsWith("To decode the crash: addr2line -pfiaC -e <the ELF of waveshare-c6-touch-lcd-169 0.2.0> 0x4200a1b2")));
+        assertFalse(d.missing().stream().anyMatch(t->t.startsWith("The backtrace")),"the addresses came over the network");
+        // Invalid crash values are dropped, a start from older firmware has none.
+        var v=DeviceDiagnostics.parse("boot=0000c0df;panic=4200a1b2,zz;cause=-1;fault=123456789;abort=a;b<script>");
+        assertFalse(v.containsKey("panic"));assertFalse(v.containsKey("cause"));assertFalse(v.containsKey("fault"));
+    }
     private static final SupportRedactor NONE=new SupportRedactor(List.of(),false);
     private static DeviceDiagnostics.Start start(String boot,String kind,String phase,Long up,Long min){
-        return new DeviceDiagnostics.Start(boot,1_760_000_000_000L,"0.2.0","x",kind,4,phase==null?null:"00000001",phase,up,null,min,null,null);
+        return new DeviceDiagnostics.Start(boot,1_760_000_000_000L,"0.2.0","x",kind,4,phase==null?null:"00000001",phase,up,null,min,null,null,null,null,null,null);
     }
     @Test void theOverviewTellsObservedFromSuspectedAndNamesWhatIsMissing(@TempDir Path dir) throws Exception {
         var registry=new ClientRegistry(dir.toString(),json,Clock.systemUTC());

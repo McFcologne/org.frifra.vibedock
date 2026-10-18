@@ -251,16 +251,25 @@ Turning an address back into a source line needs the symbols of exactly that bui
   ```sh
   ~/.platformio/packages/toolchain-xtensa/bin/xtensa-lx106-elf-addr2line -pfiaC -e vibedock-m1-<version>.elf 0x40212345
   ```
-- **ESP32 boards (S3, C6, …):** the display reports the reset (`start=crash reset=4`) and the phase before, but the
-  backtrace of a panic is only printed on the USB serial port. Keep the display connected and read it with the decoder,
-  which needs the ELF of the running build:
+- **ESP32 boards (S3, C6, …):** the panic handler keeps the crash in RTC memory; after the restart the start line
+  names it (`Exception: pc 0x4200a1b2 < 0x4200c3d4, cause 5, address 0x0`) and the display reports it with its next
+  pull (`panic=…`, in the support file as *Crash of the run before at …*). The C6 (Arduino core 3) sends up to six
+  addresses of its backtrace, the other ESP32 boards (core 2) the instruction and the return address, after
+  `abort()` or a failed assert also its text. Decode them with the ELF of that build:
+
+  ```sh
+  ~/.platformio/packages/toolchain-riscv32-esp/bin/riscv32-esp-elf-addr2line -pfiaC -e waveshare-c6-touch-lcd-169-<version>.elf 0x4200a1b2 0x4200c3d4
+  ```
+
+  On the S3 and the other Xtensa boards use `xtensa-esp32s3-elf-addr2line` (or `xtensa-esp32-elf-addr2line`). The
+  complete backtrace and the registers are only printed on the USB serial port; for those keep the display connected
+  and read it with the decoder:
 
   ```sh
   pio device monitor -d firmware -e <board> -f esp32_exception_decoder
   ```
 
-  Keeping the backtrace across the restart would need a core dump partition in flash, which this firmware does not
-  have (changing the partition table is a separate step, not done by an update).
+  A power cut clears the RTC memory: a crash followed by unplugging is not reported.
 
 ## Troubleshooting and scope of validation
 

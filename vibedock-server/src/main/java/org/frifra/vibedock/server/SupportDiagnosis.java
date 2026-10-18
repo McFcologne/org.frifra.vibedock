@@ -54,6 +54,9 @@ final class SupportDiagnosis {
             observed.add("Last start "+time(start.seenAt(),zone)+": "+start.kind()+(start.resetCode()==null?"":" (reset code "+start.resetCode()+")")
                     +(start.previousPhase()!=null?"; the run before ended in phase "+start.previousPhase()+" after "+start.previousUptime()+" s"
                     +(start.previousHeapMin()!=null?", lowest free memory "+start.previousHeapMin()+" B":""):"; the run before is unknown"));
+            if(start.crashCode()!=null)observed.add("Crash of the run before at "+start.crashAddresses()
+                    +(start.crashCause()==null?"":", cause "+start.crashCause()+", address 0x"+start.crashAddress())
+                    +(start.crashText()==null?"":": "+start.crashText()));
             observed.add(unexpected+" unexpected of the last "+starts.size()+" start(s) the display reported");
         }
         if(live!=null&&live.wifiDrops()!=null&&live.wifiDrops()>0)observed.add("Wi-Fi lost "+live.wifiDrops()+"× since the current start");
@@ -89,9 +92,11 @@ final class SupportDiagnosis {
         else if(differs)missing.add("No log of the firmware it runs now: Request current logs");
         if(start!=null&&start.unexpected()){
             if(start.previousPhase()==null)missing.add("The state before the restart was not kept");
-            if(!esp8266)missing.add("The backtrace of a panic: printed on the serial port only (FLASHING.md, Decoding a crash)");
-            if(esp8266&&crash==null)missing.add("The crash record: in the log of that start (read the log)");
-            missing.add("To decode addresses: the ELF of "+v.board().id()+" "+(start.firmware()==null?"of that firmware":start.firmware()));
+            if(start.crashCode()==null&&!esp8266)missing.add("The backtrace of a panic: printed on the serial port only (FLASHING.md, Decoding a crash)");
+            if(start.crashCode()==null&&esp8266&&crash==null)missing.add("The crash record: in the log of that start (read the log)");
+            String elf="the ELF of "+v.board().id()+" "+(start.firmware()==null?"of that firmware":start.firmware());
+            missing.add(start.crashCode()==null?"To decode addresses: "+elf
+                    :"To decode the crash: addr2line -pfiaC -e <"+elf+"> "+start.crashAddresses());
         }
         if(suspected.isEmpty())suspected.add("Nothing points to a problem");
         return new Display(v.identifier(),redactor.text(v.name()),v.board().id(),v.status(),pull,v.firmware(),latest==null?null:latest.firmware(),

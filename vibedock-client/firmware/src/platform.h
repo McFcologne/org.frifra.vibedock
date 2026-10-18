@@ -72,9 +72,13 @@ inline bool powerCycleStart() {
   return reason == ESP_RST_POWERON || reason == ESP_RST_EXT;
 #endif
 }
-#if defined(ESP8266)
-String lastCrash();  // crash.cpp
-#endif
+// crash.cpp: the crash of the run before as text (ESP8266: the crash record; ESP32: what the panic handler saw), and
+// for X-VibeDock-Diag as "<code addresses in hex, pc first, comma-separated>" with ";cause=…;fault=…" where known and
+// ";abort=<text>" after abort or assert (empty without a crash). crashBegin() reads the record of the run before and
+// (Arduino core 3) registers the panic handler; called first in setup().
+String lastCrash();
+String crashHeader();
+void crashBegin();
 // crash.cpp: the reset as a number (ESP8266: rst_info reason or the crash record's; ESP32: esp_reset_reason) and
 // its kind, and the diagnosis record in memory that survives a reset.
 uint32_t resetCode();
@@ -98,8 +102,8 @@ inline String resetReason() {
     case ESP_RST_POWERON: return "Power on";
     case ESP_RST_EXT: return "External reset";
     case ESP_RST_SW: return "Software restart";
-    case ESP_RST_PANIC: return "Exception";
-    case ESP_RST_INT_WDT: case ESP_RST_TASK_WDT: case ESP_RST_WDT: return "Watchdog";
+    case ESP_RST_PANIC: return lastCrash().isEmpty() ? "Exception" : "Exception: " + lastCrash();
+    case ESP_RST_INT_WDT: case ESP_RST_TASK_WDT: case ESP_RST_WDT: return lastCrash().isEmpty() ? "Watchdog" : "Watchdog: " + lastCrash();
     case ESP_RST_BROWNOUT: return "Brownout";
     case ESP_RST_DEEPSLEEP: return "Deep sleep";
     default: return "Other";

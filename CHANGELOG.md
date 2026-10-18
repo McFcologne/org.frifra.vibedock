@@ -29,7 +29,9 @@ the administration (over Wi-Fi where their firmware can, otherwise once over USB
   data sources, displays, logs; opened again as sections or raw JSON to copy; secrets removed) for problem reports,
   with the key shown once.
 - **Crash diagnosis:** displays report how each start came about (power on, update, reset button, crash, watchdog,
-  …), the platform's reset code and the last phase, run time and memory before a reset; each start counts once. The
+  …), the platform's reset code and the last phase, run time and memory before a reset; each start counts once. After
+  a crash, ESP32 boards also send its code addresses (on the C6 a backtrace), the cause and the text of an abort, to
+  decode with the ELF without a USB cable. The
   Troubleshooting page shows how old the newest log is and from which firmware, asks all displays for current logs at
   once, and the support file adds a diagnosis per display (observed, suspected, missing). Closing an administration
   page no longer logs "Saving failed".
@@ -39,6 +41,8 @@ the administration (over Wi-Fi where their firmware can, otherwise once over USB
 - **`flash.sh`** finds the chip, takes the board the device reports, and asks only when it cannot tell.
 - **Test mode for development:** made-up usage and no sign-in (`DEMO_USAGE`, `ADMIN_AUTH=none`), and a quicker Docker
   build without the manual.
+- The C6 keeps its log in memory only for now (test whether writing it to flash causes its crashes in phase idle);
+  the crash itself is in the next start's line.
 - ESP32 boards stay on Arduino core 2 (core 3 crashed on the ESP32-S3); only the C6 uses core 3. Docker needs room
   for its toolchain: free space in Docker Desktop if the build reports *No space left on device*.
 

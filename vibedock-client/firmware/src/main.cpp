@@ -104,7 +104,7 @@ String diagStart() {
 }
 // X-VibeDock-Diag with every request: the current start and, as far as known, the run before (DeviceDiagnostics).
 String diagHeader() {
-  char text[300];
+  char text[400];
   int n = snprintf(text, sizeof(text), "boot=%08lx;up=%lu;heap=%lu;min=%lu;rssi=%d;drops=%u;start=%s;reset=%lu", (unsigned long)diag.boot,
                    (unsigned long)(millis() / 1000), (unsigned long)diag.heapFree, (unsigned long)diag.heapMin, int(diag.rssi), unsigned(diag.drops),
                    startKind, (unsigned long)platform::resetCode());
@@ -112,7 +112,8 @@ String diagHeader() {
     snprintf(text + n, sizeof(text) - n, ";prev=%08lx;phase=%s;prevup=%lu;prevheap=%lu;prevmin=%lu;prevrssi=%d;prevdrops=%u", (unsigned long)previousDiag.boot,
              client_policy::phaseName(previousDiag.phase), (unsigned long)previousDiag.uptime, (unsigned long)previousDiag.heapFree,
              (unsigned long)previousDiag.heapMin, int(previousDiag.rssi), unsigned(previousDiag.drops));
-  return text;
+  String crash = platform::crashHeader();
+  return crash.isEmpty() ? String(text) : String(text) + ";panic=" + crash;
 }
 // ---- device log: the last events, kept in /log.txt across restarts and read over USB (VIBEDOCK-LOG) ----
 // What the display did and why a connection failed; no keys, passwords or tokens.
@@ -123,7 +124,12 @@ String logLast; uint16_t logRepeats = 0;
 bool logStored = false;  // the storage is mounted; until then events stay in memory
 bool logDirty = false; uint32_t logSavedAt = 0;
 bool logParked = false;  // see parkLog
+// VIBEDOCK_LOG_IN_MEMORY: the log is not written to flash (test on the ESP32-C6, whether writing it causes the
+// crashes); the lines of a run are lost with a reset, the crash itself is in the next start's line.
 void saveLog() {
+#ifdef VIBEDOCK_LOG_IN_MEMORY
+  logDirty = false; logSavedAt = millis(); return;
+#endif
   if (!logStored || logParked) return;  // parked: the file is complete, the lines in memory are not
   logDirty = false; logSavedAt = millis();
   auto out = LittleFS.open("/log.tmp", "w"); if (!out) return;
@@ -133,6 +139,9 @@ void saveLog() {
 // During a TLS 1.3 handshake the ESP8266 needs every kilobyte: the lines are then only in /log.txt and their heap is
 // free. Reading the log meanwhile reads the file; a new event brings the lines back first.
 void parkLog() {
+#ifdef VIBEDOCK_LOG_IN_MEMORY
+  return;  // the lines are only in memory
+#endif
   if (!logStored || logParked) return;
   saveLog();
   for (auto &line : logLines) line = String();
@@ -1301,6 +1310,7 @@ void initJd9853() {
 #define BOOT_TRACE(step) do {} while (0)
 #endif
 void setup() {
+  platform::crashBegin();  // the crash of the run before, and from now on the panic handler
   diagBegin();  // first: anything before would overwrite the state of the run before
   Serial.setRxBufferSize(1024); Serial.begin(115200);  // the flasher sends in paced chunks
 #ifdef VIBEDOCK_BOOT_TRACE

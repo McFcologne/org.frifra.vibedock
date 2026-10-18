@@ -194,12 +194,16 @@ X-VibeDock-Diag: boot=1a2b3c4d;up=754;heap=21344;min=18012;rssi=-61;drops=0;star
 | `start` | `power-on`, `update`, `setup`, `factory-reset`, `external` (button or USB reset), `crash`, `watchdog`, `brownout`, `software` (a restart the firmware did not plan), `deep-sleep`, `other` |
 | `reset` | the platform's reset code (ESP8266: `rst_info` reason or the crash record's; ESP32: `esp_reset_reason()`) |
 | `prev`, `phase`, `prev…` | the run before as kept in memory that survives a reset (not a power cut): its boot id, its last phase (`start`, `wifi`, `connect`, `tls`, `image`, `draw`, `config`, `log`, `ota`, `idle`, `portal`) and its values; missing when unknown |
+| `panic` | after a crash of the run before: its code addresses in hex, the instruction first, comma-separated (at most 6; ESP32 with Arduino core 3: the backtrace, core 2: the return address; ESP8266: `epc1`) |
+| `cause`, `fault` | with `panic`, where the chip gives them: the exception cause (RISC-V `mcause`, Xtensa and ESP8266 `EXCCAUSE`) and the faulting address in hex |
+| `abort` | with `panic` after `abort()` or a failed assert (ESP-IDF 5): its text, at most 60 characters of `A-Za-z0-9 .:_/()-` |
 
 The firmware writes the record to RTC memory, not to flash: when the phase changes and once per pull. The log's start
 line carries the same (`Start v… <board>: boot=… reset=… start=… prev=… phase=… up=… heap=…/…; <reset text>`), so a log
 read over USB names its starts too. The server checks every value, keeps the current values in memory and each new
-start per display (the last 20); a header from older firmware is simply absent. A panic's backtrace stays on the
-serial port (see `vibedock-client/FLASHING.md`, *Decoding a crash*).
+start per display (the last 20); a header from older firmware is simply absent. The crash addresses come from the panic
+handler, kept in RTC memory as well; they are decoded with the ELF of that firmware (`addr2line -pfiaC -e firmware.elf
+<addresses>`, see `vibedock-client/FLASHING.md`, *Decoding a crash*). The full backtrace stays on the serial port.
 
 ## Boards
 

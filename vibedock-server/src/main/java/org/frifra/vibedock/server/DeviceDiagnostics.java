@@ -40,11 +40,16 @@ class DeviceDiagnostics {
     record Live(String bootId,Long uptimeSeconds,Long heapFree,Long heapMin,Integer rssi,Integer wifiDrops,long receivedAt) {}
     /**
      * One start: seenAt is the server time of its first report. previous*: the last state of the start before, null
-     * where it did not survive (power cut) or the firmware does not know it.
+     * where it did not survive (power cut) or the firmware does not know it. crash*: what the crash of the start before
+     * left (firmware 0.2.0 and newer): its code addresses in hex, pc first ("4200a1b2,4200c3d4"), the cause and the
+     * faulting address where the chip gives them, the text of an abort or assert; null without one.
      */
     record Start(String bootId,long seenAt,String firmware,String board,String kind,Integer resetCode,
-                 String previousBoot,String previousPhase,Long previousUptime,Long previousHeapFree,Long previousHeapMin,Integer previousRssi,Integer previousWifiDrops) {
+                 String previousBoot,String previousPhase,Long previousUptime,Long previousHeapFree,Long previousHeapMin,Integer previousRssi,Integer previousWifiDrops,
+                 String crashCode,Long crashCause,String crashAddress,String crashText) {
         public boolean unexpected(){return UNEXPECTED.contains(kind);}
+        /** The code addresses as 0x… for addr2line, separated by spaces; null without a crash. */
+        public String crashAddresses(){return crashCode==null?null:String.join(" ",Arrays.stream(crashCode.split(",")).map(a->"0x"+a).toList());}
     }
     private final Map<String,Live> live=new ConcurrentHashMap<>();
     private final Path root;private final ObjectMapper json;private final Clock clock;
@@ -55,7 +60,7 @@ class DeviceDiagnostics {
     /** The values of a diagnosis header, each checked; unknown keys and invalid values are left out. */
     static Map<String,String> parse(String header){
         var values=new LinkedHashMap<String,String>();
-        if(header==null||header.length()>400)return values;
+        if(header==null||header.length()>600)return values;
         for(String part:header.split(";")){
             int eq=part.indexOf('=');if(eq<=0)continue;
             String key=part.substring(0,eq).trim(),value=part.substring(eq+1).trim();
@@ -66,6 +71,10 @@ class DeviceDiagnostics {
                 case "drops","prevdrops","reset" -> value.matches("\\d{1,5}");
                 case "start" -> KINDS.contains(value);
                 case "phase" -> PHASES.contains(value);
+                case "panic" -> value.matches("[0-9a-f]{1,8}(,[0-9a-f]{1,8}){0,5}");
+                case "cause" -> value.matches("\\d{1,10}");
+                case "fault" -> value.matches("[0-9a-f]{1,8}");
+                case "abort" -> value.matches("[A-Za-z0-9 .:_/()-]{1,60}");
                 default -> false;
             };
             if(valid)values.put(key,value);
@@ -82,11 +91,13 @@ class DeviceDiagnostics {
                 var starts=new ArrayList<>(starts(identifier));
                 if(starts.stream().anyMatch(s->s.bootId().equals(boot)))return;
                 var start=new Start(boot,clock.millis(),firmware,board,v.getOrDefault("start","other"),intOf(v,"reset"),
-                        v.get("prev"),v.get("phase"),longOf(v,"prevup"),longOf(v,"prevheap"),longOf(v,"prevmin"),intOf(v,"prevrssi"),intOf(v,"prevdrops"));
+                        v.get("prev"),v.get("phase"),longOf(v,"prevup"),longOf(v,"prevheap"),longOf(v,"prevmin"),intOf(v,"prevrssi"),intOf(v,"prevdrops"),
+                        v.get("panic"),longOf(v,"cause"),v.get("fault"),v.get("abort"));
                 starts.add(0,start);
                 save(identifier,starts.subList(0,Math.min(KEEP,starts.size())));
-                if(start.unexpected())log.warn("Display {} restarted unexpectedly: {} (reset {}), before in phase {} after {} s",identifier,start.kind(),
-                        start.resetCode(),start.previousPhase()==null?"unknown":start.previousPhase(),start.previousUptime()==null?"?":start.previousUptime());
+                if(start.unexpected())log.warn("Display {} restarted unexpectedly: {} (reset {}), before in phase {} after {} s{}",identifier,start.kind(),
+                        start.resetCode(),start.previousPhase()==null?"unknown":start.previousPhase(),start.previousUptime()==null?"?":start.previousUptime(),
+                        start.crashCode()==null?"":", crashed at "+start.crashAddresses()+(start.crashText()==null?"":" ("+start.crashText()+")"));
                 else log.info("Display {} started: {}",identifier,start.kind());
             }catch(IOException|RuntimeException e){log.warn("Could not keep the start of {}: {}",identifier,e.toString());}
         }
