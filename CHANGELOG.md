@@ -2,6 +2,17 @@
 
 The release workflow publishes the section of the tagged version (`## 0.1.0` for the tag `v0.1.0` or `0.1.0`) above the list of commits that GitHub generates.
 
+## 0.2.1
+
+Claude sign-ins stay valid. Update the server image; nothing to do on the displays.
+
+- **Claude sign-in renewed automatically:** the access token of a Claude Code sign-in lives about eight hours and
+  was never renewed, so every Claude source showed *authentication_required* after that, often noticed after an
+  image update. Like Grok and Gemini, the server now runs the official Claude CLI (`claude auth status`) in the
+  source's folder half an hour before the token expires, and also once it has expired while its refresh token is
+  still valid; the CLI renews the token itself. The server log says whether it worked ("renewed until …" or "not
+  renewed"); a renewal that changed nothing is tried again after ten minutes.
+
 ## 0.2.0
 
 New boards, touch, photos and better diagnosis. Update the server image; paired displays then offer the update in
