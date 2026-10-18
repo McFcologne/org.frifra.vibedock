@@ -87,9 +87,9 @@ void (*wait)() = nullptr;
 String &lastSuccess() { static String text; return text; }
 String traffic() {
   char code[12]; snprintf(code, sizeof(code), "-0x%04X", unsigned(-lastRead));
-  return "sent " + String(sent) + ", got " + String(received) + " B, " + String(records) + " reads, last " + (lastRead < 0 ? String(code) : String(lastRead))
-      + ", record " + String(recordHave) + "/" + String(recordWant) + ", TCP " + String(tcpWaiting) + ", idle "
-      + String(millis() - lastByte) + " ms, heap " + heapText();
+  return String(F("sent ")) + String(sent) + F(", got ") + String(received) + F(" B, ") + String(records) + F(" reads, last ") + (lastRead < 0 ? String(code) : String(lastRead))
+      + F(", record ") + String(recordHave) + "/" + String(recordWant) + F(", TCP ") + String(tcpWaiting) + F(", idle ")
+      + String(millis() - lastByte) + F(" ms, heap ") + heapText();
 }
 }
 static void *countedCalloc(size_t count, size_t size) {
@@ -132,7 +132,7 @@ extern "C" mbedtls_ms_time_t mbedtls_ms_time(void) { return (mbedtls_ms_time_t)m
 String tls13::heapText() {
   String text = String(ESP.getFreeHeap());
 #if defined(MMU_IRAM_HEAP)
-  { HeapSelectIram iram; text += "+" + String(ESP.getFreeHeap()) + " IRAM"; }
+  { HeapSelectIram iram; text += "+" + String(ESP.getFreeHeap()) + F(" IRAM"); }
 #endif
   return text;
 }
@@ -149,24 +149,24 @@ static const __FlashStringHelper *alertName(uint8_t alert) {  // texts in flash:
 
 static String describe(int code, uint32_t flags = 0) {
   char hex[12]; snprintf(hex, sizeof(hex), "-0x%04X", (unsigned)-code);
-  String text = "TLS 1.3 " + String(hex);
+  String text = String(F("TLS 1.3 ")) + String(hex);
   switch (code) {
-    case MBEDTLS_ERR_SSL_FATAL_ALERT_MESSAGE: text += " alert from the server"; break;
-    case MBEDTLS_ERR_SSL_BAD_PROTOCOL_VERSION: text += " server does not speak TLS 1.3"; break;
-    case MBEDTLS_ERR_X509_CERT_VERIFY_FAILED: text += " certificate not trusted"; break;
+    case MBEDTLS_ERR_SSL_FATAL_ALERT_MESSAGE: text += F(" alert from the server"); break;
+    case MBEDTLS_ERR_SSL_BAD_PROTOCOL_VERSION: text += F(" server does not speak TLS 1.3"); break;
+    case MBEDTLS_ERR_X509_CERT_VERIFY_FAILED: text += F(" certificate not trusted"); break;
     case MBEDTLS_ERR_SSL_ALLOC_FAILED: case MBEDTLS_ERR_MPI_ALLOC_FAILED: case MBEDTLS_ERR_X509_ALLOC_FAILED:
-      text += " out of memory (" + tls13::heapText() + " bytes free)"; break;
-    case MBEDTLS_ERR_SSL_TIMEOUT: text += " timeout"; break;
-    case MBEDTLS_ERR_SSL_CONN_EOF: text += " connection closed during the handshake"; break;
-    case MBEDTLS_ERR_SSL_HANDSHAKE_FAILURE: text += " handshake failure"; break;  // also when memory runs out (see block)
+      text += String(F(" out of memory (")) + tls13::heapText() + F(" bytes free)"); break;
+    case MBEDTLS_ERR_SSL_TIMEOUT: text += F(" timeout"); break;
+    case MBEDTLS_ERR_SSL_CONN_EOF: text += F(" connection closed during the handshake"); break;
+    case MBEDTLS_ERR_SSL_HANDSHAKE_FAILURE: text += F(" handshake failure"); break;  // also when memory runs out (see block)
     default: break;
   }
-  if (flags & MBEDTLS_X509_BADCERT_EXPIRED) text += ", certificate expired";
-  if (flags & MBEDTLS_X509_BADCERT_FUTURE) text += ", certificate not yet valid (clock?)";
-  if (flags & MBEDTLS_X509_BADCERT_CN_MISMATCH) text += ", host name does not match";
+  if (flags & MBEDTLS_X509_BADCERT_EXPIRED) text += F(", certificate expired");
+  if (flags & MBEDTLS_X509_BADCERT_FUTURE) text += F(", certificate not yet valid (clock?)");
+  if (flags & MBEDTLS_X509_BADCERT_CN_MISMATCH) text += F(", host name does not match");
   // A signature check that runs out of memory also counts as "not trusted" in Mbed TLS.
-  if (tls13::failed) text += ", out of memory (" + String(tls13::failed) + " allocations up to " + String(tls13::failedLargest) + " bytes failed)";
-  else if (flags & MBEDTLS_X509_BADCERT_NOT_TRUSTED) text += ", root from pairing does not match";
+  if (tls13::failed) text += String(F(", out of memory (")) + String(tls13::failed) + F(" allocations up to ") + String(tls13::failedLargest) + F(" bytes failed)");
+  else if (flags & MBEDTLS_X509_BADCERT_NOT_TRUSTED) text += F(", root from pairing does not match");
   return text;
 }
 
@@ -210,11 +210,11 @@ int Tls13Client::open(const String &host, IPAddress ip, uint16_t port, bool byNa
   tls13::peak = tls13::used; tls13::failed = tls13::failedLargest = 0; String heapBefore = tls13::heapText();
   // Resolved here: WiFiClient::connect(host) would call the overridden connect(ip) and start a second handshake
   // for the IP address instead of the host name.
-  if (byName && !WiFi.hostByName(host.c_str(), ip)) { tls13::lastError() = "name " + host + " not resolved (DNS)"; return 0; }
-  if (!WiFiClient::connect(ip, port)) { tls13::lastError() = "no TCP connection to " + ip.toString() + ":" + String(port); return 0; }
+  if (byName && !WiFi.hostByName(host.c_str(), ip)) { tls13::lastError() = String(F("name ")) + host + F(" not resolved (DNS)"); return 0; }
+  if (!WiFiClient::connect(ip, port)) { tls13::lastError() = String(F("no TCP connection to ")) + ip.toString() + ":" + String(port); return 0; }
   setNoDelay(true);
   session_ = new (std::nothrow) Session;
-  if (!session_) { tls13::lastError() = "TLS 1.3 out of memory for its contexts; heap " + tls13::heapText(); WiFiClient::stop(); return 0; }
+  if (!session_) { tls13::lastError() = String(F("TLS 1.3 out of memory for its contexts; heap ")) + tls13::heapText(); WiFiClient::stop(); return 0; }
   mbedtls_ssl_context &ssl_ = session_->ssl; mbedtls_ssl_config &conf_ = session_->conf; mbedtls_x509_crt &ca_ = session_->ca;
   mbedtls_ssl_init(&ssl_); mbedtls_ssl_config_init(&conf_); mbedtls_x509_crt_init(&ca_);
   int code = mbedtls_ssl_config_defaults(&conf_, MBEDTLS_SSL_IS_CLIENT, MBEDTLS_SSL_TRANSPORT_STREAM, MBEDTLS_SSL_PRESET_DEFAULT);
@@ -242,8 +242,8 @@ int Tls13Client::open(const String &host, IPAddress ip, uint16_t port, bool byNa
   if (code) { tls13::lastError() = describe(code); close(); return 0; }
   mbedtls_ssl_set_bio(&ssl_, this, sendRaw, receiveRaw, nullptr);
   if (!allocateStack()) {
-    tls13::lastError() = "TLS 1.3 needs " + String(STACK_WORDS * 4) + " bytes for its stack, largest free block "
-        + String(ESP.getMaxFreeBlockSize()) + "; heap " + tls13::heapText();
+    tls13::lastError() = String(F("TLS 1.3 needs ")) + String(STACK_WORDS * 4) + F(" bytes for its stack, largest free block ")
+        + String(ESP.getMaxFreeBlockSize()) + F("; heap ") + tls13::heapText();
     close(); return 0;
   }
   thunk_ = true;
@@ -267,8 +267,8 @@ int Tls13Client::open(const String &host, IPAddress ip, uint16_t port, bool byNa
     yield();
   }
   tls13::handshaking = false;
-  String timing = " after " + String(millis() - started) + " ms (" + String(computing) + " computing, step " + String(ssl_.state) + ")";
-  String stack = ", stack " + String(stackUsed()) + "/" + String(STACK_WORDS * 4);
+  String timing = String(F(" after ")) + String(millis() - started) + F(" ms (") + String(computing) + F(" computing, step ") + String(ssl_.state) + ")";
+  String stack = String(F(", stack ")) + String(stackUsed()) + "/" + String(STACK_WORDS * 4);
   if (code) {
     tls13::versionRefused() = code == MBEDTLS_ERR_SSL_BAD_PROTOCOL_VERSION;
     String alert;
@@ -279,14 +279,14 @@ int Tls13Client::open(const String &host, IPAddress ip, uint16_t port, bool byNa
     const mbedtls_x509_crt *top = ssl_.session_negotiate ? ssl_.session_negotiate->peer_cert : nullptr;
     if (top && flags != uint32_t(-1) && (flags & MBEDTLS_X509_BADCERT_NOT_TRUSTED) && !tls13::failed) {
       while (top->next && top->next->raw.p) top = top->next;
-      alert += "; chain issued by " + commonName(&top->issuer) + ", root " + commonName(&ca_.subject);
+      alert += String(F("; chain issued by ")) + commonName(&top->issuer) + F(", root ") + commonName(&ca_.subject);
     }
-    tls13::lastError() = describe(code, flags) + alert + timing + "; heap " + heapBefore + ", TLS " + String(tls13::peak)
-        + ", block " + String(ESP.getMaxFreeBlockSize()) + stack;
+    tls13::lastError() = describe(code, flags) + alert + timing + F("; heap ") + heapBefore + F(", TLS ") + String(tls13::peak)
+        + F(", block ") + String(ESP.getMaxFreeBlockSize()) + stack;
     close(); return 0;
   }
   if (pin_ && (!tls13::leafSeen || memcmp(tls13::leaf, pin_, 20) != 0)) {
-    tls13::lastError() = "TLS 1.3 certificate is not the pinned one (renewed?)" + timing;
+    tls13::lastError() = String(F("TLS 1.3 certificate is not the pinned one (renewed?)")) + timing;
     close(); return 0;
   }
   // What the connection no longer needs: the separate stack, the server's certificates and the root.
@@ -297,9 +297,9 @@ int Tls13Client::open(const String &host, IPAddress ip, uint16_t port, bool byNa
   mbedtls_x509_crt_free(&ca_);
   ready_ = true; tls13::sent = tls13::received = tls13::records = 0; tls13::lastRead = 0; tls13::lastByte = millis();
   tls13::recordHave = tls13::recordWant = 0; tls13::tcpWaiting = 0;
-  String after = ", " + tls13::heapText() + " free after";
-  tls13::lastSuccess() = String("TLS 1.3 ") + (pin_ ? "pinned " : "") + mbedtls_ssl_get_ciphersuite(&ssl_) + timing + "; heap "
-      + heapBefore + ", TLS " + String(tls13::peak) + stack + after;
+  String after = ", " + tls13::heapText() + F(" free after");
+  tls13::lastSuccess() = String("TLS 1.3 ") + (pin_ ? "pinned " : "") + mbedtls_ssl_get_ciphersuite(&ssl_) + timing + F("; heap ")
+      + heapBefore + F(", TLS ") + String(tls13::peak) + stack + after;
   return 1;
 }
 

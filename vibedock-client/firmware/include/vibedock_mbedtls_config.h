@@ -56,6 +56,9 @@
 // Memory: the ESP8266 has about 40 kB of heap; small tables at the cost of some speed.
 #define MBEDTLS_AES_ROM_TABLES
 #define MBEDTLS_AES_FEWER_TABLES
+// RAM on the ESP8266: constant data of Mbed TLS lands in its 80 kB data RAM, not in flash.
+#define MBEDTLS_BLOCK_CIPHER_NO_DECRYPT    // AES-GCM only encrypts: no decryption tables
+#define MBEDTLS_X509_REMOVE_INFO           // no texts for certificates and OIDs (the firmware writes its own errors)
 #define MBEDTLS_ECP_WINDOW_SIZE 2
 #define MBEDTLS_ECP_FIXED_POINT_OPTIM 0
 #define MBEDTLS_MPI_WINDOW_SIZE 1
