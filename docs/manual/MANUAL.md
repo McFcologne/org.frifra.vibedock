@@ -367,6 +367,53 @@ docker compose up -d --force-recreate   # update: same data, new image
    encrypted, and **flashing from the browser works directly** on `https://<NAS name>:10001/admin`, without an SSH
    tunnel. The device port 8081 can be published the same way as `https://…:10002` for `EXTERNAL_URL`.
 
+### TLS pin lookup from a Synology container
+
+An HTTPS address can work from a display on a phone hotspot while certificate inspection from the server
+container times out. These are different network paths: external reachability does not establish that the
+container can reach the public address through NAT loopback or the proxy through its LAN address.
+
+If the reverse proxy runs on a separate host, the automatic internal-host fallback reaches the VibeDock backend,
+not that proxy. Add the proxy's actual LAN HTTPS listener to the project's Compose `environment`, for example:
+
+```yaml
+environment:
+  EXTERNAL_TLS_PROBE_URL: "https://192.168.1.20:10002"
+```
+
+Use your proxy's LAN IP and internal HTTPS port, which may differ from the router's public port. Do not use the
+plain HTTP backend. The server still verifies the certificate against the configured external hostname and sends
+that hostname as SNI. Recreate the container to apply the environment change; restarting an existing container is
+not enough. See [HTTPS pinning and DNS fallback](#https-pinning-and-dns-fallback).
+
+If **Check pin again** still reports `Connect timed out` for the correct proxy IP, compare access from the NAS host
+and from the container. A successful TLS handshake followed by HTTP 404 for `/` is sufficient to establish TLS
+reachability; a timeout occurs before certificate validation. `wrong version number` or `Unsupported or unrecognized
+SSL message` can indicate a plain HTTP listener instead of HTTPS.
+
+The DSM firewall can filter forwarded Docker traffic before Docker's own allow rules. In the confirmed case,
+`FORWARD` entered `FORWARD_FIREWALL` before `DEFAULT_FORWARD`; an unconditional `DROP` rejected the container's
+connection to TCP 10002 before it reached Docker's allow rule. TCP 443 and DNS were allowed, so ordinary Internet
+access and public DNS still worked. A working host connection alone does not rule out this firewall restriction.
+
+For this case, allow the Docker source subnet and the proxy's HTTPS destination port in DSM:
+
+1. Find the current Docker subnet; do not assume that every installation uses the example below:
+   `sudo docker network inspect vibedock-server_default --format '{{json .IPAM.Config}}'`.
+   Use the actual network name if the Compose project has a different name.
+2. Open **Control Panel → Security → Firewall → active firewall profile → Edit Rules → Create** on the NAS
+   running the VibeDock container. Select **All interfaces** in the rule editor so the Docker bridge is covered.
+3. Under **Ports**, choose **Custom**, then **TCP**, **Destination port**, and the proxy's HTTPS port (e.g. `10002`).
+4. Under **Source IP**, choose **Specific IP → Select → Subnet**. For a Docker network `172.30.0.0/16`, enter
+   `172.30.0.0` and mask `255.255.0.0`. This covers changing container IPs in that network; it also permits the
+   other containers in that subnet to use the selected port.
+5. Select **Allow**, leave the rule enabled, and place it **above the matching deny rule**. Save and apply the
+   profile, then use **Check pin again**. Keep the firewall enabled.
+
+A recreated Docker network may get a different subnet. Recheck this rule after recreating the network, or configure
+an explicit non-overlapping subnet with Compose IPAM if a stable subnet is required. A known pin is sent to the
+display during pairing; re-pair an existing display to transfer it (USB **Only pair** keeps the installed firmware).
+
 ## Troubleshooting
 
 | Symptom | Cause and remedy |
