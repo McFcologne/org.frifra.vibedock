@@ -844,6 +844,12 @@ Every log read this way is also saved on the server. On the same page, each pair
 with the time they were read and how (USB or network), to show, download as text or delete. Removing
 the display removes its logs.
 
+The table also shows how fresh the **newest log** is: how long ago the server received it (server time; its lines can
+be much older), over USB or the network, the firmware it came from and, with firmware 0.2.0, the start it was sent in
+(boot id and run time). *Older firmware than now* marks a log from another firmware than the display runs today: read
+a current one before drawing conclusions. Below the display's name: its current start (run time, free memory and its
+minimum, Wi-Fi signal) and how the last start came about (*power-on*, *update*, *external*, *crash*, …).
+
 **Read over the network** there asks the display to send its log without a cable: it sends it right
 after its next image pull, over the same address and encryption as its images, within seconds when the server can
 ask it to pull now. This needs firmware newer than 0.1.1; older firmware sends its log only over USB. The request is
@@ -855,8 +861,11 @@ valid for 10 minutes and for one log.
 
 | Log line | Meaning and what to do |
 | --- | --- |
-| `Start v… board, Power on` / `External System` | A start; *External System* is the reset when a USB port opens. |
-| `Start …, Software/System restart: stack overflow …` / `abort …` | The firmware crashed before this start. Copy the log and report it with the firmware version. |
+| `Start v… board: boot=… reset=… start=power-on prev=unknown; Power on` | A start (firmware 0.2.0): its boot id, the platform's reset code and its kind. After a power cut the run before is unknown. |
+| `… start=update prev=… phase=ota …` / `start=setup` / `start=factory-reset` | A restart the display planned: not a crash. |
+| `… start=external …` | The reset button, or a USB port that was opened (esptool, serial monitor, *Restart display*). |
+| `… start=crash` / `watchdog` / `software` / `brownout` `prev=… phase=image up=5400 heap=…/…` | An unexpected restart and what the display was doing before (`phase`), how long it ran and its free memory then. On the M1 a crash record follows (`exception (reason …, cause … at 0x…)`). Report it with the firmware version; see `vibedock-client/FLASHING.md`, *Decoding a crash*. |
+| `Start v… board, Power on` / `External System` / `Software/System restart: stack overflow …` | The same from firmware up to 0.1.1, without boot id and kind. |
 | `USB console: this start is not counted as a power cycle` | Normal after reading the log: USB starts do not count towards Wi-Fi setup or factory reset. |
 | `New firmware: this start is not counted as a power cycle` | The first start after installing a new firmware; the resets while flashing do not open the Wi-Fi setup. |
 | `Second quick power cycle: …`, `Factory reset after …` | Two or three short power cycles opened the Wi-Fi setup or reset the display. |
@@ -911,9 +920,16 @@ To test a fix before a release, build the firmware from your checkout and instal
 
 ## Report a problem
 
+**Request current logs** first asks every display that can for its log, so that the file holds current ones: nothing
+is read from a display without it. The list shows per display whether its log arrived, is still awaited (a display
+that cannot be reached at once sends it with its next pull), timed out after 10 minutes, or can only be read over USB;
+saved logs stay either way.
+
 **Devices → Troubleshooting → Create support file** puts what a problem needs into one file: your description of the
 problem (one line, what happened, what you expected, the steps to see it again, since when, the displays concerned),
-version and platform,
+a **diagnosis** per display (the firmware it runs and that of its newest log, how old that log is, its last start and
+the run before, memory and Wi-Fi; separately what was *observed*, what that *suggests* and what data is *missing*, e.g.
+a panic backtrace that only the serial port shows), the server's warnings and errors, version and platform,
 the data sources (without sign-ins or keys), the displays, the server and access log of the chosen days and the
 saved display logs. Keys, tokens, display links and e-mail addresses are removed; *Also hide host names and public IP
 addresses* removes those as well (addresses in the home network stay). The file is encrypted with a key that the page

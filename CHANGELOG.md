@@ -27,6 +27,11 @@ the administration (over Wi-Fi where their firmware can, otherwise once over USB
   logs refresh by themselves, and an **encrypted support file** (the user's description of the problem, summary,
   data sources, displays, logs; opened again as sections or raw JSON to copy; secrets
   removed) for problem reports, with the key shown once.
+- **Crash diagnosis:** displays report how each start came about (power on, update, reset button, crash, watchdog,
+  …), the platform's reset code and the last phase, run time and memory before a reset; each start counts once. The
+  Troubleshooting page shows how old the newest log is and from which firmware, asks all displays for current logs at
+  once, and the support file adds a diagnosis per display (observed, suspected, missing). Closing an administration
+  page no longer logs "Saving failed".
 - **Colours:** calibrated defaults for the VibeTV M1 (gamma 3.20, 100/74/40 %) and the Waveshare boards (1.50,
   100/91/76 %); the device page shows the uncorrected image beside the sliders and applies changes without reloading.
 - **Firmware updates** are also offered for another build of the same version (e.g. a local build).

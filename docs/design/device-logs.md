@@ -2,7 +2,7 @@
 
 # Device logs and support files
 
-Status: steps 1 to 3 implemented on branch `0.2.0`.
+Status: steps 1 to 4 implemented on branch `0.2.0`.
 
 Goal: everything needed to analyse a problem of a user, server and displays alike, in one file that is safe to
 attach to a public ticket.
@@ -56,3 +56,24 @@ Needs firmware newer than 0.1.1; displays with older firmware keep the USB way. 
   memory and shows its contents (description, summary, sources, displays, logs) for analysis, also as raw JSON to
   copy or download; nothing of it is stored.
 - Open: a GitHub issue template that asks for version, board, description and whether a support file is attached.
+
+## Step 4 – crash diagnosis (implemented)
+
+- The firmware keeps a small record in RTC memory (no flash writes): boot id, run time, free memory and its
+  minimum, Wi-Fi signal and drops, the current phase (`wifi`, `connect`, `tls`, `image`, `draw`, `config`, `log`,
+  `ota`, `idle`, `portal`) and the intent of a planned restart (update, setup, factory reset). A check value rejects
+  memory after a power cut. After a reset the record is the state of the run before.
+- At the start the firmware classifies the reset (`client_policy::startKind`): a software restart with an intent is
+  that intent; panic, watchdog, brownout and an unplanned software restart are unexpected. The start line of the log
+  and the header `X-VibeDock-Diag` (`CLIENT-PROTOCOL.md` 3f) carry it.
+- The server (`DeviceDiagnostics`) keeps the current values in memory and each start per display once by boot id;
+  logs keep the start they were sent in. Older firmware sends nothing; nothing depends on it.
+- Troubleshooting shows the freshness of the newest log (received time and age, source, its firmware and a mark when
+  it differs from the current one) and the last start; *Request current logs* asks all displays (the existing
+  request per display) and shows per display received, pending, not reachable now, timed out or USB only.
+- The support file starts with a diagnosis overview (`SupportDiagnosis`): observed, suspected and missing, server
+  warnings and errors, with server times carrying their offset and device run times in seconds.
+- Limits: the ESP8266 keeps its crash record (program counter, cause, address); the ESP32 boards keep reset code and
+  phase, but a panic's backtrace is only printed on the serial port. A core dump would need its own flash partition:
+  a separate change of the partition table, not part of this step. Decoding needs the ELF of the exact build
+  (`ELF_OUT` in `scripts/images.sh`).
