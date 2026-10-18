@@ -54,6 +54,22 @@ class SecretStoreTest {
         String hash=new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode("test portal password");store.saveAdminPasswordHash(hash);
         new SettingsStore(dir.toString(),json);assertEquals(hash,Files.readString(dir.resolve("admin-password")));assertEquals(hash,store.adminPasswordHash().orElseThrow());
     }
+    @Test void codexPluginCacheStaysOutOfTheRamWorkspace(@TempDir Path dir,@TempDir Path ram) throws Exception {
+        // Codex keeps downloaded plugins (here 68 MB with a Git pack) in .tmp; Docker's /dev/shm has 64 MB by default.
+        Path folder=dir.resolve("auth/accounts/private");Files.createDirectories(folder.resolve(".tmp/plugins/.git"));
+        Files.writeString(folder.resolve("auth.json"),"{\"tokens\":{\"access_token\":\"old-secret\"}}");
+        Files.write(folder.resolve(".tmp/plugins/.git/pack"),new byte[256*1024]);
+        Files.writeString(folder.resolve(".tmp/plugins/manifest.json"),"{\"token\":\"not-a-credential\"}");
+        var vault=new SecretStore(dir,"",ram.toString(),false);
+        assertEquals("not-a-credential",json.readTree(folder.resolve(".tmp/plugins/manifest.json").toFile()).path("token").asText(),"scratch is left as it is");
+        try(var workspace=vault.workspace(folder)){
+            assertFalse(Files.exists(workspace.path.resolve(".tmp")));
+            assertTrue(Files.readString(workspace.path.resolve("auth.json")).contains("old-secret"));
+            Files.createDirectories(workspace.path.resolve(".tmp/new"));Files.writeString(workspace.path.resolve(".tmp/new/cache"),"x");
+        }
+        assertFalse(Files.exists(folder.resolve(".tmp/new")),"scratch the CLI wrote in RAM is not stored");
+        assertTrue(Files.exists(folder.resolve(".tmp/plugins/.git/pack")),"and the stored scratch is not deleted");
+    }
     @Test void codexLauncherScratchLinksDoNotBlockMigrationOrCliWorkspaces(@TempDir Path dir,@TempDir Path ram,@TempDir Path outside) throws Exception {
         Path executable=outside.resolve("codex");Files.writeString(executable,"external executable must not be touched");
         for(String account:List.of("codex","accounts/private")){

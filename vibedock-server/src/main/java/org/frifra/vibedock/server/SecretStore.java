@@ -63,23 +63,27 @@ final class SecretStore {
         }
         return files;
     }
-    /** Codex creates executable links under each account's tmp/arg0. They are disposable launcher files, not credentials. */
-    private boolean launcherScratch(Path root,Path path,boolean authRoot){
+    /**
+     * Scratch folders directly in a sign-in folder, not credentials: Codex keeps executable links under tmp/arg0 and its
+     * downloaded plugins (tens of MB, a Git repository) under .tmp. They are neither encrypted nor copied into the RAM
+     * workspace, which would otherwise outgrow Docker's 64 MB /dev/shm; the CLI creates them again when it needs them.
+     */
+    static final Set<String> SCRATCH=Set.of("tmp",".tmp");
+    private boolean scratch(Path root,Path path,boolean authRoot){
         Path relative=root.relativize(path);int prefix=0;
         if(authRoot)prefix=relative.getNameCount()>0&&relative.getName(0).toString().equals("accounts")?2:1;
-        return relative.getNameCount()>=prefix+2&&relative.getName(prefix).toString().equals("tmp")
-                &&relative.getName(prefix+1).toString().equals("arg0");
+        return relative.getNameCount()>prefix&&SCRATCH.contains(relative.getName(prefix).toString());
     }
-    /** Never follow links; skip launcher scratch trees before visiting their contents. */
+    /** Never follow links; skip scratch trees before visiting their contents. */
     private List<Path> entries(Path root,boolean authRoot) throws IOException {
         var result=new ArrayList<Path>();
         Files.walkFileTree(root,new SimpleFileVisitor<>(){
             @Override public FileVisitResult preVisitDirectory(Path dir,BasicFileAttributes attrs){
-                if(launcherScratch(root,dir,authRoot))return FileVisitResult.SKIP_SUBTREE;
+                if(scratch(root,dir,authRoot))return FileVisitResult.SKIP_SUBTREE;
                 result.add(dir);return FileVisitResult.CONTINUE;
             }
             @Override public FileVisitResult visitFile(Path file,BasicFileAttributes attrs) throws IOException {
-                if(launcherScratch(root,file,authRoot))return FileVisitResult.CONTINUE;
+                if(scratch(root,file,authRoot))return FileVisitResult.CONTINUE;
                 if(attrs.isSymbolicLink())throw new IOException("Symbolic links are not supported in credential files: "+data.relativize(file.toAbsolutePath().normalize()));
                 if(attrs.isRegularFile())result.add(file);return FileVisitResult.CONTINUE;
             }
