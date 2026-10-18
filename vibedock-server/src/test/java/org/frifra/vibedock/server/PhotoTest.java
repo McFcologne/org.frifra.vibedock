@@ -45,6 +45,18 @@ class PhotoTest {
         var shown=ImageIO.read(new java.io.ByteArrayInputStream(library.render(photo.id(),DisplayType.of("240x280"),3).orElseThrow().png()));
         Assertions.assertEquals(720,shown.getWidth());Assertions.assertEquals(840,shown.getHeight());
     }
+    @Test void aPhotoClaimingTooManyPixelsIsRefusedBeforeItIsDecoded() throws Exception {
+        // A valid PNG header claiming 20000 × 20000 pixels (400 million), without the pixel data: refused from the header.
+        var out=new ByteArrayOutputStream();var data=new java.io.DataOutputStream(out);
+        data.write(new byte[]{(byte)0x89,'P','N','G','\r','\n',0x1a,'\n'});
+        byte[] ihdr={'I','H','D','R',0,0,0x4e,0x20,0,0,0x4e,0x20,8,2,0,0,0};
+        var crc=new java.util.zip.CRC32();crc.update(ihdr);
+        data.writeInt(13);data.write(ihdr);data.writeInt((int)crc.getValue());data.flush();
+        var library=new PhotoLibrary(Files.createTempDirectory("vibedock-photos-").toString());
+        var refused=Assertions.assertThrows(IllegalArgumentException.class,()->library.add(out.toByteArray()));
+        Assertions.assertEquals("The photo has too many pixels",refused.getMessage());
+        Assertions.assertTrue(library.list().isEmpty());
+    }
     @Test void exifOrientationTurnsPhonePhotosUpright(){
         var wide=new BufferedImage(40,20,BufferedImage.TYPE_INT_RGB);wide.setRGB(0,0,0xff0000);
         var turned=PhotoLibrary.upright(wide,6);  // 90 degrees clockwise

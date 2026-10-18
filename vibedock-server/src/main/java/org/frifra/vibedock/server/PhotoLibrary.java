@@ -23,6 +23,7 @@ import java.util.regex.Pattern;
 class PhotoLibrary {
     static final Pattern ID=Pattern.compile("[0-9a-f]{16}");
     static final int MAX_SIDE=600,MAX_UPLOAD=30*1024*1024,MAX_PHOTOS=500;
+    static final long MAX_PIXELS=60_000_000L;
     record Photo(String id,int width,int height,long addedAt) {}
     private final Path dir;private final SecureRandom random=new SecureRandom();
     /** Display images of a photo per display size, small enough to keep: a slideshow repeats them. */
@@ -47,10 +48,7 @@ class PhotoLibrary {
         if(upload==null||upload.length==0)throw new IllegalArgumentException("Choose a photo");
         if(upload.length>MAX_UPLOAD)throw new IllegalArgumentException("The photo is larger than 30 MB");
         if(list().size()>=MAX_PHOTOS)throw new IllegalArgumentException("At most "+MAX_PHOTOS+" photos");
-        BufferedImage image;
-        try{image=ImageIO.read(new ByteArrayInputStream(upload));}catch(IOException|RuntimeException e){image=null;}
-        if(image==null)throw new IllegalArgumentException("Not a photo this server can read (JPEG, PNG, GIF or BMP; not HEIC)");
-        if((long)image.getWidth()*image.getHeight()>60_000_000L)throw new IllegalArgumentException("The photo has too many pixels");
+        var image=decode(upload);
         image=upright(image,exifOrientation(upload));
         double scale=Math.min(1,(double)MAX_SIDE/Math.max(image.getWidth(),image.getHeight()));
         int w=Math.max(1,(int)Math.round(image.getWidth()*scale)),h=Math.max(1,(int)Math.round(image.getHeight()*scale));
@@ -97,6 +95,29 @@ class PhotoLibrary {
         return Optional.of(image);
     }
 
+    /**
+     * Decodes an upload; its size is read from the header first, so a small file that claims a huge picture is
+     * refused before the memory for its pixels is taken.
+     */
+    static BufferedImage decode(byte[] upload) throws IOException {
+        String unreadable="Not a photo this server can read (JPEG, PNG, GIF or BMP; not HEIC)";
+        try(var in=ImageIO.createImageInputStream(new ByteArrayInputStream(upload))){
+            var readers=in==null?Collections.<ImageReader>emptyIterator():ImageIO.getImageReaders(in);
+            if(!readers.hasNext())throw new IllegalArgumentException(unreadable);
+            var reader=readers.next();
+            try{
+                reader.setInput(in,true,true);
+                long pixels;
+                try{pixels=(long)reader.getWidth(0)*reader.getHeight(0);}catch(IOException|RuntimeException e){throw new IllegalArgumentException(unreadable);}
+                if(pixels<=0)throw new IllegalArgumentException(unreadable);
+                if(pixels>MAX_PIXELS)throw new IllegalArgumentException("The photo has too many pixels");
+                BufferedImage image;
+                try{image=reader.read(0);}catch(IOException|RuntimeException e){image=null;}
+                if(image==null)throw new IllegalArgumentException(unreadable);
+                return image;
+            }finally{reader.dispose();}
+        }
+    }
     private Path file(String id){return dir.resolve(id+".jpg");}
     private byte[] bytes(int n){byte[] b=new byte[n];random.nextBytes(b);return b;}
     private static Dimension size(Path p) throws IOException {
