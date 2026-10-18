@@ -2,6 +2,16 @@
 
 The release workflow publishes the section of the tagged version (`## 0.1.0` for the tag `v0.1.0` or `0.1.0`) above the list of commits that GitHub generates.
 
+## 0.2.3
+
+More free memory on the VibeTV M1. Update the server image; the M1 then offers the update in the administration.
+
+- **VibeTV M1 connects over https again after pairing:** firmware 0.2.x left about 1 kB less memory than 0.1.x, so
+  the first full certificate check after pairing could run out of memory and was reported as *certificate not
+  trusted* (e.g. over a phone hotspot when the server cannot reach its own public address). Texts of the display's
+  pages, log and diagnosis now stay in flash, and Mbed TLS leaves out certificate texts and the AES decryption tables
+  it never uses: about 8.5 kB more free memory than 0.2.2.
+
 ## 0.2.2
 
 The administration remembers the browser. Update the server image; nothing to do on the displays.
