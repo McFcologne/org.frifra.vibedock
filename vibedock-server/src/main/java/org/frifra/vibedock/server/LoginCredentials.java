@@ -8,19 +8,25 @@ import java.io.IOException;
 final class LoginCredentials {
     private final Path directory;
     private final ObjectMapper json;
-    LoginCredentials(Path directory,ObjectMapper json) { this.directory=directory; this.json=json; }
+    private final SecretStore secrets;
+    LoginCredentials(Path directory,ObjectMapper json) { this(directory,json,null); }
+    LoginCredentials(Path directory,ObjectMapper json,SecretStore secrets) {this.directory=directory;this.json=json;this.secrets=secrets;}
 
     SettingsStore.Credential read(SettingsStore.Account account,SettingsStore.Credential manual) {
         if (!manual.token().isBlank()) return manual;
         String provider=account.type();
         if (!SettingsStore.Account.SIGN_IN_TYPES.contains(provider)) return manual;
         Path file=SettingsStore.authDirectory(directory,account).resolve(account.credentialFile());
-        if (provider.equals("grok")) return grok(file,json);
-        if (provider.equals("gemini")) return gemini(file,json);
+        return readFile(provider,file);
+    }
+    SettingsStore.Credential readFile(String provider,Path file) {
+        if(provider.equals("grok"))return grok(file,json,secrets);
+        if(provider.equals("gemini"))return gemini(file,json,secrets);
         try {
             if (!Files.isRegularFile(file,LinkOption.NOFOLLOW_LINKS)) return empty();
             byte[] bytes;
-            try (var input=Files.newInputStream(file,LinkOption.NOFOLLOW_LINKS)) { bytes=input.readNBytes(65537); }
+            if(secrets!=null)bytes=secrets.read(file);
+            else try (var input=Files.newInputStream(file,LinkOption.NOFOLLOW_LINKS)) { bytes=input.readNBytes(65537); }
             if (bytes.length>65536) return empty();
             var root=json.readTree(bytes);
             var node=root.path(provider.equals("codex") ? "tokens" : "claudeAiOauth");
@@ -41,11 +47,13 @@ final class LoginCredentials {
      * Grok Build keeps its sign-in in $GROK_HOME/auth.json: entries with the bearer token in "key", the issuer and
      * "expires_at". The sign-in entry of auth.x.ai is used; API-key entries are not a subscription sign-in.
      */
-    static SettingsStore.Credential grok(Path file,ObjectMapper json) {
+    static SettingsStore.Credential grok(Path file,ObjectMapper json) {return grok(file,json,null);}
+    private static SettingsStore.Credential grok(Path file,ObjectMapper json,SecretStore secrets) {
         try {
             if (!Files.isRegularFile(file,LinkOption.NOFOLLOW_LINKS)) return empty();
             byte[] bytes;
-            try (var input=Files.newInputStream(file,LinkOption.NOFOLLOW_LINKS)) { bytes=input.readNBytes(65537); }
+            if(secrets!=null)bytes=secrets.read(file);
+            else try (var input=Files.newInputStream(file,LinkOption.NOFOLLOW_LINKS)) { bytes=input.readNBytes(65537); }
             if (bytes.length>65536) return empty();
             var entries=new java.util.ArrayList<com.fasterxml.jackson.databind.JsonNode>();collect(json.readTree(bytes),entries,0);
             var best=entries.stream().filter(e->e.toString().contains("auth.x.ai")).findFirst().or(()->entries.stream().findFirst());
@@ -61,11 +69,13 @@ final class LoginCredentials {
      * Gemini CLI keeps its Google sign-in in $GEMINI_CLI_HOME/.gemini/oauth_creds.json: "access_token" and
      * "expiry_date" in milliseconds. An expired token is not used; the CLI renews it (see SignInRenewal).
      */
-    static SettingsStore.Credential gemini(Path file,ObjectMapper json) {
+    static SettingsStore.Credential gemini(Path file,ObjectMapper json) {return gemini(file,json,null);}
+    private static SettingsStore.Credential gemini(Path file,ObjectMapper json,SecretStore secrets) {
         try {
             if (!Files.isRegularFile(file,LinkOption.NOFOLLOW_LINKS)) return empty();
             byte[] bytes;
-            try (var input=Files.newInputStream(file,LinkOption.NOFOLLOW_LINKS)) { bytes=input.readNBytes(65537); }
+            if(secrets!=null)bytes=secrets.read(file);
+            else try (var input=Files.newInputStream(file,LinkOption.NOFOLLOW_LINKS)) { bytes=input.readNBytes(65537); }
             if (bytes.length>65536) return empty();
             var root=json.readTree(bytes);var token=root.path("access_token");
             if (!token.isTextual() || token.textValue().isBlank() || token.textValue().length()>16384

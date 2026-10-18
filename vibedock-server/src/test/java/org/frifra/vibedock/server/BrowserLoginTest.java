@@ -13,11 +13,14 @@ import static org.mockito.Mockito.*;
 
 class BrowserLoginTest {
     final ObjectMapper json=new ObjectMapper();
+    SettingsStore store(Path dir) throws Exception {
+        return new SettingsStore(dir.toString(),json,new SecretStore(dir,"",Files.createTempDirectory("vibedock-test-ram-").toString(),false));
+    }
     BrowserLogin login(Path dir,SettingsStore store) throws Exception {
         Path executable=dir.resolve("client");
         String java=Path.of(System.getProperty("java.home"),"bin/java").toString();
         String cp=System.getProperty("surefire.test.class.path",System.getProperty("java.class.path"));
-        Files.writeString(executable,"#!/bin/sh\nexec '"+java.replace("'","'\\''")+"' -cp '"+cp.replace("'","'\\''")+"' org.frifra.vibedock.server.FakeLoginClient \"$@\"\n");
+        Files.writeString(executable,"#!/bin/sh\nexport REVIEW_APPROVAL='"+dir.resolve("approve")+"'\nexec '"+java.replace("'","'\\''")+"' -cp '"+cp.replace("'","'\\''")+"' org.frifra.vibedock.server.FakeLoginClient \"$@\"\n");
         Files.setPosixFilePermissions(executable,PosixFilePermissions.fromString("rwx------"));
         var usage=new UsageService(store,mock(ProviderClient.class),mock(DeviceSender.class),Clock.systemUTC());
         return new BrowserLogin(dir.toString(),executable.toString(),executable.toString(),json,store,usage);
@@ -30,23 +33,23 @@ class BrowserLoginTest {
         throw new AssertionError("Login simulator timed out");
     }
     @Test void codexButtonStartsStructuredFlowAndPersistsWithoutDeviceWrites(@TempDir Path dir) throws Exception {
-        var store=new SettingsStore(dir.toString(),json);
+        var store=store(dir);
         store.save(new SettingsStore.Settings(List.of(),new SettingsStore.Credential("old-manual","old-account"),store.get().claude(),List.of()));
         var login=login(dir,store);
         try {
             var first=login.start("codex");assertEquals(first.id(),login.start("codex").id());
             var waiting=await(login,"codex",v->v.status().equals("waiting"));
             assertEquals("TEST-1234",waiting.userCode());assertEquals("https://auth.openai.com/codex/device",waiting.authUrl());
-            Files.createFile(dir.resolve("auth/codex/approve"));
+            Files.createFile(dir.resolve("approve"));
             var success=await(login,"codex",v->v.status().equals("success"));
             assertNull(success.authUrl());assertNull(success.userCode());
-            assertEquals("synthetic-codex-token",new SettingsStore(dir.toString(),json).effective().codex().token());
+            assertEquals("synthetic-codex-token",store(dir).effective().codex().token());
             assertTrue(store.get().codex().token().isEmpty());
             assertFalse(json.writeValueAsString(success).contains("synthetic-codex-token"));
         } finally { login.close(); }
     }
     @Test void claudeButtonAcceptsBrowserReturnCodeAndPersists(@TempDir Path dir) throws Exception {
-        var store=new SettingsStore(dir.toString(),json);var login=login(dir,store);
+        var store=store(dir);var login=login(dir,store);
         try {
             login.start("claude");var view=await(login,"claude",v->v.status().equals("waiting"));
             assertEquals("https://claude.ai/oauth/authorize?client_id=fixture&state=synthetic-state",view.authUrl());
@@ -55,11 +58,11 @@ class BrowserLoginTest {
             assertThrows(IllegalArgumentException.class,()->login.submitCode("claude",view.id(),"bad\ncode"));
             login.submitCode("claude",view.id(),"test-code#test-state");
             await(login,"claude",v->v.status().equals("success"));
-            assertEquals("synthetic-claude-token",new SettingsStore(dir.toString(),json).effective().claude().token());
+            assertEquals("synthetic-claude-token",store(dir).effective().claude().token());
         } finally { login.close(); }
     }
     @Test void cancellationMissingClientAndUnsafeUrlsAreHandled(@TempDir Path dir) throws Exception {
-        var store=new SettingsStore(dir.toString(),json);var login=login(dir,store);
+        var store=store(dir);var login=login(dir,store);
         try {
             var start=login.start("claude");await(login,"claude",v->v.status().equals("waiting"));
             assertEquals("cancelled",login.cancel("claude",start.id()).status());

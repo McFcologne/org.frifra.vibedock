@@ -46,7 +46,7 @@ class SourceTransfer {
             String name=account.credentialFile();if(name==null)continue;
             Path file=store.authDirectory(account).resolve(name);
             if(!Files.isRegularFile(file,LinkOption.NOFOLLOW_LINKS))continue;
-            byte[] bytes;try(var in=Files.newInputStream(file,LinkOption.NOFOLLOW_LINKS)){bytes=in.readNBytes(MAX_FILE+1);}
+            byte[] bytes=store.secrets.read(file);
             if(bytes.length<=MAX_FILE)files.put(account.id(),Base64.getEncoder().encodeToString(bytes));
         }
         byte[] salt=new byte[16],nonce=new byte[12];random.nextBytes(salt);random.nextBytes(nonce);
@@ -160,14 +160,9 @@ class SourceTransfer {
             Files.createDirectories(target.getParent());Files.setPosixFilePermissions(target.getParent(),PosixFilePermissions.fromString("rwx------"));
         }
         if(account.type().equals("gemini"))SignInRenewal.prepareGemini(dir);
-        Path temporary=Files.createTempFile(target.getParent(),"import-",".tmp");
-        try{
-            Files.setPosixFilePermissions(temporary,PosixFilePermissions.fromString("rw-------"));
-            Files.write(temporary,bytes);
-            Files.move(temporary,target,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);
-            return target;
-        }finally{Files.deleteIfExists(temporary);Arrays.fill(bytes,(byte)0);}
+        try{store.secrets.write(target,bytes);return target;}finally{Arrays.fill(bytes,(byte)0);}
     }
+
     /** AES-256-GCM with a PBKDF2 key from the password; the format and version are the associated data (also SupportFile). */
     static Cipher cipher(int mode,String format,String password,byte[] salt,int iterations,byte[] nonce) throws GeneralSecurityException {
         var spec=new PBEKeySpec(password.toCharArray(),salt,iterations,256);

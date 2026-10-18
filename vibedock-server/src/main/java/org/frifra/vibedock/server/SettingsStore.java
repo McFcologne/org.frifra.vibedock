@@ -62,14 +62,21 @@ public class SettingsStore {
     private final Path file,directory;
     private final ObjectMapper json;
     private final LoginCredentials login;
+    final SecretStore secrets;
     private volatile Settings current;
-    public SettingsStore(@Value("${vibedock.data-dir}") String directory,ObjectMapper json) throws IOException {
-        this.json=json;
-        Path dir=Path.of(directory); Files.createDirectories(dir);this.directory=dir;
-        login=new LoginCredentials(dir,json);
+    @org.springframework.beans.factory.annotation.Autowired
+    public SettingsStore(@Value("${vibedock.data-dir}") String directory,ObjectMapper json,
+                         @Value("${vibedock.auth-runtime-dir:}") String runtime) throws IOException {
+        this(directory,json,new SecretStore(Path.of(directory),"",runtime));
+    }
+    public SettingsStore(String directory,ObjectMapper json) throws IOException {this(directory,json,"");}
+    SettingsStore(String directory,ObjectMapper json,SecretStore secrets) throws IOException {
+        this.json=json;this.secrets=secrets;
+        Path dir=Path.of(directory);Files.createDirectories(dir);this.directory=dir;
+        login=new LoginCredentials(dir,json,secrets);
         file=dir.resolve("settings.json");
-        current=Files.exists(file) ? read(json.readTree(file.toFile()))
-                : new Settings(List.of(),new Credential("",""),new Credential("",""),List.of());
+        current=Files.exists(file)?read(json.readTree(secrets.read(file)))
+                :new Settings(List.of(),new Credential("",""),new Credential("",""),List.of());
         validate(current);
     }
     /** Earlier files had exactly one Codex and one Claude credential; they become the two default sources. */
@@ -154,14 +161,10 @@ public class SettingsStore {
     }
     public synchronized void save(Settings settings) throws IOException {
         validate(settings);
-        Path temporary=Files.createTempFile(file.getParent(),"settings-",".tmp");
-        try {
-            Files.setPosixFilePermissions(temporary,PosixFilePermissions.fromString("rw-------"));
-            json.writeValue(temporary.toFile(),settings);
-            Files.move(temporary,file,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);
-            current=settings;
-        } finally { Files.deleteIfExists(temporary); }
+        secrets.write(file,json.writeValueAsBytes(settings));
+        current=settings;
     }
+
     static void validate(Settings s) {
         if (s.allowedIps().size()>100 || s.devices().size()>3) throw new IllegalArgumentException("At most 100 IP rules and three devices");
         if (s.accounts().size()>12) throw new IllegalArgumentException("At most 12 data sources");

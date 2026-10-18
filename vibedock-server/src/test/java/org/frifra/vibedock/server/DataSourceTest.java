@@ -20,7 +20,7 @@ class DataSourceTest {
         assertEquals(List.of("codex","claude"),store.get().accounts().stream().map(SettingsStore.Account::id).toList());
         assertEquals("manual-codex",store.get().codex().token());assertEquals("ws",store.get().codex().accountId());
         store.save(store.get());
-        assertTrue(json.readTree(dir.resolve("settings.json").toFile()).has("accounts"));
+        assertTrue(json.readTree(store.secrets.read(dir.resolve("settings.json"))).has("accounts"));
         assertEquals(store.get(),new SettingsStore(dir.toString(),json).get());
     }
     @Test void everySourceSignsInIntoItsOwnFolderAndIsPolledWithItsType(@TempDir Path dir) throws Exception {

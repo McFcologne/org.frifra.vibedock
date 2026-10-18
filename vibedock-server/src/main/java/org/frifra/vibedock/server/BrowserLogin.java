@@ -40,6 +40,7 @@ public class BrowserLogin {
         final String id=UUID.randomUUID().toString();
         final String provider,type;  // provider: the data source id; type: codex or claude
         Process process;
+        SecretStore.Workspace workspace;
         ScheduledFuture<?> timeout;
         View view;
         Session(String provider,String type) { this.provider=provider;this.type=type;view=new View(id,"starting",null,null,false,"Starting sign-in …"); }
@@ -68,6 +69,8 @@ public class BrowserLogin {
                 Files.createDirectories(dir);
                 Files.setPosixFilePermissions(dir,PosixFilePermissions.fromString("rwx------"));
             }
+            s.workspace=settings.secrets.workspace(auth);
+            auth=s.workspace.path;
             List<String> command=switch(account.type()){
                 case "codex" -> List.of(codexCli,"-c","cli_auth_credentials_store=\"file\"","app-server");
                 case "grok" -> List.of(grokCli,"login","--device-auth");
@@ -75,12 +78,12 @@ public class BrowserLogin {
                 case "gemini" -> List.of("script","-qfec",geminiCli,"/dev/null");
                 default -> List.of(claudeCli,"auth","login","--claudeai","--sso");
             };
-            ProcessBuilder builder=new ProcessBuilder(command).directory(directory.resolve("home").toFile());
+            ProcessBuilder builder=new ProcessBuilder(command).directory(auth.toFile());
             var env=builder.environment();
             // Only the service-owned login caches may supply authentication.
             for (String key:List.of("OPENAI_API_KEY","CODEX_API_KEY","CODEX_ACCESS_TOKEN","CODEX_AUTH_JSON",
                     "ANTHROPIC_API_KEY","ANTHROPIC_AUTH_TOKEN","CLAUDE_CODE_OAUTH_TOKEN","ANTHROPIC_PROFILE")) env.remove(key);
-            env.put("HOME",directory.resolve("home").toString());
+            env.put("HOME",auth.toString());
             // Each source signs in into its own folder, so several accounts of one provider can coexist.
             env.put("CODEX_HOME",auth.toString());
             env.put("CLAUDE_CONFIG_DIR",auth.toString());
@@ -209,7 +212,7 @@ public class BrowserLogin {
     private synchronized boolean geminiSignedIn(Session s) {
         if (!active(s) || !s.view.status().equals("completing")) return false;
         var account=settings.get().account(s.provider).orElse(null);
-        if (account==null || LoginCredentials.gemini(SettingsStore.authDirectory(directory,account).resolve(account.credentialFile()),json).token().isBlank()) return false;
+        if (account==null || s.workspace==null || LoginCredentials.gemini(s.workspace.path.resolve(account.credentialFile()),json).token().isBlank()) return false;
         completed(s);return true;
     }
     static boolean allowedUrl(String provider,String value) {
@@ -233,11 +236,13 @@ public class BrowserLogin {
         if (!active(s)) return;
         var account=settings.get().account(s.provider).orElse(null);
         if (account==null) { finish(s,"error","The data source was removed during the sign-in.");return; }
-        var credential=new LoginCredentials(directory,json).read(account,new SettingsStore.Credential("",""));
+        var credential=s.workspace==null?new SettingsStore.Credential("",""):new LoginCredentials(directory,json).readFile(account.type(),s.workspace.path.resolve(account.credentialFile()));
         if (credential.token().isBlank()) {
             finish(s,"error","The client stored no readable credentials. Please sign in inside the Linux Docker container.");return;
         }
         try {
+            stop(s);
+            s.workspace.close();s.workspace=null;
             // The browser sign-in replaces a manual token of this source.
             var old=settings.get();
             settings.save(old.withAccounts(old.accounts().stream().map(a->a.id().equals(s.provider)?a.withManual(null):a).toList()));
@@ -249,11 +254,21 @@ public class BrowserLogin {
         if (!active(s)) return;
         s.view=new View(s.id,status,null,null,false,message);
         if (s.timeout!=null) s.timeout.cancel(false);
-        if (s.process!=null) {
-            s.process.descendants().forEach(ProcessHandle::destroyForcibly);
-            s.process.destroyForcibly();
+        try {
+            stop(s);
+            if(s.workspace!=null){s.workspace.close();s.workspace=null;}
+        }catch(IOException e){
+            s.view=new View(s.id,"error",null,null,false,"The sign-in could not be saved securely. Check server storage and retry.");
+            org.slf4j.LoggerFactory.getLogger(BrowserLogin.class).warn("Could not persist encrypted sign-in: {}",e.getMessage());
         }
     }
+    private void stop(Session s) throws IOException {
+        if(s.process==null)return;
+        s.process.descendants().forEach(ProcessHandle::destroyForcibly);s.process.destroyForcibly();
+        try{if(!s.process.waitFor(5,TimeUnit.SECONDS))throw new IOException("Sign-in process did not stop");}
+        catch(InterruptedException e){Thread.currentThread().interrupt();throw new IOException("Interrupted while stopping sign-in",e);}
+    }
+
     private boolean active(Session s) { return sessions.get(s.provider)==s && Set.of("starting","waiting","completing").contains(s.view.status()); }
     private Session matching(String provider,String id) {
         check(provider);var s=sessions.get(provider);
