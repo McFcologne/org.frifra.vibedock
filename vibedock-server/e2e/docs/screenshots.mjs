@@ -143,7 +143,6 @@ try {
 
     // Firmware
     await go('/admin/firmware');
-    await shot('20-firmware-board', page.locator('form.board-pick'));
     await shot('21-firmware-card', page.locator('.firmware-card'));
     await shot('22-firmware-flasher', page.locator('#web-flasher'));
     await shot('23-firmware-esptool', page.locator('main > section.card').last());

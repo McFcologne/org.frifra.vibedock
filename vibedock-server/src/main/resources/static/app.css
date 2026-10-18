@@ -357,7 +357,7 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 ::view-transition-old(root),::view-transition-new(root){animation-duration:.12s}
 .appbar{view-transition-name:appbar}
 @media(prefers-reduced-motion:reduce){@view-transition{navigation:none}}
-.board-pick{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 14px;align-items:center}.board-pick label{margin:0}.board-pick .meta{grid-column:2;margin:0}
+.board-pick{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 14px;align-items:center;margin:0 0 16px}.board-pick label{margin:0}.board-pick .meta,.board-pick .notice{grid-column:2;margin:0}
 .status-actions{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}.status-actions .inline-form{margin:0}
 .firmware-devices .inline-form button.badge,.status-actions .inline-form button.badge{margin:0}
 /* Grip to reorder device and data source cards. */

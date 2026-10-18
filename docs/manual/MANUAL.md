@@ -654,10 +654,8 @@ settings or sign-ins; check the mount and its owner (see [Data directory and bac
 > **Flashing is at your own risk** (see [Disclaimer](#disclaimer)). Always download and keep a full backup of the
 > device first; it is the only way back to its current firmware.
 
-**Devices → Firmware** holds the firmware of the server's version for every supported board. Choose the **Board**
-first; it decides which image is installed:
-
-<img src="images/20-firmware-board.png" width="80%" alt="Board">
+**Devices → Firmware** holds the firmware of the server's version for every supported board. The **Board** in the
+firmware card decides which image is shown, downloaded and installed:
 
 | Board | Chip | Display | Hardware |
 | --- | --- | --- | --- |
@@ -672,8 +670,8 @@ first; it decides which image is installed:
 
 *Tested*: runs on real hardware (installation over USB, pairing, images; on the Waveshare boards also touch). *Prepared*: builds, with the settings the tested boards called for, but has not run on hardware yet.
 
-The firmware card shows file, size, SHA-256, chip and flash address, and the displays of this board with their
-installed version. **Download** saves the image; **Update to … over Wi-Fi** updates a paired display.
+Below the board, the firmware card shows file, size, SHA-256, chip and flash address, and the displays of this board
+with their installed version. **Download** saves the image; **Update to … over Wi-Fi** updates a paired display.
 
 <img src="images/21-firmware-card.png" width="80%" alt="Firmware of the VibeTV M1">
 
@@ -681,8 +679,7 @@ ESP32 boards get one image with bootloader and partition table:
 
 <img src="images/24-firmware-esp32.png" width="80%" alt="Firmware of an ESP32 board">
 
-> Only the VibeTV M1 has been validated on hardware. The ESP32 builds compile and run the same code, but have not
-> been tested on the boards yet.
+> The boards marked *prepared* compile and run the same code, but have not been tested on hardware yet.
 
 ## From the browser (recommended)
 
@@ -692,7 +689,9 @@ Needs Chrome or Edge on a computer, and the administration opened over HTTPS or 
 
 1. **Connect the display by USB** and close other programs that use its serial port (e.g. a serial monitor).
    Choose the **Speed** (115200 is the most reliable) and press **Connect**, then choose the serial port in the
-   browser's dialog. The page checks that the chip matches the chosen board.
+   browser's dialog. The page checks the chip: when it is not the chosen board's and only one board of the
+   installation has it (e.g. the ESP32-C6), the page switches to that board and connects again by itself; boards
+   that share a chip (the ESP32-S3 boards) you choose yourself.
 2. **Back up the whole flash** with **Download backup** and keep the file private: it is the only way back to the
    current firmware and contains the display's Wi-Fi and pairing data. Without a download, confirm that you have a
    verified full backup.

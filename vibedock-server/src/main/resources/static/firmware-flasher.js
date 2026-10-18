@@ -34,21 +34,41 @@ if (!('serial' in navigator) || !window.isSecureContext) {
     try { await transport?.disconnect(); } catch { /* already closed */ }
     loader = transport = undefined; deviceInfo.textContent = 'Not connected.'; backedUp = false;
   };
-  button('connect').addEventListener('click', () => run(async () => {
-    const port = await navigator.serial.requestPort();
+  // Connects to the port (chosen by the user, or the one already allowed after the page switched to the right board).
+  const connect = port => run(async () => {
     serialPort = port; pair.hidden = true;
     transport = new Transport(port, true);
     loader = new ESPLoader({ transport, baudrate: Number($('#flash-baud').value), terminal });
     try {
       const chip = await loader.main(), expected = card.dataset.chip;
       const name = chipFamily(chip);
-      if (name !== expected.toUpperCase()) throw new Error(`This display has an ${name}; the board chosen above needs an ${expected}. Choose the matching board.`);
+      if (name !== expected.toUpperCase()) {
+        // Another chip: when only one board of this installation has it, that board's page opens and connects again
+        // by itself (the port stays allowed); otherwise the boards with that chip are named.
+        const matching = JSON.parse(card.dataset.boards || '[]').filter(b => b.chip.toUpperCase() === name);
+        if (matching.length === 1) {
+          terminal.writeLine(`This display has an ${name}: switching to ${matching[0].label} …`);
+          await disconnect();
+          location.assign(`${location.pathname}?board=${encodeURIComponent(matching[0].id)}&connect=1#web-flasher`);
+          return;
+        }
+        throw new Error(matching.length
+          ? `This display has an ${name}; several boards have it: ${matching.map(b => b.label).join(', ')}. Choose yours under Board above.`
+          : `This display has an ${name}; no board of this installation has that chip.`);
+      }
       flashSize = await loader.detectFlashSize();
       if (expected === 'ESP8266' && flashSize !== '4MB') throw new Error(`The display has ${flashSize} flash; this firmware is built for 4MB`);
       try { mac = await loader.chip.readMac(loader); } catch { mac = 'unknown'; }
       deviceInfo.textContent = `${chip} · MAC ${mac} · flash ${flashSize}`;
     } catch (error) { await disconnect(); throw error; }
-  }));
+  });
+  button('connect').addEventListener('click', async () => { try { connect(await navigator.serial.requestPort()); } catch { /* no port chosen */ } });
+  // Opened after switching to the right board: connect to the port allowed before, without asking again.
+  if (new URLSearchParams(location.search).get('connect') === '1') {
+    history.replaceState(null, '', location.pathname + '?board=' + encodeURIComponent(card.dataset.board) + '#web-flasher');
+    const ports = await navigator.serial.getPorts();
+    if (ports.length === 1) { terminal.writeLine('Connecting again for this board …'); connect(ports[0]); }
+  }
   button('disconnect').addEventListener('click', () => run(disconnect));
   button('backup').addEventListener('click', () => run(async () => {
     const bytes = loader.flashSizeBytes(flashSize);
