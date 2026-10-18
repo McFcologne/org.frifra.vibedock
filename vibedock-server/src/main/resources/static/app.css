@@ -388,3 +388,6 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 .support-form fieldset{margin-top:0}.support-form textarea{width:100%;resize:vertical;font:inherit}
 .field-label{display:block;margin:14px 0 6px;font-weight:550;font-size:14px}
 .support-displays{display:flex;flex-wrap:wrap;gap:4px 18px}.support-displays label{margin:0}
+
+.auth-card .stay-signed-in{margin-top:16px;color:var(--text)}
+.auth-card #remember-help{display:block;color:var(--muted);line-height:1.5;margin-top:6px}

@@ -25,6 +25,8 @@
   <input id="username" name="username" autocomplete="username" required autofocus>
   <label for="password">Password</label>
   <input id="password" name="password" type="password" autocomplete="current-password" required>
+  <label class="stay-signed-in"><input type="checkbox" name="remember-me" checked aria-describedby="remember-help"> Stay signed in</label>
+  <small id="remember-help">Remember this browser for 30 days. Renewed automatically while you use VibeDock.</small>
   <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
   <button type="submit">Sign in</button>
   <div class="auth-foot"><button type="button" class="ghost theme-toggle" data-theme-toggle aria-pressed="false">☾ Dark</button></div>

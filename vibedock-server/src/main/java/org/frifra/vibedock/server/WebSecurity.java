@@ -37,7 +37,7 @@ class WebSecurity {
         return new org.springframework.security.web.session.HttpSessionEventPublisher();
     }
     @Bean SecurityFilterChain security(HttpSecurity http,org.springframework.security.core.session.SessionRegistry sessions,
-            @Value("${vibedock.admin-auth:password}") String auth,@Value("${vibedock.admin-user}") String admin) throws Exception {
+            @Value("${vibedock.admin-auth:password}") String auth,@Value("${vibedock.admin-user}") String admin,AdminRememberMe remember) throws Exception {
         // ADMIN_AUTH=none (quick tests): every visitor of the administration port counts as the administrator. The port
         // guard still keeps the administration off the public port; publish the administration port on this host only.
         if("none".equals(auth)){
@@ -57,6 +57,8 @@ class WebSecurity {
                 .anyRequest().hasRole("ADMIN"))
                 .sessionManagement(s -> s.maximumSessions(-1).sessionRegistry(sessions).expiredUrl("/login?expired"))
                 .formLogin(f -> f.loginPage("/login").defaultSuccessUrl("/admin",true).permitAll())
+                .rememberMe(r -> r.key(AdminRememberMe.KEY).rememberMeServices(remember))
+                .addFilterAfter(remember.renewalFilter(),org.springframework.security.web.authentication.rememberme.RememberMeAuthenticationFilter.class)
                 // Sign out by GET as well and without the CSRF token: opening /logout or a form from before a server
                 // restart (expired token) used to end on a 403 page. A forged sign-out link can only sign you out.
                 .logout(l -> l.logoutRequestMatcher(new OrRequestMatcher(PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.GET,"/logout"),
