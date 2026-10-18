@@ -44,7 +44,9 @@ test('default design is saved right away',async ({page,app}) => {
   const scheme=page.locator('#design-scheme'), message=page.locator('#design-message');
   await expect(page.locator('#design-save')).toHaveCount(0);
   await scheme.selectOption('ocean');await expect(message).toContainText('Default design saved');
-  await page.locator('#design-align').selectOption('top');await expect(message).toContainText('Default design saved');
+  // The message still says saved from before: wait for this save itself.
+  const saved=page.waitForResponse(r=>r.url().endsWith('/admin/designs/default')&&r.request().method()==='POST');
+  await page.locator('#design-align').selectOption('top');await saved;
   await page.reload();await expect(scheme).toHaveValue('ocean');await expect(page.locator('#design-align')).toHaveValue('top');
   await page.locator('#design-align').selectOption('spread');await expect(message).toContainText('Default design saved');
 });

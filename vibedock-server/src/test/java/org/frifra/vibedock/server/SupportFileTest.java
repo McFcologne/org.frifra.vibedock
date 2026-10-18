@@ -79,6 +79,8 @@ class SupportFileTest {
                     .andExpect(jsonPath("$.summary.days").value(7)).andExpect(jsonPath("$.summary.hostsHidden").value(true))
                     .andExpect(jsonPath("$.displays[?(@.identifier=='"+id+"')].board").value("waveshare-s3-touch-lcd-147"))
                     .andExpect(jsonPath("$.deviceLogs[0].lines[0]").value("Start v0.2.0"))
+                    .andExpect(jsonPath("$.diagnosis.legend").exists()).andExpect(jsonPath("$.diagnosis.server.storageWritable").value(true))
+                    .andExpect(jsonPath("$.diagnosis.displays[?(@.identifier=='"+id+"')].logSource").value("usb"))
                     // The description: redacted, control characters removed, only known displays, empty fields absent.
                     .andExpect(jsonPath("$.report.title").value("Desk stays dark")).andExpect(jsonPath("$.report.happened").value("Black since the update.\nMail [e-mail]"))
                     .andExpect(jsonPath("$.report.since").value("yesterday")).andExpect(jsonPath("$.report.expected").doesNotExist())

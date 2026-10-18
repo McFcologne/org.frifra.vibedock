@@ -34,7 +34,8 @@ class SupportFile {
     record Source(String type,String label,boolean suspended,String status,Long observedAt) {}
     record Display(String identifier,String name,String board,String display,String firmware,String status,Long lastPullAt,String ip,
                    boolean web,boolean ota,boolean otaNeedsPairing,boolean updating,String updateError,boolean flipped,boolean serverFooter) {}
-    record DeviceLog(String identifier,long savedAt,String source,String firmware,String board,List<String> lines) {}
+    /** savedAt: when the server received it (its lines can be older); bootId, uptimeSeconds: the start it came from, when known. */
+    record DeviceLog(String identifier,long savedAt,String source,String firmware,String board,String bootId,Long uptimeSeconds,List<String> lines) {}
     /** The problem in the user's words (all optional); displays: the identifiers of the displays it concerns. */
     record Report(String title,String happened,String expected,String steps,String since,List<String> displays) {
         static final int MAX_TITLE=200,MAX_TEXT=4000;
@@ -50,14 +51,16 @@ class SupportFile {
             return text.isEmpty()?null:text.length()>max?text.substring(0,max)+" …":text;
         }
     }
-    record Contents(Report report,Summary summary,List<Source> sources,List<Display> displays,List<String> serverLog,List<String> accessLog,List<DeviceLog> deviceLogs) {}
+    record Contents(Report report,SupportDiagnosis.Overview diagnosis,Summary summary,List<Source> sources,List<Display> displays,List<String> serverLog,List<String> accessLog,List<DeviceLog> deviceLogs) {}
     record Created(String name,String key,byte[] bytes) {}
 
     private final ApplicationInfo info;private final SettingsStore settings;private final UsageService usage;private final ClientRegistry registry;
     private final DeviceLogs logs;private final ObjectMapper json;private final Clock clock;private final Path logDir;
+    private final DeviceDiagnostics diagnostics;private final StorageErrors storage;
     private final SecureRandom random=new SecureRandom();
     SupportFile(ApplicationInfo info,SettingsStore settings,UsageService usage,ClientRegistry registry,DeviceLogs logs,ObjectMapper json,Clock clock,
-                @Value("${vibedock.log-dir}") String logDir){
+                @Value("${vibedock.log-dir}") String logDir,DeviceDiagnostics diagnostics,StorageErrors storage){
+        this.diagnostics=diagnostics;this.storage=storage;
         this.info=info;this.settings=settings;this.usage=usage;this.registry=registry;this.logs=logs;this.json=json;this.clock=clock;this.logDir=Path.of(logDir);
     }
 
@@ -126,13 +129,25 @@ class SupportFile {
         for(String id:logs.identifiers())for(var entry:logs.list(id)){
             if(entry.savedAt()<since.toEpochMilli())continue;
             var log=logs.read(id,entry.name());
-            log.ifPresent(l->deviceLogs.add(new DeviceLog(id,entry.savedAt(),entry.source(),entry.firmware(),entry.board(),l.lines().stream().map(redactor::text).toList())));
+            log.ifPresent(l->deviceLogs.add(new DeviceLog(id,entry.savedAt(),entry.source(),entry.firmware(),entry.board(),entry.bootId(),entry.uptimeSeconds(),
+                    l.lines().stream().map(redactor::text).toList())));
         }
+        // The overview: per display from its newest log (also when older than the chosen days) and its reported starts.
+        var overview=new ArrayList<SupportDiagnosis.Display>();
+        for(var v:registry.views()){
+            if(v.web()!=null)continue;
+            var entries=logs.list(v.identifier());var latest=entries.isEmpty()?null:entries.get(0);
+            List<String> lines=latest==null?List.of():logs.read(v.identifier(),latest.name()).map(DeviceLogs.Log::lines).orElse(List.of());
+            overview.add(SupportDiagnosis.display(v,latest,lines.stream().map(redactor::text).toList(),diagnostics.starts(v.identifier()),
+                    diagnostics.live(v.identifier()).orElse(null),now,ZoneId.systemDefault(),redactor));
+        }
+        var serverLog=logLines("vibedock.log",since,redactor);
         var runtime=ManagementFactory.getRuntimeMXBean();
         var summary=new Summary(info.getVersion(),System.getProperty("java.version"),System.getProperty("os.name")+" "+System.getProperty("os.arch"),
                 Files.exists(Path.of("/.dockerenv")),ZoneId.systemDefault().getId(),runtime.getUptime()/1000,now,days,registry.pollSeconds(),
                 s.allowedIps().size(),s.accounts().size(),displays.size(),info.getTestMode(),hideHosts);
-        return new Contents(report,summary,sources,displays,logLines("vibedock.log",since,redactor),logLines("access.",since,redactor),deviceLogs);
+        var diagnosis=new SupportDiagnosis.Overview(SupportDiagnosis.LEGEND,SupportDiagnosis.server(serverLog,storage.problem()==null),overview);
+        return new Contents(report,diagnosis,summary,sources,displays,serverLog,logLines("access.",since,redactor),deviceLogs);
     }
 
     private static final Pattern STAMP=Pattern.compile("^(\\d{4}-\\d{2}-\\d{2})[T ](\\d{2}:\\d{2}:\\d{2})");

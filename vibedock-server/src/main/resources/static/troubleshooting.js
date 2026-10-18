@@ -105,6 +105,12 @@ const section = (title, text, open = false) => {
   const pre = element('pre', text); pre.className = 'log-lines'; details.append(pre); return details;
 };
 const when = millis => millis ? new Date(millis).toLocaleString() : '-';
+// The overview per display: observed facts, what they suggest and what is missing; the server's warnings.
+const diagnosisText = d => [d.legend, '',
+  `Server: ${d.server.warnings} warnings, ${d.server.errors} errors, ${d.server.savingFailed} failed saves in the log; data directory ${d.server.storageWritable ? 'writable' : 'NOT writable'}`,
+  ...d.displays.flatMap(x => ['', `${x.name} (${x.identifier}) · ${x.board} · firmware ${x.firmwareNow ?? 'unknown'}`
+    + (x.logFirmware ? ` · newest log ${x.logFirmware}, ${x.logAgeMinutes} min old` : ' · no log') + (x.firmwareDiffers ? ' · FIRMWARE DIFFERS' : ''),
+    ...x.observed.map(t => '  observed:  ' + t), ...x.suspected.map(t => '  suspected: ' + t), ...x.missing.map(t => '  missing:   ' + t)])].join('\n');
 const rawActions = document.querySelector('[data-support-raw-actions]');
 let raw = null, rawName = 'vibedock-support.json';
 document.querySelector('[data-support-download]').addEventListener('click', () => {
@@ -132,6 +138,7 @@ opener.addEventListener('submit', async event => {
     const rawSection = section('Raw (JSON)', raw); rawSection.querySelector('pre').dataset.supportRaw = '';
     contents.replaceChildren(
       section('Problem', reportText(data.report, data.displays), true),
+      ...(data.diagnosis ? [section('Diagnosis', diagnosisText(data.diagnosis), true)] : []),
       section('Summary', `VibeDock ${s.version} · Java ${s.java} · ${s.platform}${s.docker ? ' · Docker' : ''} · ${s.timeZone}\n`
         + `Created ${when(s.createdAt)}, logs of ${s.days} day(s)${s.hostsHidden ? ', host names hidden' : ''} · up ${Math.round(s.uptimeSeconds / 3600)} h\n`
         + `Poll ${s.pollSeconds} s · ${s.ipRules} IP rules · ${s.sources} data sources · ${s.displays} displays${s.testMode ? ' · ' + s.testMode : ''}`, true),
