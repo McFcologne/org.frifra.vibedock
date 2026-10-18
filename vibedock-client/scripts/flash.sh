@@ -90,16 +90,21 @@ fi
 esp_ports=(); esp_macs=(); esp_chips=()
 while IFS= read -r candidate; do
     if lsof "$candidate" >/dev/null 2>&1; then echo "Skipping $candidate: in use by another program." >&2; continue; fi
-    # Ask the chip; hard_reset lets devices that are not chosen start normally again. A port without a matching chip
-    # makes esptool fail; with pipefail that must not end the script.
-    answer=$(esptool --port "$candidate" --connect-attempts 2 --after hard_reset read_mac 2>&1 || true)
+    # Ask the chip, whatever it is: with a given board's chip esptool stopped on any other chip after it had already
+    # put it into its bootloader, without the reset after, so that display stayed dark. hard_reset lets devices that
+    # are not chosen start normally again. A port without a chip makes esptool fail; with pipefail that must not end
+    # the script.
+    answer=$("$python" -m esptool --chip auto --baud "${VIBEDOCK_BAUD:-115200}" --port "$candidate" --connect-attempts 2 \
+        --after hard_reset read_mac 2>&1 || true)
     mac=$(sed -n 's/^MAC: *//p' <<< "$answer" | head -1)
     # "Chip is ESP32-S3 (QFN56) ...", "Chip is ESP8266EX", "Chip is ESP32-D0WD-V3 ..."
     case "$(sed -n 's/^Chip is //p' <<< "$answer" | head -1)" in
         ESP8266*) detected=esp8266 ;; ESP32-S3*) detected=esp32s3 ;; ESP32-C3*) detected=esp32c3 ;;
         ESP32-C6*) detected=esp32c6 ;; ESP32-S2*) detected=esp32s2 ;; ESP32*) detected=esp32 ;; *) detected="" ;;
     esac
-    if [ -n "$mac" ]; then esp_ports+=("$candidate"); esp_macs+=("$mac"); esp_chips+=("${detected:-$chip}")
+    if [ -n "$mac" ] && [ "$chip" != auto ] && [ -n "$detected" ] && [ "$detected" != "$chip" ]; then
+        echo "Skipping $candidate: $detected, not the $chip of $board." >&2
+    elif [ -n "$mac" ]; then esp_ports+=("$candidate"); esp_macs+=("$mac"); esp_chips+=("${detected:-$chip}")
     else echo "No ${board:-ESP} chip on $candidate: $(grep -m1 -iE 'error|fatal' <<< "$answer" || echo 'no answer')" >&2; fi
 done <<< "$found"
 # Native USB (ESP32-S3/C3/C6) drops off the bus for a moment after the reset.
@@ -119,6 +124,11 @@ else
     pick=$((choice - 1))
 fi
 port="${esp_ports[$pick]}"; chip="${esp_chips[$pick]}"
+# The others were reset to start their firmware again; the VibeTV M1's USB adapter may leave it in the bootloader.
+for i in "${!esp_ports[@]}"; do
+    [ "$i" = "$pick" ] || [ "${esp_chips[$i]}" != esp8266 ] && continue
+    echo "Not chosen: ${esp_ports[$i]} (esp8266). If its display stays dark, unplug it and plug it in again." >&2
+done
 
 # 2. Board: given, or the boards with this chip (one is taken, several are offered).
 if [ -z "$board" ]; then
