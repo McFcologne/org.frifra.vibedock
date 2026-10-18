@@ -36,6 +36,13 @@ class WebSecurity {
     @Bean org.springframework.security.web.session.HttpSessionEventPublisher sessionEvents(){
         return new org.springframework.security.web.session.HttpSessionEventPublisher();
     }
+    /** Finish an existing event response without trying to log in or redirect on its async redispatch. */
+    @Bean @org.springframework.core.annotation.Order(0)
+    SecurityFilterChain eventCompletion(HttpSecurity http) throws Exception {
+        return http.securityMatcher(AdminEvents::acceptedCompletion)
+                .requestCache(cache->cache.disable())
+                .authorizeHttpRequests(a->a.anyRequest().permitAll()).build();
+    }
     @Bean SecurityFilterChain security(HttpSecurity http,org.springframework.security.core.session.SessionRegistry sessions,
             @Value("${vibedock.admin-auth:password}") String auth,@Value("${vibedock.admin-user}") String admin,AdminRememberMe remember) throws Exception {
         // ADMIN_AUTH=none (quick tests): every visitor of the administration port counts as the administrator. The port

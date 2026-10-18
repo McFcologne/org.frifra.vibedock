@@ -1,5 +1,9 @@
 package org.frifra.vibedock.server;
 
+import jakarta.servlet.DispatcherType;
+import jakarta.servlet.http.HttpServletRequest;
+import java.io.IOException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -21,8 +25,17 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @Controller
 class AdminEvents {
     private static final Logger log=LoggerFactory.getLogger(AdminEvents.class);
+    static final String ACCEPTED=AdminEvents.class.getName()+".accepted";
+    /** Server-side marker: only this already-authorized GET's async completion can use the completion chain. */
+    static boolean acceptedCompletion(HttpServletRequest request){
+        return request.getDispatcherType()==DispatcherType.ASYNC&&"GET".equals(request.getMethod())
+                &&"/admin/events".equals(request.getRequestURI())&&Boolean.TRUE.equals(request.getAttribute(ACCEPTED));
+    }
     private final List<SseEmitter> pages=new CopyOnWriteArrayList<>();
-    @GetMapping(value="/admin/events",produces=MediaType.TEXT_EVENT_STREAM_VALUE) @ResponseBody SseEmitter subscribe(){
+    @GetMapping(value="/admin/events",produces=MediaType.TEXT_EVENT_STREAM_VALUE) @ResponseBody SseEmitter subscribe(HttpServletRequest request){
+        request.setAttribute(ACCEPTED,true);return subscribe();
+    }
+    SseEmitter subscribe(){
         var page=new SseEmitter(0L);pages.add(page);
         page.onCompletion(()->pages.remove(page));page.onTimeout(()->{pages.remove(page);page.complete();});page.onError(e->pages.remove(page));
         return page;
@@ -47,6 +60,8 @@ class AdminEvents {
         pages.remove(page);
         if(StorageErrors.disconnected(e))log.debug("Administration page closed its event stream: {}",e.toString());
         else log.warn("Event stream of an administration page failed: {}",e.toString());
-        try{page.complete();}catch(Exception ignored){}
+        // On an IOException the container dispatches the send failure back to MVC and owns completion.
+        // A second complete() races that dispatch, which may happen after the user's session has expired.
+        if(!(e instanceof IOException))try{page.complete();}catch(Exception ignored){}
     }
 }
