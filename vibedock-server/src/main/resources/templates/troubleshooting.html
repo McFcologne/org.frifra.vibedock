@@ -9,6 +9,17 @@
   <a href="https://github.com/McFcologne/org.frifra.vibedock/blob/main/docs/manual/MANUAL.md#troubleshooting-a-display" target="_blank" rel="noopener noreferrer">Troubleshooting a display</a>.</p></div>
   <div class="heading-actions"><a class="button secondary" th:href="@{/admin/devices}">← Devices</a></div></div>
 
+<section class="card" id="server-log">
+  <details data-server-log>
+    <summary>Server log</summary>
+    <p class="meta">Recent server activity and errors: up to 500 lines from the last 256 KiB. Refresh to load new entries.</p>
+    <div class="flash-row"><button type="button" class="secondary" data-server-log-refresh>Refresh server log</button>
+      <a th:href="@{/admin/server-log}" target="_blank" rel="noopener">Open as text</a></div>
+    <p class="meta" role="status" aria-live="polite" data-server-log-status></p>
+    <pre class="flash-log" data-server-log-output style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
+  </details>
+</section>
+
 <section class="card" id="usb-log">
   <div class="card-head"><h3 class="grow">Display log over USB</h3></div>
   <p>Connect the display by USB and close other programs that use its serial port. Works with every board and every display, paired or not;

@@ -15,6 +15,7 @@ import java.util.*;
  */
 @Component
 public class TlsTrust {
+    private static final org.slf4j.Logger log=org.slf4j.LoggerFactory.getLogger(TlsTrust.class);
     /**
      * Root certificate (DER) a trusted chain leads to, and the SHA-1 fingerprint of the server certificate itself.
      * fromLog: the root comes from the public certificate log because the server cannot reach the address; then
@@ -26,6 +27,7 @@ public class TlsTrust {
     @org.springframework.beans.factory.annotation.Autowired(required=false) private CertificateLog certificateLog;
     @org.springframework.beans.factory.annotation.Autowired(required=false) private org.springframework.beans.factory.ObjectProvider<ServerAddresses> addresses;
     @org.springframework.beans.factory.annotation.Value("${vibedock.external-tls-probe-url:}") private String probeUrl="";
+    @org.springframework.beans.factory.annotation.Autowired(required=false) private PublicDns publicDns;
     private final Map<String,Inspection> recent=new java.util.concurrent.ConcurrentHashMap<>();
     private final Map<String,Long> checkedAt=new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -62,8 +64,8 @@ public class TlsTrust {
             try{chain=chain(uri,uri);}
             catch(IllegalArgumentException e){
                 // Never turn a rejected certificate into a successful fallback.
-                if(probe==null||!e.getMessage().endsWith("is not reachable from the server"))throw e;
-                chain=chain(uri,probe);
+                if(!unreachable(e))throw e;
+                chain=alternativeChain(uri,probe,e);
             }
         }
         try{
@@ -71,6 +73,31 @@ public class TlsTrust {
             return new Inspection(trustRoot(chain),fingerprint);
         }catch(IllegalArgumentException e){throw e;}
         catch(Exception e){throw new IllegalArgumentException("Certificate of "+url+" could not be read");}
+    }
+    private static boolean unreachable(IllegalArgumentException e){return e.getMessage().endsWith("is not reachable from the server");}
+    private Certificate[] alternativeChain(URI identity,URI probe,IllegalArgumentException failure){
+        if(probe!=null){
+            try{return chain(identity,probe);}
+            catch(IllegalArgumentException e){if(!unreachable(e))throw e;failure=e;}
+        }
+        var configured=addresses==null?null:addresses.getIfAvailable();
+        // Only an administrator-configured external hostname is sent to public resolvers, never a device IP.
+        if(publicDns!=null&&configured!=null&&identity.toString().equals(configured.external())&&!ipLiteral(identity.getHost())){
+            int port=identity.getPort()>0?identity.getPort():443;
+            for(String ip:publicDns.resolve(identity.getHost())){
+                String host=ip.contains(":")?"["+ip+"]":ip;
+                URI target=URI.create("https://"+host+":"+port);
+                try{
+                    var result=chain(identity,target);
+                    log.info("TLS certificate for {} verified through public DNS address {}",identity,ip);return result;
+                }catch(IllegalArgumentException e){if(!unreachable(e))throw e;failure=e;}
+            }
+        }
+        throw failure;
+    }
+    private static boolean ipLiteral(String host){
+        try{IpNetworks.literal(host.startsWith("[")?host.substring(1,host.length()-1):host);return true;}
+        catch(IllegalArgumentException e){return false;}
     }
     /** Only the configured external address may use this transport override; it is never announced to devices. */
     private URI probeFor(String url,int port){
@@ -102,8 +129,15 @@ public class TlsTrust {
                     return socket.getSession().getPeerCertificates();
                 }
             }
-        }catch(SSLException e){throw new IllegalArgumentException("Certificate of "+url+" is not trusted");}
-        catch(Exception e){throw new IllegalArgumentException(url+" is not reachable from the server");}
+        }catch(SSLHandshakeException|SSLPeerUnverifiedException e){
+            log.warn("TLS certificate check for {} via {}:{} failed: {}: {}",url,target.getHost(),target.getPort()>0?target.getPort():443,e.getClass().getSimpleName(),e.getMessage());
+            throw new IllegalArgumentException("Certificate of "+url+" is not trusted");
+        }catch(Exception e){
+            log.warn("TLS connection to {} via {}:{} failed: {}: {}",url,target.getHost(),target.getPort()>0?target.getPort():443,e.getClass().getSimpleName(),e.getMessage());
+            // An HTTP listener can answer TLS with HTTP 400 (SSLException): a protocol mismatch, not a rejected
+            // certificate. Keep the root-only certificate-log fallback; it never supplies an unverified pin.
+            throw new IllegalArgumentException(url+" is not reachable from the server");
+        }
     }
     byte[] trustRoot(Certificate[] chain){return root(chain);}
     SSLContext tlsContext() throws java.security.GeneralSecurityException {

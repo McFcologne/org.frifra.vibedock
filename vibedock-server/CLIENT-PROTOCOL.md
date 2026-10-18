@@ -255,3 +255,8 @@ listener and bypasses the public route. In both cases SNI, hostname validation a
 use the external identity. The live leaf certificate's existing SHA-1 `pin` and the validated `anchor` are included
 in the unchanged pairing payload. The LAN probe address is never announced to devices. The certificate-log fallback
 still supplies no leaf pin. Existing devices receive the initial pin when paired again; no firmware change is needed.
+
+If the system and automatic LAN routes cannot establish TLS, the server also resolves the configured external
+hostname through `8.8.8.8` and `1.1.1.1` and connects directly to those IPs with the original SNI and hostname
+verification. Public DNS is a transport alternative, never a substitute for certificate validation. Explicit
+`EXTERNAL_TLS_PROBE_URL` overrides continue to take precedence.

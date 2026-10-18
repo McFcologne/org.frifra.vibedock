@@ -241,3 +241,15 @@ test('TLS pin status shows a known fingerprint and pairing can omit it',async ({
   await expect(page.getByText('Pairing request captured')).toBeVisible();
   expect(submitted.get('omitTlsPin')).toBe('on');
 });
+
+test('troubleshooting loads and refreshes server logs only for an administrator',async ({page,app}) => {
+  const denied=await fetch(app.baseURL+'/admin/server-log',{redirect:'manual'});
+  expect(denied.status).toBe(401);
+  await page.goto(app.baseURL+'/admin/troubleshooting');
+  const section=page.locator('[data-server-log]');
+  await section.locator('summary').click();
+  await expect(section.locator('[data-server-log-output]')).toContainText('VibeDock server started');
+  await expect(section.locator('[data-server-log-status]')).toContainText('Loaded at');
+  await section.getByRole('button',{name:'Refresh server log'}).click();
+  await expect(section.locator('[data-server-log-status]')).toContainText('Loaded at');
+});

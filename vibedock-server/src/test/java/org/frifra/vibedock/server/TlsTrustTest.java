@@ -18,6 +18,33 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class TlsTrustTest {
+    @Test void plainHttpLanCandidatePreservesRootOnlyCertificateLogFallback() throws Exception {
+        try(var plain=new java.net.ServerSocket(0,10,java.net.InetAddress.getByName("127.0.0.1"))){
+            var requests=new java.util.concurrent.atomic.AtomicInteger();
+            Thread responder=Thread.ofVirtual().start(()->{
+                try(var socket=plain.accept()){
+                    socket.setSoTimeout(5000);
+                    byte[] header=socket.getInputStream().readNBytes(5);
+                    if(header.length==5)socket.getInputStream().readNBytes(((header[3]&255)<<8)|(header[4]&255));
+                    requests.incrementAndGet();
+                    socket.getOutputStream().write("HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+                }catch(java.io.IOException ignored){}
+            });
+            String external="https://external.example.invalid:"+plain.getLocalPort();
+            var configured=mock(ServerAddresses.class);
+            when(configured.external()).thenReturn(external);when(configured.configuredInternal()).thenReturn("http://127.0.0.1:8081");
+            @SuppressWarnings("unchecked") ObjectProvider<ServerAddresses> provider=mock(ObjectProvider.class);
+            when(provider.getIfAvailable()).thenReturn(configured);
+            var certificateLog=mock(CertificateLog.class);byte[] root={1,2,3};
+            when(certificateLog.root("external.example.invalid")).thenReturn(root);
+            var trust=new TlsTrust();ReflectionTestUtils.setField(trust,"addresses",provider);
+            ReflectionTestUtils.setField(trust,"certificateLog",certificateLog);
+            var result=trust.forPairing(external);
+            assertTrue(result.fromLog());assertArrayEquals(root,result.root());assertNull(result.fingerprint());
+            verify(certificateLog).root("external.example.invalid");
+            responder.join(5000);assertEquals(1,requests.get());assertFalse(responder.isAlive());
+        }
+    }
     @Test void lanProbeValidatesExternalIdentityAndDeliversPinInUsbPairing(@TempDir Path dir) throws Exception {
         Path store=dir.resolve("tls.p12");
         var process=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","keytool").toString(),
@@ -58,6 +85,24 @@ class TlsTrustTest {
             var result=trust.forPairing(external);
             assertEquals(pin,result.fingerprint());assertArrayEquals(leaf,result.root());assertFalse(result.fromLog());
             assertEquals("external.example.invalid",sni.get());
+            // Split DNS: no usable system route or LAN candidate, but public DNS returns the TLS listener's IP.
+            var externalOnly=mock(ServerAddresses.class);when(externalOnly.external()).thenReturn(external);
+            when(externalOnly.configuredInternal()).thenReturn("");
+            @SuppressWarnings("unchecked") ObjectProvider<ServerAddresses> publicProvider=mock(ObjectProvider.class);
+            when(publicProvider.getIfAvailable()).thenReturn(externalOnly);
+            var resolver=mock(PublicDns.class);when(resolver.resolve(anyString())).thenReturn(List.of("127.0.0.1"));
+            var publicRoute=new TlsTrust(){
+                @Override SSLContext tlsContext(){return trustedContext;}
+                @Override byte[] trustRoot(Certificate[] chain){return leaf;}
+            };
+            ReflectionTestUtils.setField(publicRoute,"addresses",publicProvider);ReflectionTestUtils.setField(publicRoute,"publicDns",resolver);
+            assertEquals(pin,publicRoute.forPairing(external).fingerprint());assertEquals("external.example.invalid",sni.get());
+            verify(resolver).resolve("external.example.invalid");
+            when(externalOnly.external()).thenReturn("https://wrong.example.invalid:"+port);
+            assertTrue(assertThrows(IllegalArgumentException.class,()->publicRoute.forPairing("https://wrong.example.invalid:"+port)).getMessage().contains("not trusted"));
+            clearInvocations(resolver);
+            assertThrows(IllegalArgumentException.class,()->publicRoute.inspect("https://internal.example.invalid:"+port));
+            verifyNoInteractions(resolver);
             // USB setup forwards the live certificate's pin through the existing pairing format.
             var pairing=new ClientPairing(registry,java.net.http.HttpClient.newHttpClient(),new ObjectMapper(),trust,new OtaSigning(dir.resolve("data").toString()));
             var setup=pairing.setUp("vibedock-123456789abc","Test",List.of("http://127.0.0.1:8081",external));
@@ -72,10 +117,15 @@ class TlsTrustTest {
             // The LAN certificate is NOT trusted merely because the transport connects.
             var untrusted=new TlsTrust();ReflectionTestUtils.setField(untrusted,"addresses",provider);
             ReflectionTestUtils.setField(untrusted,"probeUrl","https://127.0.0.1:"+port);
-            assertTrue(assertThrows(IllegalArgumentException.class,()->untrusted.inspect(external)).getMessage().contains("not trusted"));
+            var rejectedFallback=mock(CertificateLog.class);
+            ReflectionTestUtils.setField(untrusted,"certificateLog",rejectedFallback);
+            assertTrue(assertThrows(IllegalArgumentException.class,()->untrusted.forPairing(external)).getMessage().contains("not trusted"));
+            verifyNoInteractions(rejectedFallback);
             // A trusted certificate for another name must also fail; LAN routing never disables hostname validation.
             when(provider.getIfAvailable()).thenReturn(new ServerAddresses(registry,10002,"", "https://wrong.example.invalid"));
-            assertTrue(assertThrows(IllegalArgumentException.class,()->trust.inspect("https://wrong.example.invalid")).getMessage().contains("not trusted"));
+            ReflectionTestUtils.setField(trust,"certificateLog",rejectedFallback);
+            assertTrue(assertThrows(IllegalArgumentException.class,()->trust.forPairing("https://wrong.example.invalid")).getMessage().contains("not trusted"));
+            verifyNoInteractions(rejectedFallback);
             ReflectionTestUtils.setField(trust,"probeUrl","http://127.0.0.1:"+port);
             assertTrue(assertThrows(IllegalArgumentException.class,()->trust.inspect("https://wrong.example.invalid")).getMessage().contains("must use https"));
         }finally{server.stop(0);}

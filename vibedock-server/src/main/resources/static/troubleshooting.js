@@ -153,3 +153,27 @@ opener.addEventListener('submit', async event => {
   } catch (error) { openError.textContent = 'Opening failed: ' + error.message; openError.hidden = false; }
   button.disabled = false;
 });
+
+
+// Application logs stay separate from device logs and are loaded only when requested.
+const serverLog = document.querySelector('[data-server-log]');
+if (serverLog) {
+  const refresh = serverLog.querySelector('[data-server-log-refresh]');
+  const status = serverLog.querySelector('[data-server-log-status]');
+  const output = serverLog.querySelector('[data-server-log-output]');
+  let loaded = false;
+  async function loadServerLog() {
+    if (refresh.disabled) return;
+    refresh.disabled = true;status.textContent = 'Loading server log …';
+    try {
+      const response = await fetch('/admin/server-log', {credentials: 'same-origin', cache: 'no-store', headers: {Accept: 'text/plain'}});
+      if (!response.ok || !response.headers.get('Content-Type')?.startsWith('text/plain'))
+        throw new Error('Could not load the server log. Check your sign-in and the log file permissions.');
+      output.textContent = await response.text();loaded = true;
+      status.textContent = 'Loaded at ' + new Date().toLocaleTimeString();
+    } catch (error) {status.textContent = error.message;}
+    finally {refresh.disabled = false;}
+  }
+  serverLog.addEventListener('toggle', () => {if (serverLog.open && !loaded) loadServerLog();});
+  refresh.addEventListener('click', loadServerLog);
+}

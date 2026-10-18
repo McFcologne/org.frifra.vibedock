@@ -155,7 +155,7 @@ Sources: [Codex App Server](https://learn.chatgpt.com/docs/app-server), [Codex a
 By default the data lives in `vibedock-server/docker.data/`. To keep it elsewhere, set `VIBEDOCK_DATA_PATH` in `.env` to a confidential directory writable by UID 10001. Data is not transferred automatically between directories or from an earlier Docker volume; copy it with `docker cp vibedock-server:/data/. <directory>/` before switching. The directory contains credentials and must not be published or committed.
 
 
-**Logs:** `/data/logs/` (set `LOG_DIR` to move them). `vibedock.log` holds start-up settings, pairings, device pulls (first pull, address changes, rejected keys), provider status changes with the HTTP code and weather problems; `access-YYYY-MM-DD.log` lists every request with port, status and duration. Both rotate daily (application log also at 10 MB) and are kept 14 days, the application log at most 200 MB. Web-display paths are replaced with `/web/[redacted]` and query strings are omitted. They contain IP addresses but no keys, tokens, cookies or passwords. Logs made by older versions may contain reusable web-display links: rotate those links with **New links** and restrict or remove the old logs. `ACCESS_LOG=false` turns the access log off.
+**Logs:** `/data/logs/` (set `LOG_DIR` to move them). `vibedock.log` holds start-up settings, pairings, device pulls (first pull, address changes, rejected keys), provider status changes with the HTTP code and weather problems; `access-YYYY-MM-DD.log` lists every request with port, status and duration. Both rotate daily (application log also at 10 MB) and are kept 14 days, the application log at most 200 MB. Web-display paths are replaced with `/web/[redacted]` and query strings are omitted. They contain IP addresses but no keys, tokens, cookies or passwords. Logs made by older versions may contain reusable web-display links: rotate those links with **New links** and restrict or remove the old logs. `ACCESS_LOG=false` turns the access log off. **Devices → Troubleshooting → Server log** shows the latest 500 application-log lines (bounded to 256 KiB), with manual refresh and a text view. TLS probe failures include the target host and port, exception type and reason in this log.
 
 ### HTTPS pinning behind a reverse proxy
 
@@ -165,8 +165,10 @@ Use a trusted LAN for HTTP pairing, or USB: the pairing channel carries the devi
 
 If the router does not support NAT loopback, the server first tries the public address and then connects to the
 **configured internal address's host on the external HTTPS port**. The port of the internal HTTP backend is not
-used. SNI and certificate hostname verification still use the external hostname, and the chain must be trusted by
-Java. Neither address announced to devices changes.
+used. If both routes fail to establish TLS, the server queries public DNS at `8.8.8.8` and `1.1.1.1` for the
+configured external hostname and tries those IPs on its external HTTPS port. This bypasses a local DNS rewrite;
+it does not change system DNS or the addresses announced to devices. SNI and certificate hostname verification
+still use the external hostname, and the chain must be trusted by Java. Neither address announced to devices changes.
 
 If the TLS proxy has a different LAN address or port, set, for example:
 
