@@ -17,7 +17,7 @@
   <a class="brand" href="/admin" th:href="@{/admin}"><img class="logo" src="../static/logo.svg" th:src="@{/logo.svg}" alt=""><span><h1>VibeDock</h1><small>Administration</small></span></a>
   <span class="spacer"></span>
   <button type="button" class="ghost theme-toggle" data-theme-toggle aria-pressed="false">☾ Dark</button>
-  <form th:action="@{/logout}" method="post"><button class="secondary">Sign out</button></form>
+  <form th:action="@{/logout}" method="post" th:unless="${testMode != null and #strings.contains(testMode, 'no sign-in')}"><button class="secondary">Sign out</button></form>
 </div>
 <nav class="admin-nav" aria-label="Administration">
   <a th:href="@{/admin}" th:classappend="${page == 'overview'} ? 'active'" th:attrappend="aria-current=${page == 'overview'} ? 'page'">Overview</a>
@@ -27,6 +27,7 @@
   <a th:href="@{/admin/server}" th:classappend="${page == 'server'} ? 'active'" th:attrappend="aria-current=${page == 'server'} ? 'page'">Settings</a>
 </nav></header>
 <th:block th:fragment="notices">
+<p class="notice error" th:if="${testMode != null}" th:text="${testMode}"></p>
 <p class="notice" th:if="${param.saved}">Settings saved.</p>
 <p class="notice error" th:if="${error}" th:text="${error}"></p>
 <p class="notice error" th:if="${storageProblem != null and error == null}" th:text="${storageProblem}"></p>

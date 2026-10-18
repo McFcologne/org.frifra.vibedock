@@ -1,0 +1,39 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="VibeDock test server (Docker, demo data, no sign-in)" type="docker-deploy" factoryName="docker-compose.yml" server-name="Docker">
+    <deployment type="docker-compose.yml">
+      <settings>
+        <option name="envVars">
+          <list>
+            <!-- Builds without "bake": bake asks on the terminal before reading ../.git (the version source), and the
+                 IDE has no terminal, so the build would wait forever. ADMIN_PASSWORD and the rest come from .env. -->
+            <DockerEnvVarImpl>
+              <option name="name" value="COMPOSE_BAKE" />
+              <option name="value" value="false" />
+            </DockerEnvVarImpl>
+            <!-- The normal server's container, data and paired displays, for quick tests: no manual in the image,
+                 made-up usage instead of the real accounts, the administration without sign-in on this host only. -->
+            <DockerEnvVarImpl>
+              <option name="name" value="VIBEDOCK_MANUAL" />
+              <option name="value" value="skip" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="DEMO_USAGE" />
+              <option name="value" value="true" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="ADMIN_AUTH" />
+              <option name="value" value="none" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="ADMIN_PUBLISH_ADDRESS" />
+              <option name="value" value="127.0.0.1" />
+            </DockerEnvVarImpl>
+          </list>
+        </option>
+        <option name="commandLineOptions" value="--build" />
+        <option name="sourceFilePath" value="compose.yaml" />
+      </settings>
+    </deployment>
+    <method v="2" />
+  </configuration>
+</component>

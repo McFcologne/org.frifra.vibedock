@@ -37,23 +37,30 @@ public class ClientRegistry {
      * board: its {@link Board} id, null for the VibeTV M1; chosen when pairing or reported by the device.
      * callbackNetwork: pairing target plus the mask reported at pairing; missing means IPv4 /24 for old devices.
      * This field may be missing in older files. The first valid authenticated mask fixes it once; USB origins are fixed by their first authenticated pull.
+     * flipped: the display shows its picture turned by 180 degrees (mounted upside down); set in the administration,
+     * the device learns it with every pull (X-VibeDock-Orientation). Never for the VibeTV M1, whose case decides.
      */
     record Device(String identifier,String name,String keyHash,String ip,int port,long pairedAt,Long lastPullAt,String lastPullIp,Design design,
-                  boolean serverFooter,String firmware,String display,Web web,String board,String callbackNetwork) {
+                  boolean serverFooter,String firmware,String display,Web web,String board,String callbackNetwork,boolean flipped) {
+        Device(String identifier,String name,String keyHash,String ip,int port,long pairedAt,Long lastPullAt,String lastPullIp,Design design,
+               boolean serverFooter,String firmware,String display,Web web,String board,String callbackNetwork){
+            this(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,callbackNetwork,false);
+        }
         Device(String identifier,String name,String keyHash,String ip,int port,long pairedAt,Long lastPullAt,String lastPullIp,Design design,
                boolean serverFooter,String firmware){this(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,null,null,null,null);}
         Device(String identifier,String name,String keyHash,String ip,int port,long pairedAt,Long lastPullAt,String lastPullIp,Design design,
                boolean serverFooter,String firmware,String display,Web web,String board){
             this(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,null);
         }
-        Device withCallbackNetwork(String network){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,network);}
-        Device withCallbackOrigin(String origin){return new Device(identifier,name,keyHash,origin,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,null);}
-        Device pulled(long at,String peer,boolean footer,String version){return new Device(identifier,name,keyHash,ip,port,pairedAt,at,peer,design,footer,version,display,web,board,callbackNetwork);}
-        Device withDesign(Design next){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,next,serverFooter,firmware,display,web,board,callbackNetwork);}
-        Device withName(String next){return new Device(identifier,next,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,callbackNetwork);}
-        Device withDisplay(String next){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,next,web,board,callbackNetwork);}
-        Device withWeb(Web next){return new Device(identifier,name,hash(next.secret()),ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,next,board,callbackNetwork);}
-        Device withBoard(String next,String nextDisplay){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,nextDisplay,web,next,callbackNetwork);}
+        Device withCallbackNetwork(String network){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,network,flipped);}
+        Device withCallbackOrigin(String origin){return new Device(identifier,name,keyHash,origin,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,null,flipped);}
+        Device pulled(long at,String peer,boolean footer,String version){return new Device(identifier,name,keyHash,ip,port,pairedAt,at,peer,design,footer,version,display,web,board,callbackNetwork,flipped);}
+        Device withDesign(Design next){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,next,serverFooter,firmware,display,web,board,callbackNetwork,flipped);}
+        Device withName(String next){return new Device(identifier,next,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,callbackNetwork,flipped);}
+        Device withDisplay(String next){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,next,web,board,callbackNetwork,flipped);}
+        Device withWeb(Web next){return new Device(identifier,name,hash(next.secret()),ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,next,board,callbackNetwork,flipped);}
+        Device withFlipped(boolean next){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,callbackNetwork,next);}
+        Device withBoard(String next,String nextDisplay){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,nextDisplay,web,next,callbackNetwork,flipped);}
         DisplayType displayType(){return DisplayType.of(display);}
         Board boardType(){return Board.of(board);}
     }
@@ -80,7 +87,7 @@ public class ClientRegistry {
      * update is requested and not yet installed; updateError: why its last update over Wi-Fi failed.
      */
     public record View(String identifier,String name,String ip,String status,Long lastPullAt,Design design,boolean overridden,boolean serverFooter,String firmware,
-                       boolean ota,boolean otaNeedsPairing,boolean updating,String updateError,DisplayType display,Web web,Board board) {}
+                       boolean ota,boolean otaNeedsPairing,boolean updating,String updateError,DisplayType display,Web web,Board board,boolean flipped) {}
     private final Path file;
     private final ObjectMapper json;
     private final Clock clock;
@@ -139,8 +146,8 @@ public class ClientRegistry {
     }
     private static Design renamed(Design design,Map<String,String> renamed){
         var bands=design.layout().bands().stream().map(b->b instanceof Layout.Usage u
-                ?(Layout.Band)new Layout.Usage(u.sources().stream().map(s->renamed.getOrDefault(s,s)).toList()):b).toList();
-        return new Design(design.scheme(),design.mood(),design.weather(),new Layout(bands));
+                ?(Layout.Band)new Layout.Usage(u.sources().stream().map(s->renamed.getOrDefault(s,s)).toList(),u.compact()):b).toList();
+        return design.withLayout(design.layout().withBands(bands));
     }
 
     // ---- clients ----
@@ -161,7 +168,7 @@ public class ClientRegistry {
         if(next.size()>=100)throw new IllegalArgumentException("At most 100 clients");
         next.add(new Device(id,name.trim(),hash(key),ip,port,clock.instant().getEpochSecond(),null,null,previous.map(Device::design).orElse(null),
                 previous.map(Device::serverFooter).orElse(false),previous.map(Device::firmware).orElse(null),previous.map(Device::display).orElse(null),null,
-                previous.map(Device::board).orElse(null),callbackNetwork));
+                previous.map(Device::board).orElse(null),callbackNetwork,previous.map(Device::flipped).orElse(false)));
         save(state.withDevices(next));
         if(board!=null)setBoard(id,board);
     }
@@ -222,10 +229,18 @@ public class ClientRegistry {
     /** Sets the display type of a device (null or the M1 id: the VibeTV M1). */
     public synchronized void setDisplay(String id,String type) throws IOException {
         var d=find(id);String next=type==null||type.equals(DisplayType.M1.id())?null:DisplayType.of(type).id();
+        if(DisplayType.FIT.id().equals(next)&&d.web()==null)throw new IllegalArgumentException("Only web displays fit the browser");
         if(Objects.equals(next,d.display()))return;
         List<Device> list=new ArrayList<>(state.devices());list.replaceAll(x->x.identifier().equals(id)?x.withDisplay(next):x);save(state.withDevices(list));
     }
     public synchronized DisplayType displayType(String id){return find(id).displayType();}
+    /** Turns the picture of a device by 180 degrees or back; boards whose case decides the orientation keep it upright. */
+    public synchronized void setFlipped(String id,boolean flipped) throws IOException {
+        var d=find(id);boolean next=flipped&&d.web()==null&&d.boardType().flippable();
+        if(next==d.flipped())return;
+        List<Device> list=new ArrayList<>(state.devices());list.replaceAll(x->x.identifier().equals(id)?x.withFlipped(next):x);save(state.withDevices(list));
+    }
+    public synchronized boolean flipped(String id){var d=find(id);return d.flipped()&&d.boardType().flippable();}
     public synchronized void remove(String id) throws IOException {
         var removed=find(id);List<Device> next=new ArrayList<>(state.devices());next.removeIf(d->d.identifier().equals(id));
         save(state.withDevices(next));forcedRefresh.remove(id);otaCapable.remove(id);otaWithoutKey.remove(id);updateRequested.remove(id);updateErrors.remove(id);
@@ -254,12 +269,12 @@ public class ClientRegistry {
     /** Requests an update to {@code version}; false if the device cannot update over Wi-Fi or runs it or a newer one. */
     public synchronized boolean requestUpdate(String id,String version){
         var d=find(id);
-        if(!otaCapable.contains(id)||!FirmwareVersion.newer(version,d.firmware()))return false;
+        if(!otaCapable.contains(id)||!FirmwareVersion.offered(version,d.firmware()))return false;
         updateRequested.put(id,clock.instant().getEpochSecond());updateErrors.remove(id);return true;
     }
     /** True while an update is requested and the device does not yet run {@code version}; cleared once it does. */
     public synchronized boolean updatePending(String id,String version){
-        if(!FirmwareVersion.newer(version,find(id).firmware())){updateRequested.remove(id);return false;}
+        if(!FirmwareVersion.offered(version,find(id).firmware())){updateRequested.remove(id);return false;}
         expireUpdate(id);return updateRequested.containsKey(id);
     }
     /** Constant-time key check; false for unknown identifiers so callers cannot tell them apart. */
@@ -335,7 +350,7 @@ public class ClientRegistry {
         String status=d.lastPullAt()==null?(d.web()!=null?"Not connected yet":"Waiting for first pull")
                 :now-d.lastPullAt()>3L*interval?(d.web()!=null?"Not connected":"Updates missing"):"Connected";
         return new View(d.identifier(),d.name(),d.lastPullIp()==null?d.ip():d.lastPullIp(),status,d.lastPullAt(),design(d),d.design()!=null,d.serverFooter(),d.firmware(),
-                otaCapable.contains(d.identifier()),otaWithoutKey.contains(d.identifier()),updateRequested.containsKey(d.identifier()),updateErrors.get(d.identifier()),d.displayType(),d.web(),d.boardType());
+                otaCapable.contains(d.identifier()),otaWithoutKey.contains(d.identifier()),updateRequested.containsKey(d.identifier()),updateErrors.get(d.identifier()),d.displayType(),d.web(),d.boardType(),d.flipped()&&d.boardType().flippable());
     }
     private void save(State next) throws IOException {
         Path temp=Files.createTempFile(file.getParent(),"clients-",".tmp");

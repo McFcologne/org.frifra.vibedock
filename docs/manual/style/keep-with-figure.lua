@@ -17,6 +17,13 @@ local function html_image(inline)
   return pandoc.Image(attr('alt') or '', attr('src'), '', pandoc.Attr('', {}, {width = attr('width')}))
 end
 
+-- <!-- page break --> in MANUAL.md (invisible on GitHub) starts a new page in the PDF.
+function RawBlock(raw)
+  if FORMAT:match('latex') and raw.format == 'html' and raw.text:match('^<!%-%-%s*page break%s*%-%->$') then
+    return pandoc.RawBlock('latex', '\\clearpage')
+  end
+end
+
 function Para(para)
   if not FORMAT:match('latex') then return nil end
   local images, other = {}, false

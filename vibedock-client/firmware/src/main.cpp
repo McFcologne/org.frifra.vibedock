@@ -4,12 +4,17 @@
 #include "platform.h"
 #include <time.h>
 #include <memory>
+#include <new>
 #include <vector>
 #include <DNSServer.h>
 #include "icons.h"
 #include <ArduinoJson.h>
 #include <TFT_eSPI.h>
 #include "client_policy.h"
+#include "touch.h"
+#if defined(VIBEDOCK_BOOT_TRACE) && defined(ESP32) && ESP_ARDUINO_VERSION_MAJOR >= 3
+#include "esp32-hal-periman.h"  // the pin owners in the start diagnosis
+#endif
 #include <qrcode.h>
 
 #ifndef VIBEDOCK_VERSION
@@ -37,6 +42,10 @@ bool networkVerified = false;
 String pin;  // SHA-1 fingerprint of the https server certificate, learned over a fully verified connection
 String servers[2]; uint8_t serverCount = 0, serverIndex = 0, storedIndex = 0;
 uint32_t pollSeconds = client_policy::defaultPollSeconds;
+uint8_t brightness = 100;  // backlight in percent; touch boards change it with swipes up and down
+String pendingGesture;  // a swipe for the server (X-VibeDock-Gesture), sent with the next image pull
+bool upsideDown = false;  // mounted upside down: the picture is turned by 180 degrees (set in the administration)
+void applyOrientation(bool flipped);
 client_policy::ToneSettings toneSettings;  // colour correction of the panel, set on the status page
 client_policy::Tone panelTone;
 
@@ -52,6 +61,61 @@ String currentIp() {
   if (mode == Mode::Portal) return WiFi.softAPIP().toString();
   return WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : "-- (no Wi-Fi)";
 }
+// ---- diagnosis: the current start and its last phase, in memory that survives a reset (crash.cpp) ----
+// Written to that memory (no flash) when the phase changes and once per pull; read after the next reset as the state
+// of the run before. After a power cut, or when the record does not check out, the run before is unknown.
+using client_policy::Phase; using client_policy::Intent;
+client_policy::DiagRecord diag{}, previousDiag{};
+bool previousKnown = false; const char *startKind = "other"; uint32_t heapLow = UINT32_MAX;
+void diagWrite() { diag.check = client_policy::diagCheck(diag); platform::storeDiag(diag); }
+void diagPhase(Phase phase) { if (diag.phase != uint8_t(phase)) { diag.phase = uint8_t(phase); diagWrite(); } }
+// Sets a phase for a scope and goes back to the one before (a saved configuration inside a pull, ...).
+struct PhaseScope { uint8_t before; explicit PhaseScope(Phase phase) : before(diag.phase) { diagPhase(phase); } ~PhaseScope() { diagPhase(Phase(before)); } };
+// Before restarting on purpose: the next start is then this intent, not an unexpected restart.
+void diagIntent(Intent intent) { diag.intent = uint8_t(intent); diagWrite(); }
+void diagSample() {
+  uint32_t heap = ESP.getFreeHeap(); if (heap < heapLow) heapLow = heap;
+  uint32_t low = platform::minFreeHeap();
+  diag.uptime = millis() / 1000; diag.heapFree = heap; diag.heapMin = low ? low : heapLow;
+  diag.rssi = WiFi.status() == WL_CONNECTED ? int8_t(constrain(WiFi.RSSI(), -127, 0)) : 0;
+  diagWrite();
+}
+void diagBegin() {
+  client_policy::DiagRecord stored{};
+  auto reset = platform::resetKind();
+  // After a power cut the memory holds anything, even a record that seems to check out.
+  previousKnown = reset != client_policy::ResetKind::PowerOn && platform::loadDiag(stored) && client_policy::diagValid(stored);
+  if (previousKnown) previousDiag = stored;
+  startKind = client_policy::startKind(reset, previousKnown ? Intent(previousDiag.intent) : Intent::None);
+  uint32_t boot = 0;
+  while (boot == 0) { if (!platform::randomBytes(reinterpret_cast<uint8_t *>(&boot), sizeof(boot))) boot = micros() | 1; }
+  diag = client_policy::DiagRecord{client_policy::diagMagic, boot, 0, ESP.getFreeHeap(), ESP.getFreeHeap(), 0, uint8_t(Phase::Start), 0, 0, 0};
+  diagWrite();
+}
+// "boot=… reset=… start=… prev=… phase=… up=… heap=…/… rssi=… drops=…" for the start line of the log.
+String diagStart() {
+  char text[200];
+  int n = snprintf(text, sizeof(text), "boot=%08lx reset=%lu start=%s", (unsigned long)diag.boot, (unsigned long)platform::resetCode(), startKind);
+  if (previousKnown)
+    snprintf(text + n, sizeof(text) - n, " prev=%08lx phase=%s up=%lu heap=%lu/%lu rssi=%d drops=%u", (unsigned long)previousDiag.boot,
+             client_policy::phaseName(previousDiag.phase), (unsigned long)previousDiag.uptime, (unsigned long)previousDiag.heapFree,
+             (unsigned long)previousDiag.heapMin, int(previousDiag.rssi), unsigned(previousDiag.drops));
+  else snprintf(text + n, sizeof(text) - n, " prev=unknown");
+  return text;
+}
+// X-VibeDock-Diag with every request: the current start and, as far as known, the run before (DeviceDiagnostics).
+String diagHeader() {
+  char text[400];
+  int n = snprintf(text, sizeof(text), "boot=%08lx;up=%lu;heap=%lu;min=%lu;rssi=%d;drops=%u;start=%s;reset=%lu", (unsigned long)diag.boot,
+                   (unsigned long)(millis() / 1000), (unsigned long)diag.heapFree, (unsigned long)diag.heapMin, int(diag.rssi), unsigned(diag.drops),
+                   startKind, (unsigned long)platform::resetCode());
+  if (previousKnown)
+    snprintf(text + n, sizeof(text) - n, ";prev=%08lx;phase=%s;prevup=%lu;prevheap=%lu;prevmin=%lu;prevrssi=%d;prevdrops=%u", (unsigned long)previousDiag.boot,
+             client_policy::phaseName(previousDiag.phase), (unsigned long)previousDiag.uptime, (unsigned long)previousDiag.heapFree,
+             (unsigned long)previousDiag.heapMin, int(previousDiag.rssi), unsigned(previousDiag.drops));
+  String crash = platform::crashHeader();
+  return crash.isEmpty() ? String(text) : String(text) + ";panic=" + crash;
+}
 // ---- device log: the last events, kept in /log.txt across restarts and read over USB (VIBEDOCK-LOG) ----
 // What the display did and why a connection failed; no keys, passwords or tokens.
 bool clockSet();
@@ -61,7 +125,12 @@ String logLast; uint16_t logRepeats = 0;
 bool logStored = false;  // the storage is mounted; until then events stay in memory
 bool logDirty = false; uint32_t logSavedAt = 0;
 bool logParked = false;  // see parkLog
+// VIBEDOCK_LOG_IN_MEMORY: the log is not written to flash (test on the ESP32-C6, whether writing it causes the
+// crashes); the lines of a run are lost with a reset, the crash itself is in the next start's line.
 void saveLog() {
+#ifdef VIBEDOCK_LOG_IN_MEMORY
+  logDirty = false; logSavedAt = millis(); return;
+#endif
   if (!logStored || logParked) return;  // parked: the file is complete, the lines in memory are not
   logDirty = false; logSavedAt = millis();
   auto out = LittleFS.open("/log.tmp", "w"); if (!out) return;
@@ -71,6 +140,9 @@ void saveLog() {
 // During a TLS 1.3 handshake the ESP8266 needs every kilobyte: the lines are then only in /log.txt and their heap is
 // free. Reading the log meanwhile reads the file; a new event brings the lines back first.
 void parkLog() {
+#ifdef VIBEDOCK_LOG_IN_MEMORY
+  return;  // the lines are only in memory
+#endif
   if (!logStored || logParked) return;
   saveLog();
   for (auto &line : logLines) line = String();
@@ -277,6 +349,7 @@ void showWrapped(const String &text, int top, int lines, uint16_t colour, uint8_
 bool reasonOnScreen = false;  // "Server unreachable" with its reason: the address line shows the next attempt
 uint8_t failedInRow = 0, imageFailures = 0;      // connection failures since the last answer, to try every address once right away
 void message(const String &value, Step step = Step::None, bool problem = false) {
+  PhaseScope drawing(Phase::Draw);
   reasonOnScreen = false;
   display.fillRect(0, 0, 240, client_policy::footerTop, TFT_BLACK);
   spinningStep = -1;
@@ -305,13 +378,16 @@ String randomHex(size_t bytes) {
 }
 
 // ---- configuration ----
-bool saveConfig() {
+bool writeConfig();
+bool saveConfig() { PhaseScope saving(Phase::Config); return writeConfig(); }
+bool writeConfig() {
   JsonDocument doc;
   doc["identifier"] = identifier; doc["name"] = deviceName;
   doc["ssid"] = ssid; doc["password"] = password; doc["key"] = key; doc["poll"] = pollSeconds; doc["pin"] = pin;
-  doc["verified"] = networkVerified;
+  doc["verified"] = networkVerified; doc["brightness"] = brightness; doc["flipped"] = upsideDown;
   JsonObject t = doc["tone"].to<JsonObject>();
   t["gamma"] = toneSettings.gamma; t["red"] = toneSettings.red; t["green"] = toneSettings.green; t["blue"] = toneSettings.blue;
+  t["custom"] = !(toneSettings == client_policy::ToneSettings());  // calibrated on the status page
   JsonArray list = doc["servers"].to<JsonArray>();
   for (uint8_t i = 0; i < serverCount; i++) list.add(servers[i]);
   doc["server"] = storedIndex = serverIndex;  // the address that answered last: tried first after a restart
@@ -333,11 +409,16 @@ bool loadConfig() {
       serverCount = 0;
       for (JsonVariant url : doc["servers"].as<JsonArray>()) if (serverCount < 2) servers[serverCount++] = url.as<String>();
       serverIndex = storedIndex = serverCount ? std::min<uint8_t>(doc["server"] | 0, serverCount - 1) : 0;
+      brightness = client_policy::clampBrightness(doc["brightness"] | 100);
+      upsideDown = doc["flipped"] | false;
       client_policy::ToneSettings d; JsonObject t = doc["tone"];
-      toneSettings.gamma = client_policy::clampGamma(t["gamma"] | long(d.gamma));
-      toneSettings.red = client_policy::clampGain(t["red"] | long(d.red));
-      toneSettings.green = client_policy::clampGain(t["green"] | long(d.green));
-      toneSettings.blue = client_policy::clampGain(t["blue"] | long(d.blue));
+      long gamma = t["gamma"] | long(d.gamma), red = t["red"] | long(d.red), green = t["green"] | long(d.green), blue = t["blue"] | long(d.blue);
+      // Only a calibration made on this display is kept; otherwise the board's defaults apply.
+      bool custom = t["custom"].isNull() ? !t.isNull() && client_policy::legacyCalibration(gamma, red, green, blue) : t["custom"].as<bool>();
+      if (custom) {
+        toneSettings.gamma = client_policy::clampGamma(gamma); toneSettings.red = client_policy::clampGain(red);
+        toneSettings.green = client_policy::clampGain(green); toneSettings.blue = client_policy::clampGain(blue);
+      } else toneSettings = d;
     }
   }
   file.close();
@@ -448,7 +529,7 @@ void handleQuickBoots() {
     message("Factory reset", Step::None, true); logEvent("Factory reset after " + String(boots) + " quick power cycles");
     LittleFS.remove("/boots"); LittleFS.remove("/standalone.json"); LittleFS.remove("/standalone.tmp"); LittleFS.remove("/anchor.der");
     platform::eraseWifi();
-    delay(1500); ESP.restart();
+    diagIntent(Intent::FactoryReset); delay(1500); ESP.restart();
   } else if (boots == client_policy::resetPowerCycles - 1) {
     // Second quick start: unplugging once more resets everything, waiting opens the Wi-Fi setup (pairing stays).
     message("Unplug now for factory reset", Step::None, true); logEvent("Second quick power cycle: Wi-Fi setup unless unplugged");
@@ -459,8 +540,8 @@ void handleQuickBoots() {
 }
 
 // ---- Wi-Fi setup portal (access point) ----
-struct Network { String ssid; int32_t rssi; bool open; };
-Network networks[12]; uint8_t networkCount = 0;
+struct WifiNetwork { String ssid; int32_t rssi; bool open; };
+WifiNetwork networks[12]; uint8_t networkCount = 0;
 // Scans once, keeps the strongest entry per name and sorts by signal.
 void scanWifi() {
   networkCount = 0;
@@ -514,7 +595,7 @@ void portalPage() {
   web.sendContent(F("<form action=\"/save\" method=\"post\"><section class=\"card\"><h2>Networks nearby</h2>"));
   if (networkCount == 0) web.sendContent(F("<p class=\"muted\">No networks found.</p>"));
   for (uint8_t i = 0; i < networkCount; i++) {
-    const Network &n = networks[i];
+    const WifiNetwork &n = networks[i];
     String name = html(n.ssid);
     int level = n.rssi > -60 ? 3 : n.rssi > -72 ? 2 : 1;
     web.sendContent("<label class=\"net\"><input type=\"radio\" name=\"net\" value=\"" + name
@@ -558,6 +639,7 @@ void showSetupCode(const String &name, const String &secret) {
   present();
 }
 void startPortal() {
+  diagPhase(Phase::Portal);
   mode = Mode::Portal; logEvent("Wi-Fi setup opened" + (wifiProblem.isEmpty() ? String() : ": " + wifiProblem));
   WiFi.mode(WIFI_AP_STA);
   message("Searching Wi-Fi", Step::WiFi);
@@ -580,7 +662,7 @@ void startPortal() {
     pageStart(F("Saved"));
     web.sendContent("<section class=\"card\"><p class=\"state ok\">Wi-Fi saved</p><p>VibeDock restarts and connects to <b>" + html(ssid)
         + "</b>. Reconnect this phone or computer to your normal network; the display then shows its IP address and a pairing code.</p></section>");
-    pageEnd(); delay(500); ESP.restart();
+    pageEnd(); diagIntent(Intent::Setup); delay(500); ESP.restart();
   });
   web.onNotFound([] { web.sendHeader("Location", "http://192.168.4.1/", true); web.send(302, "text/plain", ""); });
   web.begin();
@@ -740,6 +822,7 @@ template <typename Row> bool readRows(WiFiClient *stream, const client_policy::I
 // Draws the image straight to the display, scaled to the whole screen (1:1 when the server renders for this
 // display); the server draws the IP into it.
 bool readImage(WiFiClient *stream, const client_policy::ImageSize &size, uint32_t timeout) {
+  PhaseScope receiving(Phase::Image);  // rows are read and drawn in turn
   static uint16_t pixels[TFT_WIDTH > TFT_HEIGHT ? TFT_WIDTH : TFT_HEIGHT];
   const uint16_t width = panel.width(), height = panel.height();
   imageOnScreen = true;
@@ -759,16 +842,25 @@ bool readImage(WiFiClient *stream, const client_policy::ImageSize &size, uint32_
 // One image request. https uses the simple check first (pinned certificate fingerprint); when that fails, e.g. after
 // the certificate was renewed, a full check against the root from pairing follows, and only such a verified
 // connection may hand over the new fingerprint.
+// The client is declared before http, so http is destroyed first: HTTPClient's destructor calls stop() on the client
+// it was given, and http.end() forgets it only while the connection is still open. With HTTP/1.0 the server closes it
+// after the image, so the client used to be freed first and stop() then wrote into freed memory (heap corruption on
+// the ESP32-C6: "assert failed: multi_heap_free", crashes in the Wi-Fi driver; every image change, more with swipes).
 struct ImageRequest {
-  HTTPClient http;
   std::unique_ptr<WiFiClient> client;
+  HTTPClient http;
   bool verified = false;
   ~ImageRequest() { http.end(); }
+  // Another connection for a second attempt: a fresh HTTPClient first, while the old client still exists, for the
+  // same reason (http.end() would leave it pointing to the freed client).
+  void retry(WiFiClient *next) { http.~HTTPClient(); new (&http) HTTPClient(); client.reset(next); }
 };
+// While the log is sent (uploadLog): the file streamed as the request body and the server's request id.
+File *uploadFile = nullptr; String uploadRequest;
 int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
   if (!r.http.begin(*r.client, url)) return HTTPC_ERROR_CONNECTION_FAILED;
-  const char *wanted[] = {"ETag", "X-VibeDock-Image-Format", "X-VibeDock-Poll-Seconds", "X-VibeDock-Tls-Pin", "X-VibeDock-Redraw", "X-VibeDock-Update", "x-MD5", "X-VibeDock-Length"};
-  r.http.collectHeaders(wanted, 8);
+  const char *wanted[] = {"ETag", "X-VibeDock-Image-Format", "X-VibeDock-Poll-Seconds", "X-VibeDock-Tls-Pin", "X-VibeDock-Redraw", "X-VibeDock-Update", "x-MD5", "X-VibeDock-Length", "X-VibeDock-Send-Log", "X-VibeDock-Orientation"};
+  r.http.collectHeaders(wanted, 10);
   // HTTP/1.0: a reverse proxy (Synology) then cannot answer chunked; the body ends with the connection or its length.
   r.http.useHTTP10(true);
   r.http.setTimeout(r.verified ? 15000 : 5000);
@@ -780,11 +872,19 @@ int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
   r.http.addHeader("X-VibeDock-Firmware", VIBEDOCK_VERSION);  // lets the administration offer updates
   r.http.addHeader("X-VibeDock-Display", String(panel.width()) + "x" + String(panel.height()));  // suggests the display type
   r.http.addHeader("X-VibeDock-Board", VIBEDOCK_BOARD);  // which firmware build an update needs
+  r.http.addHeader("X-VibeDock-Diag", diagHeader());  // start, run time, memory, Wi-Fi (older servers ignore it)
   // Updates over Wi-Fi: "1" with the server's signing key, "no-key" when paired before the server sent one.
   r.http.addHeader("X-VibeDock-Ota", platform::hasOtaKey() ? "1" : "no-key");
   if (!updateError.isEmpty()) r.http.addHeader("X-VibeDock-Update-Error", updateError);
   if (r.verified) r.http.addHeader("X-VibeDock-Tls-Check", "full");
   if (conditional && !etag.isEmpty() && haveImage) r.http.addHeader("If-None-Match", etag);
+  if (conditional && !pendingGesture.isEmpty()) r.http.addHeader("X-VibeDock-Gesture", pendingGesture);
+  if (uploadFile) {  // the log, straight from flash: no copy on the heap the TLS handshake needs
+    r.http.addHeader("Content-Type", "text/plain; charset=utf-8");
+    r.http.addHeader("X-VibeDock-Log-Request", uploadRequest);
+    uploadFile->seek(0);  // again from the start when a second TLS attempt follows
+    return r.http.sendRequest("POST", uploadFile, uploadFile->size());
+  }
   if (!conditional) r.http.addHeader("X-VibeDock-Preview", "1");  // the status page's copy; leaves a forced redraw for the screen
   return r.http.GET();
 }
@@ -805,6 +905,7 @@ String connectionDetail(const String &url) {
 }
 int requestImage(ImageRequest &r, bool conditional, const char *resource = "image") {
   String url = servers[serverIndex] + "/api/v1/clients/" + identifier + "/" + resource;
+  PhaseScope connecting(url.startsWith("https://") ? Phase::Tls : Phase::Connect);
   lastConnectionProblem = "";
   if (!url.startsWith("https://")) {
     r.client.reset(new WiFiClient()); int code = sendImageRequest(r, url, conditional);
@@ -823,12 +924,12 @@ int requestImage(ImageRequest &r, bool conditional, const char *resource = "imag
       return code;
     }
     logEvent("Pinned certificate check failed: " + HTTPClient::errorToString(code) + " " + platform::tlsError(r.client.get()), true);
-    r.http.end(); r.client.reset();
+    r.retry(nullptr);
   }
   // Full check: chain up to the root from pairing, host name and validity; never an unchecked connection.
   if (!platform::hasAnchor()) { lastConnectionProblem = "no root certificate for https from pairing"; return HTTPC_ERROR_CONNECTION_FAILED; }
   if (!clockSet()) { lastConnectionProblem = "clock not set yet (NTP), needed for https"; return HTTPC_ERROR_CONNECTION_FAILED; }
-  r.client.reset(platform::verifiedClient()); r.verified = true;
+  r.retry(platform::verifiedClient()); r.verified = true;
   parkLog();  // the log's heap for the handshake; the next event brings it back
   int code = sendImageRequest(r, url, conditional);
   if (code < 0) lastConnectionProblem = platform::tlsError(r.client.get());
@@ -839,7 +940,7 @@ int requestImage(ImageRequest &r, bool conditional, const char *resource = "imag
   WiFiClient *legacy;
   if (code < 0 && platform::versionRefused() && (legacy = platform::legacyClient())) {
     logEvent("Server refuses TLS 1.3, using TLS 1.2", true);
-    r.http.end(); r.client.reset(legacy);
+    r.retry(legacy);
     code = sendImageRequest(r, url, conditional);
     if (code < 0) lastConnectionProblem = platform::tlsError(r.client.get(), true);
   }
@@ -867,6 +968,7 @@ void updateProgress(size_t done, size_t total) {
   present();
 }
 void installUpdate(const String &version) {
+  PhaseScope updating(Phase::Ota);
   message("Updating to v" + version, Step::None); updateProgress(0, 1); logEvent("Update to v" + version + " started");
   auto fail = [&](const String &reason) {
     updateError = version + ": " + reason; failedUpdate = version; logEvent("Update failed: " + reason);
@@ -883,7 +985,19 @@ void installUpdate(const String &version) {
   http.end();
   if (!installed) { fail(error); return; }
   updateProgress(1, 1); message("Update installed, restarting", Step::None); logEvent("Update to v" + version + " installed");
-  delay(800); ESP.restart();
+  diagIntent(Intent::Update); delay(800); ESP.restart();
+}
+// Sends /log.txt to the server that asked for it (X-VibeDock-Send-Log), over the same address and TLS as the images.
+void uploadLog(const String &requestId) {
+  PhaseScope sending(Phase::Log);
+  saveLog();  // the file holds every line; while parked it is complete already
+  File file = LittleFS.open("/log.txt", "r");
+  if (!file) return;
+  uploadFile = &file; uploadRequest = requestId;
+  int code;
+  { ImageRequest request; code = requestImage(request, false, "log"); }
+  uploadFile = nullptr; uploadRequest = ""; file.close();
+  logEvent(code == 204 ? String("Log sent to the server") : "Log not sent: " + (code > 0 ? "HTTP " + String(code) : HTTPClient::errorToString(code)), true);
 }
 // The start of an error answer, e.g. the server's reason for a 400, as one printable line.
 String answerStart(HTTPClient &http) {
@@ -895,6 +1009,7 @@ String answerStart(HTTPClient &http) {
 void pull() {
   lastPull = millis();
   if (WiFi.status() != WL_CONNECTED) return;
+  diagSample();
   if (reasonOnScreen && (!haveImage || staleScreen)) {  // the reason stays, the address line says what runs now
     display.fillRect(0, 210, 240, 10, TFT_BLACK);
     showWrapped("trying " + servers[serverIndex], 211, 1, MUTED, 1); present();
@@ -911,14 +1026,19 @@ void pull() {
   }
   lastStatus = code;
   if (code > 0) {
-    failedInRow = 0;
+    failedInRow = 0; pendingGesture = "";  // the server has it (an older one ignores it)
     if (storedIndex != serverIndex) saveConfig();  // flash only when the answering address changes
   }
   if (code == 200 || code == 304) { learnPin(request); updateError = ""; }
   String offered = code == 200 || code == 304 ? http.header("X-VibeDock-Update") : "";
+  String logRequest = code == 200 || code == 304 ? http.header("X-VibeDock-Send-Log") : "";
   if (code > 0 && http.hasHeader("X-VibeDock-Poll-Seconds")) {
     uint32_t poll = client_policy::clampPoll(http.header("X-VibeDock-Poll-Seconds").toInt());
     if (poll != pollSeconds) { pollSeconds = poll; saveConfig(); }
+  }
+  if ((code == 200 || code == 304) && http.hasHeader("X-VibeDock-Orientation")) {
+    bool flipped = client_policy::flippedOf(http.header("X-VibeDock-Orientation").c_str(), upsideDown);
+    if (flipped != upsideDown) { applyOrientation(flipped); saveConfig(); logEvent(flipped ? "Picture flipped" : "Picture upright", true); }
   }
   client_policy::ImageSize size;
   if (code == 200 && !validImage(http, size))
@@ -973,7 +1093,10 @@ void pull() {
     }
   }
   http.end();
+  holder.reset();  // the image connection's memory back before the next one
+  if (client_policy::validLogRequest(logRequest.c_str())) uploadLog(logRequest);
   if (!offered.isEmpty() && offered != VIBEDOCK_VERSION && offered != failedUpdate && platform::hasOtaKey()) installUpdate(offered);
+  diagPhase(Phase::Idle);
 }
 
 // ---- status page on port 80 (local network) ----
@@ -997,12 +1120,10 @@ void statusPage() {
         + (haveImage ? String((millis() - lastImage) / 1000) + " s ago" : String("-")) + "</dd><dt>Poll interval</dt><dd>"
         + String(pollSeconds) + " s</dd>";
   }
-  body += "<dt>Device ID</dt><dd>" + identifier + "</dd><dt>Last start</dt><dd>" + html(platform::resetReason()) + "</dd><dt>Firmware</dt><dd>" VIBEDOCK_VERSION "</dd></dl>";
+  body += "<dt>Device ID</dt><dd>" + identifier + "</dd><dt>Last start</dt><dd>" + html(String(startKind) + " (" + platform::resetReason() + ")") + "</dd><dt>Firmware</dt><dd>" VIBEDOCK_VERSION "</dd></dl>";
   if (!paired) body += F("<p class=\"muted\">Enter this IP address and the pairing code shown on the display in the VibeDock administration.</p>");
   body += "</section>";
   web.sendContent(body);
-  if (paired) web.sendContent("<section class=\"card\"><h2>Current image</h2><img class=\"screen\" src=\"/image.bmp?t="
-      + String(millis()) + "\" width=\"240\" height=\"240\" alt=\"Current image\"><p class=\"muted\"><a href=\"/\">Reload</a> (fetches a fresh image from the server)</p></section>");
   if (paired) colourCard();
   pageEnd();
 }
@@ -1013,18 +1134,29 @@ String slider(const char *name, const char *label, int value, int low, int high,
   String show = gamma ? "(this.value/100).toFixed(2)" : "this.value+' %'";
   return "<label class=\"f\" for=\"" + String(name) + "\">" + label + " <b>" + shown + "</b></label><input type=\"range\" id=\""
       + name + "\" name=\"" + name + "\" min=\"" + low + "\" max=\"" + high + "\" step=\"" + step + "\" value=\"" + value
-      + "\" oninput=\"this.previousSibling.lastChild.textContent=" + show + "\" onchange=\"this.form.submit()\">";
+      + "\" oninput=\"this.previousSibling.lastChild.textContent=" + show + "\" onchange=\"const b=new URLSearchParams(new FormData(this.form));b.set('live','1');fetch('/colours',{method:'POST',body:b}).catch(()=>this.form.submit())\">";
 }
+// The image as the server sends it, uncorrected, next to the sliders: the reference the display is matched to. A
+// slider change goes to the display in the background; the page and the image stay as they are.
 void colourCard() {
   using namespace client_policy;
+  uint16_t w = lastImageSize.width ? lastImageSize.width : 240, h = lastImageSize.height ? lastImageSize.height : 240;
   web.sendContent("<form action=\"/colours\" method=\"post\"><section class=\"card\"><h2>Display colours</h2>"
+      "<div style=\"display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start\"><figure style=\"margin:0;flex:none\"><img class=\"screen\" src=\"/image.bmp?t="
+      + String(millis()) + "\" width=\"" + w + "\" height=\"" + h + "\" style=\"width:" + w + "px;height:" + h + "px;max-width:100%;object-fit:contain;image-rendering:pixelated\" alt=\"Current image\">"
+        "<figcaption class=\"muted\">Uncorrected, as the server sends it. <a href=\"/\">Reload</a></figcaption></figure><div style=\"flex:1;min-width:200px\">"
       + slider("gamma", "Gamma (higher: darker mid tones)", toneSettings.gamma, minGamma, maxGamma, 5, true)
       + slider("red", "Red", toneSettings.red, minGain, maxGain, 1, false)
       + slider("green", "Green", toneSettings.green, minGain, maxGain, 1, false)
       + slider("blue", "Blue", toneSettings.blue, minGain, maxGain, 1, false)
-      + "<p class=\"muted\">Applied to this display only. Compare it with the preview in the VibeDock administration.</p>"
-        "<button name=\"reset\" value=\"1\">Reset to defaults</button></section></form>");
+      + "<p class=\"muted\">Applied to this display only: move a slider until the display looks like the image beside it.</p>"
+        "<button name=\"reset\" value=\"1\">Reset to defaults</button></div></div></section></form>");
 }
+// Settings changed in quick series (brightness swipes, colour sliders): written to flash once, 3 s after the last
+// change, between pulls. Writing at once with every slider move restarted the ESP32-C6 ("Exception").
+uint32_t configChangedAt = 0; bool configDirty = false;
+void saveLater() { configDirty = true; configChangedAt = millis(); }
+void savePending() { if (configDirty && millis() - configChangedAt >= 3000) { configDirty = false; saveConfig(); } }
 void saveColours() {
   using namespace client_policy;
   if (web.hasArg("reset")) toneSettings = ToneSettings();
@@ -1032,9 +1164,10 @@ void saveColours() {
     toneSettings.gamma = clampGamma(web.arg("gamma").toInt()); toneSettings.red = clampGain(web.arg("red").toInt());
     toneSettings.green = clampGain(web.arg("green").toInt()); toneSettings.blue = clampGain(web.arg("blue").toInt());
   }
-  panelTone.build(toneSettings); saveConfig();
+  panelTone.build(toneSettings); saveLater();
   // Redraw everything with the new correction: unconditional request on the next loop.
   forgetRows(); etag = ""; lastPull = millis() - clampPoll(pollSeconds) * 1000u;
+  if (web.hasArg("live")) { web.send(204, "text/plain", ""); return; }  // slider moved, the page stays
   web.sendHeader("Location", "/", true); web.send(303, "text/plain", "");
 }
 // The device keeps no copy of the image (too little RAM), so it fetches a fresh one from the server and
@@ -1067,9 +1200,16 @@ void imagePage() {
 uint32_t lastPullRequest = 0;
 void handlePullRequest() {
   if (mode != Mode::Paired) { web.send(409, "text/plain", ""); return; }
-  if (lastPullRequest != 0 && !client_policy::pullRequestAllowed(millis(), lastPullRequest)) { web.send(429, "text/plain", ""); return; }
+  uint32_t poll = client_policy::clampPoll(pollSeconds) * 1000u;
+  if (lastPullRequest != 0 && !client_policy::pullRequestAllowed(millis(), lastPullRequest)) {
+    // Too soon after the last one (e.g. a setting switched on and off again): pulled when the pause is over, not
+    // only at the next poll. Still at most one pull per pause.
+    uint32_t wait = client_policy::pullRequestMs - (millis() - lastPullRequest);
+    if (millis() - lastPull < poll - wait) lastPull = millis() - poll + wait;
+    web.send(202, "text/plain", ""); return;
+  }
   lastPullRequest = millis(); if (lastPullRequest == 0) lastPullRequest = 1;
-  lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u;  // due in the next loop
+  lastPull = millis() - poll;  // due in the next loop
   web.send(202, "text/plain", "");
 }
 void startPairingServer() {
@@ -1112,7 +1252,7 @@ void serialSetup(const String &body) {
   if (status != 200 || !saveConfig()) { Serial.println("VIBEDOCK-SETUP ERROR storage"); return; }
   Serial.println("VIBEDOCK-SETUP OK"); Serial.flush();
   message("Set up, restarting", Step::None);
-  delay(500); ESP.restart();
+  diagIntent(Intent::Setup); delay(500); ESP.restart();
 }
 // duringTls: called from inside a TLS handshake, which takes seconds on the ESP8266; only reading the log and the
 // hello answer then, nothing that scans, restarts or changes the configuration.
@@ -1147,8 +1287,44 @@ void serialPoll(bool duringTls = false) {
 // ---- lifecycle ----
 // Version and board, readable in the binary: the server takes them from an uploaded own build.
 const char IDENTITY[] PROGMEM = "VIBEDOCK-FIRMWARE " VIBEDOCK_VERSION " " VIBEDOCK_BOARD;
+#ifdef VIBEDOCK_PANEL_JD9853
+// The JD9853 takes the ST7789 commands but needs the vendor's register set after them (from Waveshare's demo for the
+// ESP32-S3-Touch-LCD-1.47). Entries: command, number of data bytes, data.
+void initJd9853() {
+  static const uint8_t sequence[] = {
+    0xDF, 2, 0x98, 0x53, 0xB2, 1, 0x23, 0xB7, 4, 0x00, 0x47, 0x00, 0x6F, 0xBB, 6, 0x1C, 0x1A, 0x55, 0x73, 0x63, 0xF0,
+    0xC0, 2, 0x44, 0xA4, 0xC1, 1, 0x16, 0xC3, 8, 0x7D, 0x07, 0x14, 0x06, 0xCF, 0x71, 0x72, 0x77,
+    0xC4, 12, 0x00, 0x00, 0xA0, 0x79, 0x0B, 0x0A, 0x16, 0x79, 0x0B, 0x0A, 0x16, 0x82,
+    0xC8, 32, 0x3F, 0x32, 0x29, 0x29, 0x27, 0x2B, 0x27, 0x28, 0x28, 0x26, 0x25, 0x17, 0x12, 0x0D, 0x04, 0x00,
+              0x3F, 0x32, 0x29, 0x29, 0x27, 0x2B, 0x27, 0x28, 0x28, 0x26, 0x25, 0x17, 0x12, 0x0D, 0x04, 0x00,
+    0xD0, 5, 0x04, 0x06, 0x6B, 0x0F, 0x00, 0xD7, 2, 0x00, 0x30, 0xE6, 1, 0x14, 0xDE, 1, 0x01,
+    0xB7, 5, 0x03, 0x13, 0xEF, 0x35, 0x35, 0xC1, 3, 0x14, 0x15, 0xC0, 0xC2, 2, 0x06, 0x3A, 0xC4, 2, 0x72, 0x12,
+    0xBE, 1, 0x00, 0xDE, 1, 0x02, 0xE5, 3, 0x00, 0x02, 0x00, 0xE5, 3, 0x01, 0x02, 0x00, 0xDE, 1, 0x00,
+    0x35, 1, 0x00, 0x3A, 1, 0x05, 0xDE, 1, 0x02, 0xE5, 3, 0x00, 0x02, 0x00, 0xDE, 1, 0x00, 0x21, 0};
+  panel.writecommand(0x11); delay(120);
+  for (size_t i = 0; i < sizeof(sequence); i += 2 + sequence[i + 1]) {
+    panel.writecommand(sequence[i]);
+    for (uint8_t k = 0; k < sequence[i + 1]; k++) panel.writedata(sequence[i + 2 + k]);
+  }
+  delay(10); panel.writecommand(0x29);
+}
+#endif
+
+// Diagnosis of a board that stays dark (build with PLATFORMIO_BUILD_FLAGS=-DVIBEDOCK_BOOT_TRACE): the backlight comes on
+// before the panel, the start waits 3 s for a serial monitor, and every step of the start is printed.
+#ifdef VIBEDOCK_BOOT_TRACE
+#define BOOT_TRACE(step) do { Serial.println("TRACE " step); Serial.flush(); } while (0)
+#else
+#define BOOT_TRACE(step) do {} while (0)
+#endif
 void setup() {
+  platform::crashBegin();  // the crash of the run before, and from now on the panic handler
+  diagBegin();  // first: anything before would overwrite the state of the run before
   Serial.setRxBufferSize(1024); Serial.begin(115200);  // the flasher sends in paced chunks
+#ifdef VIBEDOCK_BOOT_TRACE
+  pinMode(TFT_BL, OUTPUT); digitalWrite(TFT_BL, TFT_BACKLIGHT_ON); delay(3000);
+#endif
+  BOOT_TRACE("serial");
   Serial.println(); Serial.println(reinterpret_cast<const __FlashStringHelper *>(IDENTITY));
   platform::onTlsWait([] { serialPoll(true); });  // the log stays readable during a long TLS handshake
 #ifdef VIBEDOCK_POWER_PIN
@@ -1157,11 +1333,34 @@ void setup() {
 #ifndef VIBEDOCK_ROTATION
 #define VIBEDOCK_ROTATION 0
 #endif
-  panel.init(); panel.setRotation(VIBEDOCK_ROTATION); panel.setSwapBytes(true); panel.fillScreen(TFT_BLACK);
+  BOOT_TRACE("panel init");
+  panel.init();
+  BOOT_TRACE("panel init done");
+#if defined(VIBEDOCK_BOOT_TRACE) && defined(ESP32) && ESP_ARDUINO_VERSION_MAJOR >= 3
+  // Which driver holds the display pins (GPIO, SPI_MASTER_*, ...).
+  for (int pin : {TFT_SCLK, TFT_MOSI, TFT_CS, TFT_DC, TFT_RST, TFT_BL})
+    Serial.printf("TRACE pin %d: %s\n", pin, perimanGetTypeName(perimanGetPinBusType(pin)));
+#endif
+#ifdef VIBEDOCK_PANEL_JD9853
+  initJd9853();
+#endif
+  panel.setRotation(VIBEDOCK_ROTATION); panel.setSwapBytes(true); panel.fillScreen(TFT_BLACK);
+  BOOT_TRACE("panel cleared");
+#ifdef VIBEDOCK_BOOT_TRACE
+  // Red, green, blue for a second each: shows whether the panel receives anything at all.
+  for (uint16_t colour : {uint16_t(TFT_RED), uint16_t(TFT_GREEN), uint16_t(TFT_BLUE)}) { panel.fillScreen(colour); delay(1000); }
+  BOOT_TRACE("test colours shown");
+#endif
 #if VIBEDOCK_CANVAS
   canvas.setColorDepth(VIBEDOCK_CANVAS); canvas.createSprite(240, 240); canvas.fillSprite(TFT_BLACK);
+  BOOT_TRACE("canvas ready");
 #endif
   pinMode(TFT_BL, OUTPUT); digitalWrite(TFT_BL, TFT_BACKLIGHT_ON);
+#if VIBEDOCK_TOUCH
+  BOOT_TRACE("touch");
+  touch::begin();
+#endif
+  BOOT_TRACE("wifi");
   WiFi.persistent(false); WiFi.mode(WIFI_STA);
   // No modem sleep: with it the access point holds incoming packets until the next beacon, and phone hotspots drop
   // them. Over TLS 1.3 the M1 needs whole 16 kB records through a 2 kB TCP window; with sleep the answers stalled.
@@ -1171,13 +1370,18 @@ void setup() {
   WiFi.setSleep(false);
 #endif
   message("Starting network", Step::WiFi);
-  logEvent("Start v" VIBEDOCK_VERSION " " VIBEDOCK_BOARD ", " + platform::resetReason());
+  BOOT_TRACE("first screen drawn");
+  // The start with its boot id, kind and the run before first, then the platform's reset text (it may be long).
+  logEvent("Start v" VIBEDOCK_VERSION " " VIBEDOCK_BOARD ": " + diagStart() + "; " + platform::resetReason());
   if (!platform::mountStorage() || !loadConfig()) { message("Storage error", Step::None, true); return; }
+  if (brightness < 100) platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness);
+  if (upsideDown) applyOrientation(true);
   loadLog();
   loadAnchor(); loadOtaKey();
   serialReady();
   handleQuickBoots();
   if (ssid.isEmpty() || setupRequested) { startPortal(); return; }
+  diagPhase(Phase::WiFi);
   WiFi.setAutoReconnect(true); WiFi.begin(ssid.c_str(), password.c_str()); uint32_t began = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - began < 20000) { footer(); settleQuickBoot(); serialPoll(); delay(250); }
   bool online = WiFi.status() == WL_CONNECTED;
@@ -1186,15 +1390,69 @@ void setup() {
   if (!online && !networkVerified) { WiFi.setAutoReconnect(false); WiFi.disconnect(); startPortal(); return; }
   if (online && !networkVerified) { networkVerified = true; saveConfig(); }
   configTime(0, 0, "pool.ntp.org", "time.cloudflare.com");  // UTC; only needed to check https certificates
-  shownIp = currentIp(); startPairingServer(); lastReconnect = millis();
+  shownIp = currentIp(); startPairingServer(); lastReconnect = millis(); diagPhase(Phase::Idle);
   if (key.isEmpty()) enterPairing();
   else {
     mode = Mode::Paired; lastImage = millis(); lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u;
     if (online) message("Connecting to server", Step::Server); else showWaiting();
   }
 }
+#if VIBEDOCK_TOUCH
+// Swipes: left and right switch the colour scheme on the server (paired displays only), up and down the brightness.
+// A double tap starts or stops the slideshow of the design on the server, whatever its schedule says.
+uint32_t lastTouchPoll = 0;
+void touchPoll() {
+  static bool touching = false; static int16_t startX, startY, lastX, lastY; static uint8_t idle = 0;
+  static uint32_t touchedAt = 0, lastTap = 0;
+  if (millis() - lastTouchPoll < 20) return;
+  lastTouchPoll = millis();
+  int16_t x, y;
+  if (touch::read(x, y)) {
+    if (!touching) { touching = true; startX = x; startY = y; touchedAt = millis(); }
+    lastX = x; lastY = y; idle = 0; return;
+  }
+  // Released only after 60 ms without a point: the controllers drop single readings during a swipe.
+  if (!touching || ++idle < 3) return;
+  touching = false; idle = 0;
+  int dx = lastX - startX, dy = lastY - startY;
+  if (upsideDown) { dx = -dx; dy = -dy; }  // the panel's coordinates do not turn with the picture
+  auto swipe = client_policy::swipeOf(dx, dy);
+  // The release is noticed 60 ms late (see above): that time is not part of the touch.
+  if (swipe == client_policy::Swipe::None && client_policy::isTap(dx, dy, millis() - touchedAt > 60 ? millis() - touchedAt - 60 : 0)) {
+    if (!client_policy::doubleTap(lastTap, millis())) { lastTap = millis(); return; }
+    lastTap = 0;
+    if (mode != Mode::Paired) return;
+    pendingGesture = "photos-toggle"; logEvent("Touch: double tap, photos on or off", true);
+    lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u;  // the new image right away
+    return;
+  }
+  if (swipe == client_policy::Swipe::Up || swipe == client_policy::Swipe::Down) {
+    brightness = client_policy::nextBrightness(brightness, swipe == client_policy::Swipe::Up);
+    platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness);
+    saveLater();
+  } else if (swipe != client_policy::Swipe::None && mode == Mode::Paired) {
+    pendingGesture = swipe == client_policy::Swipe::Left ? "scheme-next" : "scheme-previous";
+    logEvent("Touch: " + pendingGesture, true);
+    lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u;  // the new image right away
+  }
+}
+#endif
+
+// Turns the picture by 180 degrees or back (Flip image in the administration); the next pull draws every row.
+void applyOrientation(bool flipped) {
+  upsideDown = flipped;
+  panel.setRotation((VIBEDOCK_ROTATION + (flipped ? 2 : 0)) % 4);
+  forgetRows();
+  if (imageOnScreen) { etag = ""; lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u; }  // the image again, every row
+  else present(true);
+}
+
 void loop() {
   serialPoll();
+  savePending();
+#if VIBEDOCK_TOUCH
+  touchPoll();
+#endif
   if (logDirty && millis() - logSavedAt >= 60000) saveLog();
   static bool clockLogged = false;
   if (!clockLogged && clockSet()) { clockLogged = true; logEvent("Clock set (NTP)"); }
@@ -1219,7 +1477,11 @@ void loop() {
       } else showWaiting();
     }
   }
-  if (WiFi.status() != WL_CONNECTED && millis() - lastReconnect >= 15000) { lastReconnect = millis(); WiFi.reconnect(); }
+  // Wi-Fi lost: counted for the diagnosis (the log has the IP change).
+  static bool wasOnline = false; bool online = WiFi.status() == WL_CONNECTED;
+  if (wasOnline && !online && diag.drops < 255) { diag.drops++; diagWrite(); }
+  wasOnline = online;
+  if (!online && millis() - lastReconnect >= 15000) { lastReconnect = millis(); WiFi.reconnect(); }
   if (WiFi.status() == WL_CONNECTED && !networkVerified) { networkVerified = true; saveConfig(); }
   if (mode == Mode::Paired) {
     if (client_policy::pullDue(millis(), lastPull, pollSeconds)) pull();

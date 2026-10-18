@@ -2,25 +2,65 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex"><meta name="referrer" content="no-referrer"><title th:text="${'VibeDock · ' + name}">VibeDock</title>
+<!-- Home screen (iOS web clip, Android): full screen, the display icon and the display's name. -->
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-title" th:content="${name}">
+<link rel="apple-touch-icon" th:href="${icon}"><link rel="icon" type="image/png" th:href="${icon}">
 <style>
-html,body{margin:0;height:100%;background:#000;overflow:hidden}
-body{background-position:center;background-size:contain;background-repeat:no-repeat;image-rendering:pixelated}
-.stale{position:fixed;right:12px;bottom:10px;font:12px system-ui,sans-serif;color:#fff;background:rgba(180,35,53,.85);padding:4px 9px;border-radius:99px;display:none}
+html,body{margin:0;height:100%;background:#000;overflow:hidden;touch-action:manipulation}
+/* The image area leaves out the notch and the home indicator; opened from the home screen also the blurred edge
+   below the status bar. */
+.screen{position:fixed;top:env(safe-area-inset-top);right:env(safe-area-inset-right);bottom:env(safe-area-inset-bottom);left:env(safe-area-inset-left);
+  background-position:center;background-size:contain;background-repeat:no-repeat}
+@media (display-mode: standalone){.screen{top:calc(env(safe-area-inset-top) + 14px)}}
+.stale{position:fixed;right:calc(12px + env(safe-area-inset-right));bottom:calc(10px + env(safe-area-inset-bottom));font:12px system-ui,sans-serif;color:#fff;background:rgba(180,35,53,.85);padding:4px 9px;border-radius:99px;display:none}
 </style></head>
-<body th:attr="data-image=${image},data-reload=${reload}"><span class="stale" role="status"></span>
+<body th:attr="data-image=${image},data-state=${state},data-swipe=${swipe},data-reload=${reload}"><div class="screen"></div><span class="stale" role="status"></span>
 <script>
-// Swaps the image only once the next one has loaded, so the screen never goes blank; keeps the last image offline.
+// Asks for the image in the size of the screen area and the screen's pixel ratio, so it is drawn sharp; a new size
+// (rotation, window resized) loads a new image. Swaps the image only once the next one has loaded, so the screen never
+// goes blank; keeps the last image offline. Every few seconds it asks whether the image changed and loads it then.
+// A swipe left or right (or the arrow keys) changes the theme, in a slideshow the photo, like on touch displays; a
+// double tap (or double click, or the space bar) starts or stops the slideshow, whatever its schedule says.
 (() => {
-  const body = document.body, stale = document.querySelector('.stale'), every = Number(body.dataset.reload) * 1000;
-  let last = null;
+  const body = document.body, screen = document.querySelector('.screen'), stale = document.querySelector('.stale'), every = Number(body.dataset.reload) * 1000;
+  let last = null, resized = null, tag = null;
   const time = date => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   function load() {
-    const url = body.dataset.image + '?t=' + Date.now(), next = new Image();
-    next.onload = () => { body.style.backgroundImage = 'url("' + url + '")'; last = new Date(); stale.style.display = 'none'; };
+    const ratio = Math.round((window.devicePixelRatio || 1) * 100) / 100;
+    const url = body.dataset.image + '?w=' + screen.clientWidth + '&h=' + screen.clientHeight + '&r=' + ratio + '&t=' + Date.now(), next = new Image();
+    next.onload = () => { screen.style.backgroundImage = 'url("' + url + '")'; last = new Date(); stale.style.display = 'none'; };
     next.onerror = () => { stale.textContent = last ? 'offline · last image ' + time(last) : 'offline'; stale.style.display = 'inline-block'; };
     next.src = url;
   }
-  load(); setInterval(load, every);
+  async function check() {
+    if (document.hidden) return;
+    try {
+      const answer = await (await fetch(body.dataset.state, { cache: 'no-store' })).json();
+      if (tag !== null && answer.tag !== tag) load();
+      tag = answer.tag;
+    } catch { /* offline: the regular reload shows it */ }
+  }
+  async function swipe(direction) {
+    try { await fetch(body.dataset.swipe + '?direction=' + direction, { method: 'POST' }); } catch { return; }
+    tag = null; load(); check();
+  }
+  let start = null, lastTap = 0, touched = 0;  // touched: a tap is not also taken as a double click
+  window.addEventListener('touchstart', event => { const t = event.touches[0]; start = event.touches.length === 1 ? { x: t.clientX, y: t.clientY, at: Date.now() } : null; }, { passive: true });
+  window.addEventListener('touchend', event => {
+    if (!start) return; const t = event.changedTouches[0], dx = t.clientX - start.x, dy = t.clientY - start.y, held = Date.now() - start.at; start = null; touched = Date.now();
+    if (Math.abs(dx) > 60 && Math.abs(dx) > 2 * Math.abs(dy)) { swipe(dx < 0 ? 'next' : 'previous'); return; }
+    if (Math.abs(dx) > 15 || Math.abs(dy) > 15 || held > 300) return;
+    if (Date.now() - lastTap < 350) { lastTap = 0; swipe('toggle'); } else lastTap = Date.now();
+  }, { passive: true });
+  window.addEventListener('dblclick', () => { if (Date.now() - touched > 1000) swipe('toggle'); });
+  window.addEventListener('keydown', event => {
+    if (event.key === 'ArrowLeft') swipe('next'); else if (event.key === 'ArrowRight') swipe('previous'); else if (event.key === ' ') swipe('toggle');
+  });
+  window.addEventListener('resize', () => { clearTimeout(resized); resized = setTimeout(load, 300); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+  load(); check(); setInterval(load, every); setInterval(check, 3000);
 })();
 </script>
 </body></html>

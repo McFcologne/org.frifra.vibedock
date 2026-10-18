@@ -27,7 +27,14 @@
     const copy = event.target.closest('[data-copy],[data-copy-from]'); if (!copy) return;
     const text = copy.dataset.copyFrom ? document.querySelector(copy.dataset.copyFrom)?.textContent ?? '' : copy.dataset.copy;
     const title = copy.title;
-    navigator.clipboard.writeText(text).then(() => { copy.classList.add('copied'); copy.title = 'Copied'; setTimeout(() => { copy.classList.remove('copied'); copy.title = title; }, 1500); });
+    const copied = () => { copy.classList.add('copied'); copy.title = 'Copied'; setTimeout(() => { copy.classList.remove('copied'); copy.title = title; }, 1500); };
+    // Over plain HTTP (not localhost) browsers have no clipboard API: copy through a hidden text field instead.
+    const fallback = () => {
+      const field = Object.assign(document.createElement('textarea'), { value: text, readOnly: true });
+      field.style.cssText = 'position:fixed;top:0;left:0;opacity:0'; document.body.append(field); field.select();
+      try { if (document.execCommand('copy')) copied(); } finally { field.remove(); }
+    };
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(copied, fallback); else fallback();
   });
   // Posting a form reloads the page; remember the scroll position for it (theme.js restores it).
   document.addEventListener('submit', event => {
@@ -48,6 +55,19 @@
       const links = await response.json();
       card.querySelectorAll('.web-link').forEach((row, i) => { const url = i === 0 ? links.page : links.image;
         row.querySelector('code').textContent = url; row.querySelector('[data-copy]').dataset.copy = url; const open = row.querySelector('a'); if (open) open.href = url; });
+    } catch { box.checked = !box.checked; }
+    box.disabled = false;
+  });
+  // Devices: the flip switch saves in place; the device turns its picture with its next pull (asked right away).
+  document.addEventListener('change', async event => {
+    const box = event.target.closest('[data-device-flip]'); if (!box) return;
+    const body = new URLSearchParams({ flipped: String(box.checked) });
+    const token = document.querySelector('meta[name="csrf-token"]').content, header = document.querySelector('meta[name="csrf-header"]').content;
+    box.disabled = true;
+    try {
+      const response = await fetch(box.form.action, { method: 'POST', body, headers: { Accept: 'application/json', [header]: token } });
+      if (!response.ok) throw new Error(String(response.status));
+      box.checked = (await response.json()).flipped;
     } catch { box.checked = !box.checked; }
     box.disabled = false;
   });
@@ -103,7 +123,17 @@
   document.addEventListener('load', event => { if (event.target instanceof HTMLImageElement) fitRatio(event.target); }, true);
   document.querySelectorAll('.device img').forEach(image => { if (image.complete) fitRatio(image); });
   // Previews: click (or Enter) shows the whole device, case and screen, enlarged; a click or Escape closes it.
-  let lightbox;
+  let lightbox, shown;
+  // A copy of the device as it is now; again when the page swaps in a new preview while it is open (device-state.js).
+  const enlarged = device => {
+    const copy = device.cloneNode(true);
+    for (const attribute of ['tabindex', 'title', 'role', 'aria-haspopup', 'aria-label']) copy.removeAttribute(attribute);
+    copy.querySelectorAll('[id]').forEach(element => element.removeAttribute('id'));
+    return copy;
+  };
+  document.addEventListener('vibedock:devices-refreshed', () => {
+    if (lightbox && lightbox.open && shown && shown.isConnected) lightbox.replaceChildren(enlarged(shown));
+  });
   for (const device of document.querySelectorAll('.device')) {
     if (!device.querySelector('img')) continue;
     device.tabIndex = 0; device.title = 'Click to enlarge';
@@ -118,10 +148,7 @@
         lightbox.addEventListener('close', () => { if (!lightbox.open) lightbox.replaceChildren(); });
         document.body.append(lightbox);
       }
-      const copy = device.cloneNode(true);
-      for (const attribute of ['tabindex', 'title', 'role', 'aria-haspopup', 'aria-label']) copy.removeAttribute(attribute);
-      copy.querySelectorAll('[id]').forEach(element => element.removeAttribute('id'));
-      lightbox.replaceChildren(copy); lightbox.showModal();
+      shown = device; lightbox.replaceChildren(enlarged(device)); lightbox.showModal();
     };
     device.addEventListener('click', open);
     device.addEventListener('keydown', event => {

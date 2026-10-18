@@ -36,7 +36,14 @@ class WebSecurity {
     @Bean org.springframework.security.web.session.HttpSessionEventPublisher sessionEvents(){
         return new org.springframework.security.web.session.HttpSessionEventPublisher();
     }
-    @Bean SecurityFilterChain security(HttpSecurity http,org.springframework.security.core.session.SessionRegistry sessions) throws Exception {
+    @Bean SecurityFilterChain security(HttpSecurity http,org.springframework.security.core.session.SessionRegistry sessions,
+            @Value("${vibedock.admin-auth:password}") String auth,@Value("${vibedock.admin-user}") String admin) throws Exception {
+        // ADMIN_AUTH=none (quick tests): every visitor of the administration port counts as the administrator. The port
+        // guard still keeps the administration off the public port; publish the administration port on this host only.
+        if("none".equals(auth)){
+            org.slf4j.LoggerFactory.getLogger(WebSecurity.class).warn("ADMIN_AUTH=none: the administration needs no sign-in");
+            http.anonymous(a -> a.principal(admin).authorities("ROLE_ADMIN"));
+        }
         // Behind a TLS reverse proxy (e.g. Synology Web Station) absolute http:// redirects would break; browsers get
         // a relative redirect to the login page instead. Other clients keep HTTP Basic.
         var login=new LoginUrlAuthenticationEntryPoint("/login");login.setFavorRelativeUris(true);
@@ -44,7 +51,7 @@ class WebSecurity {
         browsers.setIgnoredMediaTypes(Set.of(MediaType.ALL));
         return http
                 .exceptionHandling(e -> e.defaultAuthenticationEntryPointFor(login,browsers))
-                .authorizeHttpRequests(a -> a.requestMatchers("/api/v1/usage","/api/v1/clients/*/image","/api/v1/clients/*/firmware","/web/*","/web/*/image.png").permitAll()
+                .authorizeHttpRequests(a -> a.requestMatchers("/api/v1/usage","/api/v1/clients/*/image","/api/v1/clients/*/firmware","/api/v1/clients/*/log","/web/*","/web/*/image.png","/web/*/icon.png","/web/*/state","/web/*/swipe").permitAll()
                 // Login page assets; the port guard still limits them to the administration port.
                 .requestMatchers("/login","/error","/app.css","/theme.js","/logo.svg","/favicon.ico","/apple-touch-icon.png").permitAll()
                 .anyRequest().hasRole("ADMIN"))
@@ -54,7 +61,11 @@ class WebSecurity {
                 // restart (expired token) used to end on a 403 page. A forged sign-out link can only sign you out.
                 .logout(l -> l.logoutRequestMatcher(new OrRequestMatcher(PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.GET,"/logout"),
                         PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST,"/logout"))).logoutSuccessUrl("/login?logout").permitAll())
-                .csrf(c -> c.ignoringRequestMatchers(PathPatternRequestMatcher.withDefaults().matcher("/logout")))
+                // The display's log upload is authenticated by its key, like its image pull, and has no browser session.
+                .csrf(c -> c.ignoringRequestMatchers(PathPatternRequestMatcher.withDefaults().matcher("/logout"),
+                        PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST,"/api/v1/clients/*/log"),
+                        // Web display pages: the secret in the path is the access, there is no session.
+                        PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST,"/web/*/swipe")))
                 .httpBasic(Customizer.withDefaults()).build();
     }
     @Bean FilterRegistrationBean<Filter> portAndIpGuard(SettingsStore settings,
@@ -73,13 +84,16 @@ class WebSecurity {
                 request.setAttribute("vibedock.accessRequest",request.getMethod()+" "+loggedPath+" "+request.getProtocol());
                 boolean api=path.equals("/api/v1/usage");
                 // Device pull (protocol v2): authenticated by the device key in the controller.
-                boolean image=path.matches("/api/v1/clients/[A-Za-z0-9_.:-]{8,80}/(image|firmware)")
+                boolean upload=path.matches("/api/v1/clients/[A-Za-z0-9_.:-]{8,80}/log");
+                boolean image=upload||path.matches("/api/v1/clients/[A-Za-z0-9_.:-]{8,80}/(image|firmware)")
                         // Web displays: authenticated by the secret in the link in the controller.
-                        ||path.matches("/web/[a-f0-9]{64}(/image\\.png)?");
+                        ||path.matches("/web/[a-f0-9]{64}(/image\\.png|/icon\\.png|/state)?");
+                // The swipe of a web display page: like the page, but POST.
+                boolean swipe=path.matches("/web/[a-f0-9]{64}/swipe");
                 response.setHeader("Cache-Control","no-store");
-                if(image){
+                if(image||swipe){
                     if(request.getLocalPort()==adminPort){response.setStatus(404);return;}
-                    if(!"GET".equals(request.getMethod())){response.setStatus(405);return;}
+                    if(!(upload||swipe?"POST":"GET").equals(request.getMethod())){response.setStatus(405);return;}
                 } else if (api) {
                     if (request.getLocalPort()==adminPort) { response.setStatus(404); return; }
                     if (!"GET".equals(request.getMethod())) { response.setStatus(405); return; }

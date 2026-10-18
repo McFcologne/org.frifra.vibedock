@@ -133,7 +133,7 @@ instead of aborting.
 
 ## Reading the device log
 
-**Devices → Firmware → Display log** (or `VIBEDOCK-LOG` on the serial console) shows the last 24 events. For https:
+**Devices → Troubleshooting → Read log over USB** (or `VIBEDOCK-LOG` on the serial console) shows the last 24 events. For https:
 
 - Success (figures as an example): `HTTP 200, TLS 1.3 TLS1-3-AES-128-GCM-SHA256 after 4200 ms (3900 computing, step 16); heap 12000+20240
   IRAM, TLS 23000, stack 3300/4608, 30000+19000 IRAM free after`.

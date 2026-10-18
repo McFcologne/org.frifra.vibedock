@@ -27,10 +27,11 @@ class AdminAccount implements UserDetailsService {
                 sessions.getAllSessions(principal,false).forEach(org.springframework.security.core.session.SessionInformation::expireNow);
     }
 
-    AdminAccount(@Value("${vibedock.admin-user}") String name,@Value("${vibedock.admin-password}") String password,SettingsStore store) throws IOException {
+    AdminAccount(@Value("${vibedock.admin-user}") String name,@Value("${vibedock.admin-password}") String password,
+                 @Value("${vibedock.admin-auth:password}") String auth,SettingsStore store) throws IOException {
         this.name=name;this.store=store;
         own=store.adminPasswordHash().orElse(null);
-        if(password.isBlank()&&own==null)throw new IllegalArgumentException("ADMIN_PASSWORD must be set");
+        if(password.isBlank()&&own==null&&!"none".equals(auth))throw new IllegalArgumentException("ADMIN_PASSWORD must be set");
         configured=password.isBlank()?null:BCRYPT.encode(password);
     }
     String name(){return name;}

@@ -82,7 +82,25 @@ button:disabled{opacity:.55;cursor:default}
 .device-front{padding:calc(var(--s)*.07) calc(var(--s)*.075) calc(var(--s)*.12);border-radius:calc(var(--s)*.11);
   background:linear-gradient(180deg,#fbfaf7,#eeece6 70%,#e3e0d8);box-shadow:inset 0 max(1px,calc(var(--s)*.006)) 0 #fff,inset 0 calc(var(--s)*-.012) calc(var(--s)*.018) rgba(0,0,0,.06),0 0 0 max(1px,calc(var(--s)*.004)) #cfccc3,0 calc(var(--s)*.055) calc(var(--s)*.13) rgba(20,25,35,.16)}
 .device-glass{padding:min(calc(var(--s)*.018),1px);background:#0b0c0e}
-.device img{display:block;width:var(--s);height:calc(var(--s) * var(--ratio,1))}
+/* A new preview builds up from the top like the device draws it (device-state.js), over the previous image. */
+.device-glass.drawing{background-size:100% 100%;background-repeat:no-repeat;background-origin:content-box;background-clip:content-box}
+.device-glass.drawing img{background:transparent;animation:device-draw var(--draw,.6s) steps(24,end) both}
+@keyframes device-draw{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0 0 0 0)}}
+/* The black cases of the Waveshare touch boards (Board.previewCase), measured on the devices; --s is the screen width.
+   ESP32-S3-Touch-LCD-1.47: a frame a little wider above and below the narrow screen, gently rounded screen corners.
+   ESP32-C6-Touch-LCD-1.69: narrow sides, a chin below, strongly rounded screen corners (the image keeps clear of them). */
+.device-front.case-147,.device-front.case-c6,.device-lightbox .device-front.case-147,.device-lightbox .device-front.case-c6{
+  /* Convex glossy rim: light along the upper edge, a sheen across the top, dark below. */
+  background:radial-gradient(120% 60% at 30% 0%,rgba(255,255,255,.16),rgba(255,255,255,0) 55%),
+    linear-gradient(165deg,#3a3c41,#17181b 42%,#0b0c0e);
+  box-shadow:inset 0 max(1px,calc(var(--s)*.012)) max(1px,calc(var(--s)*.02)) rgba(255,255,255,.28),
+    inset 0 calc(var(--s)*-.02) calc(var(--s)*.035) rgba(0,0,0,.7),inset 0 0 0 max(1px,calc(var(--s)*.008)) #060607,
+    0 calc(var(--s)*.05) calc(var(--s)*.12) rgba(10,12,16,.38)}
+.device-front.case-147{padding:calc(var(--s)*.22) calc(var(--s)*.12) calc(var(--s)*.2);border-radius:calc(var(--s)*.2)}
+.device-front.case-c6{padding:calc(var(--s)*.08) calc(var(--s)*.09) calc(var(--s)*.19);border-radius:calc(var(--s)*.18)}
+.case-147 .device-glass,.case-c6 .device-glass{padding:0;overflow:hidden;background:#000;box-shadow:0 0 0 max(1px,calc(var(--s)*.006)) rgba(0,0,0,.8)}
+.case-147 .device-glass{border-radius:calc(var(--s)*.1)}.case-c6 .device-glass{border-radius:calc(var(--s)*.15)}
+.device img{display:block;width:var(--s);height:calc(var(--s) * var(--ratio,1));background:#000}
 .device[role=button]{cursor:zoom-in;border-radius:calc(var(--s)*.11)}.device[role=button]:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
 .device-lightbox{border:0;padding:0;background:transparent;overflow:visible;max-width:none;max-height:none;cursor:zoom-out}
 .device-lightbox::backdrop{background:rgba(8,12,20,.62)}
@@ -166,8 +184,7 @@ button.small{padding:5px 10px;font-size:13px;font-weight:500}
 .design-fixed{padding:0 4px 16px;font-size:13px;color:var(--muted)}.design-fixed strong{font-weight:600}
 .design-preview .screen{margin-top:16px}.design-preview .device{--s:220px;max-width:100%}
 .design-preview figure{text-align:center}.design-preview img{image-rendering:auto}.design-preview #preview-status{margin-top:15px}
-#design-save-state{align-self:center;margin-right:auto;font-size:13px;color:var(--muted)}
-#design-save:disabled{cursor:default}#design-controls:disabled{opacity:.6}
+#design-controls:disabled{opacity:.6}
 @media(max-width:860px){.layout-columns{grid-template-columns:minmax(0,1fr)}.design-side{width:100%;max-width:380px;justify-self:center;grid-row:1}.design-preview{width:100%}}
 @media(max-width:460px){.layout-heading label{width:100%;min-width:0}.design-band-head{gap:7px}.design-band-head h3{font-size:13px}.design-band-head select{order:2;width:100%}.design-source-slots{gap:8px}.design-source-slots select{font-size:13px;padding-left:7px}.design-preview .device{--s:200px}}
 @media(pointer:coarse){.design-band-actions button{min-width:44px;min-height:44px}.design-band-content>button{min-height:44px}}
@@ -213,7 +230,7 @@ select{padding-right:32px}small,.meta{font-size:12px}small{margin-top:8px}
 .import-mode{border:0;padding:0;margin:0 0 12px;background:none;border-radius:0;display:flex;gap:6px 20px;flex-wrap:wrap}.import-mode legend{font-size:13px;font-weight:600;margin-bottom:6px;padding:0}.import-mode label{display:flex;align-items:center;gap:6px;margin:0}
 .import-list{list-style:none;padding:0;margin:0 0 12px}.import-list li{border-top:1px solid var(--line);padding:9px 0}.import-list label{display:flex;align-items:center;gap:8px;margin:0;flex-wrap:wrap}.import-mode label{font-weight:500;font-size:14px;min-width:0}
 .import-mode input,.import-list input{width:auto;margin:0;flex:none}.import-review .form-actions button.secondary{background:var(--card);border-color:var(--line);color:var(--text)}
-.client-card .client-body{grid-template-columns:112px minmax(0,1fr);gap:18px}.client-card .device{--s:96px}
+.client-card .client-body{grid-template-columns:minmax(112px,auto) minmax(0,1fr);gap:18px}.client-card .device{--s:96px}
 .client-card .client-body .badge{margin:5px 0}.device-identifier{font-size:11px}.client-card-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border-top:1px solid var(--line);margin-top:16px;padding-top:15px}
 .client-card-footer .button{font-size:12px;margin:0}.device-manage{margin-top:12px}.device-manage summary{font-size:12px}.device-manage form{display:inline-block;margin:10px 8px 0 0}
 .source .card-head small{margin:3px 0 0;font-size:11px;font-weight:400}
@@ -246,7 +263,7 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 .app-footer{border-top:1px solid var(--line);background:var(--card);color:var(--muted);font-size:12px}
 .app-footer-inner{max-width:1040px;margin:auto;padding:16px 26px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .app-footer nav{display:flex;gap:20px;flex-wrap:wrap}.app-footer a{color:var(--muted);text-decoration:none}.app-footer a:hover{text-decoration:underline;color:var(--accent)}
-.license-report{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.6 ui-monospace,SFMono-Regular,monospace;color:var(--text);margin:18px 0 0}
+.license-report,.log-lines{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.6 ui-monospace,SFMono-Regular,monospace;color:var(--text);margin:18px 0 0}
 .license-components{list-style:none;padding:0;margin:16px 0 0}.license-components li{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border-top:1px solid var(--line);flex-wrap:wrap}
 .license-components li>div{min-width:0;overflow-wrap:anywhere}.license-components a{flex-shrink:0}
 @media(max-width:460px){.app-footer-inner{padding:16px 14px}.app-footer nav{gap:16px}}
@@ -331,7 +348,7 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 .web-options{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:6px}.web-options .badge{margin:0}
 .client-card-footer button.small-button{font-size:12px;padding:8px 14px}
 .web-link .icon-button.copied{color:var(--ok);border-color:var(--ok)}
-.client-card .web-external,.client-card .card-actions form,.client-card .card-actions button,.client-card .switch{margin:0}.client-card .web-options .badge{margin:0}.switch{display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}.switch input{width:auto;margin:0}
+.client-card .device-flip,.client-card .web-external,.client-card .card-actions form,.client-card .card-actions button,.client-card .switch{margin:0}.client-card .web-options .badge{margin:0}.switch{display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}.switch input{width:auto;margin:0}
 .switch:has(input:disabled){opacity:.55;cursor:not-allowed}
 /* Cards side by side share their height; the footer stays at the bottom. */
 .grid-2>.client-card{align-self:stretch;display:flex;flex-direction:column}.client-card>.client-body{flex:1}
@@ -340,7 +357,7 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 ::view-transition-old(root),::view-transition-new(root){animation-duration:.12s}
 .appbar{view-transition-name:appbar}
 @media(prefers-reduced-motion:reduce){@view-transition{navigation:none}}
-.board-pick{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 14px;align-items:center}.board-pick label{margin:0}.board-pick .meta{grid-column:2;margin:0}
+.board-pick{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 14px;align-items:center;margin:0 0 16px}.board-pick label{margin:0}.board-pick .meta,.board-pick .notice{grid-column:2;margin:0}
 .status-actions{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}.status-actions .inline-form{margin:0}
 .firmware-devices .inline-form button.badge,.status-actions .inline-form button.badge{margin:0}
 /* Grip to reorder device and data source cards. */
@@ -348,3 +365,26 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 .card-grip:hover,.card-grip:focus-visible{opacity:1;background:var(--accent-soft);color:var(--accent);border-radius:6px}
 
 [data-sortable]>.dragging{opacity:.4}[data-sortable]>.drag-over{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Photos in the design editor: the library as tiles, the chosen ones numbered in their order. */
+.design-photos select{width:100%}
+.mode-toggle{display:inline-flex;border:1px solid var(--line);border-radius:10px;padding:3px;background:var(--card-2);gap:2px}
+.mode-toggle button{border:0;background:none;padding:6px 13px;border-radius:8px;font-weight:550;font-size:13px;color:var(--muted);margin:0;display:inline-flex;gap:6px;align-items:center;box-shadow:none;min-height:0}
+.mode-toggle button[aria-pressed=true]{background:var(--card);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.14)}
+.mode-dot{width:7px;height:7px;border-radius:50%;background:#22a06b}
+.photo-options{display:flex;gap:14px;align-items:end;flex-wrap:wrap}.photo-options>div{flex:1;min-width:160px}.photo-options .check{margin-bottom:12px}
+.photo-schedule{margin-top:12px;padding:10px 12px;border:1px dashed var(--line);border-radius:10px}.photo-schedule>.check{margin:0}
+.usage-heading{margin:22px 0 4px;font-size:14px}.usage-hint{display:flex;justify-content:space-between;align-items:center;gap:8px 16px;flex-wrap:wrap;margin:0 0 10px}.usage-hint p{margin:0}
+.align-choice{display:flex;align-items:center;gap:8px;margin:0;font-weight:400;font-size:13px}.align-choice select{width:auto;margin:0}
+.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;margin:8px 0}
+.photo-tile{position:relative}.photo-pick{display:block;width:100%;aspect-ratio:1;padding:0;margin:0;border:2px solid transparent;border-radius:9px;overflow:hidden;background:var(--line);cursor:pointer}
+.photo-pick img{display:block;width:100%;height:100%;object-fit:cover;opacity:.55}.photo-tile.selected .photo-pick{border-color:var(--accent)}.photo-tile.selected .photo-pick img{opacity:1}
+.photo-order{position:absolute;left:4px;top:4px;min-width:18px;height:18px;border-radius:9px;background:var(--accent);color:#fff;font-size:11px;font-weight:700;line-height:18px;text-align:center;padding:0 4px}
+.photo-delete{position:absolute;right:3px;top:3px;margin:0;padding:0 5px;min-height:0;height:18px;font-size:11px;line-height:18px;border-radius:9px;border:0;background:rgba(0,0,0,.55);color:#fff;cursor:pointer}
+.photo-delete.armed{background:#c42b1c}
+.photo-add{display:inline-block;margin:2px 0 6px;cursor:pointer}.photo-add input{display:none}
+.photo-times{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}.photo-times label{flex:1;min-width:120px;margin:0}.photo-times input{margin-top:5px}.photo-times small{width:100%;color:var(--muted)}
+/* Support file: the problem description. */
+.support-form fieldset{margin-top:0}.support-form textarea{width:100%;resize:vertical;font:inherit}
+.field-label{display:block;margin:14px 0 6px;font-weight:550;font-size:14px}
+.support-displays{display:flex;flex-wrap:wrap;gap:4px 18px}.support-displays label{margin:0}

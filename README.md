@@ -40,16 +40,19 @@ server; a display only receives its image.
 
 - **Several accounts per provider.** Keep personal and work accounts separate, give each source its own display name, and assign sources to the display independently of their provider.
 - **One design editor for defaults and devices.** Devices follow the default until you enable a complete custom design. Return to the default at any time.
-- **Up to eight usage widgets.** Stack up to four usage bands and the weather/mood band in any order. Each usage band holds one full-width source, two half-width sources or one compact row; the VibeTV M1 fits two full bands, one full and two compact ones or four compact ones.
+- **Up to eight usage widgets.** Stack up to five usage bands and the weather/mood band in any order, spread evenly or aligned to the top. Each usage band holds one full-width source, two half-width sources or one compact row; the VibeTV M1 fits two full bands, one full and two compact ones or four compact ones.
 - **Display types.** Designs adapt to the display of each device: VibeTV M1 (240×240) by default, other common SPI panels from 128×160 to 320×240 per device.
 - **Weather and mood.** Show an emoji and weather icon/temperature; swap their slots, including the slot sizes. The update time and device IP stay with their band and cannot be hidden. The weather location is never drawn.
-- **Thirteen display themes.** Modern dark and light themes, classic green/amber terminals, classic Mac and classic Windows. Previews and devices use the same server renderer.
+- **Twenty display themes.** Modern dark and light themes, classic green/amber terminals, classic Mac and classic Windows, Windows 11, macOS, a starship console, a handheld LCD, a blueprint, neon and a newspaper page. Previews and devices use the same server renderer.
+- **Photos and slideshows.** Instead of the status a display can show uploaded photos, one after the other, optionally only at certain times of day (e.g. at night). The server keeps only reduced copies and cuts them to each display.
 - **Encrypted account transfer.** Export data sources with their saved sign-ins and restore selected sources by adding them or replacing the current collection.
 - **Device management.** Pair using the IP and six-digit code on a trusted home network (HTTP pairing is unencrypted), inspect status and previews, rename, reorder by dragging, force a redraw, update, or remove a device.
-- **Boards.** Besides the VibeTV M1 (ESP8266), the firmware builds for ESP32, ESP32-S3 and ESP32-C3 boards with a display (not yet tested on hardware); each device has a board that decides which firmware it gets.
-- **Web displays.** A browser, tablet or another program shows the image without hardware: a full-screen page that reloads itself, or a plain PNG link, protected by a secret in the link.
+- **Boards.** Besides the VibeTV M1 (ESP8266), the firmware builds for ESP32, ESP32-S3 and ESP32-C3 boards with a display (tested on hardware: Waveshare ESP32-S3-Touch-LCD-1.47 and ESP32-C6-Touch-LCD-1.69; the others are prepared); each device has a board that decides which firmware it gets.
+- **Touch displays.** On the Waveshare touch boards a swipe left or right changes the theme (or the photo), up and down the brightness, a double tap starts or stops the slideshow. Displays mounted upside down are turned with *Flip image*.
+- **Troubleshooting.** Read a display's log over USB (any board) or over the network, and create an encrypted support file for a problem report.
+- **Web displays.** A browser, tablet or another program shows the image without hardware: a full-screen page that reloads itself, sharp in the size of the window (also as an iPhone home screen app), or a plain PNG link, protected by a secret in the link.
 - **Firmware from the server.** The Docker image carries the matching display firmware for every board: download it, install it from Chrome or Edge over USB and pair the display over the same cable in one go, or update paired displays over Wi-Fi with firmware signed by the server.
-- **Responsive administration.** Five navigation areas, remembered light/dark appearance, forms that open on demand, explicit save/discard in the design editor, and a footer with build version, README and generated license information.
+- **Responsive administration.** Five navigation areas, remembered light/dark appearance, forms that open on demand, a design editor that saves every change right away, and a footer with build version, README and generated license information.
 
 The Java 21 / Spring Boot server collects usage, renders an image in each device's resolution (240×240 for the VibeTV M1) and handles provider credentials. The firmware (ESP8266 or ESP32 with an SPI display) manages Wi-Fi and pairing, pulls the image and draws it, scaled to its screen. Provider credentials never go to a device.
 
@@ -70,12 +73,12 @@ The screen shows **remaining** usage and reset times. Missing readings show `--`
 | Area | Available actions |
 | --- | --- |
 | **Overview** | See each source's remaining usage and collection status, refresh usage, preview the default display and inspect device status (live), and start a pending firmware update. Data sources sit beside the preview; devices are below. |
-| **Devices** | Open **Pair device** (IP, code, optional name and board) or **Add web display**; inspect each device's image, board, connection state, firmware and default/custom design live; rename it with the pen, drag cards to reorder them; open its editor; use the reload button (force refresh) or the bin (remove device); start **Update to …** or **Update all** over Wi-Fi. **Firmware** chooses the board, downloads its firmware, flashes it from the browser over USB, pairs a display over USB, restarts it and starts updates. |
-| **Display** | Choose the default or a device under **Design for**, enable **Custom design**, choose the display type, add, remove and reorder bands, split usage bands or make them compact rows and pick sources, set weather and mood, swap sides, choose a theme under **Appearance**, then **Save** or **Discard**. Bands the display cannot show are folded below a dashed line. |
+| **Devices** | Open **Pair device** (IP, code, optional name and board) or **Add web display**; inspect each device's image, board, connection state, firmware and default/custom design live; rename it with the pen, drag cards to reorder them; open its editor or its own status page (IP link); turn its image with **Flip image**; use the reload button (force refresh) or the bin (remove device); start **Update to …** or **Update all** over Wi-Fi. **Troubleshooting** reads display logs over USB or the network and creates support files. **Firmware** chooses the board, downloads its firmware, flashes it from the browser over USB, pairs a display over USB, restarts it and starts updates. |
+| **Display** | Choose the default or a device under **Design for**, enable **Custom design**, choose the display type, add, remove and reorder bands, split usage bands or make them compact rows and pick sources, set weather and mood, swap sides, choose a theme under **Appearance**, switch the content between **Usage monitor** and **Photos** for a slideshow (optionally at certain times). Every change is saved right away. Bands the display cannot show are folded below a dashed line. |
 | **Data sources** | **Add data source**, drag cards to reorder, rename with the pen, open **Manage** to sign in or configure credentials, pause/resume or remove sources, and use encrypted **Export / Import** with a review before applying. |
 | **Settings** | Set internal/external server addresses and poll interval, manage read-only JSON API access and legacy device delivery, and inspect storage availability. |
 
-The administration's light/dark appearance is independent of the display theme. Create forms hide their matching trigger while open; **Cancel** or Escape closes them. Save controls appear when there are changes. The design editor previews without saving and protects unsaved changes when switching devices.
+The administration's light/dark appearance is independent of the display theme. Create forms hide their matching trigger while open; **Cancel** or Escape closes them. Save controls appear when there are changes. The design editor saves every change right away; switching to another device saves a pending change first.
 
 <details>
 <summary>Device management</summary>
@@ -107,7 +110,7 @@ The administration's light/dark appearance is independent of the display theme. 
 
 ## Display themes
 
-<p align="center"><img src="docs/themes.png" width="820" alt="The thirteen display colour schemes with example data"></p>
+<p align="center"><img src="docs/manual/themes.png" width="820" alt="The twenty display colour schemes with example data"></p>
 
 The default layout remains available unchanged: two full-width usage bands followed by weather/mood, update time and IP. Half-width widgets and a different band order are optional. Current firmware supports moving the entire weather/mood band; the editor warns when older firmware needs it at the bottom.
 
@@ -149,7 +152,7 @@ replaces the seller's firmware after you have saved a full backup of your own de
 where to get one is in the [manual](docs/manual/MANUAL.md#getting-a-display).
 
 The same sources also build for several ESP32 boards with a display (Cheap Yellow Display, LilyGO T-Display and
-T-Display-S3, Waveshare ESP32-S3-LCD-1.69, ESP32-C3 with ST7789). These builds compile but are not yet tested on hardware;
+T-Display-S3, Waveshare ESP32-S3-LCD-1.69, ESP32-S3-Touch-LCD-1.47 and ESP32-C6-Touch-LCD-1.69, ESP32-C3 with ST7789). Tested on hardware are the Waveshare ESP32-S3-Touch-LCD-1.47 and ESP32-C6-Touch-LCD-1.69; the others are prepared (they build, their settings follow what the tested boards showed, but none has run on hardware yet);
 see the [client README](vibedock-client/README.md).
 
 ## Client firmware and local device page
@@ -159,7 +162,8 @@ The easiest way is **Devices → Firmware** in the administration (see Quick sta
 ```sh
 cd vibedock-client
 ./scripts/build.sh    # compile only; firmware/.pio/build/vibedock-m1/firmware.bin
-./scripts/flash.sh    # build, detect the ESP8266 and flash after confirmation
+./scripts/flash.sh    # detect the chip, choose the board, build and flash after confirmation
+./scripts/flash.sh waveshare-s3-touch-lcd-147   # a given board; --list shows them, build.sh all builds every board
 ```
 
 The firmware provides QR-based Wi-Fi setup, network scanning, pairing, internal/external server fallback, stale-image protection and a local status page at `http://<device-ip>/`. That page shows state and an image preview and offers persistent gamma/RGB calibration. It is visible on the local network. Power-cycle gestures open Wi-Fi setup or perform a factory reset; see the client README for the exact sequence.

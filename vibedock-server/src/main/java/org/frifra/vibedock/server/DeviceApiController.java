@@ -16,9 +16,10 @@ class DeviceApiController {
     static final String IMAGE_FORMAT="rgb565-be-240x240";
     private static final Logger log=LoggerFactory.getLogger(DeviceApiController.class);
     private final ClientRegistry registry;private final DesignService designs;private final ServerAddresses addresses;private final TlsTrust trust;
-    private final Firmware firmware;private final OtaSigning signing;
-    DeviceApiController(ClientRegistry registry,DesignService designs,ServerAddresses addresses,TlsTrust trust,Firmware firmware,OtaSigning signing){
-        this.registry=registry;this.designs=designs;this.addresses=addresses;this.trust=trust;this.firmware=firmware;this.signing=signing;
+    private final Firmware firmware;private final OtaSigning signing;private final DeviceLogs logs;private final AdminEvents events;private final DeviceDiagnostics diagnostics;
+    DeviceApiController(ClientRegistry registry,DesignService designs,ServerAddresses addresses,TlsTrust trust,Firmware firmware,OtaSigning signing,DeviceLogs logs,AdminEvents events,
+                        DeviceDiagnostics diagnostics){
+        this.logs=logs;this.events=events;this.diagnostics=diagnostics;this.registry=registry;this.designs=designs;this.addresses=addresses;this.trust=trust;this.firmware=firmware;this.signing=signing;
     }
     /** The device authenticates with its key; unknown devices and wrong keys get the same 401. */
     @GetMapping("/api/v1/clients/{identifier}/image")
@@ -34,6 +35,8 @@ class DeviceApiController {
         String version=request.getHeader("X-VibeDock-Firmware");
         registry.pulled(identifier,peer,serverFooter,version!=null&&version.matches("[0-9A-Za-z.+-]{1,40}")?version:null,
                 request.getHeader("X-VibeDock-Subnet-Mask"));
+        // The display's own state (newer firmware): its start and run time, memory and Wi-Fi; nothing for older firmware.
+        diagnostics.report(identifier,request.getHeader("X-VibeDock-Diag"),registry.get(identifier).firmware(),request.getHeader("X-VibeDock-Board"));
         String updateError=request.getHeader("X-VibeDock-Update-Error");
         registry.otaReport(identifier,request.getHeader("X-VibeDock-Ota"),
                 updateError!=null&&updateError.matches("[ -~]{1,120}")?updateError:null);
@@ -47,13 +50,20 @@ class DeviceApiController {
             try{if(registry.get(identifier).display()==DisplayType.M1&&type!=DisplayType.M1)registry.setDisplay(identifier,type.id());}
             catch(IOException e){log.warn("Could not store the display type of {}: {}",identifier,e.toString());}
         });
+        String gesture=request.getHeader("X-VibeDock-Gesture");
+        if("photos-toggle".equals(gesture))togglePhotos(registry,designs,events,identifier);
+        else swipe(registry,designs,events,identifier,"scheme-next".equals(gesture)?1:"scheme-previous".equals(gesture)?-1:0);
         var display=registry.displayType(identifier);
-        byte[] pixels=designs.render(DesignService.forDevice(registry.designFor(identifier),serverFooter),peer,display).rgb565();
+        byte[] pixels=designs.render(DesignService.forDevice(registry.designFor(identifier),serverFooter),peer,display,identifier).rgb565();
         String tag="\""+HexFormat.of().formatHex(Arrays.copyOf(sha256(pixels),12))+"\"";
         var headers=new HttpHeaders();headers.setETag(tag);headers.set("X-VibeDock-Image-Format",display.imageFormat());
-        headers.set("X-VibeDock-Poll-Seconds",String.valueOf(registry.pollSeconds()));
+        headers.set("X-VibeDock-Poll-Seconds",String.valueOf(designs.pollSeconds(registry.designFor(identifier),registry.pollSeconds(),identifier)));
+        // Mounted upside down: the device turns its panel by 180 degrees (also its own screens and the swipes).
+        if(registry.get(identifier).board().flippable())headers.set("X-VibeDock-Orientation",registry.flipped(identifier)?"flipped":"upright");
         // A requested update over Wi-Fi: the device fetches /firmware after this pull and installs it if signed.
         firmware.info(registry.get(identifier).board()).filter(i->registry.updatePending(identifier,i.version())).ifPresent(i->headers.set("X-VibeDock-Update",i.version()));
+        // A log requested in the administration: the display uploads it after this pull (POST .../log).
+        logs.pendingRequest(identifier).ifPresent(id->headers.set("X-VibeDock-Send-Log",id));
         // After a full certificate check the device learns the current fingerprint for its simple check. The device
         // accepts it only over such a verified connection, so it cannot be injected over plain http.
         if("full".equals(request.getHeader("X-VibeDock-Tls-Check"))&&addresses.external().startsWith("https://")){
@@ -67,6 +77,46 @@ class DeviceApiController {
         else if(tag.equals(etag))return new ResponseEntity<>(headers,HttpStatus.NOT_MODIFIED);
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
         return new ResponseEntity<>(pixels,headers,HttpStatus.OK);
+    }
+    /**
+     * A swipe on a touch display or a web display page: the next (1) or previous (-1) colour scheme. The display keeps
+     * it as its own design, also when it followed the default until now. In a running slideshow a swipe shows the next
+     * or previous photo instead.
+     */
+    static void swipe(ClientRegistry registry,DesignService designs,AdminEvents events,String identifier,int step){
+        if(step==0)return;
+        if(designs.skip(registry.designFor(identifier),identifier,step)){log.info("Display {} skipped to another photo by a swipe",identifier);return;}
+        var current=registry.designFor(identifier);var scheme=current.scheme().shifted(step);
+        try{registry.setDesign(identifier,current.withScheme(scheme));log.info("Display {} switched to the scheme {} by a swipe",identifier,scheme.id());events.devicesChanged();}
+        catch(IOException e){log.warn("Could not store the scheme of {}: {}",identifier,e.toString());}
+    }
+    /** A double tap on a touch display or a web display page: the slideshow on or off, whatever its schedule says. */
+    static void togglePhotos(ClientRegistry registry,DesignService designs,AdminEvents events,String identifier){
+        if(!designs.togglePhotos(registry.designFor(identifier),identifier)){log.info("Display {}: double tap without photos in its design",identifier);return;}
+        log.info("Display {} turned its photos {} by a double tap",identifier,Boolean.TRUE.equals(designs.photosForced(identifier))?"on":"off");
+        events.devicesChanged();
+    }
+    /**
+     * The display's log, sent after a pull that named an open request (X-VibeDock-Send-Log): plain text, one line per
+     * event, at most {@value DeviceLogs#MAX_BYTES} bytes. Accepted once per request, with the device key.
+     */
+    @PostMapping("/api/v1/clients/{identifier}/log")
+    ResponseEntity<Void> log(@PathVariable String identifier,@RequestHeader(value="Authorization",required=false) String authorization,
+                             @RequestHeader(value="X-VibeDock-Log-Request",required=false) String requestId,HttpServletRequest request) throws IOException {
+        String key=authorization!=null&&authorization.startsWith("Bearer ")?authorization.substring(7).trim():null;
+        if(!registry.authenticate(identifier,key))return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        byte[] body=request.getInputStream().readNBytes(DeviceLogs.MAX_BYTES+1);
+        if(body.length>DeviceLogs.MAX_BYTES)return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).build();
+        if(!logs.takeRequest(identifier,requestId)){
+            log.info("Log of {} rejected: no open request",identifier);
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
+        var lines=new String(body,java.nio.charset.StandardCharsets.UTF_8).lines().filter(l->!l.isBlank()).toList();
+        var diag=DeviceDiagnostics.parse(request.getHeader("X-VibeDock-Diag"));
+        var entry=logs.save(identifier,"net",request.getHeader("X-VibeDock-Firmware"),request.getHeader("X-VibeDock-Board"),lines,
+                diag.get("boot"),diag.containsKey("up")?Long.valueOf(diag.get("up")):null);
+        log.info("Saved the log {} sent by {} ({} lines)",entry.name(),identifier,entry.lines());events.logSaved(identifier);
+        return ResponseEntity.noContent().build();
     }
     /** The firmware offered by this server, signed for the device's updater; fetched by the device after a pull named it. */
     @GetMapping("/api/v1/clients/{identifier}/firmware")

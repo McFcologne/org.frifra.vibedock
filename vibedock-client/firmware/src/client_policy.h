@@ -55,6 +55,14 @@ inline bool parseFingerprint(const char *text, uint8_t out[20]) {
   for (int i = 0; i < 20; i++) out[i] = uint8_t(value(text[2 * i]) << 4 | value(text[2 * i + 1]));
   return true;
 }
+// The server's request to send the log (X-VibeDock-Send-Log): 32 lowercase hex characters, nothing else.
+inline bool validLogRequest(const char *text) {
+  for (int i = 0; i < 32; i++) {
+    char c = text[i];
+    if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) return false;
+  }
+  return text[32] == 0;
+}
 // Server images come as "rgb565-be-<width>x<height>", rendered for the display type chosen in the administration.
 // Any size within the limits is accepted and scaled to the screen.
 constexpr uint16_t maxImageSide = 480;
@@ -86,8 +94,24 @@ constexpr uint16_t pixel(uint8_t high, uint8_t low) { return uint16_t(high) << 8
 // Colour correction of the panel: one gamma for the brightness curve, one gain per channel for the white balance.
 // The gamma registers of the ST7789 shape all three channels alike, so the colour cast can only be fixed here.
 // gamma is in hundredths (250 = 2.5, darker mid and dark tones), gains in percent of the full channel.
-// The defaults are calibrated on the 240x240 ST7789 IPS panel by eye against the server preview.
-struct ToneSettings { uint16_t gamma = 250; uint8_t red = 91, green = 94, blue = 73; };
+// The defaults are calibrated by eye against the uncorrected image on the device page: these on the 240x240 ST7789
+// IPS panel of the VibeTV M1 (until 0.2.0: 250/91/94/73), the other boards set their own (VIBEDOCK_TONE_*; the
+// Waveshare 1.47 calibrated, the rest neutral until calibrated on the device).
+#ifndef VIBEDOCK_TONE_GAMMA
+#define VIBEDOCK_TONE_GAMMA 320
+#define VIBEDOCK_TONE_RED 100
+#define VIBEDOCK_TONE_GREEN 74
+#define VIBEDOCK_TONE_BLUE 40
+#endif
+struct ToneSettings {
+  uint16_t gamma = VIBEDOCK_TONE_GAMMA; uint8_t red = VIBEDOCK_TONE_RED, green = VIBEDOCK_TONE_GREEN, blue = VIBEDOCK_TONE_BLUE;
+  bool operator==(const ToneSettings &o) const { return gamma == o.gamma && red == o.red && green == o.green && blue == o.blue; }
+};
+// Settings saved without the "custom" mark (firmware before 0.2.0) held the VibeTV M1's defaults of that time on
+// every board: they count as a calibration only where they differ from those, so such devices get the new defaults.
+constexpr bool legacyCalibration(long gamma, long red, long green, long blue) {
+  return gamma != 250 || red != 91 || green != 94 || blue != 73;
+}
 constexpr uint16_t minGamma = 50, maxGamma = 350; constexpr uint8_t minGain = 40, maxGain = 100;
 constexpr uint16_t clampGamma(long v) { return v < minGamma ? minGamma : v > maxGamma ? maxGamma : uint16_t(v); }
 constexpr uint8_t clampGain(long v) { return v < minGain ? minGain : v > maxGain ? maxGain : uint8_t(v); }
@@ -103,4 +127,63 @@ struct Tone {
     for (int i = 0; i <= top; i++) out[i] = uint8_t(lround(top * (gain / 100.0) * pow(double(i) / top, gamma / 100.0)));
   }
 };
+// Touch panels: a finished touch is a swipe when it went at least minSwipe pixels, clearly more in one direction
+// than in the other (1.5 times; narrow panels leave little room sideways).
+enum class Swipe : uint8_t { None, Left, Right, Up, Down };
+constexpr int minSwipe = 30;
+constexpr int distance(int v) { return v < 0 ? -v : v; }
+constexpr Swipe swipeOf(int dx, int dy) {
+  return distance(dx) >= minSwipe && 2 * distance(dx) >= 3 * distance(dy) ? (dx < 0 ? Swipe::Left : Swipe::Right)
+       : distance(dy) >= minSwipe && 2 * distance(dy) >= 3 * distance(dx) ? (dy < 0 ? Swipe::Up : Swipe::Down)
+       : Swipe::None;
+}
+// A tap: a short touch that hardly moved; two within doubleTapMs are a double tap (slideshow on or off).
+constexpr int maxTapMove = 12; constexpr uint32_t maxTapMs = 350, doubleTapMs = 400;
+constexpr bool isTap(int dx, int dy, uint32_t heldMs) { return distance(dx) < maxTapMove && distance(dy) < maxTapMove && heldMs < maxTapMs; }
+constexpr bool doubleTap(uint32_t lastTap, uint32_t now) { return lastTap != 0 && now - lastTap < doubleTapMs; }
+// Backlight in percent: swipes up and down change it in steps, never below minBrightness (the screen stays readable).
+constexpr uint8_t minBrightness = 10, brightnessStep = 15;
+constexpr uint8_t clampBrightness(long v) { return v < minBrightness ? minBrightness : v > 100 ? 100 : uint8_t(v); }
+constexpr uint8_t nextBrightness(uint8_t percent, bool up) { return clampBrightness(long(percent) + (up ? brightnessStep : -long(brightnessStep))); }
+// ---- diagnosis: why the display started, and the last state of the run before (kept across a reset) ----
+// What the firmware meant to do when it restarted itself; a restart without one is unexpected.
+enum class Intent : uint8_t { None = 0, Update = 1, Setup = 2, FactoryReset = 3 };
+// The reset as the platform reports it, reduced to what tells planned from unexpected.
+enum class ResetKind : uint8_t { PowerOn, External, Software, Panic, Watchdog, Brownout, DeepSleep, Other };
+// The start kind for the server (DeviceDiagnostics.KINDS): a software restart with an intent is that intent, any
+// other software restart, a panic, a watchdog or a brownout is unexpected.
+constexpr const char *startKind(ResetKind reset, Intent intent) {
+  return reset == ResetKind::Software && intent == Intent::Update ? "update"
+       : reset == ResetKind::Software && intent == Intent::Setup ? "setup"
+       : reset == ResetKind::Software && intent == Intent::FactoryReset ? "factory-reset"
+       : reset == ResetKind::PowerOn ? "power-on" : reset == ResetKind::External ? "external" : reset == ResetKind::Software ? "software"
+       : reset == ResetKind::Panic ? "crash" : reset == ResetKind::Watchdog ? "watchdog" : reset == ResetKind::Brownout ? "brownout"
+       : reset == ResetKind::DeepSleep ? "deep-sleep" : "other";
+}
+// What the display was doing; the names the server knows (DeviceDiagnostics.PHASES).
+enum class Phase : uint8_t { Start = 1, WiFi, Connect, Tls, Image, Draw, Config, Log, Ota, Idle, Portal };
+constexpr const char *phaseName(uint8_t phase) {
+  return phase == 1 ? "start" : phase == 2 ? "wifi" : phase == 3 ? "connect" : phase == 4 ? "tls" : phase == 5 ? "image" : phase == 6 ? "draw"
+       : phase == 7 ? "config" : phase == 8 ? "log" : phase == 9 ? "ota" : phase == 10 ? "idle" : phase == 11 ? "portal" : nullptr;
+}
+// The state kept in memory that survives a reset but not a power cut (RTC memory). check covers the other fields:
+// memory that holds anything else after a power cut, or a record of another firmware layout, counts as unknown.
+struct DiagRecord {
+  uint32_t magic, boot, uptime, heapFree, heapMin;
+  int8_t rssi; uint8_t phase, intent, drops;
+  uint32_t check;
+};
+constexpr uint32_t diagMagic = 0x56444732;  // "VDG2"
+inline uint32_t diagCheck(const DiagRecord &r) {
+  const uint8_t *bytes = reinterpret_cast<const uint8_t *>(&r); uint32_t hash = 2166136261u;
+  for (size_t i = 0; i < offsetof(DiagRecord, check); i++) { hash ^= bytes[i]; hash *= 16777619u; }
+  return hash ^ 0x5a5a5a5au;
+}
+inline bool diagValid(const DiagRecord &r) {
+  return r.magic == diagMagic && r.check == diagCheck(r) && r.boot != 0 && phaseName(r.phase) != nullptr && r.intent <= 3;
+}
+// X-VibeDock-Orientation: "flipped" turns the picture by 180 degrees, "upright" turns it back; anything else keeps it.
+constexpr bool flippedOf(const char *orientation, bool current) {
+  return orientation[0] == 'f' && orientation[1] == 'l' ? true : orientation[0] == 'u' && orientation[1] == 'p' ? false : current;
+}
 }

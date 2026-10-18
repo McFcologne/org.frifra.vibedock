@@ -12,8 +12,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * Colour emoji for the status image. Java2D cannot draw colour emoji fonts, so the Twemoji PNG set (CC-BY 4.0,
- * bundled in the Docker image) is used instead. "-" or an empty value means no emoji.
+ * Colour emoji for the status image. Java2D cannot draw colour emoji fonts, so the Twemoji set (CC-BY 4.0, bundled in
+ * the Docker image) is used instead: the SVG files, drawn sharp at any size (high-resolution web displays); a
+ * directory of the PNG files (72 x 72) works as well. "-" or an empty value means no emoji.
  */
 @Component
 public class Twemoji {
@@ -23,9 +24,17 @@ public class Twemoji {
     private final Map<String,Optional<BufferedImage>> cache=new ConcurrentHashMap<>();
     /** One emoji of the installed set: the text to store, its PNG file name and a searchable Unicode name. */
     public record Entry(String emoji,String file,String name) {}
+    /** Largest size drawn (web displays at high resolution). */
+    static final int MAX_SIZE=512;
+    private static final java.util.regex.Pattern FILE=java.util.regex.Pattern.compile("[0-9a-f]{1,6}(-[0-9a-f]{1,6}){0,10}\\.(svg|png)");
     private volatile List<Entry> catalog;
 
-    public Twemoji(@Value("${vibedock.emoji-dir:/app/twemoji/72x72}") String directory){this.directory=Path.of(directory);}
+    public Twemoji(@Value("${vibedock.emoji-dir:/app/twemoji/svg}") String directory){this.directory=Path.of(directory);}
+    /** The file of an emoji name: the SVG, else the PNG. */
+    private Optional<Path> file(String name){
+        for(String extension:List.of(".svg",".png")){var file=directory.resolve(name+extension);if(Files.isRegularFile(file))return Optional.of(file);}
+        return Optional.empty();
+    }
 
     /** Twemoji file names for an emoji: code points in hex joined by "-"; U+FE0F is dropped unless the sequence has a ZWJ. */
     static List<String> fileNames(String emoji){
@@ -48,19 +57,25 @@ public class Twemoji {
     /** The catalog entry for an emoji, if the installed set has it. */
     public Optional<Entry> entry(String emoji){
         if(emoji==null||emoji.isBlank()||emoji.length()>32)return Optional.empty();
-        return fileNames(emoji).stream().filter(name->Files.isRegularFile(directory.resolve(name+".png"))).findFirst()
+        return fileNames(emoji).stream().filter(name->file(name).isPresent()).findFirst()
                 .map(name->new Entry(emoji.strip(),name,describe(name)));
     }
-    /** The PNG of one emoji for the admin picker; only names made of hex code points are served. */
+    /** The PNG of one emoji for the admin picker (56 pixels from SVG); only names made of hex code points are served. */
     public Optional<byte[]> png(String file){
         if(file==null||!file.matches("[0-9a-f]{1,6}(-[0-9a-f]{1,6}){0,10}"))return Optional.empty();
-        try{return Optional.of(Files.readAllBytes(directory.resolve(file+".png")));}catch(Exception e){return Optional.empty();}
+        var path=file(file);if(path.isEmpty())return Optional.empty();
+        try{
+            if(path.get().toString().endsWith(".png"))return Optional.of(Files.readAllBytes(path.get()));
+            var image=draw(path.get(),PICKER_SIZE);if(image.isEmpty())return Optional.empty();
+            var out=new java.io.ByteArrayOutputStream();ImageIO.write(image.get(),"png",out);return Optional.of(out.toByteArray());
+        }catch(Exception e){return Optional.empty();}
     }
+    static final int PICKER_SIZE=56;
     private List<Entry> buildCatalog(){
         if(!Files.isDirectory(directory))return List.of();
         try(var files=Files.list(directory)){
-            return files.map(f->f.getFileName().toString()).filter(n->n.matches("[0-9a-f]{1,6}(-[0-9a-f]{1,6}){0,10}\\.png"))
-                    .map(n->n.substring(0,n.length()-4)).map(Twemoji::codePoints)
+            return files.map(f->f.getFileName().toString()).filter(n->FILE.matcher(n).matches())
+                    .map(n->n.substring(0,n.length()-4)).distinct().map(Twemoji::codePoints)
                     .filter(points->Arrays.stream(points).noneMatch(c->c>=0x1f3fb&&c<=0x1f3ff))
                     .sorted(Arrays::compare)
                     .map(points->{String file=hex(Arrays.stream(points));return new Entry(new String(points,0,points.length),file,describe(file));})
@@ -81,8 +96,8 @@ public class Twemoji {
     /** The emoji scaled to SIZE pixels, or empty for none or unknown. */
     public Optional<BufferedImage> image(String emoji){return image(emoji,SIZE);}
     public Optional<BufferedImage> image(String emoji,int size){
-        if(emoji==null||emoji.isBlank()||emoji.equals(NONE)||emoji.length()>32||size<8||size>72)return Optional.empty();
-        if(cache.size()>256)cache.clear();
+        if(emoji==null||emoji.isBlank()||emoji.equals(NONE)||emoji.length()>32||size<8||size>MAX_SIZE)return Optional.empty();
+        if(cache.size()>128)cache.clear();
         return cache.computeIfAbsent(size+":"+emoji.strip(),key->load(emoji.strip(),size));
     }
     /** Accepts empty, "-" and every emoji of the installed set. */
@@ -93,16 +108,30 @@ public class Twemoji {
     }
     private Optional<BufferedImage> load(String emoji,int size){
         for(String name:fileNames(emoji)){
-            Path file=directory.resolve(name+".png");
-            if(!Files.isRegularFile(file))continue;
-            try{
-                BufferedImage source=ImageIO.read(file.toFile());
-                if(source==null)continue;
-                var scaled=new BufferedImage(size,size,BufferedImage.TYPE_INT_ARGB);var g=scaled.createGraphics();
-                try{g.drawImage(source.getScaledInstance(size,size,Image.SCALE_AREA_AVERAGING),0,0,null);}finally{g.dispose();}
-                return Optional.of(scaled);
-            }catch(Exception e){return Optional.empty();}
+            var file=file(name);
+            if(file.isPresent())return draw(file.get(),size);
         }
         return Optional.empty();
+    }
+    /** One file at size x size pixels: SVG drawn at that size, PNG scaled (not above its own size). */
+    private static Optional<BufferedImage> draw(Path file,int size){
+        try{
+            var image=new BufferedImage(size,size,BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();
+            try{
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
+                g.setRenderingHint(RenderingHints.KEY_RENDERING,RenderingHints.VALUE_RENDER_QUALITY);
+                g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL,RenderingHints.VALUE_STROKE_PURE);
+                if(file.toString().endsWith(".svg")){
+                    var document=new com.github.weisj.jsvg.parser.SVGLoader().load(file.toUri().toURL());
+                    if(document==null)return Optional.empty();
+                    document.render((java.awt.Component)null,g,new com.github.weisj.jsvg.view.ViewBox(0,0,size,size));
+                }else{
+                    BufferedImage source=ImageIO.read(file.toFile());
+                    if(source==null)return Optional.empty();
+                    g.drawImage(source.getScaledInstance(size,size,Image.SCALE_AREA_AVERAGING),0,0,null);
+                }
+            }finally{g.dispose();}
+            return Optional.of(image);
+        }catch(Exception e){return Optional.empty();}
     }
 }

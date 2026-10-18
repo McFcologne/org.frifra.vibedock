@@ -9,6 +9,7 @@
   <div class="heading-actions">
     <span data-live-page="update-all"><form th:if="${updatable > 1}" th:action="@{/admin/clients/all/update}" method="post"><button class="secondary" th:text="${'Update all (' + updatable + ')'}">Update all</button></form></span>
     <a class="button secondary" th:href="@{/admin/firmware}">Firmware</a>
+    <a class="button secondary" th:href="@{/admin/troubleshooting}" title="Display logs over USB or the network">Troubleshooting</a>
     <button type="button" class="secondary" data-create-open="web" aria-controls="web" aria-expanded="false"><svg th:replace="~{fragments :: icon('globe')}"></svg>Add web display</button>
     <button type="button" data-create-open="invite" aria-controls="invite" aria-expanded="false"><svg th:replace="~{fragments :: icon('plus')}"></svg>Pair device</button></div></div>
 <p class="notice" th:if="${clientMessage}" th:text="${clientMessage}"></p>
@@ -41,7 +42,7 @@
     <div class="grid-3">
       <div><label for="web-name">Name</label><input id="web-name" name="name" maxlength="40" placeholder="Kitchen tablet" required></div>
       <div><label for="web-display">Display type</label><select id="web-display" name="display">
-        <option th:each="type:${displayTypes}" th:value="${type.id}" th:text="${type.label}"></option></select></div>
+        <option th:each="type:${webDisplayTypes}" th:value="${type.id}" th:text="${type.label}" th:selected="${type.id == 'fit'}"></option></select></div>
       <div><label for="web-reload">Reload every</label><select id="web-reload" name="reloadSeconds">
         <option value="10">10 s</option><option value="30" selected>30 s</option><option value="60">1 min</option><option value="300">5 min</option></select></div>
     </div>
@@ -61,8 +62,8 @@
     <form th:if="${client.web == null}" th:action="@{/admin/clients/{id}/refresh(id=${client.identifier})}" method="post"><button class="icon-button" title="Force refresh: redraw the whole screen now" aria-label="Force refresh">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4h-4"/></svg></button></form></div>
   <div class="client-body">
-    <div class="device"><div class="device-front"><div class="device-glass"><img width="160" height="160" alt="Current status image for this device" data-client-preview
-         th:src="@{/admin/clients/{id}/preview.png(id=${client.identifier})}"></div></div></div>
+    <div class="device" th:style="${'--ratio:' + (1.0 * client.display.height / client.display.width)}"><div class="device-front" th:classappend="${client.board.previewCase()}"><div class="device-glass" data-live="preview" th:style="${'--draw:' + client.board.drawSeconds() + 's'}"><img width="160" height="160" alt="Current status image for this device" data-client-preview th:attr="data-look=${previewLooks[client.identifier]}"
+         th:src="@{/admin/clients/{id}/preview.png(id=${client.identifier},v=${previewVersions[client.identifier]})}"></div></div></div>
     <div th:if="${client.web != null}" th:with="base=${webBases[client.identifier]},page=${base + '/web/' + client.web.secret}">
       <p class="meta" data-live="ip"><th:block th:if="${client.lastPullAt != null}">From <strong th:text="${client.ip}"></strong> · </th:block>every
         <th:block th:text="${client.web.reloadSeconds + ' s'}"></th:block> · <th:block th:text="${#strings.arraySplit(client.display.label, '·')[0].trim()}"></th:block></p>
@@ -76,13 +77,16 @@
         <label class="switch" th:title="${externalSet ? 'The links use the external server address' : 'Set an external address under Settings first'}">
           <input type="checkbox" name="external" value="true" th:checked="${client.web.external and externalSet}" th:disabled="${!externalSet}" data-web-external>
           <span>External address</span></label></form>
-      <span class="badge design-badge" th:classappend="${client.overridden} ? 'custom'" th:text="${client.overridden ? 'Custom design' : 'Uses default'}"></span></div>
+      <span class="badge design-badge" data-live="design" th:classappend="${client.overridden} ? 'custom'" th:text="${client.overridden ? 'Custom design' : 'Uses default'}"></span></div>
     </div>
     <div th:if="${client.web == null}">
-      <p class="meta" data-live="ip">IP <strong th:text="${client.ip == '0.0.0.0' ? 'known after its first pull' : client.ip}"></strong></p>
-      <p class="meta device-identifier" th:text="${client.identifier + ' · ' + client.board.label}"></p>
+      <p class="meta" data-live="ip">IP <strong th:if="${client.ip == '0.0.0.0'}">known after its first pull</strong>
+        <a th:unless="${client.ip == '0.0.0.0'}" th:href="${'http://' + (client.ip.contains(':') ? '[' + client.ip + ']' : client.ip) + '/'}" target="_blank" rel="noopener noreferrer"
+           title="The display's own status page (colour calibration, image) in this network"><strong th:text="${client.ip}"></strong></a></p>
+      <p class="meta device-identifier"><th:block th:text="${client.identifier + ' · ' + client.board.label}"></th:block>
+        <span th:unless="${client.board.tested}" class="badge update" title="The firmware for this board builds, but it has never run on the real board">untested board</span></p>
       <div class="meta firmware-line" data-live="firmware" th:with="firmwareVersion=${firmwareVersions.get(client.board.id)}"><span>Firmware <strong th:text="${client.firmware != null ? client.firmware : 'unknown'}"></strong></span>
-        <th:block th:if="${T(org.frifra.vibedock.server.FirmwareVersion).newer(firmwareVersion, client.firmware)}">
+        <th:block th:if="${T(org.frifra.vibedock.server.FirmwareVersion).offered(firmwareVersion, client.firmware)}">
           <span class="badge update" th:if="${client.updating}" th:text="${'Updating to ' + firmwareVersion + ' …'}">Updating</span>
           <form class="inline-form" th:if="${client.ota and !client.updating}" th:action="@{/admin/clients/{id}/update(id=${client.identifier})}" method="post">
             <button class="badge update" th:text="${'Update to ' + firmwareVersion}">Update</button></form>
@@ -94,7 +98,10 @@
              th:text="${'Update ' + firmwareVersion + ' via USB'}">Update via USB</a></th:block>
         <span class="badge ok" th:if="${firmwareVersion != null and client.firmware == firmwareVersion}">Latest version installed</span>
         <p class="notice error" th:if="${client.updateError != null}" th:text="${'Last update failed: ' + client.updateError}"></p></div>
-      <p class="badge design-badge" th:classappend="${client.overridden} ? 'custom'" th:text="${client.overridden ? 'Custom design' : 'Uses default'}"></p>
+      <div class="web-options"><p class="badge design-badge" data-live="design" th:classappend="${client.overridden} ? 'custom'" th:text="${client.overridden ? 'Custom design' : 'Uses default'}"></p>
+        <form th:if="${client.board.flippable()}" class="device-flip" th:action="@{/admin/clients/{id}/flip(id=${client.identifier})}" method="post">
+          <label class="switch" title="The display is mounted upside down: it turns its picture, its own screens and the swipes by 180 degrees">
+            <input type="checkbox" name="flipped" value="true" th:checked="${client.flipped}" data-device-flip><span>Flip image</span></label></form></div>
       <p class="notice error" th:if="${failedClient == client.identifier}" th:text="${failedClientMessage}"></p>
     </div>
   </div>

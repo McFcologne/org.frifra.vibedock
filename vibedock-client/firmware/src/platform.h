@@ -72,9 +72,27 @@ inline bool powerCycleStart() {
   return reason == ESP_RST_POWERON || reason == ESP_RST_EXT;
 #endif
 }
+// crash.cpp: the crash of the run before as text (ESP8266: the crash record; ESP32: what the panic handler saw), and
+// for X-VibeDock-Diag as "<code addresses in hex, pc first, comma-separated>" with ";cause=…;fault=…" where known and
+// ";abort=<text>" after abort or assert (empty without a crash). crashBegin() reads the record of the run before and
+// (Arduino core 3) registers the panic handler; called first in setup().
+String lastCrash();
+String crashHeader();
+void crashBegin();
+// crash.cpp: the reset as a number (ESP8266: rst_info reason or the crash record's; ESP32: esp_reset_reason) and
+// its kind, and the diagnosis record in memory that survives a reset.
+uint32_t resetCode();
+client_policy::ResetKind resetKind();
+bool loadDiag(client_policy::DiagRecord &record);
+void storeDiag(const client_policy::DiagRecord &record);
+// The lowest free heap since the start, where the platform keeps it (0: unknown).
+inline uint32_t minFreeHeap() {
 #if defined(ESP8266)
-String lastCrash();  // crash.cpp
+  return 0;
+#else
+  return ESP.getMinFreeHeap();
 #endif
+}
 inline String resetReason() {
 #if defined(ESP8266)
   String crash = lastCrash();
@@ -84,8 +102,8 @@ inline String resetReason() {
     case ESP_RST_POWERON: return "Power on";
     case ESP_RST_EXT: return "External reset";
     case ESP_RST_SW: return "Software restart";
-    case ESP_RST_PANIC: return "Exception";
-    case ESP_RST_INT_WDT: case ESP_RST_TASK_WDT: case ESP_RST_WDT: return "Watchdog";
+    case ESP_RST_PANIC: return lastCrash().isEmpty() ? "Exception" : "Exception: " + lastCrash();
+    case ESP_RST_INT_WDT: case ESP_RST_TASK_WDT: case ESP_RST_WDT: return lastCrash().isEmpty() ? "Watchdog" : "Watchdog: " + lastCrash();
     case ESP_RST_BROWNOUT: return "Brownout";
     case ESP_RST_DEEPSLEEP: return "Deep sleep";
     default: return "Other";
@@ -131,6 +149,22 @@ inline String freeHeap() {
 #endif
 }
 
+// Backlight brightness in percent by PWM; 100 drives the pin fully on as before.
+inline void backlight(uint8_t pin, bool activeHigh, uint8_t percent) {
+  if (percent >= 100) { pinMode(pin, OUTPUT); digitalWrite(pin, activeHigh ? HIGH : LOW); return; }
+  uint32_t duty = uint32_t(percent) * 255 / 100; if (!activeHigh) duty = 255 - duty;
+#if defined(ESP8266)
+  analogWriteRange(255); analogWrite(pin, duty);
+#elif ESP_ARDUINO_VERSION_MAJOR >= 3
+  static bool attached = false;
+  if (!attached) attached = ledcAttach(pin, 5000, 8);
+  ledcWrite(pin, duty);
+#else
+  static bool attached = false;
+  if (!attached) { ledcSetup(0, 5000, 8); ledcAttachPin(pin, 0); attached = true; }
+  ledcWrite(0, duty);
+#endif
+}
 inline bool mountStorage() {
 #if defined(ESP8266)
   return LittleFS.begin();

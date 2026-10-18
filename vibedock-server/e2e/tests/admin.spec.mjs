@@ -39,40 +39,121 @@ test('source save appears only for changes and a saved rename survives reload',a
   await expect(page.getByRole('heading',{name:'Renamed account',exact:false})).toBeVisible();await expect(save).toBeHidden();
 });
 
-test('default design supports Discard and persists Save',async ({page,app}) => {
+test('default design is saved right away',async ({page,app}) => {
   await editor(page,app);
-  const scheme=page.locator('#design-scheme'), save=page.locator('#design-save'), discard=page.locator('#design-discard');
-  await expect(save).toBeHidden();await scheme.selectOption('ocean');await expect(save).toBeEnabled();
-  await discard.click();await expect(scheme).toHaveValue('midnight');await expect(save).toBeHidden();
-  await scheme.selectOption('ocean');await expect(save).toBeEnabled();await save.click();
-  await expect(save).toBeHidden();await page.reload();await expect(scheme).toHaveValue('ocean');
+  const scheme=page.locator('#design-scheme'), message=page.locator('#design-message');
+  await expect(page.locator('#design-save')).toHaveCount(0);
+  await scheme.selectOption('ocean');await expect(message).toContainText('Default design saved');
+  // The message still says saved from before: wait for this save itself.
+  const saved=page.waitForResponse(r=>r.url().endsWith('/admin/designs/default')&&r.request().method()==='POST');
+  await page.locator('#design-align').selectOption('top');await saved;
+  await page.reload();await expect(scheme).toHaveValue('ocean');await expect(page.locator('#design-align')).toHaveValue('top');
+  await page.locator('#design-align').selectOption('spread');await expect(message).toContainText('Default design saved');
 });
 
 test('device inherits the default, can override it, and can return to inheritance',async ({page,app}) => {
-  await editor(page,app);
-  await page.locator('#design-scheme').selectOption('ocean');await expect(page.locator('#design-save')).toBeEnabled();await page.locator('#design-save').click();
-  await expect(page.locator('#design-save')).toBeHidden();
+  await editor(page,app);const message=page.locator('#design-message');
+  await page.locator('#design-scheme').selectOption('ocean');await expect(message).toContainText('Default design saved');
   await page.locator('#design-target').selectOption('vibedock-e2e-office');
   const scheme=page.locator('#design-scheme'), override=page.locator('#design-override');
   await expect(scheme).toHaveValue('ocean');await expect(scheme).toBeDisabled();
-  await override.check();await scheme.selectOption('forest');await expect(page.locator('#design-save')).toBeEnabled();await page.locator('#design-save').click();
-  await expect(page.locator('#design-save')).toBeHidden();await page.reload();
+  await override.check();await scheme.selectOption('forest');await expect(message).toContainText('Device design saved');
+  await page.reload();
   await expect(scheme).toHaveValue('forest');await expect(override).toBeChecked();
-  await override.uncheck();await expect(page.locator('#design-save')).toBeEnabled();await page.locator('#design-save').click();
-  await expect(page.locator('#design-save')).toBeHidden();await page.reload();
+  await override.uncheck();await expect(message).toContainText('follows the default design again');await page.reload();
   await expect(override).not.toBeChecked();await expect(scheme).toHaveValue('ocean');await expect(scheme).toBeDisabled();
 });
 
-test('switching targets protects unsaved changes with Keep editing or Discard',async ({page,app}) => {
+test('switching targets right after an edit saves it first',async ({page,app}) => {
   await editor(page,app);await page.locator('#design-scheme').selectOption('forest');
   await page.locator('#design-target').selectOption('vibedock-e2e-office');
-  await expect(page.locator('#design-switch')).toBeVisible();
-  await page.getByRole('button',{name:'Keep editing',exact:true}).click();
-  await expect(page.locator('#design-target')).toHaveValue('default');await expect(page.locator('#design-scheme')).toHaveValue('forest');
-  await page.locator('#design-target').selectOption('vibedock-e2e-office');
-  await page.getByRole('button',{name:'Discard and switch',exact:true}).click();
-  await expect(page.locator('#design-target')).toHaveValue('vibedock-e2e-office');await expect(page.locator('#design-scheme')).toHaveValue('midnight');
+  await expect(page.locator('#design-target')).toHaveValue('vibedock-e2e-office');await expect(page.locator('#design-scheme')).toHaveValue('forest');
   await expect(page.locator('#design-scheme')).toBeDisabled();
+});
+
+test('flip image saves in place and only touch boards offer it',async ({page,app}) => {
+  await page.goto(app.baseURL+'/admin/devices');
+  const shelf=page.locator('#device-vibedock-e2e-shelf'), flip=shelf.getByLabel('Flip image');
+  await expect(page.locator('#device-vibedock-e2e-office').getByLabel('Flip image')).toHaveCount(0);
+  await expect(flip).not.toBeChecked();await shelf.getByText('Flip image',{exact:true}).click();await expect(flip).toBeChecked();await expect(flip).toBeEnabled();
+  await page.reload();await expect(flip).toBeChecked();
+});
+
+test('support file is created with a key shown once and opens again with it',async ({page,app}) => {
+  await page.goto(app.baseURL+'/admin/troubleshooting');
+  const download=page.waitForEvent('download');
+  await page.getByLabel('In one line').fill('Shelf stays dark');await page.getByLabel('What happened').fill('Black after the update');
+  await page.getByLabel(/Shelf/).check();
+  await page.getByRole('button',{name:'Create support file',exact:true}).click();
+  const file=await (await download).path();
+  const key=await page.locator('[data-support-key-value]').textContent();
+  expect(key).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-/);
+  const open=page.locator('[data-support-open]');
+  await open.locator('input[type=file]').setInputFiles(file);
+  await open.getByLabel('Key').fill('wrong');await open.getByRole('button',{name:'Open',exact:true}).click();
+  await expect(page.locator('[data-support-open-error]')).toContainText('Wrong key');
+  await open.getByLabel('Key').fill(key);await open.getByRole('button',{name:'Open',exact:true}).click();
+  const contents=page.locator('[data-support-contents]');
+  await expect(contents).toContainText('Displays (2)');await expect(contents).toContainText('Shelf');
+  await expect(contents).toContainText('Shelf stays dark');await expect(contents).toContainText('Black after the update');
+  // Raw: the whole content as JSON, to copy or download.
+  const raw=JSON.parse(await page.locator('[data-support-raw]').textContent());
+  expect(raw.report.title).toBe('Shelf stays dark');expect(raw.report.displays).toHaveLength(1);
+  const json=page.waitForEvent('download');await page.getByRole('button',{name:'Download JSON'}).click();
+  expect((await json).suggestedFilename()).toMatch(/\.json$/);  // named after the opened file
+  await page.getByRole('button',{name:'Copy as JSON'}).click();
+});
+
+test('a device shows uploaded photos, saved right away with the time of day',async ({page,app}) => {
+  await editor(page,app);
+  await page.locator('#design-target').selectOption('vibedock-e2e-shelf');
+  await page.locator('#design-override').check();
+  await expect(page.locator('#design-usage')).toBeVisible();
+  await page.getByRole('button',{name:'Photos',exact:true}).click();
+  await expect(page.locator('#design-usage')).toBeHidden();
+  await expect(page.locator('#design-photos')).toContainText('No photos yet');
+  await page.locator('#design-photo-upload').setInputFiles({name:'red.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAACgAAAAeCAIAAADRv8uKAAAAK0lEQVR4nO3NMQ0AAAgDsMmZfxXIQgYcTfo3056IWCwWi8VisVgsFov/xguJMCDM2TzTeAAAAABJRU5ErkJggg==','base64')});
+  await expect(page.locator('#design-photo-state')).toContainText('1 of 1 photos added');
+  await expect(page.locator('.photo-tile.selected')).toHaveCount(1);
+  await page.getByLabel('Only at certain times').check();
+  await expect(page.locator('#design-photo-from')).toHaveValue('22:00');
+  // The usage monitor for the other times shows below the photos.
+  await expect(page.locator('#design-usage-heading')).toHaveText('Usage monitor · outside 22:00–07:00');
+  await expect(page.locator('#design-message')).toContainText('Device design saved');
+  await page.reload();await expect(page.locator('#design-scheme')).toBeEnabled();
+  await expect(page.getByRole('button',{name:'Photos',exact:true})).toHaveAttribute('aria-pressed','true');await expect(page.locator('#design-photo-timed-check')).toBeChecked();
+  await expect(page.locator('.photo-tile.selected .photo-order')).toHaveText('1');
+  // Back to the usage monitor: the photo selection is kept for switching back.
+  await page.getByRole('button',{name:'Usage monitor',exact:true}).click();
+  await expect(page.locator('#design-photo-settings')).toBeHidden();await expect(page.locator('#design-photos-kept')).toBeVisible();
+  await expect(page.locator('#design-message')).toContainText('Device design saved');
+  await page.reload();await expect(page.locator('#design-scheme')).toBeEnabled();
+  await expect(page.getByRole('button',{name:'Usage monitor',exact:true})).toHaveAttribute('aria-pressed','true');
+  await page.getByRole('button',{name:'Photos',exact:true}).click();
+  await expect(page.locator('.photo-tile.selected .photo-order')).toHaveText('1');
+});
+
+test('a photo still uploading when the editor switches to another display only joins the library',async ({page,app}) => {
+  await editor(page,app);
+  const message=page.locator('#design-message');
+  // Both designs show photos: the shelf its own, the default one.
+  await page.locator('#design-target').selectOption('vibedock-e2e-shelf');
+  await page.locator('#design-override').check();
+  await page.getByRole('button',{name:'Photos',exact:true}).click();await expect(message).toContainText('Device design saved');
+  await page.locator('#design-target').selectOption('default');await expect(page.locator('#design-target')).toHaveValue('default');
+  await page.getByRole('button',{name:'Photos',exact:true}).click();await expect(message).toContainText('Default design saved');
+  // The upload starts in the default design and answers only after the switch to the shelf.
+  let release;const held=new Promise(resolve=>release=resolve);
+  await page.route('**/admin/photos',async route=>{if(route.request().method()==='POST')await held;await route.continue();});
+  const uploaded=page.waitForResponse(r=>r.url().endsWith('/admin/photos')&&r.request().method()==='POST');
+  await page.locator('#design-photo-upload').setInputFiles({name:'red.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAACgAAAAeCAIAAADRv8uKAAAAK0lEQVR4nO3NMQ0AAAgDsMmZfxXIQgYcTfo3056IWCwWi8VisVgsFov/xguJMCDM2TzTeAAAAABJRU5ErkJggg==','base64')});
+  await page.locator('#design-target').selectOption('vibedock-e2e-shelf');await expect(page.locator('#design-target')).toHaveValue('vibedock-e2e-shelf');
+  release();const id=(await (await uploaded).json()).id;
+  await expect(page.locator('#design-photo-state')).toContainText('not chosen');
+  await expect(page.locator('.photo-tile.selected')).toHaveCount(0);
+  await page.waitForTimeout(1200);  // a save would run within 650 ms
+  const designs=await page.evaluate(async()=>(await fetch('/admin/designs',{credentials:'same-origin'})).text());
+  expect(designs).not.toContain(id);
 });
 
 test('footer links to the generated license page and uses the packaged version',async ({page}) => {
@@ -93,7 +174,7 @@ for(const width of [1024,360]) for(const dark of [false,true]) {
       await expect(toggle).toHaveAttribute('aria-pressed','false');await toggle.click();
       await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
     }
-    for(const route of ['/admin','/admin/devices','/admin/sources','/admin/design','/admin/server','/admin/licenses','/admin/firmware']) {
+    for(const route of ['/admin','/admin/devices','/admin/sources','/admin/design','/admin/server','/admin/licenses','/admin/firmware','/admin/troubleshooting']) {
       await page.goto(app.baseURL+route);
       if(route==='/admin/design') await expect(page.locator('#design-target')).toBeEnabled();
       await expect(page.locator('main h2').first()).toBeVisible();

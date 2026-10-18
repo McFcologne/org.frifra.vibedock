@@ -1,3 +1,4 @@
+#include <string>
 #include "../firmware/src/client_policy.h"
 #include <cassert>
 #include <limits>
@@ -21,11 +22,33 @@ int main(){
   uint8_t fp[20];assert(parseFingerprint("00112233445566778899aabbccddeeff01234567",fp));assert(fp[0]==0x00&&fp[1]==0x11&&fp[19]==0x67);
   assert(!parseFingerprint("00112233445566778899AABBCCDDEEFF01234567",fp));assert(!parseFingerprint("0011",fp));
   assert(!parseFingerprint("00112233445566778899aabbccddeeff012345678",fp));
+  assert(validLogRequest("0123456789abcdef0123456789abcdef"));assert(!validLogRequest(""));
+  assert(!validLogRequest("0123456789ABCDEF0123456789abcdef"));assert(!validLogRequest("0123456789abcdef0123456789abcdef0"));
+  assert(!validLogRequest("0123456789abcdef0123456789abcde"));assert(!validLogRequest("0123456789abcdef0123456789abcd\n0"));
   assert(pixel(0xf8,0)==0xf800);assert(pixel(0x07,0xe0)==0x07e0);assert(pixel(0,0x1f)==0x001f);
   ToneSettings neutral;neutral.gamma=100;neutral.red=neutral.green=neutral.blue=100;Tone same(neutral);
   for(uint32_t c=0;c<65536;c++)assert(same.apply(uint16_t(c))==c);
-  Tone tone;assert(tone.apply(0)==0);assert(tone.apply(0xf800)==28<<11);
+  ToneSettings m1;m1.gamma=250;m1.red=91;m1.green=94;m1.blue=73;Tone tone(m1);assert(tone.apply(0)==0);assert(tone.apply(0xf800)==28<<11);
   assert(((tone.apply(0x07e0)>>5)&63)==59);assert((tone.apply(0x001f)&31)==23);
   assert(((tone.apply(0x0400)>>5)&63)<16);  // gamma 2.5 lowers the mid tones
+  assert(swipeOf(-60,10)==Swipe::Left);assert(swipeOf(60,-20)==Swipe::Right);assert(swipeOf(5,-50)==Swipe::Up);assert(swipeOf(0,80)==Swipe::Down);
+  assert(swipeOf(25,0)==Swipe::None);assert(swipeOf(50,40)==Swipe::None);assert(swipeOf(-45,28)==Swipe::Left);assert(swipeOf(30,0)==Swipe::Right);assert(swipeOf(0,0)==Swipe::None);
+  assert(nextBrightness(100,true)==100);assert(nextBrightness(100,false)==85);assert(nextBrightness(20,false)==10);assert(nextBrightness(10,true)==25);
+  assert(flippedOf("flipped",false));assert(!flippedOf("upright",true));assert(flippedOf("",true));assert(!flippedOf("",false));assert(!flippedOf("x",false));
+  assert(isTap(3,-4,120));assert(!isTap(20,0,100));assert(!isTap(0,0,500));
+  assert(doubleTap(1000,1300));assert(!doubleTap(1000,1500));assert(!doubleTap(0,100));
+  assert(clampBrightness(0)==10);assert(clampBrightness(255)==100);
+  assert(!legacyCalibration(250,91,94,73));assert(legacyCalibration(240,91,94,73));assert(ToneSettings()==ToneSettings());
+  // Starts: planned restarts are named by their intent, only software restarts take one.
+  assert(std::string(startKind(ResetKind::Software,Intent::Update))=="update");assert(std::string(startKind(ResetKind::Software,Intent::None))=="software");
+  assert(std::string(startKind(ResetKind::Panic,Intent::Update))=="crash");assert(std::string(startKind(ResetKind::PowerOn,Intent::Setup))=="power-on");
+  assert(std::string(startKind(ResetKind::Watchdog,Intent::None))=="watchdog");assert(std::string(startKind(ResetKind::External,Intent::None))=="external");
+  assert(std::string(phaseName(uint8_t(Phase::Ota)))=="ota");assert(phaseName(0)==nullptr);assert(phaseName(12)==nullptr);
+  // Diagnosis records: valid only with magic and check; any changed byte (memory after a power cut) is unknown.
+  DiagRecord r{diagMagic,0x1a2b3c4d,100,20000,15000,-60,uint8_t(Phase::Image),0,1,0};r.check=diagCheck(r);assert(diagValid(r));
+  DiagRecord garbage=r;garbage.uptime^=1;assert(!diagValid(garbage));
+  DiagRecord zero{};assert(!diagValid(zero));
+  DiagRecord badPhase=r;badPhase.phase=99;badPhase.check=diagCheck(badPhase);assert(!diagValid(badPhase));
+  static_assert(sizeof(DiagRecord)%4==0,"RTC memory is written in 4-byte words");
   assert(clampGamma(10)==50);assert(clampGamma(999)==350);assert(clampGain(0)==40);assert(clampGain(200)==100);
 }

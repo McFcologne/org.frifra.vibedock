@@ -165,7 +165,7 @@ Use the freshly built `firmware/.pio/build/vibedock-m1/firmware.bin`, not an unr
 
 **From the server:** *Devices → Firmware* in the administration (Docker image) offers the firmware of the server's version for download, with its SHA-256 and esptool commands, and installs it from Chrome or Edge over USB (Web Serial; the administration must be opened over HTTPS or on `localhost`). The browser path first downloads a full flash backup of the connected device, then writes only the firmware at `0x0` with `dio`/`40m`/`4MB` and restarts the device.
 
-**Quick path for updates:** `scripts/flash.sh` builds the firmware, finds the device's serial port by asking every USB serial port for an ESP8266 (waits up to 60 s for one to be plugged in, skips busy ports, lets you choose by MAC if there are several; `VIBEDOCK_SERIAL_PORT` overrides), reads the flash size from the chip (or uses `VIBEDOCK_FLASH_MB`), shows port, size and SHA-256 of the firmware and writes it only after you confirm. It writes only the firmware at `0x000000`; Wi-Fi, pairing and the setup password stay. Make a backup (sections 2–3) before the first flash of a device; the manual steps below remain the reference.
+**Quick path for updates:** `scripts/flash.sh` builds the firmware, finds the device's serial port by asking every USB serial port for an ESP8266 (waits up to 60 s for one to be plugged in, skips busy ports, lets you choose by MAC if there are several; `VIBEDOCK_SERIAL_PORT` overrides), reads the flash size from the chip (or uses `VIBEDOCK_FLASH_MB`), shows port, size and SHA-256 of the firmware and writes it only after you confirm. It writes only the firmware at `0x000000`; Wi-Fi, pairing and the setup password stay. Make a backup (sections 2–3) before the first flash of a device; the manual steps below remain the reference. Other boards: `scripts/flash.sh` recognises the chip, takes the board the VibeDock firmware on the device names, otherwise offers the boards with that chip, marked tested or prepared (or `scripts/flash.sh <board>`, `--list` shows them), builds that board and writes `flash.bin` (bootloader, partition table and app) at `0x0`, as the browser flasher does.
 
 
 Before executing this section, confirm the exact device MAC, validated full backup, candidate checksum, port, and explicit approval to install this candidate. Ensure stable USB power and release the serial port. Stop on any failed check; do not continue with a write.
@@ -232,6 +232,44 @@ Verify the complete restored contents before booting the application:
 ```
 
 After successful verification, power-cycle and confirm the original firmware's display and behavior. Saved Wi-Fi and pairing state return to the backup snapshot; settings created later are not retained. A filesystem restore may also revert a standalone client's identifier/key state, so check its server approval if restoring a standalone snapshot.
+
+## Decoding a crash
+
+A display that restarted unexpectedly reports it with its next pull and in its log: the start line says
+`start=crash` (or `watchdog`, `brownout`, `software`), the platform's reset code and, when the memory kept it, the
+phase and run time of the run before (`prev=… phase=image up=5400 heap=…/…`). A power cut leaves `prev=unknown`;
+an update, the Wi-Fi setup or a factory reset is named as such and is not counted as unexpected. The support file
+(Troubleshooting) collects this per display.
+
+Turning an address back into a source line needs the symbols of exactly that build (board and version, including a
+`-dirty` or `-N-g<commit>` suffix): `.pio/build/<board>/firmware.elf` of the same commit, or
+`ELF_OUT=<folder> scripts/images.sh <out>`, which keeps `<board>-<version>.elf` for every board.
+
+- **VibeTV M1 (ESP8266):** the start line also holds the crash record, e.g.
+  `exception (reason 2, cause 28 at 0x40212345, address 0x00000000)`. The address after `at` is the program counter:
+
+  ```sh
+  ~/.platformio/packages/toolchain-xtensa/bin/xtensa-lx106-elf-addr2line -pfiaC -e vibedock-m1-<version>.elf 0x40212345
+  ```
+- **ESP32 boards (S3, C6, …):** the panic handler keeps the crash in RTC memory; after the restart the start line
+  names it (`Exception: pc 0x4200a1b2 < 0x4200c3d4, cause 5, address 0x0`) and the display reports it with its next
+  pull (`panic=…`, in the support file as *Crash of the run before at …*). The C6 (Arduino core 3) sends up to six
+  addresses of its backtrace, the other ESP32 boards (core 2) the instruction and the return address, after
+  `abort()` or a failed assert also its text. Decode them with the ELF of that build:
+
+  ```sh
+  ~/.platformio/packages/toolchain-riscv32-esp/bin/riscv32-esp-elf-addr2line -pfiaC -e waveshare-c6-touch-lcd-169-<version>.elf 0x4200a1b2 0x4200c3d4
+  ```
+
+  On the S3 and the other Xtensa boards use `xtensa-esp32s3-elf-addr2line` (or `xtensa-esp32-elf-addr2line`). The
+  complete backtrace and the registers are only printed on the USB serial port; for those keep the display connected
+  and read it with the decoder:
+
+  ```sh
+  pio device monitor -d firmware -e <board> -f esp32_exception_decoder
+  ```
+
+  A power cut clears the RTC memory: a crash followed by unplugging is not reported.
 
 ## Troubleshooting and scope of validation
 

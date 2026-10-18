@@ -1,0 +1,26 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="VibeDock server quick (Docker Compose, no manual)" type="docker-deploy" factoryName="docker-compose.yml" server-name="Docker">
+    <deployment type="docker-compose.yml">
+      <settings>
+        <option name="envVars">
+          <list>
+            <!-- Builds without "bake": bake asks on the terminal before reading ../.git (the version source), and the
+                 IDE has no terminal, so the build would wait forever. ADMIN_PASSWORD and the rest come from .env. -->
+            <DockerEnvVarImpl>
+              <option name="name" value="COMPOSE_BAKE" />
+              <option name="value" value="false" />
+            </DockerEnvVarImpl>
+            <!-- Without the manual PDF and its screenshots: quicker, for local tests. -->
+            <DockerEnvVarImpl>
+              <option name="name" value="VIBEDOCK_MANUAL" />
+              <option name="value" value="skip" />
+            </DockerEnvVarImpl>
+          </list>
+        </option>
+        <option name="commandLineOptions" value="--build" />
+        <option name="sourceFilePath" value="compose.yaml" />
+      </settings>
+    </deployment>
+    <method v="2" />
+  </configuration>
+</component>

@@ -35,6 +35,7 @@ class AccessTest {
     @Autowired UsageService usage;
     @Autowired ClientRegistry clients;
     @Autowired OtaSigning otaSigning;
+    @Autowired DeviceLogs deviceLogs;
     @MockitoBean ProviderClient providers;
     @MockitoBean BrowserLogin login;
     @BeforeEach void resetSettings() throws Exception {
@@ -393,6 +394,132 @@ class AccessTest {
                 .with(r->{r.setLocalPort(10001);return r;})).andExpect(status().is3xxRedirection());
         mvc.perform(get(path).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isUnauthorized());
     }
+    @Test void usbLogsAreSavedShownDownloadedAndRemovedWithTheDevice() throws Exception {
+        String id="vibedock-log-access",body="{\"firmware\":\"0.1.1\",\"board\":\"vibedock-m1\",\"lines\":[\"Start\",\"Wi-Fi Home: 192.168.1.20\"]}";
+        var admin=user("admin").roles("ADMIN");
+        clients.paired(id,"Log desk","d".repeat(64),"192.168.1.20",80);
+        mvc.perform(post("/admin/clients/"+id+"/logs").contentType("application/json").content(body).with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(status().is4xxClientError());
+        mvc.perform(post("/admin/clients/"+id+"/logs").contentType("application/json").content(body).with(admin)
+                .with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isForbidden());
+        mvc.perform(post("/admin/clients/"+id+"/logs").contentType("application/json").content(body).with(admin).with(csrf())
+                .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNotFound());
+        var saved=mvc.perform(post("/admin/clients/"+id+"/logs").contentType("application/json").content(body).with(admin).with(csrf())
+                .with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isOk()).andExpect(jsonPath("$.count").value(1)).andReturn();
+        String name=new com.fasterxml.jackson.databind.ObjectMapper().readTree(saved.getResponse().getContentAsString()).path("name").asText().replace(".json","");
+        mvc.perform(post("/admin/clients/../logs").contentType("application/json").content(body).with(admin).with(csrf())
+                .with(r->{r.setLocalPort(10001);return r;})).andExpect(status().is4xxClientError());
+        mvc.perform(get("/admin/troubleshooting").with(admin).with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("Read log over USB")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("1 of "+DeviceLogs.KEEP)));
+        mvc.perform(get("/admin/clients/"+id+"/logs").with(admin).with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("Wi-Fi Home: 192.168.1.20")));
+        mvc.perform(get("/admin/clients/"+id+"/logs/"+name+".txt").with(admin).with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(status().isOk()).andExpect(header().string("Content-Disposition",org.hamcrest.Matchers.containsString("attachment")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Firmware: 0.1.1")));
+        mvc.perform(get("/admin/clients/"+id+"/logs/"+name+".txt").with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isUnauthorized());
+        mvc.perform(post("/admin/clients/"+id+"/remove").with(admin).with(csrf()).with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(status().is3xxRedirection());
+        mvc.perform(get("/admin/clients/"+id+"/logs/"+name+".txt").with(admin).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isNotFound());
+    }
+    @Test void displaysSendTheirLogOnceWhenAskedOverTheNetwork() throws Exception {
+        String key="ef".repeat(32),id="vibedock-log-network",image="/api/v1/clients/"+id+"/image",upload="/api/v1/clients/"+id+"/log";
+        var admin=user("admin").roles("ADMIN");
+        clients.paired(id,"Shelf",key,"192.168.1.31",80);
+        try{
+            // Firmware 0.1.0 cannot send its log: no request, a hint instead.
+            mvc.perform(get(image).header("Authorization","Bearer "+key).header("X-VibeDock-Firmware","0.1.0")
+                    .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk()).andExpect(header().doesNotExist("X-VibeDock-Send-Log"));
+            mvc.perform(post("/admin/clients/"+id+"/logs/request").with(admin).with(csrf()).with(r->{r.setLocalPort(10001);return r;}))
+                    .andExpect(flash().attribute("logMessage",org.hamcrest.Matchers.containsString("only over USB")));
+            Assertions.assertTrue(deviceLogs.pendingRequest(id).isEmpty());
+            // Newer firmware: the request reaches the display with its next image, also on a 304.
+            var pull=mvc.perform(get(image).header("Authorization","Bearer "+key).header("X-VibeDock-Firmware","0.2.0")
+                    .with(r->{r.setLocalPort(8080);return r;})).andReturn();
+            mvc.perform(post("/admin/clients/"+id+"/logs/request").with(admin).with(csrf()).with(r->{r.setLocalPort(10001);return r;}))
+                    .andExpect(flash().attribute("logMessage",org.hamcrest.Matchers.startsWith("Requested")));
+            String request=mvc.perform(get(image).header("Authorization","Bearer "+key).header("X-VibeDock-Firmware","0.2.0")
+                    .header("If-None-Match",pull.getResponse().getHeader("ETag")).with(r->{r.setLocalPort(8080);return r;}))
+                    .andExpect(status().isNotModified()).andReturn().getResponse().getHeader("X-VibeDock-Send-Log");
+            Assertions.assertTrue(request!=null&&request.matches("[0-9a-f]{32}"),String.valueOf(request));
+            String body="+5s Start\n+9s Wi-Fi Home: 192.168.1.31\nBearer "+key+"\n";
+            // Wrong key, wrong request, admin port, GET and too large are refused; nothing is saved.
+            mvc.perform(post(upload).header("Authorization","Bearer "+"0".repeat(64)).header("X-VibeDock-Log-Request",request).content(body)
+                    .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isUnauthorized());
+            mvc.perform(post(upload).header("Authorization","Bearer "+key).header("X-VibeDock-Log-Request","1".repeat(32)).content(body)
+                    .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isConflict());
+            mvc.perform(post(upload).header("Authorization","Bearer "+key).header("X-VibeDock-Log-Request",request).content(body)
+                    .with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isNotFound());
+            mvc.perform(get(upload).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isMethodNotAllowed());
+            mvc.perform(post(upload).header("Authorization","Bearer "+key).header("X-VibeDock-Log-Request",request).content("x".repeat(DeviceLogs.MAX_BYTES+1))
+                    .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isPayloadTooLarge());
+            Assertions.assertEquals(0,deviceLogs.count(id));
+            // The right one is saved once, without the key; the request is used up.
+            mvc.perform(post(upload).header("Authorization","Bearer "+key).header("X-VibeDock-Log-Request",request)
+                    .header("X-VibeDock-Firmware","0.2.0").header("X-VibeDock-Board","vibedock-m1").content(body)
+                    .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNoContent());
+            mvc.perform(post(upload).header("Authorization","Bearer "+key).header("X-VibeDock-Log-Request",request).content(body)
+                    .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isConflict());
+            var saved=deviceLogs.list(id);
+            Assertions.assertEquals(1,saved.size());Assertions.assertEquals("net",saved.getFirst().source());Assertions.assertEquals("0.2.0",saved.getFirst().firmware());
+            var lines=deviceLogs.read(id,saved.getFirst().name()).orElseThrow().lines();
+            Assertions.assertEquals(3,lines.size());Assertions.assertFalse(String.join("\n",lines).contains(key));
+            mvc.perform(get(image).header("Authorization","Bearer "+key).header("X-VibeDock-Firmware","0.2.0").with(r->{r.setLocalPort(8080);return r;}))
+                    .andExpect(header().doesNotExist("X-VibeDock-Send-Log"));
+            mvc.perform(get("/admin/clients/"+id+"/logs").with(admin).with(r->{r.setLocalPort(10001);return r;}))
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString("Read log over the network")))
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString("Network")));
+        }finally{clients.remove(id);deviceLogs.deleteAll(id);}
+    }
+    @Test void touchDisplaysSwipeThroughTheColourSchemes() throws Exception {
+        String key="cd".repeat(32),id="vibedock-touch",image="/api/v1/clients/"+id+"/image";
+        clients.paired(id,"Desk",key,"192.168.1.32",80);
+        try{
+            var start=clients.defaultDesign().scheme();
+            var first=mvc.perform(get(image).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(8080);return r;}))
+                    .andExpect(status().isOk()).andReturn().getResponse().getHeader("ETag");
+            Assertions.assertFalse(clients.views().stream().filter(v->v.identifier().equals(id)).findFirst().orElseThrow().overridden());
+            // Next: a new image right away, and the device keeps its own design from then on.
+            mvc.perform(get(image).header("Authorization","Bearer "+key).header("X-VibeDock-Gesture","scheme-next").header("If-None-Match",first)
+                    .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk());
+            Assertions.assertEquals(start.shifted(1),clients.designFor(id).scheme());
+            Assertions.assertTrue(clients.views().stream().filter(v->v.identifier().equals(id)).findFirst().orElseThrow().overridden());
+            Assertions.assertEquals(start,clients.defaultDesign().scheme());
+            // Previous goes back; the first scheme wraps around to the last; unknown gestures change nothing.
+            mvc.perform(get(image).header("Authorization","Bearer "+key).header("X-VibeDock-Gesture","scheme-previous")
+                    .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk());
+            Assertions.assertEquals(start,clients.designFor(id).scheme());
+            Assertions.assertEquals(Scheme.values()[Scheme.values().length-1],Scheme.values()[0].shifted(-1));
+            mvc.perform(get(image).header("Authorization","Bearer "+key).header("X-VibeDock-Gesture","reboot")
+                    .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk());
+            Assertions.assertEquals(start,clients.designFor(id).scheme());
+            // Without the key nothing changes.
+            mvc.perform(get(image).header("Authorization","Bearer "+"0".repeat(64)).header("X-VibeDock-Gesture","scheme-next")
+                    .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isUnauthorized());
+            Assertions.assertEquals(start,clients.designFor(id).scheme());
+        }finally{clients.remove(id);}
+    }
+    @Test void flipImageTurnsEveryBoardButTheVibeTvM1() throws Exception {
+        String key="ef".repeat(32),id="vibedock-flip",image="/api/v1/clients/"+id+"/image",flip="/admin/clients/"+id+"/flip";
+        clients.paired(id,"Shelf",key,"192.168.1.33",80,"waveshare-s3-touch-lcd-147");
+        try{
+            mvc.perform(get(image).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(8080);return r;}))
+                    .andExpect(status().isOk()).andExpect(header().string("X-VibeDock-Orientation","upright"));
+            mvc.perform(post(flip).param("flipped","true").header("Accept","application/json").with(user("admin").roles("ADMIN")).with(csrf())
+                    .with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isOk()).andExpect(jsonPath("$.flipped").value(true));
+            // Also the 304 carries it: the device turns without a new image.
+            var tag=mvc.perform(get(image).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(8080);return r;}))
+                    .andExpect(header().string("X-VibeDock-Orientation","flipped")).andReturn().getResponse().getHeader("ETag");
+            mvc.perform(get(image).header("Authorization","Bearer "+key).header("If-None-Match",tag).with(r->{r.setLocalPort(8080);return r;}))
+                    .andExpect(status().isNotModified()).andExpect(header().string("X-VibeDock-Orientation","flipped"));
+            // The VibeTV M1 stands as its case decides: no switch, no header.
+            clients.setBoard(id,"vibedock-m1");
+            Assertions.assertFalse(clients.flipped(id));
+            mvc.perform(get(image).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(8080);return r;}))
+                    .andExpect(header().doesNotExist("X-VibeDock-Orientation"));
+            clients.setFlipped(id,true);Assertions.assertFalse(clients.get(id).flipped());
+        }finally{clients.remove(id);}
+    }
     @Test void firmwareIsOfferedForDownloadAndDevicesReportTheirVersion() throws Exception {
         String key="ab".repeat(32);
         for(var client:clients.views())clients.remove(client.identifier());
@@ -624,6 +751,35 @@ class AccessTest {
                 .andExpect(status().isOk()).andExpect(content().contentType("image/png")).andReturn().getResponse().getContentAsByteArray();
         var image=javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(png));Assertions.assertEquals(240,image.getWidth());Assertions.assertEquals(320,image.getHeight());
         Assertions.assertEquals("192.168.1.77",clients.get(view.identifier()).ip());Assertions.assertEquals("Connected",clients.get(view.identifier()).status());
+        // The page asks for its window's size and pixel ratio: the type's image as large as it fits, drawn sharp.
+        var sharp=javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(mvc.perform(get("/web/"+secret+"/image.png").param("w","390").param("h","844").param("r","3")
+                .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray()));
+        Assertions.assertEquals(240*5,sharp.getWidth());Assertions.assertEquals(320*5,sharp.getHeight());  // 390/240 x 3 = 4.875, rounded up to 5
+        // The home screen icon, behind the secret as well.
+        mvc.perform(get("/web/"+secret+"/icon.png").with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk()).andExpect(content().contentType("image/png"));
+        mvc.perform(get("/web/"+"0".repeat(64)+"/icon.png").with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNotFound());
+        mvc.perform(get("/web/"+secret).with(r->{r.setLocalPort(8080);return r;})).andExpect(content().string(org.hamcrest.Matchers.containsString("rel=\"apple-touch-icon\" href=\"/web/"+secret+"/icon.png\"")));
+        // Changes: the state tag follows the image; a swipe changes the theme (POST only, no session needed).
+        var state=new com.fasterxml.jackson.databind.ObjectMapper().readTree(mvc.perform(get("/web/"+secret+"/state").with(r->{r.setLocalPort(8080);return r;}))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).path("tag").asText();
+        var scheme=clients.designFor(view.identifier()).scheme();
+        mvc.perform(post("/web/"+secret+"/swipe").param("direction","next").with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNoContent());
+        Assertions.assertEquals(scheme.shifted(1),clients.designFor(view.identifier()).scheme());
+        mvc.perform(get("/web/"+secret+"/state").with(r->{r.setLocalPort(8080);return r;})).andExpect(jsonPath("$.tag").value(org.hamcrest.Matchers.not(state)));
+        mvc.perform(get("/web/"+secret+"/swipe").with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isMethodNotAllowed());
+        // A double tap without photos in the design changes nothing.
+        mvc.perform(post("/web/"+secret+"/swipe").param("direction","toggle").with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNoContent());
+        mvc.perform(post("/web/"+secret+"/swipe").param("direction","sideways").with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isBadRequest());
+        mvc.perform(post("/web/"+"0".repeat(64)+"/swipe").param("direction","next").with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNotFound());
+        mvc.perform(post("/web/"+secret+"/swipe").param("direction","next").with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isNotFound());
+        clients.setDesign(view.identifier(),null);
+        // Fitting the browser: the window's shape at its full resolution; devices cannot fit.
+        clients.setDisplay(view.identifier(),"fit");
+        var fitted=javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(mvc.perform(get("/web/"+secret+"/image.png").param("w","393").param("h","852").param("r","3")
+                .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray()));
+        Assertions.assertEquals(360*3.5,fitted.getWidth());Assertions.assertEquals(780*3.5,fitted.getHeight());  // see WebSizeTest
+        Assertions.assertThrows(IllegalArgumentException.class,()->{clients.paired("vibedock-fit-test","Desk","a".repeat(64),"192.168.1.30",80);clients.setDisplay("vibedock-fit-test","fit");});
+        clients.remove("vibedock-fit-test");clients.setDisplay(view.identifier(),"240x320");
         // Only on the public port, only GET, only with the right secret; the admin list shows the links.
         mvc.perform(get("/web/"+secret).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isNotFound());
         mvc.perform(post("/web/"+secret).with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isMethodNotAllowed());

@@ -16,7 +16,7 @@ unable to operate VibeDock, in particular:
 - **Damage from flashing.** Writing firmware can make a device unusable ("bricked"), erase its original firmware and
   settings, or damage it, e.g. through a wrong board, an interrupted write, unsuitable cables, power supplies or
   adapters. Original firmware cannot be restored without your own full backup. Flashing voids any manufacturer
-  warranty and is done entirely at your own risk. The ESP32 builds have not been tested on hardware.
+  warranty and is done entirely at your own risk. Of the ESP32 builds only the Waveshare ESP32-S3-Touch-LCD-1.47 and ESP32-C6-Touch-LCD-1.69 have been tested on hardware; the others are prepared and untested.
 - **Security.** No software is free of errors. We cannot guarantee that VibeDock is free of security
   vulnerabilities. The server stores provider sign-ins and tokens in plaintext in its data directory, the
   administration uses plain HTTP unless you put HTTPS in front of it, and displays talk to the server over the
@@ -50,11 +50,22 @@ regenerated after every change (see [Regenerating this manual](#regenerating-thi
 
 The administration user and password are set in `vibedock-server/.env` (`ADMIN_USER`, `ADMIN_PASSWORD`).
 
+<!-- page break -->
+
 ## Getting a display
 
-The VibeTV M1 is the small 240×240 desk display sold by Vibe TV at <https://vibetv.shop/>. It comes with the
-seller's own firmware and app; this project replaces that firmware with its own (see
-[Installing the firmware](#installing-the-firmware)), after you have saved a full backup of the original.
+These displays are tested on hardware:
+
+| Display | What it is | Bought at |
+| --- | --- | --- |
+| VibeTV M1 | 240×240 desk display, ESP8266 | Vibe TV, <https://vibetv.shop/> |
+| Waveshare ESP32-S3-Touch-LCD-1.47 | ESP32-S3 1.47inch Touch Display Development Board (without pin header), 172×320, 262K colours, 2.4 GHz Wi-Fi and BLE 5, 240 MHz LX7 dual core | Amazon |
+| Waveshare ESP32-C6-Touch-LCD-1.69 | ESP32-C6 1.69 inch Touch Display Dev Board, 240×280, 262K colours, 32-bit RISC-V, Wi-Fi 6, IEEE 802.15.4 (Zigbee 3.0, Thread) and Bluetooth 5 | Amazon |
+
+The VibeTV M1 comes with the seller's own firmware and app; this project replaces that firmware with its own (see
+[Installing the firmware](#installing-the-firmware)), after you have saved a full backup of the original. On the
+Waveshare boards VibeDock is installed over USB or from the browser. All other
+boards in [Installing the firmware](#installing-the-firmware) are prepared, but not tested on hardware.
 
 > **We have nothing to do with the seller.** This project is not made, endorsed or supported by Vibe TV, and we
 > get nothing for this link. We built our own server and firmware for the device just for fun. Questions about
@@ -452,8 +463,19 @@ digital photo frame. **Add web display** creates it:
 
 <img src="images/14-add-web-display.png" width="80%" alt="Add web display">
 
-- **Name**, **Display type** (the image size, e.g. *320×240 landscape*) and **Reload every** (how often the page
-  loads a new image).
+- **Name**, **Display type** and **Reload every** (how often the page loads a new image). *Fit the browser* (the
+  default) gives the image the shape of the browser window, e.g. a phone held upright or a TV; the other types keep
+  the size of a device display (e.g. *320×240 landscape*), shown as large as the window holds.
+- The page asks for the image in its window's size and the screen's pixel ratio, so it is sharp on high-resolution
+  screens (phones, tablets, 4K). Large screens get a zoomed layout with readable text. The PNG link without
+  parameters has the type's own pixels (*Fit the browser*: 360×640); programs can add `?w=<width>&h=<height>&r=<ratio>`.
+- **Home screen:** on an iPhone or iPad, *Share › Add to Home Screen* gives the page the display icon and the
+  display's name; it then opens full screen, keeping the notch and the home indicator free.
+- The page asks every 3 seconds whether its image changed, so a new design, new usage data or the next photo appear
+  within seconds; the reload interval stays as a fallback.
+- **Double tap** (or double click, or the space bar) starts or stops the slideshow, like on touch displays.
+- **Swipe** left or right on the page (or press ← →) to change the theme, in a slideshow the photo, like on touch
+  displays; the web display then keeps it as its own design.
 - The card then offers two links, both containing a long secret: the **Page** for browsers (full screen, reloads
   itself) and the **PNG** for programs. Copy them with the copy button or open them with the arrow.
 - **External address** switches both links between the internal and the external server address (see
@@ -473,8 +495,7 @@ and do not appear on the firmware page.
 # Display design
 
 The display editor sets what a display shows. **Design for** chooses the default design or a device. The preview
-on the right is rendered by the server exactly as the display will show it. Changes stay in the editor until you
-save.
+on the right is rendered by the server exactly as the display will show it. Every change is saved right away.
 
 <img src="images/30-display-default.png" width="100%" alt="Default design">
 
@@ -489,6 +510,10 @@ A design is a list of **bands** from top to bottom. A usage band holds:
 The default design above uses two full-width bands, one per source (*Claude ACME*, *Codex ACME*); the
 [web display](#display-types-and-hidden-bands) further below shows two half-width sources per band.
 
+Up to five usage bands fit a tall screen (e.g. a phone as a web display); smaller displays show the first ones that
+fit. **On tall screens** chooses where spare height goes: *Spread the bands evenly* (the default) or *Bands at the
+top*, where the bands stay together and a weather and mood band at the end keeps to the bottom edge.
+
 The **Weather & mood** band holds the weather (icon and temperature for the **Weather location**) and the **Mood**
 emoji; **Swap weather & mood** exchanges the two slots. The update time and the IP address move with this band.
 
@@ -499,8 +524,29 @@ data source that is paused or unavailable is shown as such on the display.
 
 <img src="images/31-display-device.png" width="100%" alt="Design of a device">
 
-With **Custom design** a display gets its own complete design; turn it off and save to follow the default again.
-Here the display *Home office* shows one full band and two compact rows in the *Classic Mac* theme.
+With **Custom design** a display gets its own complete design; turn it off to follow the default again (every
+change is saved right away). Here the display *Home office* shows one full band and two compact rows in the
+*Classic Mac* theme.
+
+## Photos and slideshows
+
+The switch **Usage monitor | Photos** at the top of the *Content* box chooses what the display shows. **Photos** shows
+photos instead of the usage monitor:
+
+- **Add photos** uploads JPEG, PNG, GIF or BMP files (not HEIC). The server keeps only a copy reduced to 600 × 600
+  pixels at most, turned upright like the photo app shows it; the original is not stored. All designs share these
+  photos; **✕** and **Delete** on a photo removes it from every design.
+- Click the photos to show, in the order clicked (the number on each); click again to leave one out.
+- **Each photo** sets how long one stays (10 seconds to an hour), **Shuffle** a new order every round. Displays with
+  the same slideshow change together; the display pulls once per photo then.
+- **Only at certain times** shows the photos only in that time of day (e.g. 22:00 to 07:00) and the usage monitor
+  at other times; the times are those of the server (Docker: `TIME_ZONE`). The switch then shows a green dot, and the
+  bands of the usage monitor for the other times appear below the photo settings.
+- Switching back to **Usage monitor** keeps the photo selection and its settings for later.
+- On a touch display a swipe left or right shows the next or previous photo; a double tap stops the slideshow or
+  starts it outside its times (also on a web display page: double tap, double click or the space bar).
+
+The server cuts every photo to the display's shape from its middle, so a portrait photo fills a narrow display.
 
 ## Display types and hidden bands
 
@@ -517,8 +563,11 @@ the aspect ratio:
 
 ## Appearance and mood
 
-**Style / theme** sets colours and look (e.g. *Midnight*, *Classic Windows*, *Classic Mac*, *Paper*). The mood
-button opens the emoji picker with quick picks, search and all emoji; *None* leaves the slot empty.
+**Style / theme** sets colours and look of the usage monitor; the twenty themes:
+
+<img src="themes.png" width="100%" alt="The twenty display themes with example data">
+
+The mood button opens the emoji picker with quick picks, search and all emoji; *None* leaves the slot empty.
 
 <img src="images/34-emoji-picker.png" width="100%" alt="Emoji picker">
 
@@ -618,22 +667,24 @@ settings or sign-ins; check the mount and its owner (see [Data directory and bac
 > **Flashing is at your own risk** (see [Disclaimer](#disclaimer)). Always download and keep a full backup of the
 > device first; it is the only way back to its current firmware.
 
-**Devices → Firmware** holds the firmware of the server's version for every supported board. Choose the **Board**
-first; it decides which image is installed:
+**Devices → Firmware** holds the firmware of the server's version for every supported board. The **Board** in the
+firmware card decides which image is shown, downloaded and installed:
 
-<img src="images/20-firmware-board.png" width="80%" alt="Board">
+| Board | Chip | Display | Hardware |
+| --- | --- | --- | --- |
+| VibeTV M1 | ESP8266 | 1.54" ST7789 240×240 | tested |
+| Cheap Yellow Display (ESP32-2432S028R) | ESP32 | 2.8" ILI9341 320×240 | prepared |
+| LilyGO T-Display | ESP32 | 1.14" ST7789 135×240 | prepared |
+| LilyGO T-Display-S3 | ESP32-S3 | 1.9" ST7789 170×320 | prepared |
+| Waveshare ESP32-S3-LCD-1.69 | ESP32-S3 | 1.69" ST7789V2 240×280 | prepared |
+| Waveshare ESP32-S3-Touch-LCD-1.47 | ESP32-S3 | 1.47" JD9853 172×320 | tested |
+| Waveshare ESP32-C6-Touch-LCD-1.69 | ESP32-C6 | 1.69" ST7789V2 240×280 | tested |
+| ESP32-C3 with ST7789 240×240 | ESP32-C3 | e.g. C3 SuperMini | prepared |
 
-| Board | Chip | Display |
-| --- | --- | --- |
-| VibeTV M1 | ESP8266 | 1.54" ST7789 240×240 |
-| Cheap Yellow Display (ESP32-2432S028R) | ESP32 | 2.8" ILI9341 320×240 |
-| LilyGO T-Display | ESP32 | 1.14" ST7789 135×240 |
-| LilyGO T-Display-S3 | ESP32-S3 | 1.9" ST7789 170×320 |
-| Waveshare ESP32-S3-LCD-1.69 | ESP32-S3 | 1.69" ST7789V2 240×280 |
-| ESP32-C3 with ST7789 240×240 | ESP32-C3 | e.g. C3 SuperMini |
+*Tested*: runs on real hardware (installation over USB, pairing, images; on the Waveshare boards also touch). *Prepared*: builds, with the settings the tested boards called for, but has not run on hardware yet.
 
-The firmware card shows file, size, SHA-256, chip and flash address, and the displays of this board with their
-installed version. **Download** saves the image; **Update to … over Wi-Fi** updates a paired display.
+Below the board, the firmware card shows file, size, SHA-256, chip and flash address, and the displays of this board
+with their installed version. **Download** saves the image; **Update to … over Wi-Fi** updates a paired display.
 
 <img src="images/21-firmware-card.png" width="80%" alt="Firmware of the VibeTV M1">
 
@@ -641,8 +692,7 @@ ESP32 boards get one image with bootloader and partition table:
 
 <img src="images/24-firmware-esp32.png" width="80%" alt="Firmware of an ESP32 board">
 
-> Only the VibeTV M1 has been validated on hardware. The ESP32 builds compile and run the same code, but have not
-> been tested on the boards yet.
+> The boards marked *prepared* compile and run the same code, but have not been tested on hardware yet.
 
 ## From the browser (recommended)
 
@@ -652,7 +702,9 @@ Needs Chrome or Edge on a computer, and the administration opened over HTTPS or 
 
 1. **Connect the display by USB** and close other programs that use its serial port (e.g. a serial monitor).
    Choose the **Speed** (115200 is the most reliable) and press **Connect**, then choose the serial port in the
-   browser's dialog. The page checks that the chip matches the chosen board.
+   browser's dialog. The page checks the chip: when it is not the chosen board's and only one board of the
+   installation has it (e.g. the ESP32-C6), the page switches to that board and connects again by itself; boards
+   that share a chip (the ESP32-S3 boards) you choose yourself.
 2. **Back up the whole flash** with **Download backup** and keep the file private: it is the only way back to the
    current firmware and contains the display's Wi-Fi and pairing data. Without a download, confirm that you have a
    verified full backup.
@@ -776,11 +828,46 @@ pairing code means it is not paired, *Server unreachable* means Wi-Fi works but 
 that shows an image and the green status under **Devices** is fine; a stale image disappears after three missed
 polls.
 
+## Touch displays
+
+Displays with a touch panel (Waveshare ESP32-S3-Touch-LCD-1.47 and ESP32-C6-Touch-LCD-1.69) react to swipes:
+
+| Swipe | Effect |
+| --- | --- |
+| left / right | next / previous colour scheme; the display keeps it as its own design (*Custom design* in the editor) |
+| up / down | brighter / darker (10–100 %), stored on the display |
+| double tap | photos on or off: starts the slideshow of the display's design or stops it, whatever its schedule or the editor's switch say (until the next double tap or a restart of the server) |
+
+The scheme changes with the next image, right after the swipe. To follow the default design again, turn off
+*Custom design* for the display in the editor.
+
+## Displays mounted upside down
+
+Every display except the VibeTV M1 (its case decides how it stands) has a *Flip image* switch on its card under
+**Devices**. It turns the picture by 180 degrees, also the display's own screens and the swipes; the display takes it
+over within seconds. The motion sensor of the Waveshare boards is not used: it decided too unreliably.
+
 ## Read the display log
 
-**Devices → Firmware → Connect → Display log** shows the display's last 24 events:
+**Devices → Troubleshooting → Read log over USB** shows the display's last 24 events, for every board and firmware
+(no board to choose, paired or not):
 starts and their reason, Wi-Fi, pairing, every change of the server's answer and why a connection failed. It holds
 no keys or passwords. The copy button next to the log copies it for a report.
+
+Every log read this way is also saved on the server. On the same page, each paired display links to its last 10 logs
+with the time they were read and how (USB or network), to show, download as text or delete. Removing
+the display removes its logs.
+
+The table also shows how fresh the **newest log** is: how long ago the server received it (server time; its lines can
+be much older), over USB or the network, the firmware it came from and, with firmware 0.2.0, the start it was sent in
+(boot id and run time). *Older firmware than now* marks a log from another firmware than the display runs today: read
+a current one before drawing conclusions. Below the display's name: its current start (run time, free memory and its
+minimum, Wi-Fi signal) and how the last start came about (*power-on*, *update*, *external*, *crash*, …).
+
+**Read over the network** there asks the display to send its log without a cable: it sends it right
+after its next image pull, over the same address and encryption as its images, within seconds when the server can
+ask it to pull now. This needs firmware newer than 0.1.1; older firmware sends its log only over USB. The request is
+valid for 10 minutes and for one log.
 
 > Opening the USB port restarts the VibeTV M1. Read the log only after the display has finished what you want to
 > see: it shows an image or *Server unreachable*. An https connection takes the M1 a few seconds, and the first
@@ -788,8 +875,11 @@ no keys or passwords. The copy button next to the log copies it for a report.
 
 | Log line | Meaning and what to do |
 | --- | --- |
-| `Start v… board, Power on` / `External System` | A start; *External System* is the reset when a USB port opens. |
-| `Start …, Software/System restart: stack overflow …` / `abort …` | The firmware crashed before this start. Copy the log and report it with the firmware version. |
+| `Start v… board: boot=… reset=… start=power-on prev=unknown; Power on` | A start (firmware 0.2.0): its boot id, the platform's reset code and its kind. After a power cut the run before is unknown. |
+| `… start=update prev=… phase=ota …` / `start=setup` / `start=factory-reset` | A restart the display planned: not a crash. |
+| `… start=external …` | The reset button, or a USB port that was opened (esptool, serial monitor, *Restart display*). |
+| `… start=crash` / `watchdog` / `software` / `brownout` `prev=… phase=image up=5400 heap=…/…` | An unexpected restart and what the display was doing before (`phase`), how long it ran and its free memory then. On the M1 a crash record follows (`exception (reason …, cause … at 0x…)`). Report it with the firmware version; see `vibedock-client/FLASHING.md`, *Decoding a crash*. |
+| `Start v… board, Power on` / `External System` / `Software/System restart: stack overflow …` | The same from firmware up to 0.1.1, without boot id and kind. |
 | `USB console: this start is not counted as a power cycle` | Normal after reading the log: USB starts do not count towards Wi-Fi setup or factory reset. |
 | `New firmware: this start is not counted as a power cycle` | The first start after installing a new firmware; the resets while flashing do not open the Wi-Fi setup. |
 | `Second quick power cycle: …`, `Factory reset after …` | Two or three short power cycles opened the Wi-Fi setup or reset the display. |
@@ -844,8 +934,26 @@ To test a fix before a release, build the firmware from your checkout and instal
 
 ## Report a problem
 
-Copy the display log, and note the server version (page footer), the board and the firmware version, and what the
-display showed. Remove host names or addresses you do not want to share.
+**Request current logs** first asks every display that can for its log, so that the file holds current ones: nothing
+is read from a display without it. The list shows per display whether its log arrived, is still awaited (a display
+that cannot be reached at once sends it with its next pull), timed out after 10 minutes, or can only be read over USB;
+saved logs stay either way.
+
+**Devices → Troubleshooting → Create support file** puts what a problem needs into one file: your description of the
+problem (one line, what happened, what you expected, the steps to see it again, since when, the displays concerned),
+a **diagnosis** per display (the firmware it runs and that of its newest log, how old that log is, its last start and
+the run before, memory and Wi-Fi; separately what was *observed*, what that *suggests* and what data is *missing*, e.g.
+a panic backtrace that only the serial port shows), the server's warnings and errors, version and platform,
+the data sources (without sign-ins or keys), the displays, the server and access log of the chosen days and the
+saved display logs. Keys, tokens, display links and e-mail addresses are removed; *Also hide host names and public IP
+addresses* removes those as well (addresses in the home network stay). The file is encrypted with a key that the page
+shows once and does not keep: attach the file to the issue and send the key separately, never in the issue.
+**Open a support file** on the same page decrypts such a file with its key and shows its contents, the description
+first; nothing of it is stored. *Raw (JSON)* shows the whole content as one document, *Copy as JSON* and *Download
+JSON* hand it on, e.g. to an analysis tool.
+
+Without a support file: copy the display log, and note the server version (page footer), the board and the firmware
+version, and what the display showed.
 
 # Regenerating this manual
 
@@ -866,7 +974,8 @@ DOCS_PDF=../docs/manual/vibedock-manual.pdf ./scripts/docs.sh   # screenshots an
 - `DOCS_PDF` also makes the PDF; it needs pandoc, XeLaTeX (TeX Live) and the DejaVu fonts. Title page, page header
   and footer, headings and frames are defined in `docs/manual/style/manual.tex`. `keep-with-figure.lua` next to it moves a
   heading to the next page together with its first picture when both do not fit.
-- `EMOJI_DIR` points to Twemoji 72×72 PNGs; without it the script downloads the pinned Twemoji release once.
+- `EMOJI_DIR` points to the Twemoji SVGs (`assets/svg`; the 72×72 PNGs work too); without it the script downloads the
+  pinned Twemoji release once.
 - `PLAYWRIGHT_CHROMIUM` uses an installed Chromium instead of Playwright's own.
 
 **In the Docker image.** Every Docker build (Compose, `scripts/image.sh`, the release workflow) runs the same script

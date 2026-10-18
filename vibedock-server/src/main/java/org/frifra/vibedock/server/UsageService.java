@@ -63,6 +63,8 @@ public class UsageService {
     }
     @Value("${vibedock.polling:true}") private boolean polling=true;
     @org.springframework.beans.factory.annotation.Autowired(required=false) private SignInRenewal renewal;
+    /** DEMO_USAGE: sources need no sign-in, DemoUsage makes up their readings. */
+    @org.springframework.beans.factory.annotation.Value("${vibedock.demo-usage:false}") private boolean demo;
     public UsageService(SettingsStore settings,ProviderClient client,DeviceSender devices,Clock clock) {
         this.settings=settings; this.client=client; this.devices=devices; this.clock=clock;
     }
@@ -72,7 +74,7 @@ public class UsageService {
         for (var account:s.accounts()) {
             String name=account.id();var credential=account.manual();labels.put(name,account.label());
             Provider p=account.suspended() ? new Provider("suspended",null,null,null)
-                    : credential.token().isBlank() ? new Provider("unconfigured",null,null,null)
+                    : credential.token().isBlank()&&!demo ? new Provider("unconfigured",null,null,null)
                     : s.equals(collectedFor) ? readings.getOrDefault(name,new Provider("waiting",null,null,null))
                     : new Provider("waiting",null,null,null);
             if (p.observedAt()!=null && now-p.observedAt()>staleAfter(name) && (p.status().equals("ok") || p.status().equals("partial")))
@@ -112,13 +114,13 @@ public class UsageService {
     public void refresh() { collect(true); }
     private synchronized void collect(boolean manual) {
         // Grok and Gemini sign-ins are renewed by their CLI shortly before they expire.
-        if (renewal!=null) for (var a:settings.get().accounts())
+        if (renewal!=null&&!demo) for (var a:settings.get().accounts())
             if (a.manual().token().isBlank()&&!a.suspended()) renewal.renewIfDue(a,settings.authDirectory(a));
         var configuration=settings.effective(); Map<String,Provider> next=new LinkedHashMap<>();
         for (var account:configuration.accounts()) {
             String name=account.id();var credential=account.manual();
             if (account.suspended()) { pace.remove(name); next.put(name,new Provider("suspended",null,null,null)); continue; }
-            if (credential.token().isBlank()) { pace.remove(name); next.put(name,new Provider("unconfigured",null,null,null)); continue; }
+            if (credential.token().isBlank()&&!demo) { pace.remove(name); next.put(name,new Provider("unconfigured",null,null,null)); continue; }
             var last=readings.get(name);Long previous=last==null?null:last.observedAt();
             var p=pace.computeIfAbsent(name,k->new PollPace());
             long now=clock.instant().getEpochSecond();
