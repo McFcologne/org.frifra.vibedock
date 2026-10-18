@@ -36,8 +36,15 @@ class WebSecurity {
     @Bean org.springframework.security.web.session.HttpSessionEventPublisher sessionEvents(){
         return new org.springframework.security.web.session.HttpSessionEventPublisher();
     }
+    /** Finish an existing event response without trying to log in or redirect on its async redispatch. */
+    @Bean @org.springframework.core.annotation.Order(0)
+    SecurityFilterChain eventCompletion(HttpSecurity http) throws Exception {
+        return http.securityMatcher(AdminEvents::acceptedCompletion)
+                .requestCache(cache->cache.disable())
+                .authorizeHttpRequests(a->a.anyRequest().permitAll()).build();
+    }
     @Bean SecurityFilterChain security(HttpSecurity http,org.springframework.security.core.session.SessionRegistry sessions,
-            @Value("${vibedock.admin-auth:password}") String auth,@Value("${vibedock.admin-user}") String admin) throws Exception {
+            @Value("${vibedock.admin-auth:password}") String auth,@Value("${vibedock.admin-user}") String admin,AdminRememberMe remember) throws Exception {
         // ADMIN_AUTH=none (quick tests): every visitor of the administration port counts as the administrator. The port
         // guard still keeps the administration off the public port; publish the administration port on this host only.
         if("none".equals(auth)){
@@ -50,13 +57,19 @@ class WebSecurity {
         var browsers=new MediaTypeRequestMatcher(MediaType.TEXT_HTML,MediaType.APPLICATION_XHTML_XML);
         browsers.setIgnoredMediaTypes(Set.of(MediaType.ALL));
         return http
-                .exceptionHandling(e -> e.defaultAuthenticationEntryPointFor(login,browsers))
+                .exceptionHandling(e -> e.defaultAuthenticationEntryPointFor(login,browsers).accessDeniedHandler((request,response,denied)->{
+                    // This marker permits one safe client retry: CSRF rejected the request before any controller ran.
+                    if(denied instanceof org.springframework.security.web.csrf.CsrfException)response.setHeader("X-VibeDock-CSRF","invalid");
+                    response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                }))
                 .authorizeHttpRequests(a -> a.requestMatchers("/api/v1/usage","/api/v1/clients/*/image","/api/v1/clients/*/firmware","/api/v1/clients/*/log","/web/*","/web/*/image.png","/web/*/icon.png","/web/*/state","/web/*/swipe").permitAll()
                 // Login page assets; the port guard still limits them to the administration port.
                 .requestMatchers("/login","/error","/app.css","/theme.js","/logo.svg","/favicon.ico","/apple-touch-icon.png").permitAll()
                 .anyRequest().hasRole("ADMIN"))
                 .sessionManagement(s -> s.maximumSessions(-1).sessionRegistry(sessions).expiredUrl("/login?expired"))
                 .formLogin(f -> f.loginPage("/login").defaultSuccessUrl("/admin",true).permitAll())
+                .rememberMe(r -> r.key(AdminRememberMe.KEY).rememberMeServices(remember))
+                .addFilterAfter(remember.renewalFilter(),org.springframework.security.web.authentication.rememberme.RememberMeAuthenticationFilter.class)
                 // Sign out by GET as well and without the CSRF token: opening /logout or a form from before a server
                 // restart (expired token) used to end on a 403 page. A forged sign-out link can only sign you out.
                 .logout(l -> l.logoutRequestMatcher(new OrRequestMatcher(PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.GET,"/logout"),

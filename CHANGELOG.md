@@ -2,6 +2,15 @@
 
 The release workflow publishes the section of the tagged version (`## 0.1.0` for the tag `v0.1.0` or `0.1.0`) above the list of commits that GitHub generates.
 
+## 0.2.2
+
+The administration remembers the browser. Update the server image; nothing to do on the displays.
+
+- **Stay signed in:** on by default, the sign-in lasts 30 days, renewed while in use, and survives browser and
+  server restarts. Unchecked, the session still ends after 15 minutes of inactivity. **Sign out** revokes this
+  browser's login; changing or resetting the administration password signs out all browsers. The server keeps only
+  hashes of the browser tokens in `/data/admin-logins.json`; it is not part of the data-source export.
+
 ## 0.2.1
 
 Claude sign-ins stay valid, and stored credentials are encrypted. Update the server image; nothing to do on the

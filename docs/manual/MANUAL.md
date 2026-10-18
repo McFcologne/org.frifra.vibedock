@@ -388,7 +388,7 @@ delete it yourself.
 <img src="images/01-login.png" width="70%" alt="Sign-in page">
 
 Open `http://<host>:10001/admin` and sign in with the administration user. The session ends with **Sign out**
-at the top right. **Dark** switches between the light and the dark theme; the choice is kept in this browser.
+at the top right. **Stay signed in** is enabled by default: this browser stays signed in for 30 days, renewed during use, including across browser and server restarts. Uncheck it for a session that expires after 15 minutes of inactivity. Signing out revokes this browser's saved login; changing or resetting the administration password signs out all browsers. Clearing browser cookies also requires a new sign-in. **Dark** switches between the light and the dark theme; the choice is kept in this browser.
 The footer of every page links the README, this manual as PDF (**Manual (PDF)**) and the licenses.
 
 # Overview

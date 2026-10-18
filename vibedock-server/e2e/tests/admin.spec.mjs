@@ -35,7 +35,10 @@ test('source save appears only for changes and a saved rename survives reload',a
   await expect(save).toBeHidden();await name.fill('Renamed account');await expect(save).toBeVisible();
   await name.fill('Codex');await expect(save).toBeHidden();
   await name.fill('Renamed account');await page.keyboard.press('Escape');await expect(dialog).toBeHidden();
-  await save.click();await page.reload();
+  await save.click();
+  // Session/CSRF bootstrap is asynchronous: wait for the saved page before explicitly reloading it.
+  await expect(page.getByRole('heading',{name:'Renamed account',exact:false})).toBeVisible();
+  await page.reload();
   await expect(page.getByRole('heading',{name:'Renamed account',exact:false})).toBeVisible();await expect(save).toBeHidden();
 });
 
