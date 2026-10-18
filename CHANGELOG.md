@@ -4,13 +4,22 @@ The release workflow publishes the section of the tagged version (`## 0.1.0` for
 
 ## 0.2.3
 
-More free memory on the VibeTV M1. Update the server image; the M1 then offers the update in the administration.
+The VibeTV M1 connects over https again after pairing, and the server finds its certificate pin in more networks.
+Update the server image; the M1 then offers the update in the administration.
 
 - **VibeTV M1 connects over https again after pairing:** firmware 0.2.x left about 1 kB less memory than 0.1.x, so
   the first full certificate check after pairing could run out of memory and was reported as *certificate not
   trusted* (e.g. over a phone hotspot when the server cannot reach its own public address). Texts of the display's
   pages, log and diagnosis now stay in flash, and Mbed TLS leaves out certificate texts and the AES decryption tables
   it never uses: about 8.5 kB more free memory than 0.2.2.
+- **TLS pin behind a local DNS rewrite:** to read the certificate of its external https address, the server now
+  also tries the internal host on the external port and the public DNS servers 8.8.8.8 and 1.1.1.1, always with the
+  external host name for SNI and the certificate check; `EXTERNAL_TLS_PROBE_URL` names the reverse proxy's HTTPS
+  listener explicitly. Pairing then sends the pin, and the M1 skips its first full certificate check.
+  **Settings › Network** and the pairing forms show whether a pin is known, with the route and certificate details;
+  **Do not send TLS pin** pairs without it, to test the full check.
+- **Server log in Troubleshooting:** the latest entries of the application log, including the TLS and DNS checks,
+  updated live while open.
 
 ## 0.2.2
 
