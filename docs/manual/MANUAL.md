@@ -50,6 +50,8 @@ regenerated after every change (see [Regenerating this manual](#regenerating-thi
 
 The administration user and password are set in `vibedock-server/.env` (`ADMIN_USER`, `ADMIN_PASSWORD`).
 
+<!-- page break -->
+
 ## Getting a display
 
 These displays are tested on hardware:
