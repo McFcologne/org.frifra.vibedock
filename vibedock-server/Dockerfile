@@ -105,6 +105,6 @@ COPY --from=manual /out /app/manual
 COPY --from=login-clients /usr/local/lib/node_modules/esptool-js/bundle.js /app/firmware/esptool.js
 COPY --chmod=755 docker-entrypoint.sh login-provider.sh /app/
 USER 10001:10001
-ENV DATA_DIR=/data ADMIN_BIND_ADDRESS=0.0.0.0 HOME=/data/home CODEX_HOME=/data/auth/codex CLAUDE_CONFIG_DIR=/data/auth/claude
+ENV DATA_DIR=/data ADMIN_BIND_ADDRESS=0.0.0.0 HOME=/dev/shm/vibedock-home CODEX_HOME=/dev/shm/vibedock-home/codex CLAUDE_CONFIG_DIR=/dev/shm/vibedock-home/claude
 EXPOSE 10002 10001
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

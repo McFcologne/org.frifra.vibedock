@@ -46,7 +46,7 @@ class SourceTransfer {
             String name=account.credentialFile();if(name==null)continue;
             Path file=store.authDirectory(account).resolve(name);
             if(!Files.isRegularFile(file,LinkOption.NOFOLLOW_LINKS))continue;
-            byte[] bytes;try(var in=Files.newInputStream(file,LinkOption.NOFOLLOW_LINKS)){bytes=in.readNBytes(MAX_FILE+1);}
+            byte[] bytes=store.secrets.read(file);
             if(bytes.length<=MAX_FILE)files.put(account.id(),Base64.getEncoder().encodeToString(bytes));
         }
         byte[] salt=new byte[16],nonce=new byte[12];random.nextBytes(salt);random.nextBytes(nonce);
@@ -111,14 +111,20 @@ class SourceTransfer {
         // Replacing moves the current sign-ins aside first; they are deleted only once everything is saved and are
         // put back if anything fails, so a failed import never leaves the old sources without their credentials.
         Path aside=null;Map<Path,Path> moved=new LinkedHashMap<>();List<Path> written=new ArrayList<>(),created=new ArrayList<>();
+        String transaction=UUID.randomUUID().toString();
         try{
             if(replace){
-                aside=store.authRoot().resolve(".replaced-"+UUID.randomUUID());int n=0;
-                for(var account:old.accounts()){
-                    Path signIn=signIn(account);
-                    if(!Files.exists(signIn,LinkOption.NOFOLLOW_LINKS))continue;
-                    if(moved.isEmpty()){Files.createDirectories(aside);Files.setPosixFilePermissions(aside,PosixFilePermissions.fromString("rwx------"));}
-                    Path parked=aside.resolve(String.valueOf(n++));Files.move(signIn,parked,StandardCopyOption.ATOMIC_MOVE);moved.put(signIn,parked);
+                var present=old.accounts().stream().map(this::signIn).filter(p->Files.exists(p,LinkOption.NOFOLLOW_LINKS)).distinct().toList();
+                if(!present.isEmpty()){
+                    aside=store.authRoot().resolve(ASIDE+UUID.randomUUID());
+                    Files.createDirectories(aside);Files.setPosixFilePermissions(aside,PosixFilePermissions.fromString("rwx------"));
+                    // What a restart needs if the process ends half-way: where each parked folder belongs, and the
+                    // import's id, which settings.json carries once the import is saved (recoverReplacements).
+                    var manifest=json.createObjectNode();manifest.put("transaction",transaction);
+                    var places=manifest.putArray("moved");present.forEach(p->places.add(store.authRoot().relativize(p).toString()));
+                    Files.write(aside.resolve(MANIFEST),json.writeValueAsBytes(manifest));
+                    int n=0;
+                    for(Path signIn:present){Path parked=aside.resolve(String.valueOf(n++));Files.move(signIn,parked,StandardCopyOption.ATOMIC_MOVE);moved.put(signIn,parked);}
                 }
             }
             for(var entry:content.entrySet()){
@@ -126,7 +132,7 @@ class SourceTransfer {
                 Path signIn=signIn(entry.getKey());if(!Files.exists(signIn,LinkOption.NOFOLLOW_LINKS))created.add(signIn);
                 written.add(write(entry.getKey(),Base64.getDecoder().decode(entry.getValue())));
             }
-            store.save(settings);
+            store.save(settings,transaction);
         }catch(IOException|RuntimeException e){
             for(Path file:written)Files.deleteIfExists(file);
             for(Path signIn:created)deleteTree(signIn);
@@ -139,6 +145,42 @@ class SourceTransfer {
         }
         if(aside!=null)deleteTree(aside);
         return next;
+    }
+    static final String ASIDE=".replaced-",MANIFEST="manifest.json";
+    /**
+     * Finishes a replacing import that a stopped process left half-way, before the credential store reads auth/: the
+     * parked sign-ins are encrypted for their own place and cannot be read where they are parked. When settings.json
+     * carries the import's id, the import was saved and the parked sign-ins are removed; otherwise they go back to
+     * their places, replacing what the import had written there. The source ids cannot tell: an import of the
+     * server's own export has the same ones before and after.
+     */
+    static void recoverReplacements(Path data) throws IOException {
+        Path auth=data.resolve("auth");
+        if(!Files.isDirectory(auth,LinkOption.NOFOLLOW_LINKS))return;
+        List<Path> asides;
+        try(var list=Files.list(auth)){asides=list.filter(p->p.getFileName().toString().startsWith(ASIDE)&&Files.isDirectory(p,LinkOption.NOFOLLOW_LINKS)).toList();}
+        var json=new ObjectMapper();
+        for(Path aside:asides){
+            Path manifest=aside.resolve(MANIFEST);
+            if(Files.isRegularFile(manifest,LinkOption.NOFOLLOW_LINKS)){
+                var plan=json.readTree(manifest.toFile());String transaction=plan.path("transaction").asText("");
+                Path settings=data.resolve("settings.json");
+                boolean saved=!transaction.isEmpty()&&Files.isRegularFile(settings,LinkOption.NOFOLLOW_LINKS)
+                        &&transaction.equals(json.readTree(settings.toFile()).path(SettingsStore.IMPORT_TRANSACTION).asText());
+                if(!saved){
+                    int n=0;
+                    for(var place:plan.path("moved")){
+                        Path parked=aside.resolve(String.valueOf(n++)),target=auth.resolve(place.asText()).normalize();
+                        if(!target.startsWith(auth)||target.equals(auth))throw new IOException("Invalid place in "+data.relativize(manifest));
+                        if(!Files.exists(parked,LinkOption.NOFOLLOW_LINKS))continue;
+                        deleteTree(target);Files.createDirectories(target.getParent());
+                        Files.move(parked,target,StandardCopyOption.ATOMIC_MOVE);
+                    }
+                }
+            }
+            // Without a manifest nothing had been moved yet.
+            deleteTree(aside);
+        }
     }
     /** What a replacement removes: the whole sign-in folder, or only the credential file of an earlier default source. */
     private Path signIn(SettingsStore.Account account){
@@ -160,14 +202,9 @@ class SourceTransfer {
             Files.createDirectories(target.getParent());Files.setPosixFilePermissions(target.getParent(),PosixFilePermissions.fromString("rwx------"));
         }
         if(account.type().equals("gemini"))SignInRenewal.prepareGemini(dir);
-        Path temporary=Files.createTempFile(target.getParent(),"import-",".tmp");
-        try{
-            Files.setPosixFilePermissions(temporary,PosixFilePermissions.fromString("rw-------"));
-            Files.write(temporary,bytes);
-            Files.move(temporary,target,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);
-            return target;
-        }finally{Files.deleteIfExists(temporary);Arrays.fill(bytes,(byte)0);}
+        try{store.secrets.write(target,bytes);return target;}finally{Arrays.fill(bytes,(byte)0);}
     }
+
     /** AES-256-GCM with a PBKDF2 key from the password; the format and version are the associated data (also SupportFile). */
     static Cipher cipher(int mode,String format,String password,byte[] salt,int iterations,byte[] nonce) throws GeneralSecurityException {
         var spec=new PBEKeySpec(password.toCharArray(),salt,iterations,256);

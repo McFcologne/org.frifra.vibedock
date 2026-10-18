@@ -18,7 +18,7 @@ unable to operate VibeDock, in particular:
   adapters. Original firmware cannot be restored without your own full backup. Flashing voids any manufacturer
   warranty and is done entirely at your own risk. Of the ESP32 builds only the Waveshare ESP32-S3-Touch-LCD-1.47 and ESP32-C6-Touch-LCD-1.69 have been tested on hardware; the others are prepared and untested.
 - **Security.** No software is free of errors. We cannot guarantee that VibeDock is free of security
-  vulnerabilities. The server stores provider sign-ins and tokens in plaintext in its data directory, the
+  vulnerabilities. The server encrypts provider sign-ins and tokens in its data directory; keep that directory and its backups private. The
   administration uses plain HTTP unless you put HTTPS in front of it, and displays talk to the server over the
   network. Protecting the host, the network, the data directory and its backups is your responsibility.
 - **Data and accounts.** Usage values may be wrong, delayed or missing. VibeDock reads interfaces of the providers
@@ -218,7 +218,7 @@ Everything the server keeps lives in the data directory, by default `vibedock-se
 | `firmware/` | Own firmware builds uploaded under **Devices → Firmware**, one folder per board (only when used) |
 | `logs/` | `vibedock.log` and the daily request logs (kept 14 days) |
 
-The directory contains **credentials in plaintext**: keep it private, never commit or publish it. It survives
+The directory contains **encrypted credentials and the private `.installation-id` needed to read them**: keep it private, never commit or publish it. Settings and sign-in caches remain readable JSON; only credential fields such as tokens, refresh tokens and API keys are encrypted. The portal password remains a BCrypt hash, without additional encryption. Include hidden files in a backup; existing plaintext credentials and the earlier whole-file encryption format are migrated automatically on startup. Password-protected data-source exports remain independent of that installation identity. It survives
 restarts, rebuilds and updates of the image.
 
 To keep the data elsewhere, prepare a directory for user 10001 and name it in `.env`:

@@ -113,7 +113,7 @@ public class UsageService {
     /** Manual refresh from the administration; still respects a rate-limit back-off. */
     public void refresh() { collect(true); }
     private synchronized void collect(boolean manual) {
-        // Grok and Gemini sign-ins are renewed by their CLI shortly before they expire.
+        // Grok, Gemini and Claude sign-ins are renewed by their CLI shortly before they expire.
         if (renewal!=null&&!demo) for (var a:settings.get().accounts())
             if (a.manual().token().isBlank()&&!a.suspended()) renewal.renewIfDue(a,settings.authDirectory(a));
         var configuration=settings.effective(); Map<String,Provider> next=new LinkedHashMap<>();

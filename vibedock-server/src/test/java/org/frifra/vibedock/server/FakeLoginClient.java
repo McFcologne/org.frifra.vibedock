@@ -15,7 +15,7 @@ public class FakeLoginClient {
             if (!in.readLine().contains("initialized")) System.exit(3);
             if (!in.readLine().contains("chatgptDeviceCode")) System.exit(4);
             System.out.println("{\"id\":1,\"result\":{\"verificationUrl\":\"https://auth.openai.com/codex/device\",\"userCode\":\"TEST-1234\"}}");System.out.flush();
-            while (!Files.exists(home.resolve("approve"))) Thread.sleep(20);
+            while (!Files.exists(Path.of(System.getenv("REVIEW_APPROVAL")))) Thread.sleep(20);
             Files.writeString(home.resolve("auth.json"),"{\"tokens\":{\"access_token\":\"synthetic-codex-token\",\"account_id\":\"synthetic-workspace\"}}");
             System.out.println("{\"method\":\"account/login/completed\",\"params\":{\"success\":true}}");System.out.flush();
             Thread.sleep(30000);

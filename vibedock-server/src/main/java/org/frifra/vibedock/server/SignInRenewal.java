@@ -19,7 +19,9 @@ import java.util.concurrent.TimeUnit;
  * Keeps CLI sign-ins fresh. VibeDock never refreshes tokens itself: shortly before a token expires it runs the official
  * CLI with a command that needs a valid sign-in and spends no usage, and the CLI renews the token in the source's own
  * folder. Grok Build: "grok models". Gemini CLI: "gemini --list-sessions", which signs in (renewing an expiring
- * token through the Google auth library) and lists the saved chats of an empty folder.
+ * token through the Google auth library) and lists the saved chats of an empty folder. Claude Code: "claude auth status
+ * --json" in the source's folder (CLAUDE_CONFIG_DIR); its access token lives about eight hours. Whether a renewal
+ * worked is read from the expiry in the file afterwards and logged.
  */
 @Component
 class SignInRenewal {
@@ -27,17 +29,24 @@ class SignInRenewal {
     static final long GROK_RENEW_BEFORE_SECONDS=900;
     /** Google tokens live an hour; the auth library only renews within five minutes of the expiry. */
     static final long GEMINI_RENEW_BEFORE_SECONDS=240;
+    /** Claude Code tokens live about eight hours; renewed half an hour before, and also once they have expired. */
+    static final long CLAUDE_RENEW_BEFORE_SECONDS=1800;
+    /** A Claude renewal that changed nothing is tried again after this long, not with every poll. */
+    static final long CLAUDE_RETRY_SECONDS=600;
     private static final long MIN_GAP_SECONDS=120;
-    private final String grokCli,geminiCli;private final ObjectMapper json;
+    private final String grokCli,geminiCli,claudeCli;private final ObjectMapper json;
+    @org.springframework.beans.factory.annotation.Autowired private SettingsStore settings;
     private final Map<Path,Long> lastRun=new ConcurrentHashMap<>();
-    SignInRenewal(@Value("${vibedock.grok-cli:grok}") String grokCli,@Value("${vibedock.gemini-cli:gemini}") String geminiCli,ObjectMapper json){
-        this.grokCli=grokCli;this.geminiCli=geminiCli;this.json=json;
+    SignInRenewal(@Value("${vibedock.grok-cli:grok}") String grokCli,@Value("${vibedock.gemini-cli:gemini}") String geminiCli,
+                  @Value("${vibedock.claude-cli:claude}") String claudeCli,ObjectMapper json){
+        this.grokCli=grokCli;this.geminiCli=geminiCli;this.claudeCli=claudeCli;this.json=json;
     }
 
     void renewIfDue(SettingsStore.Account account,Path folder){
         switch(account.type()){
             case "grok"->grok(folder);
             case "gemini"->gemini(folder);
+            case "claude"->claude(folder);
             default->{}
         }
     }
@@ -53,9 +62,27 @@ class SignInRenewal {
         Long previous=lastRun.get(folder);long now=Instant.now().getEpochSecond();
         if(previous!=null&&now-previous<MIN_GAP_SECONDS)return;
         lastRun.put(folder,now);
-        try{prepareGemini(folder);}catch(Exception e){log.warn("Gemini settings in {} could not be written: {}",folder.getFileName(),e.toString());return;}
+        try{if(settings==null)prepareGemini(folder);}catch(Exception e){log.warn("Gemini settings in {} could not be written: {}",folder.getFileName(),e.toString());return;}
         run("Gemini",folder,List.of(geminiCli,"--list-sessions"),geminiEnvironment(folder),GEMINI_FOREIGN_CREDENTIALS);
     }
+    private void claude(Path folder){
+        Path file=folder.resolve(".credentials.json");
+        long expires=expiry(file,SignInRenewal::claudeExpiry),now=Instant.now().getEpochSecond();
+        if(expires<=0||expires-now>CLAUDE_RENEW_BEFORE_SECONDS)return;
+        Long previous=lastRun.get(folder);
+        if(previous!=null&&now-previous<CLAUDE_RETRY_SECONDS)return;
+        lastRun.put(folder,now);
+        run("Claude",folder,List.of(claudeCli,"auth","status","--json"),Map.of("CLAUDE_CONFIG_DIR",folder.toString(),"NO_COLOR","1","TERM","dumb"),
+                CLAUDE_FOREIGN_CREDENTIALS);
+        long after=expiry(file,SignInRenewal::claudeExpiry);
+        if(after>expires)log.info("Claude sign-in in {} renewed until {}",folder.getFileName(),Instant.ofEpochSecond(after));
+        else log.warn("Claude sign-in in {} not renewed (expires {}); sign in again if it has expired",folder.getFileName(),Instant.ofEpochSecond(expires));
+    }
+    /** The expiry of the access token in Claude Code's .credentials.json (milliseconds there), 0 when missing. */
+    static long claudeExpiry(JsonNode node){return epochSeconds(node.path("claudeAiOauth").path("expiresAt"));}
+    /** Environment variables that would let the Claude CLI use other credentials than the source's own sign-in. */
+    static final List<String> CLAUDE_FOREIGN_CREDENTIALS=List.of("ANTHROPIC_API_KEY","ANTHROPIC_AUTH_TOKEN","CLAUDE_CODE_OAUTH_TOKEN",
+            "CLAUDE_CODE_USE_BEDROCK","CLAUDE_CODE_USE_VERTEX","CLAUDE_CODE_USE_FOUNDRY","ANTHROPIC_PROFILE");
     /** Environment variables that would let the Gemini CLI use other credentials than the source's own sign-in. */
     static final List<String> GEMINI_FOREIGN_CREDENTIALS=List.of("GEMINI_API_KEY","GOOGLE_API_KEY","GOOGLE_GENAI_USE_VERTEXAI","GOOGLE_GENAI_USE_GCA",
             "GOOGLE_CLOUD_ACCESS_TOKEN","GOOGLE_APPLICATION_CREDENTIALS","GOOGLE_CLOUD_PROJECT","GOOGLE_CLOUD_PROJECT_ID");
@@ -72,19 +99,30 @@ class SignInRenewal {
             Files.writeString(settings,"{\"security\":{\"auth\":{\"selectedType\":\"oauth-personal\"}}}\n",StandardCharsets.UTF_8);
     }
     private void run(String name,Path folder,List<String> command,Map<String,String> environment,List<String> removed){
+        SecretStore.Workspace workspace=null;Process process=null;
         try{
-            var builder=new ProcessBuilder(command).directory(folder.toFile()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD);
+            Path actual=folder;
+            if(settings!=null){workspace=settings.secrets.workspace(folder);actual=workspace.path;}
+            var builder=new ProcessBuilder(command).directory(actual.toFile()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD);
             builder.redirectInput(ProcessBuilder.Redirect.from(new java.io.File("/dev/null")));
-            removed.forEach(builder.environment()::remove);builder.environment().putAll(environment);
-            var process=builder.start();
-            if(!process.waitFor(60,TimeUnit.SECONDS)){process.descendants().forEach(ProcessHandle::destroyForcibly);process.destroyForcibly();}
+            removed.forEach(builder.environment()::remove);
+            for(var entry:environment.entrySet())builder.environment().put(entry.getKey(),entry.getValue().replace(folder.toString(),actual.toString()));
+            builder.environment().put("HOME",actual.toString());
+            if(name.equals("Gemini"))prepareGemini(actual);
+            process=builder.start();
+            if(!process.waitFor(60,TimeUnit.SECONDS)){process.descendants().forEach(ProcessHandle::destroyForcibly);process.destroyForcibly();process.waitFor();}
             else if(process.exitValue()!=0)log.warn("{} sign-in in {} could not be renewed (exit {}); sign in again",name,folder.getFileName(),process.exitValue());
         }catch(InterruptedException e){Thread.currentThread().interrupt();}
-        catch(Exception e){log.warn("{} CLI not available to renew the sign-in: {}",name,e.toString());}
+        catch(Exception e){log.warn("{} CLI not available to renew the sign-in: {}",name,e.getClass().getSimpleName());}
+        finally{
+            if(process!=null&&process.isAlive()){process.descendants().forEach(ProcessHandle::destroyForcibly);process.destroyForcibly();try{process.waitFor();}catch(InterruptedException e){Thread.currentThread().interrupt();}}
+            if(workspace!=null)try{workspace.close();}catch(java.io.IOException e){log.error("Could not persist encrypted {} sign-in; check server storage",name);}
+        }
     }
+
     private long expiry(Path file,java.util.function.ToLongFunction<JsonNode> reader){
         if(!Files.isRegularFile(file,LinkOption.NOFOLLOW_LINKS))return 0;
-        try{return reader.applyAsLong(json.readTree(file.toFile()));}catch(Exception e){return 0;}
+        try{return reader.applyAsLong(settings==null?json.readTree(file.toFile()):json.readTree(settings.secrets.read(file)));}catch(Exception e){return 0;}
     }
     /** The earliest expiry of the sign-in entries in Grok's auth.json, 0 when none is given. */
     private static long grokExpiry(JsonNode node){

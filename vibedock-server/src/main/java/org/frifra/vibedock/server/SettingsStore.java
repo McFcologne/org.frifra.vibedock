@@ -62,19 +62,29 @@ public class SettingsStore {
     private final Path file,directory;
     private final ObjectMapper json;
     private final LoginCredentials login;
+    final SecretStore secrets;
     private volatile Settings current;
-    public SettingsStore(@Value("${vibedock.data-dir}") String directory,ObjectMapper json) throws IOException {
-        this.json=json;
-        Path dir=Path.of(directory); Files.createDirectories(dir);this.directory=dir;
-        login=new LoginCredentials(dir,json);
+    @org.springframework.beans.factory.annotation.Autowired
+    public SettingsStore(@Value("${vibedock.data-dir}") String directory,ObjectMapper json,
+                         @Value("${vibedock.auth-runtime-dir:}") String runtime) throws IOException {
+        this(directory,json,new SecretStore(Path.of(directory),"",runtime));
+    }
+    public SettingsStore(String directory,ObjectMapper json) throws IOException {this(directory,json,"");}
+    SettingsStore(String directory,ObjectMapper json,SecretStore secrets) throws IOException {
+        this.json=json;this.secrets=secrets;
+        Path dir=Path.of(directory);Files.createDirectories(dir);this.directory=dir;
+        login=new LoginCredentials(dir,json,secrets);
         file=dir.resolve("settings.json");
-        current=Files.exists(file) ? read(json.readTree(file.toFile()))
-                : new Settings(List.of(),new Credential("",""),new Credential("",""),List.of());
+        current=Files.exists(file)?read(json.readTree(secrets.read(file)))
+                :new Settings(List.of(),new Credential("",""),new Credential("",""),List.of());
         validate(current);
     }
     /** Earlier files had exactly one Codex and one Claude credential; they become the two default sources. */
     private Settings read(com.fasterxml.jackson.databind.JsonNode root) throws IOException {
-        if(root.has("accounts"))return json.treeToValue(root,Settings.class);
+        if(root.has("accounts")){
+            if(root instanceof com.fasterxml.jackson.databind.node.ObjectNode object)object.remove(IMPORT_TRANSACTION);
+            return json.treeToValue(root,Settings.class);
+        }
         List<String> ips=new ArrayList<>();root.path("allowedIps").forEach(n->ips.add(n.asText()));
         var devices=Arrays.asList(json.treeToValue(root.path("devices").isMissingNode()?json.createArrayNode():root.path("devices"),Device[].class));
         return new Settings(ips,credential(root.path("codex")),credential(root.path("claude")),devices);
@@ -152,16 +162,20 @@ public class SettingsStore {
             for(var path:paths.sorted(Comparator.reverseOrder()).toList())Files.deleteIfExists(path);
         }
     }
-    public synchronized void save(Settings settings) throws IOException {
+    public synchronized void save(Settings settings) throws IOException {save(settings,null);}
+    /**
+     * importTransaction: the import that writes these settings (SourceTransfer.apply). It is saved in the same atomic
+     * write, so after a stop a restart can tell whether that import was saved; the next save drops it.
+     */
+    static final String IMPORT_TRANSACTION="importTransaction";
+    synchronized void save(Settings settings,String importTransaction) throws IOException {
         validate(settings);
-        Path temporary=Files.createTempFile(file.getParent(),"settings-",".tmp");
-        try {
-            Files.setPosixFilePermissions(temporary,PosixFilePermissions.fromString("rw-------"));
-            json.writeValue(temporary.toFile(),settings);
-            Files.move(temporary,file,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);
-            current=settings;
-        } finally { Files.deleteIfExists(temporary); }
+        var node=json.valueToTree(settings);
+        if(importTransaction!=null)((com.fasterxml.jackson.databind.node.ObjectNode)node).put(IMPORT_TRANSACTION,importTransaction);
+        secrets.write(file,json.writeValueAsBytes(node));
+        current=settings;
     }
+
     static void validate(Settings s) {
         if (s.allowedIps().size()>100 || s.devices().size()>3) throw new IllegalArgumentException("At most 100 IP rules and three devices");
         if (s.accounts().size()>12) throw new IllegalArgumentException("At most 12 data sources");

@@ -2,6 +2,24 @@
 
 The release workflow publishes the section of the tagged version (`## 0.1.0` for the tag `v0.1.0` or `0.1.0`) above the list of commits that GitHub generates.
 
+## 0.2.1
+
+Claude sign-ins stay valid, and stored credentials are encrypted. Update the server image; nothing to do on the
+displays.
+
+- **Claude sign-in renewed automatically:** the access token of a Claude Code sign-in lives about eight hours and
+  was never renewed, so every Claude source showed *authentication_required* after that, often noticed after an
+  image update. Like Grok and Gemini, the server now runs the official Claude CLI (`claude auth status`) in the
+  source's folder half an hour before the token expires, and also once it has expired while its refresh token is
+  still valid; the CLI renews the token itself. The server log says whether it worked ("renewed until …" or "not
+  renewed"); a renewal that changed nothing is tried again after ten minutes.
+- **Credentials encrypted on disk:** tokens and keys in `settings.json` and in the sign-in files under `auth/` are
+  stored as encrypted fields (AES-256-GCM); configuration and metadata stay readable. The first start migrates
+  existing files and creates `/data/.installation-id`: include this hidden file in backups, without it the stored
+  sign-ins cannot be read. The key lives in the data directory, so keep the directory private as before. Official
+  CLIs see the decrypted files only in RAM (`/dev/shm`) while they sign in or renew. Older versions cannot read the
+  encrypted fields; to go back, export the sources with a password and import them into a fresh data directory.
+
 ## 0.2.0
 
 New boards, touch, photos and better diagnosis. Update the server image; paired displays then offer the update in
