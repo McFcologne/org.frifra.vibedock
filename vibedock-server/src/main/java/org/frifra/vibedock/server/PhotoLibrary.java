@@ -84,12 +84,7 @@ class PhotoLibrary {
         String key=id+"/"+w+"x"+h+(scale==1?"":"/web");
         var cached=rendered.get(key);if(cached!=null)return Optional.of(cached);
         var photo=ImageIO.read(file(id).toFile());if(photo==null)return Optional.empty();
-        double cover=Math.max((double)w/photo.getWidth(),(double)h/photo.getHeight());
-        int sw=(int)Math.ceil(photo.getWidth()*cover),sh=(int)Math.ceil(photo.getHeight()*cover);
-        var canvas=new BufferedImage(w,h,BufferedImage.TYPE_INT_RGB);var g=canvas.createGraphics();
-        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-        g.setRenderingHint(RenderingHints.KEY_RENDERING,RenderingHints.VALUE_RENDER_QUALITY);
-        g.drawImage(scaled(photo,sw,sh),(w-sw)/2,(h-sh)/2,null);g.dispose();
+        var canvas=scaled(cover(photo,w,h),w,h);
         // Devices: RGB565, and the PNG shows what they show. Web displays get the photo in full colour.
         byte[] pixels=new byte[scale==1?w*h*2:0];int offset=0;
         if(scale==1)for(int y=0;y<h;y++)for(int x=0;x<w;x++){
@@ -110,6 +105,15 @@ class PhotoLibrary {
             if(readers.hasNext()){var r=readers.next();try{r.setInput(in);return new Dimension(r.getWidth(0),r.getHeight(0));}finally{r.dispose();}}
         }
         return new Dimension(0,0);
+    }
+    /**
+     * The centred part of the photo with the display's shape, before scaling: scaling the whole photo to cover the
+     * display first would make a huge image of a very wide or tall photo (600 × 1 on 240 × 280: 168000 × 280).
+     */
+    static BufferedImage cover(BufferedImage photo,int w,int h){
+        double cover=Math.max((double)w/photo.getWidth(),(double)h/photo.getHeight());
+        int cw=Math.max(1,Math.min(photo.getWidth(),(int)Math.round(w/cover))),ch=Math.max(1,Math.min(photo.getHeight(),(int)Math.round(h/cover)));
+        return photo.getSubimage((photo.getWidth()-cw)/2,(photo.getHeight()-ch)/2,cw,ch);
     }
     /** Scales in halving steps first: one bicubic step from a large photo to a small one looks coarse. */
     private static BufferedImage scaled(BufferedImage image,int w,int h){

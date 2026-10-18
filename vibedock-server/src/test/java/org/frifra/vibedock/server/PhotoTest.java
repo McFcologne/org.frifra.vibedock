@@ -33,6 +33,18 @@ class PhotoTest {
         Assertions.assertTrue(library.delete(photo.id()));Assertions.assertTrue(library.list().isEmpty());
         Assertions.assertTrue(library.render(photo.id(),DisplayType.M1).isEmpty());
     }
+    @Test void aVeryWidePhotoIsCutBeforeItIsScaled() throws Exception {
+        var library=new PhotoLibrary(Files.createTempDirectory("vibedock-photos-").toString());
+        var photo=library.add(png(6000,10,0xff0000));
+        Assertions.assertEquals(600,photo.width());Assertions.assertEquals(1,photo.height());
+        // Only the middle 1 pixel wide strip of the 600 × 1 copy is scaled, not the whole photo to 168000 × 280.
+        var cut=PhotoLibrary.cover(new BufferedImage(600,1,BufferedImage.TYPE_INT_RGB),240,280);
+        Assertions.assertEquals(1,cut.getWidth());Assertions.assertEquals(1,cut.getHeight());
+        var tall=PhotoLibrary.cover(new BufferedImage(1,600,BufferedImage.TYPE_INT_RGB),172,320);  // tall: the middle 1 × 2
+        Assertions.assertEquals(1,tall.getWidth());Assertions.assertEquals(2,tall.getHeight());
+        var shown=ImageIO.read(new java.io.ByteArrayInputStream(library.render(photo.id(),DisplayType.of("240x280"),3).orElseThrow().png()));
+        Assertions.assertEquals(720,shown.getWidth());Assertions.assertEquals(840,shown.getHeight());
+    }
     @Test void exifOrientationTurnsPhonePhotosUpright(){
         var wide=new BufferedImage(40,20,BufferedImage.TYPE_INT_RGB);wide.setRGB(0,0,0xff0000);
         var turned=PhotoLibrary.upright(wide,6);  // 90 degrees clockwise

@@ -41,8 +41,10 @@ the administration (over Wi-Fi where their firmware can, otherwise once over USB
 - **`flash.sh`** finds the chip, takes the board the device reports, and asks only when it cannot tell.
 - **Test mode for development:** made-up usage and no sign-in (`DEMO_USAGE`, `ADMIN_AUTH=none`), and a quicker Docker
   build without the manual.
-- The C6 keeps its log in memory only for now (test whether writing it to flash causes its crashes in phase idle);
-  the crash itself is in the next start's line.
+- The C6 sends over Wi-Fi without aggregation (A-MPDU): its Wi-Fi driver crashed in `ppResortTxAMPDU` when swipes
+  sent requests in quick succession.
+- Photos: a very wide or tall photo is cut before it is scaled (no huge image in between), and photos still uploading
+  when the editor switches to another display only join the library.
 - ESP32 boards stay on Arduino core 2 (core 3 crashed on the ESP32-S3); only the C6 uses core 3. Docker needs room
   for its toolchain: free space in Docker Desktop if the build reports *No space left on device*.
 

@@ -133,6 +133,29 @@ test('a device shows uploaded photos, saved right away with the time of day',asy
   await expect(page.locator('.photo-tile.selected .photo-order')).toHaveText('1');
 });
 
+test('a photo still uploading when the editor switches to another display only joins the library',async ({page,app}) => {
+  await editor(page,app);
+  const message=page.locator('#design-message');
+  // Both designs show photos: the shelf its own, the default one.
+  await page.locator('#design-target').selectOption('vibedock-e2e-shelf');
+  await page.locator('#design-override').check();
+  await page.getByRole('button',{name:'Photos',exact:true}).click();await expect(message).toContainText('Device design saved');
+  await page.locator('#design-target').selectOption('default');await expect(page.locator('#design-target')).toHaveValue('default');
+  await page.getByRole('button',{name:'Photos',exact:true}).click();await expect(message).toContainText('Default design saved');
+  // The upload starts in the default design and answers only after the switch to the shelf.
+  let release;const held=new Promise(resolve=>release=resolve);
+  await page.route('**/admin/photos',async route=>{if(route.request().method()==='POST')await held;await route.continue();});
+  const uploaded=page.waitForResponse(r=>r.url().endsWith('/admin/photos')&&r.request().method()==='POST');
+  await page.locator('#design-photo-upload').setInputFiles({name:'red.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAACgAAAAeCAIAAADRv8uKAAAAK0lEQVR4nO3NMQ0AAAgDsMmZfxXIQgYcTfo3056IWCwWi8VisVgsFov/xguJMCDM2TzTeAAAAABJRU5ErkJggg==','base64')});
+  await page.locator('#design-target').selectOption('vibedock-e2e-shelf');await expect(page.locator('#design-target')).toHaveValue('vibedock-e2e-shelf');
+  release();const id=(await (await uploaded).json()).id;
+  await expect(page.locator('#design-photo-state')).toContainText('not chosen');
+  await expect(page.locator('.photo-tile.selected')).toHaveCount(0);
+  await page.waitForTimeout(1200);  // a save would run within 650 ms
+  const designs=await page.evaluate(async()=>(await fetch('/admin/designs',{credentials:'same-origin'})).text());
+  expect(designs).not.toContain(id);
+});
+
 test('footer links to the generated license page and uses the packaged version',async ({page}) => {
   const footer=page.getByRole('contentinfo');await expect(footer).toContainText('VibeDock');await expect(footer).not.toContainText('development');
   await expect(footer.getByRole('link',{name:'README',exact:true})).toHaveAttribute('href',/github\.com\/McFcologne\/org\.frifra\.vibedock#readme/);

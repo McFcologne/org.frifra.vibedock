@@ -286,9 +286,12 @@
     const from = $('#design-photo-from').value, to = $('#design-photo-to').value;
     if (from && to && from !== to) { draft.photos.from = from; draft.photos.to = to; renderPhotos(); changed(); }
   });
-  // One request per photo, as its bytes; the server keeps a reduced copy. New photos are chosen right away.
+  // One request per photo, as its bytes; the server keeps a reduced copy. New photos are chosen right away, but only
+  // in the design the upload started in: switched to another device (or the default) meanwhile, they only join the
+  // library.
   $('#design-photo-upload').addEventListener('change', async event => {
-    const files = [...event.target.files]; event.target.value = ''; let done = 0;
+    const files = [...event.target.files]; event.target.value = ''; let done = 0, chosen = 0;
+    const owner = draft, ownerTarget = target, same = () => draft === owner && target === ownerTarget && !inherit;
     for (const file of files) {
       $('#design-photo-state').textContent = 'Uploading ' + (done + 1) + ' of ' + files.length + ' …';
       try {
@@ -296,11 +299,13 @@
           headers: {'Content-Type': file.type || 'application/octet-stream', Accept: 'application/json', [csrfHeader]: csrf}});
         const answer = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(file.name + ': ' + (answer.error || 'HTTP ' + response.status));
-        library.push(answer); if (draft.photos) draft.photos.images.push(answer.id); done++;
+        library.push(answer); done++;
+        if (same() && owner.photos) { owner.photos.images.push(answer.id); chosen++; }
       } catch (failure) { error(failure.message); }
     }
-    $('#design-photo-state').textContent = done + ' of ' + files.length + ' photos added. Kept reduced to 600 × 600 at most.';
-    renderPhotos(); if (done) changed();
+    $('#design-photo-state').textContent = done + ' of ' + files.length + ' photos added' + (chosen < done ? ' to the library (not chosen: the editor shows another design now)' : '')
+      + '. Kept reduced to 600 × 600 at most.';
+    renderPhotos(); if (chosen) changed();
   });
   async function post(url, data, signal) {
     const response = await fetch(url, {method: 'POST', credentials: 'same-origin', signal,
