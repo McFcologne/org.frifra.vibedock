@@ -4,6 +4,7 @@
 #include "platform.h"
 #include <time.h>
 #include <memory>
+#include <new>
 #include <vector>
 #include <DNSServer.h>
 #include "icons.h"
@@ -11,16 +12,6 @@
 #include <TFT_eSPI.h>
 #include "client_policy.h"
 #include "touch.h"
-#ifdef VIBEDOCK_WIFI_NO_AMPDU_TX
-// ESP32-C6: the Wi-Fi driver crashed in ppResortTxAMPDU (aggregated sending) when swipes sent requests in quick
-// succession. Sending without aggregation; receiving keeps it. Linked in front of esp_wifi_init (platformio.ini).
-#include <esp_wifi.h>
-extern "C" esp_err_t __real_esp_wifi_init(const wifi_init_config_t *config);
-extern "C" esp_err_t __wrap_esp_wifi_init(const wifi_init_config_t *config) {
-  wifi_init_config_t changed = *config; changed.ampdu_tx_enable = 0;
-  return __real_esp_wifi_init(&changed);
-}
-#endif
 #if defined(VIBEDOCK_BOOT_TRACE) && defined(ESP32) && ESP_ARDUINO_VERSION_MAJOR >= 3
 #include "esp32-hal-periman.h"  // the pin owners in the start diagnosis
 #endif
@@ -851,11 +842,18 @@ bool readImage(WiFiClient *stream, const client_policy::ImageSize &size, uint32_
 // One image request. https uses the simple check first (pinned certificate fingerprint); when that fails, e.g. after
 // the certificate was renewed, a full check against the root from pairing follows, and only such a verified
 // connection may hand over the new fingerprint.
+// The client is declared before http, so http is destroyed first: HTTPClient's destructor calls stop() on the client
+// it was given, and http.end() forgets it only while the connection is still open. With HTTP/1.0 the server closes it
+// after the image, so the client used to be freed first and stop() then wrote into freed memory (heap corruption on
+// the ESP32-C6: "assert failed: multi_heap_free", crashes in the Wi-Fi driver; every image change, more with swipes).
 struct ImageRequest {
-  HTTPClient http;
   std::unique_ptr<WiFiClient> client;
+  HTTPClient http;
   bool verified = false;
   ~ImageRequest() { http.end(); }
+  // Another connection for a second attempt: a fresh HTTPClient first, while the old client still exists, for the
+  // same reason (http.end() would leave it pointing to the freed client).
+  void retry(WiFiClient *next) { http.~HTTPClient(); new (&http) HTTPClient(); client.reset(next); }
 };
 // While the log is sent (uploadLog): the file streamed as the request body and the server's request id.
 File *uploadFile = nullptr; String uploadRequest;
@@ -926,12 +924,12 @@ int requestImage(ImageRequest &r, bool conditional, const char *resource = "imag
       return code;
     }
     logEvent("Pinned certificate check failed: " + HTTPClient::errorToString(code) + " " + platform::tlsError(r.client.get()), true);
-    r.http.end(); r.client.reset();
+    r.retry(nullptr);
   }
   // Full check: chain up to the root from pairing, host name and validity; never an unchecked connection.
   if (!platform::hasAnchor()) { lastConnectionProblem = "no root certificate for https from pairing"; return HTTPC_ERROR_CONNECTION_FAILED; }
   if (!clockSet()) { lastConnectionProblem = "clock not set yet (NTP), needed for https"; return HTTPC_ERROR_CONNECTION_FAILED; }
-  r.client.reset(platform::verifiedClient()); r.verified = true;
+  r.retry(platform::verifiedClient()); r.verified = true;
   parkLog();  // the log's heap for the handshake; the next event brings it back
   int code = sendImageRequest(r, url, conditional);
   if (code < 0) lastConnectionProblem = platform::tlsError(r.client.get());
@@ -942,7 +940,7 @@ int requestImage(ImageRequest &r, bool conditional, const char *resource = "imag
   WiFiClient *legacy;
   if (code < 0 && platform::versionRefused() && (legacy = platform::legacyClient())) {
     logEvent("Server refuses TLS 1.3, using TLS 1.2", true);
-    r.http.end(); r.client.reset(legacy);
+    r.retry(legacy);
     code = sendImageRequest(r, url, conditional);
     if (code < 0) lastConnectionProblem = platform::tlsError(r.client.get(), true);
   }

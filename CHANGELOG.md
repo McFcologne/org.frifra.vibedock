@@ -41,8 +41,8 @@ the administration (over Wi-Fi where their firmware can, otherwise once over USB
 - **`flash.sh`** finds the chip, takes the board the device reports, and asks only when it cannot tell.
 - **Test mode for development:** made-up usage and no sign-in (`DEMO_USAGE`, `ADMIN_AUTH=none`), and a quicker Docker
   build without the manual.
-- The C6 sends over Wi-Fi without aggregation (A-MPDU): its Wi-Fi driver crashed in `ppResortTxAMPDU` when swipes
-  sent requests in quick succession.
+- Displays no longer corrupt their heap after an image: the connection was freed before the HTTP client that still
+  stopped it. On the ESP32-C6 this crashed in the Wi-Fi driver or in `multi_heap_free`, more often while swiping.
 - Photos: a very wide or tall photo is cut before it is scaled (no huge image in between), and photos still uploading
   when the editor switches to another display only join the library.
 - ESP32 boards stay on Arduino core 2 (core 3 crashed on the ESP32-S3); only the C6 uses core 3. Docker needs room
