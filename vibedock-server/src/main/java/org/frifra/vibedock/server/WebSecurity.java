@@ -50,7 +50,11 @@ class WebSecurity {
         var browsers=new MediaTypeRequestMatcher(MediaType.TEXT_HTML,MediaType.APPLICATION_XHTML_XML);
         browsers.setIgnoredMediaTypes(Set.of(MediaType.ALL));
         return http
-                .exceptionHandling(e -> e.defaultAuthenticationEntryPointFor(login,browsers))
+                .exceptionHandling(e -> e.defaultAuthenticationEntryPointFor(login,browsers).accessDeniedHandler((request,response,denied)->{
+                    // This marker permits one safe client retry: CSRF rejected the request before any controller ran.
+                    if(denied instanceof org.springframework.security.web.csrf.CsrfException)response.setHeader("X-VibeDock-CSRF","invalid");
+                    response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                }))
                 .authorizeHttpRequests(a -> a.requestMatchers("/api/v1/usage","/api/v1/clients/*/image","/api/v1/clients/*/firmware","/api/v1/clients/*/log","/web/*","/web/*/image.png","/web/*/icon.png","/web/*/state","/web/*/swipe").permitAll()
                 // Login page assets; the port guard still limits them to the administration port.
                 .requestMatchers("/login","/error","/app.css","/theme.js","/logo.svg","/favicon.ico","/apple-touch-icon.png").permitAll()

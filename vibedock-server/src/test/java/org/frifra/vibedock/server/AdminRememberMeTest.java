@@ -68,4 +68,19 @@ class AdminRememberMeTest {
             mvc.perform(atAdmin(get("/admin").accept("text/html").cookie(newLogin))).andExpect(redirectedUrl("/login"));
         }finally{if(account.overridden())account.reset("remember-new-password");}
     }
+    @Test void csrfBootstrapRestoresTheSessionButNeverDisablesCsrfProtection() throws Exception {
+        Cookie cookie=login(true,false);
+        mvc.perform(atAdmin(post("/admin/refresh").cookie(cookie).header("X-CSRF-TOKEN","stale-page-token")))
+                .andExpect(status().isForbidden()).andExpect(header().string("X-VibeDock-CSRF","invalid"));
+        var restored=mvc.perform(atAdmin(get("/admin/csrf").accept("application/json").cookie(cookie)))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store")).andReturn();
+        var token=new com.fasterxml.jackson.databind.ObjectMapper().readTree(restored.getResponse().getContentAsString());
+        var session=(MockHttpSession)restored.getRequest().getSession(false);assertNotNull(session);
+        mvc.perform(atAdmin(post("/admin/refresh").session(session).cookie(cookie).header(token.path("headerName").asText(),token.path("token").asText())))
+                .andExpect(redirectedUrl("/admin"));
+        mvc.perform(atAdmin(get("/admin/csrf").accept("application/json"))).andExpect(status().isUnauthorized());
+        mvc.perform(post("/admin/refresh").with(user("visitor").roles("USER")).with(csrf()).with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(status().isForbidden()).andExpect(header().doesNotExist("X-VibeDock-CSRF"));
+    }
+
 }

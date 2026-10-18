@@ -37,6 +37,11 @@ class Controllers {
     @org.springframework.beans.factory.annotation.Value("${vibedock.admin-auth:password}") private String auth;
     /** Without sign-in (ADMIN_AUTH=none) the login page, e.g. a bookmark or after "Sign out", leads to the administration. */
     @GetMapping("/login") String login() { return "none".equals(auth) ? "redirect:/admin" : "login"; }
+    /** Read only, authenticated bootstrap for writes from a page whose servlet session has expired. */
+    @GetMapping("/admin/csrf") @ResponseBody
+    Map<String,String> csrf(org.springframework.security.web.csrf.CsrfToken token){
+        return Map.of("token",token.getToken(),"headerName",token.getHeaderName(),"parameterName",token.getParameterName());
+    }
     @GetMapping("/api/v1/usage") @ResponseBody
     UsageService.Snapshot api() { return usage.snapshot(); }
     /** The user manual, opened in the browser's PDF viewer. */
