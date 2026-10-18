@@ -3,7 +3,7 @@ import { openConsole, showAndSaveLog, restart, csrf } from './serial-console.js'
 const card = document.getElementById('usb-log');
 const output = card.querySelector('[data-usb-output]'), buttons = card.querySelectorAll('[data-usb-log],[data-usb-restart]');
 const writeLine = line => { output.hidden = false; output.textContent += line + '\n'; output.scrollTop = output.scrollHeight; };
-let port, busy = false;
+let busy = false;
 // New logs (AdminEvents "logs"): the table of saved logs is fetched again and swapped in; the USB output stays.
 try {
   new EventSource('/admin/events').addEventListener('logs', async () => {
@@ -21,11 +21,12 @@ async function run(task) {
   if (busy) return; busy = true; buttons.forEach(b => b.disabled = true);
   try { await task(); } finally { busy = false; buttons.forEach(b => b.disabled = false); }
 }
-// The port chosen once stays; when it is gone (a board with the chip's own USB after a restart) the browser asks again.
+// Each action asks for the port again, so the next one can check another display without reloading the page. When
+// the chosen port is gone at once (a board with the chip's own USB right after a restart), the browser asks again.
 async function chosen(open) {
-  port ??= await navigator.serial.requestPort();
+  const port = await navigator.serial.requestPort();
   try { return await open(port); }
-  catch { port = await navigator.serial.requestPort(); return open(port); }
+  catch { return open(await navigator.serial.requestPort()); }
 }
 card.querySelector('[data-usb-log]').addEventListener('click', () => run(async () => {
   output.textContent = ''; let console_;
