@@ -1381,14 +1381,16 @@ void setup() {
 }
 #if VIBEDOCK_TOUCH
 // Swipes: left and right switch the colour scheme on the server (paired displays only), up and down the brightness.
+// A double tap starts or stops the slideshow of the design on the server, whatever its schedule says.
 uint32_t lastTouchPoll = 0;
 void touchPoll() {
   static bool touching = false; static int16_t startX, startY, lastX, lastY; static uint8_t idle = 0;
+  static uint32_t touchedAt = 0, lastTap = 0;
   if (millis() - lastTouchPoll < 20) return;
   lastTouchPoll = millis();
   int16_t x, y;
   if (touch::read(x, y)) {
-    if (!touching) { touching = true; startX = x; startY = y; }
+    if (!touching) { touching = true; startX = x; startY = y; touchedAt = millis(); }
     lastX = x; lastY = y; idle = 0; return;
   }
   // Released only after 60 ms without a point: the controllers drop single readings during a swipe.
@@ -1397,6 +1399,15 @@ void touchPoll() {
   int dx = lastX - startX, dy = lastY - startY;
   if (upsideDown) { dx = -dx; dy = -dy; }  // the panel's coordinates do not turn with the picture
   auto swipe = client_policy::swipeOf(dx, dy);
+  // The release is noticed 60 ms late (see above): that time is not part of the touch.
+  if (swipe == client_policy::Swipe::None && client_policy::isTap(dx, dy, millis() - touchedAt > 60 ? millis() - touchedAt - 60 : 0)) {
+    if (!client_policy::doubleTap(lastTap, millis())) { lastTap = millis(); return; }
+    lastTap = 0;
+    if (mode != Mode::Paired) return;
+    pendingGesture = "photos-toggle"; logEvent("Touch: double tap, photos on or off", true);
+    lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u;  // the new image right away
+    return;
+  }
   if (swipe == client_policy::Swipe::Up || swipe == client_policy::Swipe::Down) {
     brightness = client_policy::nextBrightness(brightness, swipe == client_policy::Swipe::Up);
     platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness);

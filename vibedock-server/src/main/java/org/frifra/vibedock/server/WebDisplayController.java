@@ -47,9 +47,13 @@ class WebDisplayController {
         catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(java.util.Map.of("tag",tag));
     }
-    /** A swipe on the page: the next or previous theme, in a slideshow the next or previous photo (like touch displays). */
+    /**
+     * A swipe on the page: the next or previous theme, in a slideshow the next or previous photo (like touch
+     * displays); toggle (a double tap or double click): the slideshow on or off.
+     */
     @PostMapping("/web/{secret}/swipe") ResponseEntity<Void> swipe(@PathVariable String secret,@RequestParam String direction){
         var view=registry.webBySecret(secret).orElseThrow(WebDisplayController::notFound);
+        if("toggle".equals(direction)){DeviceApiController.togglePhotos(registry,designs,events,view.identifier());return ResponseEntity.noContent().build();}
         int step=switch(direction){case "next"->1;case "previous"->-1;default->0;};
         if(step==0)return ResponseEntity.badRequest().build();
         DeviceApiController.swipe(registry,designs,events,view.identifier(),step);

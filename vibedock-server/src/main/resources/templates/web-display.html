@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-title" th:content="${name}">
 <link rel="apple-touch-icon" th:href="${icon}"><link rel="icon" type="image/png" th:href="${icon}">
 <style>
-html,body{margin:0;height:100%;background:#000;overflow:hidden}
+html,body{margin:0;height:100%;background:#000;overflow:hidden;touch-action:manipulation}
 /* The image area leaves out the notch and the home indicator; opened from the home screen also the blurred edge
    below the status bar. */
 .screen{position:fixed;top:env(safe-area-inset-top);right:env(safe-area-inset-right);bottom:env(safe-area-inset-bottom);left:env(safe-area-inset-left);
@@ -21,7 +21,8 @@ html,body{margin:0;height:100%;background:#000;overflow:hidden}
 // Asks for the image in the size of the screen area and the screen's pixel ratio, so it is drawn sharp; a new size
 // (rotation, window resized) loads a new image. Swaps the image only once the next one has loaded, so the screen never
 // goes blank; keeps the last image offline. Every few seconds it asks whether the image changed and loads it then.
-// A swipe left or right (or the arrow keys) changes the theme, in a slideshow the photo, like on touch displays.
+// A swipe left or right (or the arrow keys) changes the theme, in a slideshow the photo, like on touch displays; a
+// double tap (or double click, or the space bar) starts or stops the slideshow, whatever its schedule says.
 (() => {
   const body = document.body, screen = document.querySelector('.screen'), stale = document.querySelector('.stale'), every = Number(body.dataset.reload) * 1000;
   let last = null, resized = null, tag = null;
@@ -45,13 +46,18 @@ html,body{margin:0;height:100%;background:#000;overflow:hidden}
     try { await fetch(body.dataset.swipe + '?direction=' + direction, { method: 'POST' }); } catch { return; }
     tag = null; load(); check();
   }
-  let start = null;
-  window.addEventListener('touchstart', event => { const t = event.touches[0]; start = event.touches.length === 1 ? { x: t.clientX, y: t.clientY } : null; }, { passive: true });
+  let start = null, lastTap = 0, touched = 0;  // touched: a tap is not also taken as a double click
+  window.addEventListener('touchstart', event => { const t = event.touches[0]; start = event.touches.length === 1 ? { x: t.clientX, y: t.clientY, at: Date.now() } : null; }, { passive: true });
   window.addEventListener('touchend', event => {
-    if (!start) return; const t = event.changedTouches[0], dx = t.clientX - start.x, dy = t.clientY - start.y; start = null;
-    if (Math.abs(dx) > 60 && Math.abs(dx) > 2 * Math.abs(dy)) swipe(dx < 0 ? 'next' : 'previous');
+    if (!start) return; const t = event.changedTouches[0], dx = t.clientX - start.x, dy = t.clientY - start.y, held = Date.now() - start.at; start = null; touched = Date.now();
+    if (Math.abs(dx) > 60 && Math.abs(dx) > 2 * Math.abs(dy)) { swipe(dx < 0 ? 'next' : 'previous'); return; }
+    if (Math.abs(dx) > 15 || Math.abs(dy) > 15 || held > 300) return;
+    if (Date.now() - lastTap < 350) { lastTap = 0; swipe('toggle'); } else lastTap = Date.now();
   }, { passive: true });
-  window.addEventListener('keydown', event => { if (event.key === 'ArrowLeft') swipe('next'); else if (event.key === 'ArrowRight') swipe('previous'); });
+  window.addEventListener('dblclick', () => { if (Date.now() - touched > 1000) swipe('toggle'); });
+  window.addEventListener('keydown', event => {
+    if (event.key === 'ArrowLeft') swipe('next'); else if (event.key === 'ArrowRight') swipe('previous'); else if (event.key === ' ') swipe('toggle');
+  });
   window.addEventListener('resize', () => { clearTimeout(resized); resized = setTimeout(load, 300); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
   load(); check(); setInterval(load, every); setInterval(check, 3000);

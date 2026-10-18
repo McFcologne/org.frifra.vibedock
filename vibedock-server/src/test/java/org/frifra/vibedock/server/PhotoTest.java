@@ -78,6 +78,19 @@ class PhotoTest {
         var paused=new Design(design.scheme(),design.mood(),null,design.layout(),new Design.Photos(List.of(a,b,c),60,false,null,null,true));
         Assertions.assertTrue(designs.currentPhoto(paused,"d1").isEmpty());Assertions.assertEquals(3,paused.photos().images().size());
         Assertions.assertEquals(300,designs.pollSeconds(paused,300));
+        // A double tap: on at noon despite the night schedule, off at night; for that display only.
+        clock.now=LocalDate.of(2026,10,18).atTime(12,0).atZone(ZoneId.systemDefault()).toInstant();
+        Assertions.assertTrue(designs.togglePhotos(night,"d1"));
+        Assertions.assertTrue(designs.currentPhoto(night,"d1").isPresent());Assertions.assertTrue(designs.currentPhoto(night,"d2").isEmpty());
+        Assertions.assertEquals(60,designs.pollSeconds(night,300,"d1"));
+        clock.now=LocalDate.of(2026,10,18).atTime(23,0).atZone(ZoneId.systemDefault()).toInstant();
+        Assertions.assertTrue(designs.togglePhotos(night,"d1"));
+        Assertions.assertTrue(designs.currentPhoto(night,"d1").isEmpty());Assertions.assertTrue(designs.currentPhoto(night,"d2").isPresent());
+        Assertions.assertFalse(designs.skip(night,"d1",1),"no swipe through photos that are off");
+        // Also when the editor chose the usage monitor; nothing without photos.
+        var paused2=new Design(design.scheme(),design.mood(),null,design.layout(),new Design.Photos(List.of(a,b,c),60,false,null,null,true));
+        Assertions.assertTrue(designs.togglePhotos(paused2,"d3"));Assertions.assertTrue(designs.currentPhoto(paused2,"d3").isPresent());
+        Assertions.assertFalse(designs.togglePhotos(Design.DEFAULT,"d4"));
         // A removed photo is skipped.
         library.delete(a);library.delete(b);library.delete(c);
         Assertions.assertTrue(designs.currentPhoto(design,"d1").isEmpty());

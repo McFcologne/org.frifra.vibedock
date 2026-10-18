@@ -462,6 +462,7 @@ digital photo frame. **Add web display** creates it:
   display's name; it then opens full screen, keeping the notch and the home indicator free.
 - The page asks every 3 seconds whether its image changed, so a new design, new usage data or the next photo appear
   within seconds; the reload interval stays as a fallback.
+- **Double tap** (or double click, or the space bar) starts or stops the slideshow, like on touch displays.
 - **Swipe** left or right on the page (or press ← →) to change the theme, in a slideshow the photo, like on touch
   displays; the web display then keeps it as its own design.
 - The card then offers two links, both containing a long secret: the **Page** for browsers (full screen, reloads
@@ -531,7 +532,8 @@ photos instead of the usage monitor:
   at other times; the times are those of the server (Docker: `TIME_ZONE`). The switch then shows a green dot, and the
   bands of the usage monitor for the other times appear below the photo settings.
 - Switching back to **Usage monitor** keeps the photo selection and its settings for later.
-- On a touch display a swipe left or right shows the next or previous photo.
+- On a touch display a swipe left or right shows the next or previous photo; a double tap stops the slideshow or
+  starts it outside its times (also on a web display page: double tap, double click or the space bar).
 
 The server cuts every photo to the display's shape from its middle, so a portrait photo fills a narrow display.
 
@@ -823,6 +825,7 @@ Displays with a touch panel (Waveshare ESP32-S3-Touch-LCD-1.47 and ESP32-C6-Touc
 | --- | --- |
 | left / right | next / previous colour scheme; the display keeps it as its own design (*Custom design* in the editor) |
 | up / down | brighter / darker (10–100 %), stored on the display |
+| double tap | photos on or off: starts the slideshow of the display's design or stops it, whatever its schedule or the editor's switch say (until the next double tap or a restart of the server) |
 
 The scheme changes with the next image, right after the swipe. To follow the default design again, turn off
 *Custom design* for the display in the editor.

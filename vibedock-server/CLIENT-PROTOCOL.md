@@ -127,7 +127,7 @@ A web display is created in the administration and has no firmware. It fetches w
 | `GET /web/<secret>` | HTML page that shows the image full screen (black background, scaled to fit) and fetches it again every reload interval |
 | `GET /web/<secret>/image.png` | the image as PNG in the resolution of the web display's type, `Cache-Control: no-store`; with `?w=<width>&h=<height>&r=<pixel ratio>` (CSS pixels of the window) drawn at that resolution, *Fit the browser* in the window's shape |
 | `GET /web/<secret>/state` | `{"tag":"…"}`, a tag of the current image; the page polls it every 3 s and loads a new image when it changes |
-| `POST /web/<secret>/swipe?direction=next\|previous` | a swipe on the page: the next or previous colour scheme, in a running slideshow the photo (as 3d); **204** |
+| `POST /web/<secret>/swipe?direction=next\|previous\|toggle` | a swipe on the page: the next or previous colour scheme, in a running slideshow the photo; `toggle` (double tap): the slideshow on or off (as 3d); **204** |
 | `GET /web/<secret>/icon.png` | the home screen icon (180 × 180) |
 
 The secret is 64 lowercase hex characters; unknown secrets get **404**, other methods **405**, the administration port **404**. Each image fetch counts as a pull for the status in the administration. Where a device's image shows `IP: …`, a web display's image shows `VibeDock server v<version>`.
@@ -166,6 +166,9 @@ Displays with a touch panel send a swipe left or right with their next image pul
 to the next or previous one in its list (wrapping around), stores it as the display's own design (also when it
 followed the default until then) and answers with the new image. Other values are ignored, and so is the header on
 older servers. Swipes up and down change the backlight on the display only (10–100 %, kept across restarts).
+A double tap sends `X-VibeDock-Gesture: photos-toggle`: the server starts the slideshow of the display's design when
+it does not run and stops it when it does, whatever its schedule or the editor's switch say, for that display until
+the next double tap or a restart of the server; a design without photos stays as it is.
 
 ## 3e. Orientation (server → device)
 

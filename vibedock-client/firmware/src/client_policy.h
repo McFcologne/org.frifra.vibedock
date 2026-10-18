@@ -137,6 +137,10 @@ constexpr Swipe swipeOf(int dx, int dy) {
        : distance(dy) >= minSwipe && 2 * distance(dy) >= 3 * distance(dx) ? (dy < 0 ? Swipe::Up : Swipe::Down)
        : Swipe::None;
 }
+// A tap: a short touch that hardly moved; two within doubleTapMs are a double tap (slideshow on or off).
+constexpr int maxTapMove = 12; constexpr uint32_t maxTapMs = 350, doubleTapMs = 400;
+constexpr bool isTap(int dx, int dy, uint32_t heldMs) { return distance(dx) < maxTapMove && distance(dy) < maxTapMove && heldMs < maxTapMs; }
+constexpr bool doubleTap(uint32_t lastTap, uint32_t now) { return lastTap != 0 && now - lastTap < doubleTapMs; }
 // Backlight in percent: swipes up and down change it in steps, never below minBrightness (the screen stays readable).
 constexpr uint8_t minBrightness = 10, brightnessStep = 15;
 constexpr uint8_t clampBrightness(long v) { return v < minBrightness ? minBrightness : v > 100 ? 100 : uint8_t(v); }

@@ -51,12 +51,13 @@ class DeviceApiController {
             catch(IOException e){log.warn("Could not store the display type of {}: {}",identifier,e.toString());}
         });
         String gesture=request.getHeader("X-VibeDock-Gesture");
-        swipe(registry,designs,events,identifier,"scheme-next".equals(gesture)?1:"scheme-previous".equals(gesture)?-1:0);
+        if("photos-toggle".equals(gesture))togglePhotos(registry,designs,events,identifier);
+        else swipe(registry,designs,events,identifier,"scheme-next".equals(gesture)?1:"scheme-previous".equals(gesture)?-1:0);
         var display=registry.displayType(identifier);
         byte[] pixels=designs.render(DesignService.forDevice(registry.designFor(identifier),serverFooter),peer,display,identifier).rgb565();
         String tag="\""+HexFormat.of().formatHex(Arrays.copyOf(sha256(pixels),12))+"\"";
         var headers=new HttpHeaders();headers.setETag(tag);headers.set("X-VibeDock-Image-Format",display.imageFormat());
-        headers.set("X-VibeDock-Poll-Seconds",String.valueOf(designs.pollSeconds(registry.designFor(identifier),registry.pollSeconds())));
+        headers.set("X-VibeDock-Poll-Seconds",String.valueOf(designs.pollSeconds(registry.designFor(identifier),registry.pollSeconds(),identifier)));
         // Mounted upside down: the device turns its panel by 180 degrees (also its own screens and the swipes).
         if(registry.get(identifier).board().flippable())headers.set("X-VibeDock-Orientation",registry.flipped(identifier)?"flipped":"upright");
         // A requested update over Wi-Fi: the device fetches /firmware after this pull and installs it if signed.
@@ -88,6 +89,12 @@ class DeviceApiController {
         var current=registry.designFor(identifier);var scheme=current.scheme().shifted(step);
         try{registry.setDesign(identifier,current.withScheme(scheme));log.info("Display {} switched to the scheme {} by a swipe",identifier,scheme.id());events.devicesChanged();}
         catch(IOException e){log.warn("Could not store the scheme of {}: {}",identifier,e.toString());}
+    }
+    /** A double tap on a touch display or a web display page: the slideshow on or off, whatever its schedule says. */
+    static void togglePhotos(ClientRegistry registry,DesignService designs,AdminEvents events,String identifier){
+        if(!designs.togglePhotos(registry.designFor(identifier),identifier)){log.info("Display {}: double tap without photos in its design",identifier);return;}
+        log.info("Display {} turned its photos {} by a double tap",identifier,Boolean.TRUE.equals(designs.photosForced(identifier))?"on":"off");
+        events.devicesChanged();
     }
     /**
      * The display's log, sent after a pull that named an open request (X-VibeDock-Send-Log): plain text, one line per

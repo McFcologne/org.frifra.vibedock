@@ -35,6 +35,8 @@ int main(){
   assert(swipeOf(25,0)==Swipe::None);assert(swipeOf(50,40)==Swipe::None);assert(swipeOf(-45,28)==Swipe::Left);assert(swipeOf(30,0)==Swipe::Right);assert(swipeOf(0,0)==Swipe::None);
   assert(nextBrightness(100,true)==100);assert(nextBrightness(100,false)==85);assert(nextBrightness(20,false)==10);assert(nextBrightness(10,true)==25);
   assert(flippedOf("flipped",false));assert(!flippedOf("upright",true));assert(flippedOf("",true));assert(!flippedOf("",false));assert(!flippedOf("x",false));
+  assert(isTap(3,-4,120));assert(!isTap(20,0,100));assert(!isTap(0,0,500));
+  assert(doubleTap(1000,1300));assert(!doubleTap(1000,1500));assert(!doubleTap(0,100));
   assert(clampBrightness(0)==10);assert(clampBrightness(255)==100);
   assert(!legacyCalibration(250,91,94,73));assert(legacyCalibration(240,91,94,73));assert(ToneSettings()==ToneSettings());
   // Starts: planned restarts are named by their intent, only software restarts take one.

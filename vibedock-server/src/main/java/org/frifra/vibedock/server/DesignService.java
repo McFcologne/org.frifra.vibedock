@@ -16,6 +16,11 @@ class DesignService {
     private final PhotoLibrary photos;private final java.time.Clock clock;
     /** Swipes in a slideshow: photos skipped per display, in memory only. */
     private final java.util.Map<String,Integer> skipped=new java.util.concurrent.ConcurrentHashMap<>();
+    /**
+     * A double tap on a touch display (or the web page): photos on (true) or off (false) for that display, whatever
+     * the schedule or the switch in the editor say; until the next double tap or a restart of the server.
+     */
+    private final java.util.Map<String,Boolean> forced=new java.util.concurrent.ConcurrentHashMap<>();
     DesignService(UsageService usage,StatusImage renderer,Twemoji twemoji,WeatherService weather,PhotoLibrary photos,java.time.Clock clock){
         this.usage=usage;this.renderer=renderer;this.twemoji=twemoji;this.weather=weather;this.photos=photos;this.clock=clock;
     }
@@ -31,17 +36,31 @@ class DesignService {
         return render(design,ip,type,scale);
     }
     /** The photos of the design's slideshow that still exist, if it is active now. */
-    java.util.List<String> activePhotos(Design design){
+    java.util.List<String> activePhotos(Design design){return activePhotos(design,null);}
+    /** The same for one display: its double tap decides instead of the schedule. */
+    java.util.List<String> activePhotos(Design design,String display){
         var p=design.photos();
-        if(p==null||!p.active(java.time.LocalTime.now(clock)))return java.util.List.of();
+        Boolean on=display==null?null:forced.get(display);
+        if(p==null||p.images().isEmpty()||(on==null?!p.active(java.time.LocalTime.now(clock)):!on))return java.util.List.of();
         return p.images().stream().filter(photos::exists).toList();
     }
+    /**
+     * A double tap: the slideshow stops when it runs and starts when it does not, independent of its schedule; false
+     * (nothing changes) for a design without photos.
+     */
+    boolean togglePhotos(Design design,String display){
+        if(display==null||design.photos()==null||design.photos().images().isEmpty())return false;
+        boolean running=!activePhotos(design,display).isEmpty();
+        forced.put(display,!running);skipped.remove(display);return true;
+    }
+    /** Whether a display's double tap overrides its slideshow now: true on, false off, null not. */
+    Boolean photosForced(String display){return display==null?null:forced.get(display);}
     /**
      * The photo shown now: every photo for its seconds, counted from the clock so that all displays with the same
      * slideshow change together; swipes move a display on. Shuffled: a new order per round, the same for all.
      */
     java.util.Optional<String> currentPhoto(Design design,String display){
-        var images=activePhotos(design);if(images.isEmpty())return java.util.Optional.empty();
+        var images=activePhotos(design,display);if(images.isEmpty())return java.util.Optional.empty();
         long step=clock.instant().getEpochSecond()/design.photos().seconds()+skipped.getOrDefault(display==null?"":display,0);
         int n=images.size();
         if(!design.photos().shuffle())return java.util.Optional.of(images.get((int)Math.floorMod(step,n)));
@@ -51,12 +70,13 @@ class DesignService {
     }
     /** A swipe in a running slideshow: the next (1) or previous (-1) photo; false when no slideshow runs. */
     boolean skip(Design design,String display,int step){
-        if(activePhotos(design).isEmpty()||display==null)return false;
+        if(display==null||activePhotos(design,display).isEmpty())return false;
         skipped.merge(display,step,Integer::sum);return true;
     }
     /** The poll interval while a slideshow runs: one pull per photo, but not slower than the server's interval. */
-    int pollSeconds(Design design,int server){
-        return activePhotos(design).isEmpty()?server:Math.min(server,Math.max(ClientRegistry.MIN_POLL,design.photos().seconds()));
+    int pollSeconds(Design design,int server){return pollSeconds(design,server,null);}
+    int pollSeconds(Design design,int server,String display){
+        return activePhotos(design,display).isEmpty()?server:Math.min(server,Math.max(ClientRegistry.MIN_POLL,design.photos().seconds()));
     }
     /** The device image for a design with the current usage data; weather appears once a reading is cached. */
     StatusImage.Image render(Design design,String ip) throws IOException {return render(design,ip,DisplayType.M1);}

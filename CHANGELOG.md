@@ -8,7 +8,8 @@ New boards, touch, photos and better diagnosis. Update the server image; paired 
 the administration (over Wi-Fi where their firmware can, otherwise once over USB).
 
 - **Waveshare touch displays:** ESP32-S3-Touch-LCD-1.47 (172×320) and ESP32-C6-Touch-LCD-1.69 (240×280) are tested
-  on hardware. A swipe left or right changes the theme, up and down the brightness. The other ESP32 boards are
+  on hardware. A swipe left or right changes the theme, up and down the brightness; a double tap starts or stops the
+  slideshow, whatever its schedule. The other ESP32 boards are
   prepared (they build, but have not run on hardware); the administration, `flash.sh` and the manual mark both.
 - **Sharp web displays:** the page asks for its window's size and pixel ratio, so phones, tablets and TVs get a
   sharp image; *Fit the browser* takes the window's shape. Emoji are drawn from the Twemoji SVGs. Added to the home

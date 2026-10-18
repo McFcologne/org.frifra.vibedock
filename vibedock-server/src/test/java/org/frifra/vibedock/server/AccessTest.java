@@ -767,6 +767,9 @@ class AccessTest {
         Assertions.assertEquals(scheme.shifted(1),clients.designFor(view.identifier()).scheme());
         mvc.perform(get("/web/"+secret+"/state").with(r->{r.setLocalPort(8080);return r;})).andExpect(jsonPath("$.tag").value(org.hamcrest.Matchers.not(state)));
         mvc.perform(get("/web/"+secret+"/swipe").with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isMethodNotAllowed());
+        // A double tap without photos in the design changes nothing.
+        mvc.perform(post("/web/"+secret+"/swipe").param("direction","toggle").with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNoContent());
+        mvc.perform(post("/web/"+secret+"/swipe").param("direction","sideways").with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isBadRequest());
         mvc.perform(post("/web/"+"0".repeat(64)+"/swipe").param("direction","next").with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNotFound());
         mvc.perform(post("/web/"+secret+"/swipe").param("direction","next").with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isNotFound());
         clients.setDesign(view.identifier(),null);
