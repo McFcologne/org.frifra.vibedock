@@ -203,6 +203,14 @@ confirms successful verification. `Unsupported or unrecognized SSL message` usua
 reached on a port expected to speak TLS. Public resolver queries require access to DNS port 53; the TLS target must
 also be reachable. The full lookup order and pairing fields are documented in [CLIENT-PROTOCOL.md](CLIENT-PROTOCOL.md#server-side-certificate-inspection).
 
+**Synology containers:** a working external HTTPS connection from a display does not prove the container can
+reach the same address. If the reverse proxy is on another host, point `EXTERNAL_TLS_PROBE_URL` at that host's
+LAN HTTPS listener. DSM's firewall can drop forwarded Docker traffic before Docker's allow rules, even when
+DNS and Internet HTTPS on port 443 work. Allow the actual Docker source subnet to reach the proxy's HTTPS port,
+above the matching deny rule; a single container IP may change. See the
+[Synology TLS pin troubleshooting steps](../docs/manual/MANUAL.md#tls-pin-lookup-from-a-synology-container) for
+finding the subnet, the DSM rule fields, and the difference between connection timeouts and TLS errors.
+
 ## Client management and image display
 
 Devices are invited by the server and then pull their image; see [CLIENT-PROTOCOL.md](CLIENT-PROTOCOL.md) for the details.
