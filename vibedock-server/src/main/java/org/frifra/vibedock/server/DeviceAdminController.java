@@ -14,9 +14,10 @@ import java.util.List;
 class DeviceAdminController {
     private static final Logger log=LoggerFactory.getLogger(DeviceAdminController.class);
     private final ClientRegistry registry;private final ClientPairing pairing;private final DesignService designs;private final ServerAddresses addresses;private final DevicePoke poke;
-    private final Firmware firmware;private final ApplicationInfo info;private final DeviceLogs logs;private final AdminEvents events;
-    DeviceAdminController(ClientRegistry registry,ClientPairing pairing,DesignService designs,ServerAddresses addresses,DevicePoke poke,Firmware firmware,ApplicationInfo info,DeviceLogs logs,AdminEvents events){
-        this.info=info;this.logs=logs;this.events=events;
+    private final Firmware firmware;private final ApplicationInfo info;private final DeviceLogs logs;private final AdminEvents events;private final DeviceDiagnostics diagnostics;
+    DeviceAdminController(ClientRegistry registry,ClientPairing pairing,DesignService designs,ServerAddresses addresses,DevicePoke poke,Firmware firmware,ApplicationInfo info,DeviceLogs logs,AdminEvents events,
+                          DeviceDiagnostics diagnostics){
+        this.info=info;this.logs=logs;this.events=events;this.diagnostics=diagnostics;
         this.registry=registry;this.pairing=pairing;this.designs=designs;this.addresses=addresses;this.poke=poke;this.firmware=firmware;
     }
     @PostMapping("/admin/clients/invite") String invite(@RequestParam String ip,@RequestParam(defaultValue="80") int port,
@@ -39,17 +40,54 @@ class DeviceAdminController {
         return "redirect:/admin/server";
     }
     @PostMapping("/admin/clients/{identifier}/remove") String remove(@PathVariable String identifier,RedirectAttributes flash) throws IOException {
-        try{registry.remove(identifier);logs.deleteAll(identifier);}
+        try{registry.remove(identifier);logs.deleteAll(identifier);diagnostics.forget(identifier);}
         catch(IllegalArgumentException e){flash.addFlashAttribute("deviceRemovalError","The device was already removed.");}
         return "redirect:/admin/devices";
     }
 
     // ---- troubleshooting: logs read from a display, over USB (any board) or the network ----
-    /** A paired display on the troubleshooting page: its saved logs and whether it can send one over the network. */
-    record LogTarget(ClientRegistry.View device,int logs,boolean network) {}
+    /**
+     * A paired display on the troubleshooting page: its saved logs, whether it can send one over the network, its
+     * newest log (when the server received it, how, from which firmware) and whether that firmware differs from
+     * what the display reports now, the state of the last log request and the display's current start.
+     */
+    record LogTarget(ClientRegistry.View device,int logs,boolean network,DeviceLogs.Entry latest,boolean firmwareDiffers,String age,String received,
+                     DeviceLogs.RequestState request,DevicePoke.Reach reach,DeviceDiagnostics.Live live,DeviceDiagnostics.Start start) {
+        /** The current start: "Up 3 h 12 min · free memory 21000 B (min 18000) · -61 dBm"; null without one. */
+        public String liveSummary(){
+            if(live==null)return null;
+            return "Up "+duration(live.uptimeSeconds())+(live.heapFree()!=null?" · free memory "+live.heapFree()+" B"+(live.heapMin()!=null?" (min "+live.heapMin()+")":""):"")
+                    +(live.rssi()!=null?" · "+live.rssi()+" dBm":"")+(live.wifiDrops()!=null&&live.wifiDrops()>0?" · Wi-Fi lost "+live.wifiDrops()+"×":"");
+        }
+        /** The newest log's firmware and start: "firmware 0.2.0-20 · start 1a2b3c4d, up 33 min". */
+        public String logSummary(){
+            if(latest==null)return null;
+            return "firmware "+(latest.firmware()==null?"unknown":latest.firmware())+(latest.bootId()!=null?" · start "+latest.bootId():"")
+                    +(latest.uptimeSeconds()!=null?", up "+duration(latest.uptimeSeconds()):"");
+        }
+        /** "up 3 h 12 min" from seconds. */
+        static String duration(Long seconds){
+            if(seconds==null)return null;long s=seconds;
+            return s<120?s+" s":s<7200?(s/60)+" min":s<172800?(s/3600)+" h "+(s%3600/60)+" min":(s/86400)+" days "+(s%86400/3600)+" h";
+        }
+    }
+    LogTarget target(ClientRegistry.View c) throws IOException {
+        var entries=logs.list(c.identifier());var latest=entries.isEmpty()?null:entries.get(0);
+        boolean differs=latest!=null&&latest.firmware()!=null&&c.firmware()!=null&&!latest.firmware().equals(c.firmware());
+        var starts=diagnostics.starts(c.identifier());
+        return new LogTarget(c,entries.size(),sendsLog(c.firmware()),latest,differs,latest==null?null:age(latest.savedAt()),
+                latest==null?null:java.time.format.DateTimeFormatter.ofPattern("dd.MM. HH:mm").withZone(java.time.ZoneId.systemDefault()).format(java.time.Instant.ofEpochMilli(latest.savedAt())),
+                logs.requestState(c.identifier()),logs.lastRequest(c.identifier()).map(DeviceLogs.RequestStatus::reach).orElse(null),
+                diagnostics.live(c.identifier()).orElse(null),starts.isEmpty()?null:starts.get(0));
+    }
+    /** How long ago, in server time: "33 min ago". */
+    static String age(long millis){
+        long s=Math.max(0,(System.currentTimeMillis()-millis)/1000);
+        return s<90?s+" s ago":s<5400?(s/60)+" min ago":s<172800?(s/3600)+" h ago":(s/86400)+" days ago";
+    }
     @GetMapping("/admin/troubleshooting") String troubleshooting(org.springframework.ui.Model model) throws IOException {
         var targets=new java.util.ArrayList<LogTarget>();
-        for(var c:registry.views())if(c.web()==null)targets.add(new LogTarget(c,logs.count(c.identifier()),sendsLog(c.firmware())));
+        for(var c:registry.views())if(c.web()==null)targets.add(target(c));
         model.addAttribute("targets",targets);model.addAttribute("keep",DeviceLogs.KEEP);model.addAttribute("displays",registry.views());
         return "troubleshooting";
     }
@@ -62,6 +100,40 @@ class DeviceAdminController {
             return org.springframework.http.ResponseEntity.ok(java.util.Map.of("name",entry.name(),"count",logs.count(identifier),"keep",DeviceLogs.KEEP));
         }catch(IllegalArgumentException e){return org.springframework.http.ResponseEntity.badRequest().body(java.util.Map.of("error",e.getMessage()));}
     }
+    /**
+     * "Request current logs" for every display that can send its log over the network: the existing request per
+     * display, each asked to pull now. The answer (and GET .../log-requests while waiting) says per display whether
+     * the log arrived, is still awaited (also when the display could not be reached at once: it then sends it with its
+     * next pull), timed out, or can only be read over USB. Saved logs stay.
+     */
+    @PostMapping(value="/admin/support/request-logs",produces="application/json") @ResponseBody
+    java.util.List<java.util.Map<String,Object>> requestLogs(){
+        for(var c:registry.views()){
+            if(c.web()!=null||!sendsLog(c.firmware()))continue;
+            String id=c.identifier();logs.request(id);
+            long at=logs.lastRequest(id).map(DeviceLogs.RequestStatus::requestedAt).orElse(0L);
+            poke.pullNow(registry.address(id)).thenAccept(reach->logs.reached(id,at,reach));
+        }
+        log.info("Requested the logs of all displays");
+        return logRequests();
+    }
+    @GetMapping(value="/admin/support/log-requests",produces="application/json") @ResponseBody
+    java.util.List<java.util.Map<String,Object>> logRequests(){
+        var states=new java.util.ArrayList<java.util.Map<String,Object>>();
+        for(var c:registry.views()){
+            if(c.web()!=null)continue;
+            var row=new java.util.LinkedHashMap<String,Object>();row.put("identifier",c.identifier());row.put("name",c.name());
+            try{
+                if(!sendsLog(c.firmware()))row.put("state","USB_ONLY");
+                else{
+                    row.put("state",logs.requestState(c.identifier()).name());
+                    logs.lastRequest(c.identifier()).ifPresent(r->{row.put("requestedAt",r.requestedAt());row.put("until",r.until());if(r.reach()!=null)row.put("reach",r.reach().name());});
+                }
+            }catch(IOException e){row.put("state","ERROR");}
+            states.add(row);
+        }
+        return states;
+    }
     /** Firmware that sends its log over the network when asked; older firmware only over USB. */
     static boolean sendsLog(String firmware){return FirmwareVersion.knownNewer(firmware,"0.1.1");}
     /** Asks the display to send its log: with its next pull, right away when the server may ask it to pull now. */
@@ -70,7 +142,8 @@ class DeviceAdminController {
         try{
             var view=registry.get(identifier);
             if(view.web()!=null||!sendsLog(view.firmware())){flash.addFlashAttribute("logMessage","This display can send its log only over USB. Update its firmware to read it over the network.");return page;}
-            logs.request(identifier);poke.pullNow(List.of(registry.address(identifier)));
+            logs.request(identifier);long at=logs.lastRequest(identifier).map(DeviceLogs.RequestStatus::requestedAt).orElse(0L);
+            poke.pullNow(registry.address(identifier)).thenAccept(reach->logs.reached(identifier,at,reach));
             flash.addFlashAttribute("logMessage","Requested. The log appears here by itself: within seconds, or with the display's next pull.");
         }catch(IllegalArgumentException e){flash.addFlashAttribute("logMessage","The device was already removed.");}
         return page;

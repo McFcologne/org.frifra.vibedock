@@ -25,10 +25,22 @@
   <div class="card-head"><h3 class="grow">Paired displays</h3></div>
   <p class="meta" th:if="${#lists.isEmpty(targets)}">No displays paired yet. A log read over USB is kept anyway.</p>
   <table class="firmware-devices" data-log-targets th:unless="${#lists.isEmpty(targets)}">
-    <thead><tr><th>Display</th><th>Board · firmware</th><th>Saved logs</th><th></th></tr></thead>
+    <thead><tr><th>Display</th><th>Board · firmware now</th><th>Newest log</th><th>Saved logs</th><th></th></tr></thead>
     <tbody><tr th:each="t:${targets}" th:with="c=${t.device}">
-      <td><strong th:text="${c.name}"></strong><br><span class="meta" th:text="${c.status}"></span></td>
+      <td><strong th:text="${c.name}"></strong><br><span class="meta" th:text="${c.status}"></span>
+        <th:block th:if="${t.live != null}"><br><span class="meta" th:text="${t.liveSummary()}"></span></th:block>
+        <th:block th:if="${t.start != null}"><br><span class="badge" th:classappend="${t.start.unexpected()} ? 'warn' : 'ok'"
+            th:text="${'Last start: ' + t.start.kind + (t.start.unexpected() and t.start.previousPhase != null ? ', before in ' + t.start.previousPhase : '')}"></span></th:block></td>
       <td th:text="${c.board.label + ' · ' + (c.firmware ?: 'unknown')}"></td>
+      <td data-log-fresh><th:block th:if="${t.latest != null}">
+          <span th:text="${t.age}" th:title="${'Received ' + t.received + ' (server time); its lines can be older'}"></span>
+          · <span th:text="${t.latest.source == 'usb' ? 'USB' : 'network'}"></span><br>
+          <span class="meta" th:text="${t.logSummary()}"></span>
+          <th:block th:if="${t.firmwareDiffers}"><br><span class="badge warn" title="The display has run another firmware since this log was read">Older firmware than now</span></th:block>
+        </th:block><span th:unless="${t.latest != null}" class="meta">none</span>
+        <th:block th:switch="${t.request.name()}">
+          <span th:case="'PENDING'" class="meta"><br>Requested, waiting<th:block th:if="${t.reach != null and t.reach.name() == 'UNREACHABLE'}"> (not reachable now: sends it with its next pull)</th:block></span>
+          <span th:case="'TIMED_OUT'" class="meta"><br>Request timed out</span></th:block></td>
       <td><a th:href="@{/admin/clients/{id}/logs(id=${c.identifier})}" th:text="${t.logs + ' of ' + keep}"></a></td>
       <td><form th:if="${t.network}" th:action="@{/admin/clients/{id}/logs/request(id=${c.identifier})}" method="post">
           <button class="secondary" title="The display sends its log over its server connection">Read over the network</button></form>
@@ -40,6 +52,10 @@
   <p>One file with what a problem needs: version and platform, the data sources (no sign-ins or keys), the displays, the server and
     access log of the chosen days and the saved display logs. Keys, tokens, links and e-mail addresses are removed. It is encrypted with
     a key that is shown once here: attach the file to the issue, and send the key separately, never in the issue.</p>
+  <div class="support-request"><p class="meta">The file holds the logs saved so far. To add the current ones first, ask the displays for them:
+      nothing is read from a display without this.</p>
+    <button type="button" class="secondary" data-request-logs>Request current logs</button>
+    <ul class="status-list" data-request-states hidden></ul></div>
   <form class="support-form" data-support-create>
     <fieldset><legend>The problem</legend>
       <label for="support-title">In one line</label><input id="support-title" name="title" maxlength="200" placeholder="Display stays on “Waiting for first pull”" required>

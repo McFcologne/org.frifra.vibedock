@@ -44,6 +44,40 @@ card.querySelector('[data-usb-restart]').addEventListener('click', () => run(asy
   catch (error) { writeLine('Restart failed: ' + (error?.message || error)); }
 }));
 
+// "Request current logs": every display that can is asked for its log; the list shows per display whether it arrived,
+// is awaited (also when it could not be reached at once: then it comes with its next pull), timed out or is USB only.
+const requestButton = document.querySelector('[data-request-logs]'), requestStates = document.querySelector('[data-request-states]');
+const stateText = row => ({
+  RECEIVED: 'Received', TIMED_OUT: 'No answer within 10 minutes', USB_ONLY: 'Only over USB (older firmware)', NONE: 'Not requested', ERROR: 'Could not be checked',
+  PENDING: row.reach === 'UNREACHABLE' ? 'Not reachable now: it sends the log with its next pull' : row.reach === 'NO_ADDRESS' ? 'Waiting for its next pull' : 'Requested, waiting …'
+}[row.state] || row.state);
+const showStates = rows => {
+  requestStates.replaceChildren(...rows.map(row => {
+    const item = document.createElement('li'), name = document.createElement('strong'), state = document.createElement('span');
+    name.textContent = row.name; state.className = 'badge' + (row.state === 'RECEIVED' ? ' ok' : row.state === 'PENDING' ? ' custom' : '');
+    state.textContent = stateText(row); item.append(name, state); return item;
+  }));
+  requestStates.hidden = !rows.length;
+};
+let watching = null;
+requestButton?.addEventListener('click', async () => {
+  requestButton.disabled = true; clearTimeout(watching);
+  try {
+    const response = await fetch('/admin/support/request-logs', { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json', ...csrf } });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    showStates(await response.json());
+    const started = Date.now();
+    const watch = async () => {
+      try {
+        const rows = await (await fetch('/admin/support/log-requests', { credentials: 'same-origin', headers: { Accept: 'application/json' } })).json();
+        showStates(rows);
+        if (rows.some(r => r.state === 'PENDING' && r.reach !== 'UNREACHABLE') && Date.now() - started < 60000) watching = setTimeout(watch, 3000);
+      } catch { /* the list stays as it is */ }
+    };
+    watching = setTimeout(watch, 2000);
+  } catch (error) { showStates([{ name: 'Request failed', state: error.message }]); }
+  requestButton.disabled = false;
+});
 // Support file: the server answers the encrypted file and its key once; the file is downloaded, the key shown.
 const create = document.querySelector('[data-support-create]'), keyBox = document.querySelector('[data-support-key]');
 const createError = document.querySelector('[data-support-error]');

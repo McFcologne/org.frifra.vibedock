@@ -16,9 +16,10 @@ class DeviceApiController {
     static final String IMAGE_FORMAT="rgb565-be-240x240";
     private static final Logger log=LoggerFactory.getLogger(DeviceApiController.class);
     private final ClientRegistry registry;private final DesignService designs;private final ServerAddresses addresses;private final TlsTrust trust;
-    private final Firmware firmware;private final OtaSigning signing;private final DeviceLogs logs;private final AdminEvents events;
-    DeviceApiController(ClientRegistry registry,DesignService designs,ServerAddresses addresses,TlsTrust trust,Firmware firmware,OtaSigning signing,DeviceLogs logs,AdminEvents events){
-        this.logs=logs;this.events=events;this.registry=registry;this.designs=designs;this.addresses=addresses;this.trust=trust;this.firmware=firmware;this.signing=signing;
+    private final Firmware firmware;private final OtaSigning signing;private final DeviceLogs logs;private final AdminEvents events;private final DeviceDiagnostics diagnostics;
+    DeviceApiController(ClientRegistry registry,DesignService designs,ServerAddresses addresses,TlsTrust trust,Firmware firmware,OtaSigning signing,DeviceLogs logs,AdminEvents events,
+                        DeviceDiagnostics diagnostics){
+        this.logs=logs;this.events=events;this.diagnostics=diagnostics;this.registry=registry;this.designs=designs;this.addresses=addresses;this.trust=trust;this.firmware=firmware;this.signing=signing;
     }
     /** The device authenticates with its key; unknown devices and wrong keys get the same 401. */
     @GetMapping("/api/v1/clients/{identifier}/image")
@@ -34,6 +35,8 @@ class DeviceApiController {
         String version=request.getHeader("X-VibeDock-Firmware");
         registry.pulled(identifier,peer,serverFooter,version!=null&&version.matches("[0-9A-Za-z.+-]{1,40}")?version:null,
                 request.getHeader("X-VibeDock-Subnet-Mask"));
+        // The display's own state (newer firmware): its start and run time, memory and Wi-Fi; nothing for older firmware.
+        diagnostics.report(identifier,request.getHeader("X-VibeDock-Diag"),registry.get(identifier).firmware(),request.getHeader("X-VibeDock-Board"));
         String updateError=request.getHeader("X-VibeDock-Update-Error");
         registry.otaReport(identifier,request.getHeader("X-VibeDock-Ota"),
                 updateError!=null&&updateError.matches("[ -~]{1,120}")?updateError:null);
@@ -102,7 +105,9 @@ class DeviceApiController {
             return ResponseEntity.status(HttpStatus.CONFLICT).build();
         }
         var lines=new String(body,java.nio.charset.StandardCharsets.UTF_8).lines().filter(l->!l.isBlank()).toList();
-        var entry=logs.save(identifier,"net",request.getHeader("X-VibeDock-Firmware"),request.getHeader("X-VibeDock-Board"),lines);
+        var diag=DeviceDiagnostics.parse(request.getHeader("X-VibeDock-Diag"));
+        var entry=logs.save(identifier,"net",request.getHeader("X-VibeDock-Firmware"),request.getHeader("X-VibeDock-Board"),lines,
+                diag.get("boot"),diag.containsKey("up")?Long.valueOf(diag.get("up")):null);
         log.info("Saved the log {} sent by {} ({} lines)",entry.name(),identifier,entry.lines());events.logSaved(identifier);
         return ResponseEntity.noContent().build();
     }

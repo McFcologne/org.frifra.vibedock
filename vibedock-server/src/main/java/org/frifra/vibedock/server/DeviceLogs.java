@@ -18,6 +18,8 @@ import java.util.regex.Pattern;
 @Component
 class DeviceLogs {
     static final int KEEP=10,MAX_LINES=500,MAX_LINE=400,MAX_BYTES=64*1024;
+    /** The starts the display reported (DeviceDiagnostics), beside its logs. */
+    static final String STARTS="starts.json";
     static final List<String> SOURCES=List.of("usb","net");
     private static final Pattern IDENTIFIER=Pattern.compile("[A-Za-z0-9_.:-]{8,80}");
     private static final Pattern NAME=Pattern.compile("\\d{13}-(usb|net)(-\\d{1,2})?\\.json");
@@ -25,15 +27,29 @@ class DeviceLogs {
     private static final Pattern HEX64=Pattern.compile("(?i)\\b[0-9a-f]{64}\\b");
     private static final Pattern WEB=Pattern.compile("/web/[^\\s\"'/?#]+");
 
-    /** A saved log without its lines; name identifies it within the device. */
-    record Entry(String name,long savedAt,String source,String firmware,String board,int lines) {}
+    /**
+     * A saved log without its lines; name identifies it within the device. savedAt is when the server received it
+     * (server time), not when its events happened: a log sent now can hold events of earlier starts. bootId: the
+     * start of the display the log was sent in (or its newest start line names), uptimeSeconds its run time then;
+     * both null for firmware that does not report them.
+     */
+    record Entry(String name,long savedAt,String source,String firmware,String board,int lines,String bootId,Long uptimeSeconds) {}
     record Log(Entry entry,List<String> lines) {}
-    private record Stored(long savedAt,String source,String firmware,String board,List<String> lines) {}
+    private record Stored(long savedAt,String source,String firmware,String board,List<String> lines,String bootId,Long uptimeSeconds) {}
+    /** Boot ids as the firmware writes them: 8 hex digits. */
+    static final Pattern BOOT_ID=Pattern.compile("[0-9a-f]{8}");
+    private static final Pattern BOOT_IN_LINE=Pattern.compile("\\bboot=([0-9a-f]{8})\\b");
 
     /** How long a display may answer a request to send its log over the network. */
     static final java.time.Duration REQUEST_VALID=java.time.Duration.ofMinutes(10);
     private record Request(String id,long until) {}
     private final Map<String,Request> requests=new HashMap<>();
+    /**
+     * The last request per display, kept after it was answered or expired, for the troubleshooting page: when it was
+     * made, until when the display may answer, and whether the display could be asked to pull at once.
+     */
+    record RequestStatus(long requestedAt,long until,DevicePoke.Reach reach) {}
+    private final Map<String,RequestStatus> lastRequests=new HashMap<>();
     private final java.security.SecureRandom random=new java.security.SecureRandom();
     private final Path root;private final ObjectMapper json;private final Clock clock;
     DeviceLogs(@Value("${vibedock.data-dir}") String dataDir,ObjectMapper json,Clock clock){
@@ -42,6 +58,10 @@ class DeviceLogs {
 
     /** Saves a log read from a display and drops its oldest logs beyond {@value #KEEP}. */
     synchronized Entry save(String identifier,String source,String firmware,String board,List<String> lines) throws IOException {
+        return save(identifier,source,firmware,board,lines,null,null);
+    }
+    /** The same with the start the display sent it in; without one the newest start line of the log names it. */
+    synchronized Entry save(String identifier,String source,String firmware,String board,List<String> lines,String bootId,Long uptimeSeconds) throws IOException {
         Path dir=directory(identifier);
         if(!SOURCES.contains(source))throw new IllegalArgumentException("Unknown log source");
         if(lines==null)throw new IllegalArgumentException("No log lines");
@@ -56,7 +76,9 @@ class DeviceLogs {
         Files.createDirectories(dir);
         String base=String.format(Locale.ROOT,"%013d-%s",now,source),name=base+".json";
         for(int i=1;Files.exists(dir.resolve(name));i++)name=base+"-"+i+".json";
-        var stored=new Stored(now,source,short40(firmware),short40(board),clean);
+        String boot=bootId!=null&&BOOT_ID.matcher(bootId).matches()?bootId:newestBoot(clean);
+        Long uptime=uptimeSeconds!=null&&uptimeSeconds>=0&&uptimeSeconds<10L*365*86400?uptimeSeconds:null;
+        var stored=new Stored(now,source,short40(firmware),short40(board),clean,boot,uptime);
         Path temporary=Files.createTempFile(dir,"log-",".tmp");
         try{
             try{Files.setPosixFilePermissions(temporary,PosixFilePermissions.fromString("rw-------"));}catch(UnsupportedOperationException ignored){}
@@ -94,7 +116,8 @@ class DeviceLogs {
     }
     /** Removes every log of a device, e.g. when the device is removed. */
     synchronized void deleteAll(String identifier) throws IOException {
-        Path dir=directory(identifier);requests.remove(identifier);
+        Path dir=directory(identifier);requests.remove(identifier);lastRequests.remove(identifier);
+        Files.deleteIfExists(dir.resolve(STARTS));
         for(String name:names(dir))Files.deleteIfExists(dir.resolve(name));
         try{Files.deleteIfExists(dir);}catch(DirectoryNotEmptyException ignored){}
     }
@@ -107,8 +130,28 @@ class DeviceLogs {
         directory(identifier);
         byte[] bytes=new byte[16];random.nextBytes(bytes);
         String id=HexFormat.of().formatHex(bytes);
-        requests.put(identifier,new Request(id,clock.millis()+REQUEST_VALID.toMillis()));
+        long now=clock.millis();
+        requests.put(identifier,new Request(id,now+REQUEST_VALID.toMillis()));
+        lastRequests.put(identifier,new RequestStatus(now,now+REQUEST_VALID.toMillis(),null));
         return id;
+    }
+    /** Notes whether the display could be asked to pull at once for its last request. */
+    synchronized void reached(String identifier,long requestedAt,DevicePoke.Reach reach){
+        var last=lastRequests.get(identifier);
+        if(last!=null&&last.requestedAt()==requestedAt)lastRequests.put(identifier,new RequestStatus(last.requestedAt(),last.until(),reach));
+    }
+    synchronized Optional<RequestStatus> lastRequest(String identifier){return Optional.ofNullable(lastRequests.get(identifier));}
+    /**
+     * Where the last request of a display stands: RECEIVED once a log arrived over the network after it, PENDING
+     * while the display may still answer (also when it could not be reached at once: then it sends it with its next
+     * pull), TIMED_OUT afterwards. Logs saved before stay either way.
+     */
+    enum RequestState { NONE, PENDING, RECEIVED, TIMED_OUT }
+    synchronized RequestState requestState(String identifier) throws IOException {
+        var last=lastRequests.get(identifier);
+        if(last==null)return RequestState.NONE;
+        for(var entry:list(identifier))if("net".equals(entry.source())&&entry.savedAt()>=last.requestedAt())return RequestState.RECEIVED;
+        return clock.millis()<=last.until()&&requests.containsKey(identifier)?RequestState.PENDING:RequestState.TIMED_OUT;
     }
     /** The open request of a display, if any. */
     synchronized Optional<String> pendingRequest(String identifier){
@@ -146,7 +189,16 @@ class DeviceLogs {
         var stored=json.readValue(dir.resolve(name).toFile(),Stored.class);
         return new Log(entry(name,stored),stored.lines()==null?List.of():stored.lines());
     }
-    private static Entry entry(String name,Stored s){return new Entry(name,s.savedAt(),s.source(),s.firmware(),s.board(),s.lines()==null?0:s.lines().size());}
+    private static Entry entry(String name,Stored s){return new Entry(name,s.savedAt(),s.source(),s.firmware(),s.board(),s.lines()==null?0:s.lines().size(),s.bootId(),s.uptimeSeconds());}
+    /** The boot id of the newest start line ("Start v… boot=…") of a log, if the firmware writes them. */
+    static String newestBoot(List<String> lines){
+        for(int i=lines.size()-1;i>=0;i--){
+            String line=lines.get(i);
+            if(!line.contains("Start v"))continue;
+            var m=BOOT_IN_LINE.matcher(line);if(m.find())return m.group(1);
+        }
+        return null;
+    }
     private static String short40(String value){
         if(value==null)return null;String text=value.replaceAll("[^0-9A-Za-z.+_-]","");
         return text.isEmpty()?null:text.substring(0,Math.min(40,text.length()));

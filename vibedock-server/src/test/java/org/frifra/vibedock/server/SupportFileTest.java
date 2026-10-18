@@ -30,6 +30,28 @@ class SupportFileTest {
     @Autowired DeviceLogs deviceLogs;
     final ObjectMapper json=new ObjectMapper();
 
+    @Autowired DeviceDiagnostics diagnostics;
+    @Test void troubleshootingShowsHowOldTheNewestLogIsAndAsksForCurrentOnes() throws Exception {
+        String id="vibedock-fresh-test";
+        clients.paired(id,"Shelf","cd".repeat(32),"192.168.1.41",80,"waveshare-c6-touch-lcd-169");
+        try{
+            clients.pulled(id,"192.168.1.41",true,"0.1.1-22-g1234567",null);
+            deviceLogs.save(id,"net","0.1.1-20-g7654321","waveshare-c6-touch-lcd-169",List.of("Start v0.1.1-20"),"0badc0de",1980L);
+            diagnostics.report(id,"boot=0000c0de;up=60;heap=150000;min=120000;rssi=-58;drops=1;start=update;reset=3;prev=0badc0de;phase=ota;prevup=1990","0.1.1-22-g1234567","waveshare-c6-touch-lcd-169");
+            mvc.perform(get("/admin/troubleshooting").with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isOk())
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString("firmware 0.1.1-20-g7654321 · start 0badc0de, up 33 min")))
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString("Older firmware than now")))
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString("0.1.1-22-g1234567")))
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString("Last start: update")))
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString("Received ")));
+            // Asking for current logs: per display, without touching the saved ones.
+            mvc.perform(post("/admin/support/request-logs").with(csrf()).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isOk())
+                    .andExpect(jsonPath("$[?(@.identifier=='"+id+"')].state").value("PENDING"));
+            Assertions.assertEquals(1,deviceLogs.count(id));
+            mvc.perform(get("/admin/support/log-requests").with(r->{r.setLocalPort(10001);return r;}))
+                    .andExpect(jsonPath("$[?(@.identifier=='"+id+"')].reach").value("DISABLED"));
+        }finally{clients.remove(id);deviceLogs.deleteAll(id);diagnostics.forget(id);}
+    }
     @Test void createdFilesHideSecretsAndOpenOnlyWithTheirKey() throws Exception {
         String now=LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),old=LocalDateTime.now().minusDays(9).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         Files.write(logs.resolve("access.test.log"),List.of(
