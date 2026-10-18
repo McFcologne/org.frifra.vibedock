@@ -12,8 +12,9 @@
 <section class="card" id="server-log">
   <details data-server-log>
     <summary>Server log</summary>
-    <p class="meta">Recent server activity and errors: up to 500 lines from the last 256 KiB. Refresh to load new entries.</p>
+    <p class="meta">Recent server activity and errors: up to 500 lines from the last 256 KiB. Opens at the latest entry. Scroll up to read without following new entries.</p>
     <div class="flash-row"><button type="button" class="secondary" data-server-log-refresh>Refresh server log</button>
+      <label class="check"><input type="checkbox" data-server-log-live checked> Live updates (every 5 seconds)</label>
       <a th:href="@{/admin/server-log}" target="_blank" rel="noopener">Open as text</a></div>
     <p class="meta" role="status" aria-live="polite" data-server-log-status></p>
     <pre class="flash-log" data-server-log-output style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>

@@ -4,8 +4,22 @@
 <th:block th:fragment="tlsPin">
   <div class="tls-pin-status" data-tls-pin-status>
     <p class="meta" role="status" aria-live="polite" data-tls-pin-message>Checking external HTTPS pin …</p>
+    <p class="meta" data-tls-pin-route hidden></p>
     <code data-tls-pin-value hidden style="overflow-wrap:anywhere"></code>
-    <button type="button" class="link-button" data-tls-pin-refresh>Check pin again</button>
+    <div class="flash-row"><button type="button" class="secondary" data-tls-pin-refresh>
+      <svg th:replace="~{fragments :: icon('refresh')}"></svg><span data-tls-pin-label>Check pin again</span>
+    </button></div>
+    <p class="meta" role="status" aria-live="polite" data-tls-pin-action hidden></p>
+    <details data-tls-cert hidden><summary>Certificate details</summary>
+      <dl class="tls-cert-info meta">
+        <dt>Subject</dt><dd data-cert-subject></dd>
+        <dt>Issuer</dt><dd data-cert-issuer></dd>
+        <dt>Valid from</dt><dd data-cert-not-before></dd>
+        <dt>Valid until</dt><dd data-cert-not-after></dd>
+        <dt>TLS version</dt><dd data-cert-protocol></dd>
+        <dt>SHA-256</dt><dd><code data-cert-sha256></code></dd>
+      </dl>
+    </details>
   </div>
 </th:block>
 <th:block th:fragment="tlsPinOption">

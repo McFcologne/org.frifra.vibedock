@@ -21,9 +21,12 @@ public class TlsTrust {
      * fromLog: the root comes from the public certificate log because the server cannot reach the address; then
      * there is no fingerprint.
      */
-    public record Inspection(byte[] root,String fingerprint,boolean fromLog) {
+    public record CertificateInfo(String subject,String issuer,String notBefore,String notAfter,String sha256,String protocol) {}
+    public record Inspection(byte[] root,String fingerprint,boolean fromLog,String route,String target,CertificateInfo certificate) {
         public Inspection(byte[] root,String fingerprint){this(root,fingerprint,false);}
+        public Inspection(byte[] root,String fingerprint,boolean fromLog){this(root,fingerprint,fromLog,null,null,null);}
     }
+    private record Connection(Certificate[] certificates,String route,String target,String protocol) {}
     @org.springframework.beans.factory.annotation.Autowired(required=false) private CertificateLog certificateLog;
     @org.springframework.beans.factory.annotation.Autowired(required=false) private org.springframework.beans.factory.ObjectProvider<ServerAddresses> addresses;
     @org.springframework.beans.factory.annotation.Value("${vibedock.external-tls-probe-url:}") private String probeUrl="";
@@ -35,9 +38,11 @@ public class TlsTrust {
     public byte[] rootFor(String url){return inspect(url).root();}
     /** Like {@link #inspect} but reuses a result younger than a minute, for devices doing their full check. */
     public Inspection recentInspection(String url){
-        Long at=checkedAt.get(url);
-        if(at!=null&&System.currentTimeMillis()-at<60_000&&recent.containsKey(url))return recent.get(url);
+        if(isRecent(url))return recent.get(url);
         var result=inspect(url);recent.put(url,result);checkedAt.put(url,System.currentTimeMillis());return result;
+    }
+    boolean isRecent(String url){
+        Long at=checkedAt.get(url);return at!=null&&System.currentTimeMillis()-at<60_000&&recent.containsKey(url);
     }
     /**
      * The root for pairing a device: from the address itself, or from the public certificate log when the server
@@ -57,27 +62,31 @@ public class TlsTrust {
         if(!"https".equals(uri.getScheme())||uri.getHost()==null)throw new IllegalArgumentException("Not an https address: "+url);
         int port=uri.getPort()>0?uri.getPort():443;
         URI probe=probeFor(url,port);
-        Certificate[] chain;
+        Connection connection;
         // An explicit LAN proxy address avoids the public route entirely (routers without NAT loopback).
-        if(probe!=null&&!probeUrl.isBlank())chain=chain(uri,probe);
+        if(probe!=null&&!probeUrl.isBlank())connection=chain(uri,probe,"configured-probe");
         else{
-            try{chain=chain(uri,uri);}
+            try{connection=chain(uri,uri,"system-dns");}
             catch(IllegalArgumentException e){
                 // Never turn a rejected certificate into a successful fallback.
                 if(!unreachable(e))throw e;
-                chain=alternativeChain(uri,probe,e);
+                connection=alternativeChain(uri,probe,e);
             }
         }
         try{
-            String fingerprint=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-1").digest(chain[0].getEncoded()));
-            return new Inspection(trustRoot(chain),fingerprint);
+            Certificate[] chain=connection.certificates();var leaf=(X509Certificate)chain[0];
+            String fingerprint=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-1").digest(leaf.getEncoded()));
+            String sha256=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(leaf.getEncoded()));
+            var details=new CertificateInfo(leaf.getSubjectX500Principal().getName(),leaf.getIssuerX500Principal().getName(),
+                    leaf.getNotBefore().toInstant().toString(),leaf.getNotAfter().toInstant().toString(),sha256,connection.protocol());
+            return new Inspection(trustRoot(chain),fingerprint,false,connection.route(),connection.target(),details);
         }catch(IllegalArgumentException e){throw e;}
         catch(Exception e){throw new IllegalArgumentException("Certificate of "+url+" could not be read");}
     }
     private static boolean unreachable(IllegalArgumentException e){return e.getMessage().endsWith("is not reachable from the server");}
-    private Certificate[] alternativeChain(URI identity,URI probe,IllegalArgumentException failure){
+    private Connection alternativeChain(URI identity,URI probe,IllegalArgumentException failure){
         if(probe!=null){
-            try{return chain(identity,probe);}
+            try{return chain(identity,probe,"lan-fallback");}
             catch(IllegalArgumentException e){if(!unreachable(e))throw e;failure=e;}
         }
         var configured=addresses==null?null:addresses.getIfAvailable();
@@ -88,7 +97,7 @@ public class TlsTrust {
                 String host=ip.contains(":")?"["+ip+"]":ip;
                 URI target=URI.create("https://"+host+":"+port);
                 try{
-                    var result=chain(identity,target);
+                    var result=chain(identity,target,"public-dns");
                     log.info("TLS certificate for {} verified through public DNS address {}",identity,ip);return result;
                 }catch(IllegalArgumentException e){if(!unreachable(e))throw e;failure=e;}
             }
@@ -116,7 +125,7 @@ public class TlsTrust {
         return URI.create("https://"+(host.contains(":")&&!host.startsWith("[")?"["+host+"]":host)+":"+port);
     }
     // The socket connects to the LAN address; SNI and certificate identity always refer to the external host.
-    private Certificate[] chain(URI identity,URI target){
+    private Connection chain(URI identity,URI target,String route){
         String url=identity.toString();
         try{
             try(var transport=new java.net.Socket()){
@@ -126,7 +135,9 @@ public class TlsTrust {
                     var parameters=socket.getSSLParameters();parameters.setEndpointIdentificationAlgorithm("HTTPS");
                     parameters.setServerNames(List.of(new SNIHostName(identity.getHost())));socket.setSSLParameters(parameters);
                     socket.setSoTimeout(5000);socket.startHandshake();
-                    return socket.getSession().getPeerCertificates();
+                    String ip=transport.getInetAddress().getHostAddress();
+                    String endpoint=(ip.contains(":")?"["+ip+"]":ip)+":"+transport.getPort();
+                    return new Connection(socket.getSession().getPeerCertificates(),route,endpoint,socket.getSession().getProtocol());
                 }
             }
         }catch(SSLHandshakeException|SSLPeerUnverifiedException e){

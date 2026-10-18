@@ -391,3 +391,5 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 
 .auth-card .stay-signed-in{margin-top:16px;color:var(--text)}
 .auth-card #remember-help{display:block;color:var(--muted);line-height:1.5;margin-top:6px}
+
+.tls-cert-info{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 12px}.tls-cert-info dt{color:var(--muted)}.tls-cert-info dd{margin:0;overflow-wrap:anywhere}.tls-cert-info code{word-break:break-all}

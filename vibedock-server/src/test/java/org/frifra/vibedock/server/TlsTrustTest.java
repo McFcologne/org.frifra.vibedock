@@ -85,6 +85,10 @@ class TlsTrustTest {
             var result=trust.forPairing(external);
             assertEquals(pin,result.fingerprint());assertArrayEquals(leaf,result.root());assertFalse(result.fromLog());
             assertEquals("external.example.invalid",sni.get());
+            assertEquals("lan-fallback",result.route());assertEquals("127.0.0.1:"+port,result.target());
+            assertTrue(result.certificate().subject().contains("external.example.invalid"));
+            assertEquals(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(leaf)),result.certificate().sha256());
+            assertTrue(result.certificate().protocol().startsWith("TLSv1."));
             // Split DNS: no usable system route or LAN candidate, but public DNS returns the TLS listener's IP.
             var externalOnly=mock(ServerAddresses.class);when(externalOnly.external()).thenReturn(external);
             when(externalOnly.configuredInternal()).thenReturn("");
@@ -96,7 +100,10 @@ class TlsTrustTest {
                 @Override byte[] trustRoot(Certificate[] chain){return leaf;}
             };
             ReflectionTestUtils.setField(publicRoute,"addresses",publicProvider);ReflectionTestUtils.setField(publicRoute,"publicDns",resolver);
-            assertEquals(pin,publicRoute.forPairing(external).fingerprint());assertEquals("external.example.invalid",sni.get());
+            var publicResult=publicRoute.forPairing(external);
+            assertEquals(pin,publicResult.fingerprint());assertEquals("external.example.invalid",sni.get());
+            assertEquals("public-dns",publicResult.route());assertEquals("127.0.0.1:"+port,publicResult.target());
+            assertEquals(result.certificate().sha256(),publicResult.certificate().sha256());
             verify(resolver).resolve("external.example.invalid");
             when(externalOnly.external()).thenReturn("https://wrong.example.invalid:"+port);
             assertTrue(assertThrows(IllegalArgumentException.class,()->publicRoute.forPairing("https://wrong.example.invalid:"+port)).getMessage().contains("not trusted"));

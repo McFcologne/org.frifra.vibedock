@@ -155,25 +155,42 @@ opener.addEventListener('submit', async event => {
 });
 
 
-// Application logs stay separate from device logs and are loaded only when requested.
+// Application logs are refreshed only while this panel and the page are visible.
 const serverLog = document.querySelector('[data-server-log]');
 if (serverLog) {
   const refresh = serverLog.querySelector('[data-server-log-refresh]');
+  const live = serverLog.querySelector('[data-server-log-live]');
   const status = serverLog.querySelector('[data-server-log-status]');
   const output = serverLog.querySelector('[data-server-log-output]');
-  let loaded = false;
+  let loaded = false, timer;
+  function stop() {clearTimeout(timer);timer = null;}
+  function schedule() {
+    stop();
+    if (serverLog.open && !document.hidden && live.checked) timer = setTimeout(loadServerLog, 5000);
+  }
   async function loadServerLog() {
-    if (refresh.disabled) return;
+    stop();
+    if (!serverLog.open || document.hidden || refresh.disabled) return;
     refresh.disabled = true;status.textContent = 'Loading server log …';
     try {
       const response = await fetch('/admin/server-log', {credentials: 'same-origin', cache: 'no-store', headers: {Accept: 'text/plain'}});
       if (!response.ok || !response.headers.get('Content-Type')?.startsWith('text/plain'))
         throw new Error('Could not load the server log. Check your sign-in and the log file permissions.');
-      output.textContent = await response.text();loaded = true;
-      status.textContent = 'Loaded at ' + new Date().toLocaleTimeString();
+      const text = await response.text();
+      // Follow new entries only when already at the end; preserve the position while reading older lines.
+      const follow = !loaded || output.scrollHeight - output.clientHeight - output.scrollTop <= 24;
+      const top = output.scrollTop;
+      if (output.textContent !== text) {
+        output.textContent = text;
+        output.scrollTop = follow ? output.scrollHeight : top;
+      }
+      loaded = true;status.textContent = 'Loaded at ' + new Date().toLocaleTimeString();
     } catch (error) {status.textContent = error.message;}
-    finally {refresh.disabled = false;}
+    finally {refresh.disabled = false;schedule();}
   }
-  serverLog.addEventListener('toggle', () => {if (serverLog.open && !loaded) loadServerLog();});
+  serverLog.addEventListener('toggle', () => {if (serverLog.open && !document.hidden) loadServerLog();else stop();});
+  document.addEventListener('visibilitychange', () => {if (!document.hidden && serverLog.open) loadServerLog();else stop();});
+  live.addEventListener('change', () => {if (live.checked && serverLog.open && !document.hidden) loadServerLog();else stop();});
+  window.addEventListener('pagehide', stop);
   refresh.addEventListener('click', loadServerLog);
 }

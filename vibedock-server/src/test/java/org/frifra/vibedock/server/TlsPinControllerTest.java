@@ -12,12 +12,17 @@ class TlsPinControllerTest {
     @Test void statusShowsValidatedPinAndDoesNotRetainItAfterLookupFails() throws Exception {
         var addresses=mock(ServerAddresses.class);var trust=mock(TlsTrust.class);
         when(addresses.external()).thenReturn("https://external.example.org");
-        when(trust.recentInspection(anyString())).thenReturn(new TlsTrust.Inspection(new byte[]{1},"ab".repeat(20)))
+        var certificate=new TlsTrust.CertificateInfo("CN=external.example.org","CN=Test issuer","2026-10-01T00:00:00Z","2026-12-01T00:00:00Z","cd".repeat(32),"TLSv1.3");
+        when(trust.isRecent(anyString())).thenReturn(true);
+        when(trust.recentInspection(anyString())).thenReturn(new TlsTrust.Inspection(new byte[]{1},"ab".repeat(20),false,"public-dns","203.0.113.5:443",certificate))
                 .thenThrow(new IllegalArgumentException("not reachable"));
         var mvc=MockMvcBuilders.standaloneSetup(new TlsPinController(trust,addresses)).build();
         mvc.perform(get("/admin/tls-pin")).andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store"))
-                .andExpect(jsonPath("$.known").value(true)).andExpect(jsonPath("$.fingerprint").value("ab".repeat(20)));
-        mvc.perform(get("/admin/tls-pin")).andExpect(jsonPath("$.known").value(false)).andExpect(jsonPath("$.fingerprint").isEmpty());
+                .andExpect(jsonPath("$.known").value(true)).andExpect(jsonPath("$.fingerprint").value("ab".repeat(20)))
+                .andExpect(jsonPath("$.route").value("public-dns")).andExpect(jsonPath("$.target").value("203.0.113.5:443"))
+                .andExpect(jsonPath("$.cached").value(true)).andExpect(jsonPath("$.certificate.issuer").value("CN=Test issuer"));
+        mvc.perform(get("/admin/tls-pin")).andExpect(jsonPath("$.known").value(false)).andExpect(jsonPath("$.fingerprint").isEmpty())
+                .andExpect(jsonPath("$.certificate").isEmpty()).andExpect(jsonPath("$.route").isEmpty());
         when(addresses.external()).thenReturn("");
         mvc.perform(get("/admin/tls-pin")).andExpect(jsonPath("$.known").value(false));
         verify(trust,times(2)).recentInspection(anyString());
