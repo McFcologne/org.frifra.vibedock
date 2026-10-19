@@ -81,6 +81,11 @@ void player(void*) {
     if(volume()==0) continue;
     auto tune=melody(cue); digitalWrite(amplifier,HIGH);
     bool ok=true;
+    // NS4150B startup is typically 120 ms. Prime with 160 ms of silence BEFORE the first sample:
+    // otherwise the 80/90/120 ms button and swipe cues finish before the amplifier becomes audible.
+    // I2S stays in this task and send() keeps polling the buttons during the pre-roll.
+    memset(data,0,sizeof(data));
+    for(uint32_t frames=0;frames<rate*160/1000 && ok;frames+=256) ok=send(data,sizeof(data));
     for(size_t n=0;n<tune.count && ok;n++) {
       const auto &note=tune.notes[n]; uint32_t samples=rate*note.ms/1000, gap=rate*note.gap/1000;
       for(uint32_t offset=0;offset<samples+gap && ok;offset+=256) {

@@ -243,7 +243,7 @@ One firmware source builds for several boards (PlatformIO environments in `vibed
 | `lilygo-t-display-s3` | LilyGO T-Display-S3 (1.9" ST7789, 8-bit parallel) | ESP32-S3 | 170×320 | prepared |
 | `waveshare-s3-lcd-169` | Waveshare ESP32-S3-LCD-1.69 (ST7789V2) | ESP32-S3 | 240×280 | prepared |
 | `waveshare-s3-touch-lcd-147` | Waveshare ESP32-S3-Touch-LCD-1.47 (JD9853, AXS5106L touch) | ESP32-S3 | 172×320 | tested |
-| `waveshare-s3-touch-lcd-154` | Waveshare ESP32-S3-Touch-LCD-1.54 (ST7789, CST816 touch) | ESP32-S3 | 240×240 | prepared |
+| `waveshare-s3-touch-lcd-154` | Waveshare ESP32-S3-Touch-LCD-1.54 (ST7789, CST816 touch) | ESP32-S3 | 240×240 | tested |
 | `waveshare-c6-touch-lcd-169` | Waveshare ESP32-C6-Touch-LCD-1.69 (ST7789V2, CST816 touch; Arduino core 3) | ESP32-C6 | 240×280 | tested |
 | `esp32-c3-st7789` | ESP32-C3 with a 1.3" ST7789 (SCL 4, SDA 6, DC 2, RES 3, BLK 10) | ESP32-C3 | 240×240 | prepared |
 
