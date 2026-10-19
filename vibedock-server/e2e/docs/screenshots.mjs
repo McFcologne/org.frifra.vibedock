@@ -108,7 +108,9 @@ try {
     await new Promise(resolve => { process.once('SIGINT', resolve); process.once('SIGTERM', resolve); java.once('exit', resolve); });
   } else {
     browser = await chromium.launch(process.env.PLAYWRIGHT_CHROMIUM ? {executablePath: process.env.PLAYWRIGHT_CHROMIUM} : {});
-    const context = await browser.newContext({viewport: {width: 1280, height: 900}, deviceScaleFactor: 2, reducedMotion: 'reduce', colorScheme: 'light'});
+    // Dates and times the pages format in the browser: the same zone and language on every machine (also in Docker).
+    const context = await browser.newContext({viewport: {width: 1280, height: 900}, deviceScaleFactor: 2, reducedMotion: 'reduce', colorScheme: 'light',
+      timezoneId: 'Europe/Berlin', locale: 'en-US'});
     // No request leaves the demo server (fonts, provider sign-in, weather).
     await context.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
     // example.com has no live TLS endpoint. Show a successful, made-up inspection in the manual,
@@ -118,7 +120,7 @@ try {
       message: 'TLS pin available for https://vibedock.example.com',
       route: 'configured-probe', target: '192.168.1.20:10002', cached: false,
       certificate: {subject: 'CN=vibedock.example.com', issuer: 'CN=Example Certificate Authority',
-        notBefore: '2026-10-01T00:00:00Z', notAfter: '2026-12-30T23:59:59Z',
+        notBefore: '2026-10-01T10:00:00Z', notAfter: '2026-12-30T10:00:00Z',
         sha256: '0123456789abcdef'.repeat(4), protocol: 'TLSv1.3'}
     }}));
     const page = await context.newPage();
@@ -131,6 +133,8 @@ try {
       if (await page.locator('[data-tls-pin-status]').count()) {
         await expect(page.locator('[data-tls-pin-value]').first()).toHaveText('0123456789abcdef0123456789abcdef01234567');
         await expect(page.locator('[data-tls-pin-refresh]').first()).toBeEnabled();
+        // The status line shows the browser's clock and the request's duration: fixed, like DocsDemo.NOW (07:41 UTC).
+        await page.locator('[data-tls-pin-action]').evaluateAll(lines => lines.forEach(line => { line.textContent = 'Last refresh: 9:41:00 AM · Pin available · 18 ms'; }));
       }
     };
     const main = () => page.locator('main');
