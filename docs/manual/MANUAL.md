@@ -767,6 +767,7 @@ firmware card decides which image is shown, downloaded and installed:
 | LilyGO T-Display-S3 | ESP32-S3 | 1.9" ST7789 170×320 | prepared |
 | Waveshare ESP32-S3-LCD-1.69 | ESP32-S3 | 1.69" ST7789V2 240×280 | prepared |
 | Waveshare ESP32-S3-Touch-LCD-1.47 | ESP32-S3 | 1.47" JD9853 172×320 | tested |
+| Waveshare ESP32-S3-Touch-LCD-1.54 | ESP32-S3 | 1.54" ST7789 240×240, CST816 touch | prepared; display/touch checked, audio/battery verification pending |
 | Waveshare ESP32-C6-Touch-LCD-1.69 | ESP32-C6 | 1.69" ST7789V2 240×280 | tested |
 | ESP32-C3 with ST7789 240×240 | ESP32-C3 | e.g. C3 SuperMini | prepared |
 
@@ -919,7 +920,7 @@ polls.
 
 ## Touch displays
 
-Displays with a touch panel (Waveshare ESP32-S3-Touch-LCD-1.47 and ESP32-C6-Touch-LCD-1.69) react to swipes:
+Displays with a touch panel (Waveshare ESP32-S3-Touch-LCD-1.47, ESP32-S3-Touch-LCD-1.54 and ESP32-C6-Touch-LCD-1.69) react to swipes:
 
 | Swipe | Effect |
 | --- | --- |
@@ -929,6 +930,26 @@ Displays with a touch panel (Waveshare ESP32-S3-Touch-LCD-1.47 and ESP32-C6-Touc
 
 The scheme changes with the next image, right after the swipe. To follow the default design again, turn off
 *Custom design* for the display in the editor.
+
+## Sounds and battery on the Waveshare 1.54-inch touch display
+
+This board's speaker plays short startup, connection, pairing and quota notifications. Open its local IP address
+and use **Sounds** to set volume, mute or play the test tone. The physical **+ / - buttons** change volume in steps
+of 10. Louder gives a short high beep, quieter a low boop; recognized swipes have a quiet sliding sound.
+Every volume-button press briefly shows a bar and percentage on the display, or **Muted** at zero.
+The notice disappears after 1.6 seconds and restores the picture without needing the server.
+Zero mutes all sounds, including this feedback; the default is 30%. The setting is saved after three seconds and survives restarts.
+
+With the updated server, every reported quota increase/decrease sounds, without thresholds. Full remaining
+quota uses the rising tune, empty the low beep. Initial and unchanged readings stay silent. Only audio-capable
+clients request the extra metadata, piggybacked on image replies; other devices get no extra header. Local tones
+also work with older servers. Sustained connection loss and subsequent recovery sound once each.
+
+The **Battery** card shows measured voltage, a coarse estimated level and the charging signal. Reload to take
+another reading. These readings do not prove a battery is fitted or full while USB supplies power; battery
+presence stays **Unknown**. USB serial command `VIBEDOCK-BATTERY` returns the same diagnostic values.
+Audio and battery sensing still require verification on the actual board. The BGR display colours and touch
+have been checked by the owner. No motion-based rotation or microphone recording is implemented.
 
 ## Displays mounted upside down
 

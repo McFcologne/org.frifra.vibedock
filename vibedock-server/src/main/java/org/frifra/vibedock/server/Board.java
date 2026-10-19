@@ -18,6 +18,7 @@ public record Board(String id,String label,String chip,String display,String not
             new Board("lilygo-t-display-s3","LilyGO T-Display-S3","ESP32-S3","170x320","1.9\" ST7789 170×320, 8-bit parallel",false),
             new Board("waveshare-s3-lcd-169","Waveshare ESP32-S3-LCD-1.69","ESP32-S3","240x280","1.69\" ST7789V2 240×280",false),
             new Board("waveshare-s3-touch-lcd-147","Waveshare ESP32-S3-Touch-LCD-1.47","ESP32-S3","172x320","1.47\" JD9853 172×320, touch",true),
+            new Board("waveshare-s3-touch-lcd-154","Waveshare ESP32-S3-Touch-LCD-1.54","ESP32-S3","vibedock-m1","1.54\" ST7789 240×240, CST816 touch",false),
             new Board("waveshare-c6-touch-lcd-169","Waveshare ESP32-C6-Touch-LCD-1.69","ESP32-C6","240x280","1.69\" ST7789V2 240×280, touch",true),
             new Board("esp32-c3-st7789","ESP32-C3 with ST7789 240×240","ESP32-C3","vibedock-m1","e.g. C3 SuperMini, wired SCL 4 · SDA 6 · DC 2 · RES 3 · BLK 10",false));
     /** The board of an id; unknown or missing ids are the VibeTV M1. */

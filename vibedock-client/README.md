@@ -6,7 +6,7 @@ Turn a compatible VibeDock display into a small Wi-Fi dashboard for your provide
 
 The firmware targets the **VibeTV M1: ESP8266EX with 4 MB flash and a 240×240 ST7789 display**, the desk display sold by Vibe TV ([vibetv.shop](https://vibetv.shop/); not affiliated with this project). Wi-Fi setup, pairing, image pulls and colour calibration are in use on real hardware.
 
-The same sources also build for ESP32 boards with a display: Cheap Yellow Display (ESP32-2432S028R), LilyGO T-Display, LilyGO T-Display-S3, Waveshare ESP32-S3-LCD-1.69, Waveshare ESP32-S3-Touch-LCD-1.47, Waveshare ESP32-C6-Touch-LCD-1.69 and an ESP32-C3 with a 240×240 ST7789 (wiring and display types in [CLIENT-PROTOCOL.md](../vibedock-server/CLIENT-PROTOCOL.md#boards)). Each is a PlatformIO environment in `firmware/platformio.ini`; `firmware/src/platform.h` holds what differs between the chips. Tested on hardware: the VibeTV M1, the Waveshare ESP32-S3-Touch-LCD-1.47 and ESP32-C6-Touch-LCD-1.69. The other boards are prepared: they build and use what the tested boards showed, but have not run on hardware (status per board in [CLIENT-PROTOCOL.md](../vibedock-server/CLIENT-PROTOCOL.md#boards), tests in [VALIDATION.md](../vibedock-server/VALIDATION.md)).
+The same sources also build for ESP32 boards with a display: Cheap Yellow Display (ESP32-2432S028R), LilyGO T-Display, LilyGO T-Display-S3, Waveshare ESP32-S3-LCD-1.69, Waveshare ESP32-S3-Touch-LCD-1.47, Waveshare ESP32-S3-Touch-LCD-1.54, Waveshare ESP32-C6-Touch-LCD-1.69 and an ESP32-C3 with a 240×240 ST7789 (wiring and display types in [CLIENT-PROTOCOL.md](../vibedock-server/CLIENT-PROTOCOL.md#boards)). Each is a PlatformIO environment in `firmware/platformio.ini`; `firmware/src/platform.h` holds what differs between the chips. Tested on hardware: the VibeTV M1, the Waveshare ESP32-S3-Touch-LCD-1.47 and ESP32-C6-Touch-LCD-1.69. The other boards are prepared: they build and use what the tested boards showed, but have not run on hardware (status per board in [CLIENT-PROTOCOL.md](../vibedock-server/CLIENT-PROTOCOL.md#boards), tests in [VALIDATION.md](../vibedock-server/VALIDATION.md)).
 
 <p align="center"><img src="../docs/manual/images/62-image-test-bench.png" width="320" alt="Example of the VibeDock status display with usage bands, weather, mood, update time and IP address"></p>
 
@@ -20,6 +20,83 @@ The same sources also build for ESP32 boards with a display: Cheap Yellow Displa
 | Move to another Wi-Fi network | [Change Wi-Fi or reset the device](#change-wi-fi-or-reset-the-device) |
 | Diagnose a problem | [Troubleshooting](#troubleshooting) |
 | Build or install the firmware | [Build and test](#build-and-test) · [Backup and flashing](FLASHING.md) |
+
+### Waveshare ESP32-S3-Touch-LCD-1.54
+
+Select **Waveshare ESP32-S3-Touch-LCD-1.54** in the administration, or use
+`scripts/build.sh waveshare-s3-touch-lcd-154` to build without touching a device. This is a separate build from the
+1.47-inch and 1.69-inch boards: 240×240 ST7789, 16 MB flash, CST816 touch. It is **prepared, not tested on hardware**;
+display colours and touch have been checked by the owner, while audio, battery sensing and battery operation
+still need hardware verification. SD card and motion sensor are not used. Keep a verified full backup of your own device before installing.
+
+For manual installation from `vibedock-client/`, close the browser's serial connection and other serial monitors,
+then run `./scripts/flash.sh waveshare-s3-touch-lcd-154`. It builds the selected board and asks before writing the
+merged `flash.bin` at address `0x0`. The script does not create a backup for you; use the browser's full-backup
+function or a verified esptool backup first. The separate `firmware.bin` is for later signed updates over Wi-Fi.
+
+The wiring comes from the [manufacturer's examples](https://github.com/waveshareteam/ESP32-S3-Touch-LCD-1.54/tree/5157db7c888e476fd57f8a95020800377447478f/examples/ESP32-S3-Touch-LCD-1.54-demo/Arduino-3.2.0/examples):
+LCD DC=45, CS=21, SCK=38, MOSI=39, reset=40, backlight=46; touch SDA=42, SCL=41, reset=47, interrupt=48 (unused;
+the firmware polls). Colour correction starts neutral until calibrated on hardware.
+
+### Sounds and volume on the Waveshare ESP32-S3-Touch-LCD-1.54
+
+The ES8311 and speaker amplifier play the seven agreed short melodies: boot, connected to the server,
+Wi-Fi pairing prompt, USB pairing prompt, quota increase, quota decrease and sustained connection loss.
+The melodies are synthesized locally; no audio files, microphone recording or audio streaming are needed.
+
+Use the **+ / - buttons** to adjust volume by 10, or open the device's IP address and use **Sounds** to set volume,
+mute, or save and play a test tone. The default is 30%; 0 is mute. The volume is stored with the other device
+settings, after the existing three-second write delay, and survives a restart. A muted device stays silent at boot.
+A button press changes the volume once; holding it does not repeatedly change it. Louder plays a short high beep,
+quieter a lower boop, only when the volume actually changes. Saving a new volume on the status page gives the same
+feedback. Recognized swipes play a quiet short sliding tone. Volume 0 mutes these feedback sounds too.
+Each volume-button press (also at 0 or 100) briefly shows an on-screen bar and percentage, or **Muted** at zero.
+It disappears 1.6 seconds after the last press. The latest underlying pixels are restored locally, even offline;
+no image refresh is required. Changes saved on the status page show the same feedback. Sound playback and buttons run
+in their own task, so a melody does not block image reception. If audio initialization fails, the image and touch
+still work and the status page and device log report the audio error.
+
+There are **no quota thresholds**: each observed rise or fall sounds, including small changes (0.01 percentage
+point precision). Reaching 100% remaining uses the rising melody; reaching zero uses the low beep. These endpoint
+events replace the ordinary rise/fall for that window, so one change does not sound twice. Changes of the same
+kind in multiple windows of one response share one melody; if different kinds occur, they are queued. The first
+reading after boot, a new/returning source, and unchanged readings are silent. No history is written to flash.
+
+Only a working audio client asks for `X-VibeDock-Audio: 1`. The server then adds `X-VibeDock-Quota` to normal
+image replies, including HTTP 304, for sources fitted to this display's layout (also during a photo slideshow).
+Clients without audio and preview requests get no extra header. Old servers still work: local startup/connection
+and pairing tones work, but quota sounds need the updated server. A connection outage must last five seconds
+after previously successful contact to sound once; recovery sounds once too. Wi-Fi pairing prompts sound when
+entering setup/pairing; a USB HELLO while unpaired prompts at most once every 30 seconds.
+
+The audio pinout follows the [manufacturer's example](https://github.com/waveshareteam/ESP32-S3-Touch-LCD-1.54/blob/5157db7c888e476fd57f8a95020800377447478f/examples/ESP32-S3-Touch-LCD-1.54-demo/Arduino-3.2.0/examples/01_i2s_audio/01_i2s_audio.ino):
+ES8311 at I2C 0x18 on SDA42/SCL41 shared with touch; MCLK8, BCLK9, LRCK10, data12, amplifier7.
+The physical volume buttons are GPIO4 (+) and GPIO0 (-); GPIO5 (PWR) is not used for volume. The firmware uses 16 kHz,
+16-bit stereo I2S with identical samples in both channels. Other boards compile without this audio driver.
+
+### Battery readings on the Waveshare ESP32-S3-Touch-LCD-1.54
+
+The device's local status page shows measured battery voltage, a coarse voltage-based level estimate and the
+active-low charging signal. Reload the page to take another reading. No credentials are included in these readings.
+The firmware also holds the board's battery-power latch on (GPIO 2), as in the manufacturer's example.
+
+Over the USB serial console (115200 baud, close the browser's serial connection first), send this line:
+
+```text
+VIBEDOCK-BATTERY
+```
+
+The reply starts with `VIBEDOCK-BATTERY ` followed by JSON containing `supported`, `voltageMv`,
+`estimatedPercent`, `chargeSignal` (`active`, `inactive`, `unstable` or `unknown`) and `present`.
+`VIBEDOCK-HELLO` also includes these fields inside `battery` on this board. Other boards answer the explicit
+battery request with `supported: false` and unknown measurements, without reading their pins.
+
+**Battery presence stays unknown (`present: null`).** The charging circuit does not reliably distinguish an
+absent battery from a charged one while USB is connected. Its output can show a voltage even without a cell.
+An inactive charging signal does not mean "full". The percentage is only an estimate, not a fuel-gauge reading;
+out-of-range voltages produce `estimatedPercent: null`. A short sample cannot rule out slower charger cycling.
+The pin assignments and voltage divider follow the [manufacturer's power-manager example](https://github.com/waveshareteam/ESP32-S3-Touch-LCD-1.54/blob/5157db7c888e476fd57f8a95020800377447478f/examples/ESP32-S3-Touch-LCD-1.54-demo/ESP-IDF-5.5.1/01_factory/components/esp_bsp/bsp_power_manager.c).
+Battery measurements and operation still need verification on the physical board.
 
 ## Before you start
 
@@ -234,7 +311,7 @@ c++ -std=c++17 tests/policy_test.cpp -o /tmp/vibedock-policy-test
 /tmp/vibedock-policy-test
 ```
 
-A successful test exits with code 0 and produces no output. It checks registration retry timing, clock rollover, RGB565 decoding and the colour correction. It uses no physical device.
+A successful test exits with code 0 and produces no output. It checks registration retry timing, clock rollover, RGB565 decoding, colour correction, the battery estimate (invalid readings, bounds and monotonicity), quota-sound deduplication/validation and connection-sound timing. It uses no physical device.
 
 ### Generated files and display memory
 

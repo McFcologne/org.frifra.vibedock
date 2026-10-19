@@ -42,6 +42,19 @@ class AccessTest {
         store.save(new SettingsStore.Settings(List.of("127.0.0.1/32"),new SettingsStore.Credential("",""),new SettingsStore.Credential("",""),List.of()));
         usage.configurationChanged();
     }
+    @Test void quotaMetadataRequiresAudioOptInAndSurvives304ButNotPreview() throws Exception {
+        String key="ab".repeat(32),id="vibedock-audio-test",path="/api/v1/clients/"+id+"/image";
+        clients.paired(id,"Audio",key,"192.168.1.20",80);
+        var first=mvc.perform(get(path).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(8080);return r;}))
+                .andExpect(status().isOk()).andExpect(header().doesNotExist("X-VibeDock-Quota")).andReturn();
+        String etag=first.getResponse().getHeader("ETag");
+        mvc.perform(get(path).header("Authorization","Bearer "+key).header("X-VibeDock-Audio","1")
+                .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk()).andExpect(header().string("X-VibeDock-Quota","v1"));
+        mvc.perform(get(path).header("Authorization","Bearer "+key).header("X-VibeDock-Audio","1").header("If-None-Match",etag)
+                .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNotModified()).andExpect(header().string("X-VibeDock-Quota","v1"));
+        mvc.perform(get(path).header("Authorization","Bearer "+key).header("X-VibeDock-Audio","1").header("X-VibeDock-Preview","1")
+                .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk()).andExpect(header().doesNotExist("X-VibeDock-Quota"));
+    }
     @Test void footerAndLicensePageUseGeneratedBuildInformation() throws Exception {
         mvc.perform(get("/admin").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Licenses &amp; notices")))

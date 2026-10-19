@@ -58,6 +58,9 @@ class DeviceApiController {
         String tag="\""+HexFormat.of().formatHex(Arrays.copyOf(sha256(pixels),12))+"\"";
         var headers=new HttpHeaders();headers.setETag(tag);headers.set("X-VibeDock-Image-Format",display.imageFormat());
         headers.set("X-VibeDock-Poll-Seconds",String.valueOf(designs.pollSeconds(registry.designFor(identifier),registry.pollSeconds(),identifier)));
+        // Only clients that explicitly support sound receive quota metadata. Preview pulls neither need nor consume it.
+        if(QuotaHeader.requested(request.getHeader("X-VibeDock-Audio"),request.getHeader("X-VibeDock-Preview")))
+            headers.set("X-VibeDock-Quota",designs.quotaHeader(registry.designFor(identifier),display));
         // Mounted upside down: the device turns its panel by 180 degrees (also its own screens and the swipes).
         if(registry.get(identifier).board().flippable())headers.set("X-VibeDock-Orientation",registry.flipped(identifier)?"flipped":"upright");
         // A requested update over Wi-Fi: the device fetches /firmware after this pull and installs it if signed.

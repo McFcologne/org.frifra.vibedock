@@ -4,6 +4,14 @@
 #include <math.h>
 // Pure timing and format rules of the VibeDock client (protocol v2), shared with the native test.
 namespace client_policy {
+// Coarse voltage-only estimate for a single Li-ion cell, following the Waveshare 1.54-inch example.
+// This is not a fuel gauge or battery-presence detector; a charger without a cell can also show a voltage.
+constexpr int batteryEstimate(uint32_t millivolts) {
+  return millivolts < 3000 || millivolts > 4350 ? -1 :
+      millivolts < 3520 ? 1 : millivolts < 3640 ? 20 : millivolts < 3760 ? 40 :
+      millivolts < 3880 ? 60 : millivolts < 4000 ? 80 : 100;
+}
+
 constexpr uint32_t minPollSeconds = 10, maxPollSeconds = 3600, defaultPollSeconds = 30;
 constexpr uint8_t maxPairingAttempts = 5;
 constexpr uint32_t clampPoll(uint32_t seconds) {

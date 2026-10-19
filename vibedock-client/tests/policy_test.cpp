@@ -1,9 +1,63 @@
 #include <string>
+#include "../firmware/src/sound_policy.h"
+#include "../firmware/src/volume_overlay.h"
 #include "../firmware/src/client_policy.h"
 #include <cassert>
 #include <limits>
 int main(){
   using namespace client_policy;
+  {
+    sound_policy::VolumeOverlay overlay; uint16_t row[240];
+    for(int i=0;i<240;i++)row[i]=uint16_t(i);
+    assert(!overlay.savedRow(0)); overlay.capture(95,row,240); assert(!overlay.savedRow(0));
+    overlay.capture(96,row,240); assert(overlay.savedRow(0)[0]==20 && overlay.savedRow(0)[199]==219);
+    overlay.show(100); assert(overlay.visible(1699)); assert(overlay.expired(1700));
+    overlay.show(1600); assert(overlay.visible(2000)); // another press extends the notice
+    row[20]=1234; overlay.capture(96,row,240); assert(overlay.savedRow(0)[0]==1234); // restore the NEW picture
+    overlay.capture(96,row,200); assert(overlay.savedRow(0)[0]==1234); // reject incompatible rows
+    overlay.dismiss(); assert(!overlay.visible(2000) && !overlay.expired(2000));
+    overlay.show(0xfffffff0u); assert(overlay.visible(100)); assert(overlay.expired(1600));
+    assert(!overlay.savedRow(-1) && !overlay.savedRow(48));
+  }
+  {
+    using namespace sound_policy;
+    assert(clampVolume(-1)==0 && clampVolume(101)==100 && clampVolume(30)==30);
+    auto quiet=[](Changes c){return !c.up&&!c.down&&!c.full&&!c.empty;};
+    Quotas q;
+    assert(quiet(q.update("v1;0123456789abf:5000"))); // initial snapshot is silent
+    assert(quiet(q.update("v1;0123456789abf:5000"))); // includes repeated HTTP 304 metadata
+    auto c=q.update("v1;0123456789abf:4999"); assert(c.down&&!c.up); // even 0.01%, no threshold
+    c=q.update("v1;0123456789abf:5000"); assert(c.up&&!c.full);
+    c=q.update("v1;0123456789abf:10000"); assert(c.full&&!c.up);
+    c=q.update("v1;0123456789abf:0"); assert(c.empty&&!c.down);
+    assert(quiet(q.update("v1;0123456789abf:0")));
+    assert(quiet(q.update("v1"))); // source disappeared, its later return establishes a baseline
+    assert(quiet(q.update("v1;0123456789abf:3000;0123456789abw:7000")));
+    assert(quiet(q.update("v1;0123456789abw:7000;0123456789abf:3000"))); // order independent
+    for(const char *bad:{"v2;0123456789abf:3000","v1;", "v1;a", "v1;0123456789abf:",
+        "v1;0123456789abf:10001","v1;0123456789abf:-1","v1;0123456789abf:2x",
+        "v1;0123456789abf:1;0123456789abf:2"}) assert(quiet(q.update(bad)));
+    assert(quiet(q.update("v1;0123456789abf:3000;0123456789abw:7000"))); // malformed metadata did not advance state
+    c=q.update("v1;0123456789abf:3001;0123456789abw:6999"); assert(c.up&&c.down);
+    assert(quiet(q.update(""))); assert(quiet(q.update("v1;0123456789abf:10000"))); // old server / pairing reset
+    Connection state;
+    assert(state.update(false,0)==0); assert(state.update(false,9000)==0);
+    assert(state.update(true,10000)==1); assert(state.update(true,11000)==0);
+    assert(state.update(false,12000)==0); assert(state.update(true,13000)==0); // short outage stays quiet
+    assert(state.update(false,14000)==0); assert(state.update(false,18999)==0);
+    assert(state.update(false,19000)==-1); assert(state.update(false,25000)==0);
+    assert(state.update(true,26000)==1); assert(state.update(true,27000)==0);
+    Connection wrap; assert(wrap.update(true,0xfffff000u)==1);
+    assert(wrap.update(false,0xfffffff0u)==0); assert(wrap.update(false,5000)==-1);
+  }
+  // A disconnected/invalid ADC must never become a plausible percentage. Estimates are bounded and monotonic.
+  assert(batteryEstimate(0) == -1); assert(batteryEstimate(2999) == -1);
+  assert(batteryEstimate(4351) == -1); assert(batteryEstimate(0xffffffffu) == -1);
+  assert(batteryEstimate(3300) == 1); assert(batteryEstimate(3700) == 40); assert(batteryEstimate(4200) == 100);
+  for (uint32_t mv = 3000; mv <= 4350; ++mv) {
+    assert(batteryEstimate(mv) >= 0 && batteryEstimate(mv) <= 100);
+    if (mv > 3000) assert(batteryEstimate(mv) >= batteryEstimate(mv - 1));
+  }
   assert(clampPoll(1)==10);assert(clampPoll(30)==30);assert(clampPoll(99999)==3600);
   assert(!pullDue(29999,0,30));assert(pullDue(30000,0,30));assert(pullDue(10000,0,5));
   assert(!imageStale(89999,0,30));assert(imageStale(90000,0,30));
