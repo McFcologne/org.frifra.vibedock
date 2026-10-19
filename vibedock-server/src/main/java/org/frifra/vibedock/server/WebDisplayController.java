@@ -23,6 +23,7 @@ class WebDisplayController {
     @GetMapping("/web/{secret}") String page(@PathVariable String secret,Model model){
         var view=registry.webBySecret(secret).orElseThrow(WebDisplayController::notFound);
         model.addAttribute("name",view.name());model.addAttribute("image","/web/"+secret+"/image.png");model.addAttribute("icon","/web/"+secret+"/icon.png");
+        model.addAttribute("background",background(view));
         model.addAttribute("state","/web/"+secret+"/state");model.addAttribute("swipe","/web/"+secret+"/swipe");
         model.addAttribute("reload",view.web().reloadSeconds());model.addAttribute("ratio",(double)view.display().height()/view.display().width());
         return "web-display";
@@ -71,6 +72,7 @@ class WebDisplayController {
     static String base(ClientRegistry.View view,ServerAddresses addresses,HttpServletRequest request){
         return view.web().external()&&!addresses.external().isBlank()?addresses.external().replaceFirst("/$",""):addresses.internal(request).replaceFirst("/$","");
     }
+    private static String background(ClientRegistry.View view){return "#%06x".formatted(view.design().scheme().background);}
     private static org.springframework.web.server.ResponseStatusException notFound(){
         return new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND);
     }

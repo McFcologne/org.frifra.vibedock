@@ -783,6 +783,20 @@ class AccessTest {
                 .with(user("admin").roles("ADMIN")).with(csrf()).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isOk());
         Assertions.assertFalse(clients.get(id).overridden());Assertions.assertEquals(clients.defaultDesign(),clients.designFor(id));
     }
+    @Test void webDisplayBackgroundIsExplicitForEveryThemeBeforeImagesLoad() throws Exception {
+        var view=clients.addWeb("Theme background test","240x320",30);
+        String page="/web/"+view.web().secret();
+        try{
+            for(var scheme:Scheme.values()){
+                clients.setDesign(view.identifier(),clients.designFor(view.identifier()).withScheme(scheme));
+                String colour="#%06x".formatted(scheme.background);
+                mvc.perform(get(page).with(r->{r.setLocalPort(8080);return r;}))
+                        .andExpect(status().isOk())
+                        .andExpect(content().string(org.hamcrest.Matchers.containsString("style=\"--display-background:"+colour+"\"")))
+                        .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"theme-color\" content=\""+colour+"\"")));
+            }
+        }finally{clients.remove(view.identifier());}
+    }
     @Test void webDisplaysServeTheirPageAndImageOnlyWithTheirSecretOnThePublicPort() throws Exception {
         mvc.perform(post("/admin/clients/web").param("name","Kitchen tablet").param("display","240x320").param("reloadSeconds","30")
                 .with(user("admin").roles("ADMIN")).with(csrf()).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().is3xxRedirection());
