@@ -30,9 +30,20 @@ html,body{margin:0;height:100%;background:#000;overflow:hidden;touch-action:mani
   function load() {
     const ratio = Math.round((window.devicePixelRatio || 1) * 100) / 100;
     const url = body.dataset.image + '?w=' + screen.clientWidth + '&h=' + screen.clientHeight + '&r=' + ratio + '&t=' + Date.now(), next = new Image();
-    next.onload = () => { screen.style.backgroundImage = 'url("' + url + '")'; last = new Date(); stale.style.display = 'none'; };
+    next.onload = () => { screen.style.backgroundImage = 'url("' + url + '")'; last = new Date(); stale.style.display = 'none'; tint(next); };
     next.onerror = () => { stale.textContent = last ? 'offline · last image ' + time(last) : 'offline'; stale.style.display = 'inline-block'; };
     next.src = url;
+  }
+  // The page and the status bar (theme-color; iOS also samples the page) take the colour of the image's top edge, also
+  // after a swipe to another theme, instead of keeping the first one.
+  const theme = document.querySelector('meta[name="theme-color"]'), probe = document.createElement('canvas');
+  function tint(image) {
+    try {
+      probe.width = 1; probe.height = 1; const context = probe.getContext('2d', { willReadFrequently: true });
+      context.drawImage(image, Math.floor(image.naturalWidth / 2), 0, 1, 1, 0, 0, 1, 1);
+      const [r, g, b] = context.getImageData(0, 0, 1, 1).data, colour = 'rgb(' + r + ',' + g + ',' + b + ')';
+      document.documentElement.style.background = colour; body.style.background = colour; theme.setAttribute('content', colour);
+    } catch { /* keeps the colour it has */ }
   }
   async function check() {
     if (document.hidden) return;
