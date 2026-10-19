@@ -1,7 +1,7 @@
 // Screenshots of the user manual (docs/manual/images), started by scripts/docs.sh. Starts the server with demo data
 // (org.frifra.vibedock.server.DocsDemo: fixed clock, made-up usage and weather), brings the demo devices into their states over
 // the device API and photographs every administration page. The same sources always give the same pictures.
-import {chromium} from '@playwright/test';
+import {chromium, expect} from '@playwright/test';
 import {mkdtemp, mkdir, writeFile, readFile, rm} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {tmpdir} from 'node:os';
@@ -111,13 +111,28 @@ try {
     const context = await browser.newContext({viewport: {width: 1280, height: 900}, deviceScaleFactor: 2, reducedMotion: 'reduce', colorScheme: 'light'});
     // No request leaves the demo server (fonts, provider sign-in, weather).
     await context.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+    // example.com has no live TLS endpoint. Show a successful, made-up inspection in the manual,
+    // just like its demo usage and weather; never probe a real certificate service for screenshots.
+    await context.route('**/admin/tls-pin', route => route.fulfill({json: {
+      known: true, fingerprint: '0123456789abcdef0123456789abcdef01234567',
+      message: 'TLS pin available for https://vibedock.example.com',
+      route: 'configured-probe', target: '192.168.1.20:10002', cached: false,
+      certificate: {subject: 'CN=vibedock.example.com', issuer: 'CN=Example Certificate Authority',
+        notBefore: '2026-10-01T00:00:00Z', notAfter: '2026-12-30T23:59:59Z',
+        sha256: '0123456789abcdef'.repeat(4), protocol: 'TLSv1.3'}
+    }}));
     const page = await context.newPage();
     await rm(out, {recursive: true, force: true}); await mkdir(out, {recursive: true});
     const shot = async (name, target = page, options = {}) => { await page.waitForTimeout(250); await target.screenshot({path: path.join(out, name + '.png'), animations: 'disabled', ...options}); console.log('  ' + name); };
     // The sticky app bar would cover the top of element shots further down the page; the footer's version is left out,
     // so the pictures do not show one release's number.
     const go = async url => { await page.goto(B + url); await page.waitForLoadState('networkidle'); await page.evaluate(() => document.fonts.ready);
-      await page.addStyleTag({content: '.appbar{position:static!important}.app-footer-inner>span>span{display:none}'}); };
+      await page.addStyleTag({content: '.appbar{position:static!important}.app-footer-inner>span>span{display:none}'});
+      if (await page.locator('[data-tls-pin-status]').count()) {
+        await expect(page.locator('[data-tls-pin-value]').first()).toHaveText('0123456789abcdef0123456789abcdef01234567');
+        await expect(page.locator('[data-tls-pin-refresh]').first()).toBeEnabled();
+      }
+    };
     const main = () => page.locator('main');
 
     // Sign-in
