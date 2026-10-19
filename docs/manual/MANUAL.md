@@ -59,8 +59,9 @@ These displays are tested on hardware:
 | Display | What it is | Bought at |
 | --- | --- | --- |
 | VibeTV M1 | 240×240 desk display, ESP8266 | Vibe TV, <https://vibetv.shop/> |
-| Waveshare ESP32-S3-Touch-LCD-1.47 | ESP32-S3 1.47inch Touch Display Development Board (without pin header), 172×320, 262K colours, 2.4 GHz Wi-Fi and BLE 5, 240 MHz LX7 dual core | Amazon |
-| Waveshare ESP32-C6-Touch-LCD-1.69 | ESP32-C6 1.69 inch Touch Display Dev Board, 240×280, 262K colours, 32-bit RISC-V, Wi-Fi 6, IEEE 802.15.4 (Zigbee 3.0, Thread) and Bluetooth 5 | Amazon |
+| Waveshare ESP32-S3-Touch-LCD-1.47 | ESP32-S3 1.47inch Touch Display Development Board (without pin header), 172×320, 262K colours, 2.4 GHz Wi-Fi and BLE 5, 240 MHz LX7 dual core | Waveshare shop at Amazon |
+| Waveshare ESP32-C6-Touch-LCD-1.69 | ESP32-C6 1.69 inch Touch Display Dev Board, 240×280, 262K colours, 32-bit RISC-V, Wi-Fi 6, IEEE 802.15.4 (Zigbee 3.0, Thread) and Bluetooth 5 | Waveshare shop at Amazon |
+| Waveshare ESP32-S3-Touch-LCD-1.54 | ESP32-S3 1.54 inch Touch Display Development Board, 240×240, 262K colours, 2.4 GHz Wi-Fi and BLE 5, 240 MHz LX7 dual core, 16 MB flash, speaker and battery connector | Waveshare shop at Amazon |
 
 The VibeTV M1 comes with the seller's own firmware and app; this project replaces that firmware with its own (see
 [Installing the firmware](#installing-the-firmware)), after you have saved a full backup of the original. On the
@@ -767,7 +768,7 @@ firmware card decides which image is shown, downloaded and installed:
 | LilyGO T-Display-S3 | ESP32-S3 | 1.9" ST7789 170×320 | prepared |
 | Waveshare ESP32-S3-LCD-1.69 | ESP32-S3 | 1.69" ST7789V2 240×280 | prepared |
 | Waveshare ESP32-S3-Touch-LCD-1.47 | ESP32-S3 | 1.47" JD9853 172×320 | tested |
-| Waveshare ESP32-S3-Touch-LCD-1.54 | ESP32-S3 | 1.54" ST7789 240×240, CST816 touch | tested on hardware by the owner |
+| Waveshare ESP32-S3-Touch-LCD-1.54 | ESP32-S3 | 1.54" ST7789 240×240, CST816 touch | tested |
 | Waveshare ESP32-C6-Touch-LCD-1.69 | ESP32-C6 | 1.69" ST7789V2 240×280 | tested |
 | ESP32-C3 with ST7789 240×240 | ESP32-C3 | e.g. C3 SuperMini | prepared |
 
@@ -954,9 +955,8 @@ also work with older servers. Sustained connection loss and subsequent recovery 
 The **Battery** card shows measured voltage, a coarse estimated level and the charging signal. Reload to take
 another reading. These readings do not prove a battery is fitted or full while USB supplies power; battery
 presence stays **Unknown**. USB serial command `VIBEDOCK-BATTERY` returns the same diagnostic values.
-The owner has confirmed hardware testing: display colours, touch, audio and volume controls work. A later
-amplifier-startup fix for the short volume/swipe cues still needs confirmation. Battery presence and operation
-without USB have not been established. No motion-based rotation or microphone recording is implemented.
+Tested on hardware: display colours, touch, audio, the short volume and swipe cues and the volume controls work.
+Battery presence and operation without USB have not been established. No motion-based rotation or microphone recording is implemented.
 
 ## Displays mounted upside down or turned
 

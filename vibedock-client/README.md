@@ -25,9 +25,9 @@ The same sources also build for ESP32 boards with a display: Cheap Yellow Displa
 
 Select **Waveshare ESP32-S3-Touch-LCD-1.54** in the administration, or use
 `scripts/build.sh waveshare-s3-touch-lcd-154` to build without touching a device. This is a separate build from the
-1.47-inch and 1.69-inch boards: 240×240 ST7789, 16 MB flash, CST816 touch. It has been **tested on hardware by the owner**, including colours, touch, audio and the volume controls.
+1.47-inch and 1.69-inch boards: 240×240 ST7789, 16 MB flash, CST816 touch. It has been **tested on hardware**, including colours, touch, audio, the short volume and swipe cues and the volume controls.
 The battery page reports readings, but battery presence and operation without USB have not been established.
-The short volume/swipe sounds received an amplifier-startup fix; confirmation of that fix on the device is pending. SD card and motion sensor are not used. Keep a verified full backup of your own device before installing.
+SD card and motion sensor are not used. Keep a verified full backup of your own device before installing.
 
 For manual installation from `vibedock-client/`, close the browser's serial connection and other serial monitors,
 then run `./scripts/flash.sh waveshare-s3-touch-lcd-154`. It builds the selected board and asks before writing the

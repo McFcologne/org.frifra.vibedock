@@ -12,8 +12,7 @@ unverified. The board is marked hardware-tested in both inventories.
 The owner reported that only the short volume and swipe cues were inaudible. The NS4150B's typical startup time
 is 120 ms, while those cues last 80, 90 and 120 ms. Playback now primes I2S with 160 ms of silence after amplifier
 enable. An isolated execution trace of the actual player confirmed the first nonzero samples move from 0.06 ms
-to 160.06 ms for all three short cues. This fix builds and passes client policy tests; its audible result still
-needs confirmation on the device.
+to 160.06 ms for all three short cues. Confirmed on the device: the short cues are audible now.
 
 ## State of version 0.2.0 (2026-10-17, on the branch 0.2.0)
 
