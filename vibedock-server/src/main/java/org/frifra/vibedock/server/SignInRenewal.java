@@ -46,6 +46,10 @@ class SignInRenewal {
     private final String grokCli,geminiCli,claudeCli;private final ObjectMapper json;
     @org.springframework.beans.factory.annotation.Autowired private SettingsStore settings;
     private final Map<Path,Long> lastRun=new ConcurrentHashMap<>();
+    /** Claude folders whose last renewal failed with the token already expired: only these wait the long gap. */
+    private final java.util.Set<Path> expiredFailures=ConcurrentHashMap.newKeySet();
+    /** The time of the Claude renewal decisions; replaced in tests. */
+    Clock clock=Clock.systemUTC();
     SignInRenewal(@Value("${vibedock.grok-cli:grok}") String grokCli,@Value("${vibedock.gemini-cli:gemini}") String geminiCli,
                   @Value("${vibedock.claude-cli:claude}") String claudeCli,ObjectMapper json){
         this.grokCli=grokCli;this.geminiCli=geminiCli;this.claudeCli=claudeCli;this.json=json;
@@ -76,18 +80,18 @@ class SignInRenewal {
     }
     private void claude(Path folder){
         Path file=folder.resolve(".credentials.json");
-        long expires=expiry(file,SignInRenewal::claudeExpiry),now=Instant.now().getEpochSecond();
+        long expires=expiry(file,SignInRenewal::claudeExpiry),now=clock.instant().getEpochSecond();
         if(expires<=0||expires-now>CLAUDE_RENEW_BEFORE_SECONDS)return;
         Long previous=lastRun.get(folder);
-        if(previous!=null&&now-previous<(expires<now?CLAUDE_EXPIRED_RETRY_SECONDS:CLAUDE_RETRY_SECONDS))return;
+        if(previous!=null&&now-previous<(expiredFailures.contains(folder)?CLAUDE_EXPIRED_RETRY_SECONDS:CLAUDE_RETRY_SECONDS))return;
         lastRun.put(folder,now);
         run("Claude",folder,claudeCommand(claudeCli),Map.of("CLAUDE_CONFIG_DIR",folder.toString(),"NO_COLOR","1","TERM","dumb"),
                 CLAUDE_FOREIGN_CREDENTIALS);
         long after=expiry(file,SignInRenewal::claudeExpiry);
-        if(after>expires){lastRun.remove(folder);log.info("Claude sign-in in {} renewed until {}",folder.getFileName(),Instant.ofEpochSecond(after));}
-        else if(expires<now)log.warn("Claude sign-in in {} expired at {} and could not be renewed; sign in again (next try in {} h)",
-                folder.getFileName(),Instant.ofEpochSecond(expires),CLAUDE_EXPIRED_RETRY_SECONDS/3600);
-        else log.warn("Claude sign-in in {} not renewed (expires {}); tried again in {} min",folder.getFileName(),Instant.ofEpochSecond(expires),CLAUDE_RETRY_SECONDS/60);
+        if(after>expires){lastRun.remove(folder);expiredFailures.remove(folder);log.info("Claude sign-in in {} renewed until {}",folder.getFileName(),Instant.ofEpochSecond(after));}
+        else if(expires<now){expiredFailures.add(folder);log.warn("Claude sign-in in {} expired at {} and could not be renewed; sign in again (next try in {} h)",
+                folder.getFileName(),Instant.ofEpochSecond(expires),CLAUDE_EXPIRED_RETRY_SECONDS/3600);}
+        else{expiredFailures.remove(folder);log.warn("Claude sign-in in {} not renewed (expires {}); tried again in {} min",folder.getFileName(),Instant.ofEpochSecond(expires),CLAUDE_RETRY_SECONDS/60);}
     }
     /** The expiry of the access token in Claude Code's .credentials.json (milliseconds there), 0 when missing. */
     static long claudeExpiry(JsonNode node){return epochSeconds(node.path("claudeAiOauth").path("expiresAt"));}

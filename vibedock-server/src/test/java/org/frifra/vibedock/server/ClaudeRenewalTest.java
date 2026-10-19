@@ -19,7 +19,10 @@ class ClaudeRenewalTest {
     private Path fakeCli(Path dir) throws Exception {
         Path script=dir.resolve("claude");
         long later=(Instant.now().getEpochSecond()+8*3600)*1000;
-        Files.writeString(script,"#!/bin/sh\necho \"$# $@ | $CLAUDE_CONFIG_DIR | $(ls -A) | ${ANTHROPIC_API_KEY:-none}\" >> \"$CLAUDE_CONFIG_DIR/calls\"\n"
+        // One line per call; the arguments one per line (an empty one stays an empty line); folder, key and the number of
+        // entries in the working folder separately, so no shell quirk mixes them.
+        Files.writeString(script,"#!/bin/sh\necho call >> \"$CLAUDE_CONFIG_DIR/calls\"\nprintf '%s\\n' \"$@\" > \"$CLAUDE_CONFIG_DIR/args\"\n"
+                +"printf '%s\\n' \"$CLAUDE_CONFIG_DIR\" \"${ANTHROPIC_API_KEY:-none}\" \"$(ls -A | wc -l | tr -d ' ')\" > \"$CLAUDE_CONFIG_DIR/env\"\n"
                 +"[ -f \"$CLAUDE_CONFIG_DIR/broken\" ] || printf '%s' '"+credentials(later)+"' > \"$CLAUDE_CONFIG_DIR/.credentials.json\"\n");
         Files.setPosixFilePermissions(script,PosixFilePermissions.fromString("rwx------"));
         return script;
@@ -38,7 +41,8 @@ class ClaudeRenewalTest {
         renewal.renewIfDue(account,folder);
         var command=SignInRenewal.claudeCommand("claude");
         assertTrue(command.containsAll(java.util.List.of("-p","--tools","","--strict-mcp-config","--disable-slash-commands","--no-session-persistence")));
-        assertEquals((command.size()-1)+" "+String.join(" ",command.subList(1,command.size()))+" | "+folder+" |  | none\n",Files.readString(folder.resolve("calls")));
+        assertEquals(command.subList(1,command.size()),Files.readAllLines(folder.resolve("args")));
+        assertEquals(java.util.List.of(folder.toString(),"none","0"),Files.readAllLines(folder.resolve("env")));
         long expires=SignInRenewal.claudeExpiry(json.readTree(folder.resolve(".credentials.json").toFile()));
         assertTrue(expires>Instant.now().getEpochSecond()+7*3600);
         // Expired already: still renewed by the request (the CLI refreshes an expired token before it).
@@ -50,6 +54,32 @@ class ClaudeRenewalTest {
         Files.writeString(folder.resolve("broken"),"");
         Files.writeString(folder.resolve(".credentials.json"),credentials((Instant.now().getEpochSecond()-60)*1000));
         renewal.renewIfDue(account,folder);renewal.renewIfDue(account,folder);
+        assertEquals(3,Files.readAllLines(folder.resolve("calls")).size());
+    }
+    /** A clock the test moves forward. */
+    static class Time extends java.time.Clock {
+        Instant instant=Instant.parse("2026-10-19T12:00:00Z");
+        void advance(long seconds){instant=instant.plusSeconds(seconds);}
+        public java.time.ZoneId getZone(){return java.time.ZoneOffset.UTC;}
+        public java.time.Clock withZone(java.time.ZoneId zone){return this;}
+        public Instant instant(){return instant;}
+    }
+    @Test void aFailureBeforeTheExpiryDoesNotDelayTheFirstTryAfterIt(@TempDir Path dir) throws Exception {
+        Path folder=Files.createDirectories(dir.resolve("accounts/claude-b"));
+        var renewal=new SignInRenewal("grok","gemini",fakeCli(dir).toString(),json);var time=new Time();renewal.clock=time;
+        var account=new SettingsStore.Account("claude-b","claude","Claude",null,"accounts/claude-b",false);
+        Files.writeString(folder.resolve("broken"),"");
+        Files.writeString(folder.resolve(".credentials.json"),credentials((time.instant().getEpochSecond()+600)*1000));
+        // Ten minutes before the expiry: fails, tried again after ten minutes.
+        renewal.renewIfDue(account,folder);
+        assertEquals(1,Files.readAllLines(folder.resolve("calls")).size());
+        // Expired now: the first try after the expiry still comes after ten minutes, not six hours.
+        time.advance(SignInRenewal.CLAUDE_RETRY_SECONDS+60);renewal.renewIfDue(account,folder);
+        assertEquals(2,Files.readAllLines(folder.resolve("calls")).size());
+        // That one failed with the token expired: the next only after six hours.
+        time.advance(SignInRenewal.CLAUDE_RETRY_SECONDS+60);renewal.renewIfDue(account,folder);
+        assertEquals(2,Files.readAllLines(folder.resolve("calls")).size());
+        time.advance(SignInRenewal.CLAUDE_EXPIRED_RETRY_SECONDS);renewal.renewIfDue(account,folder);
         assertEquals(3,Files.readAllLines(folder.resolve("calls")).size());
     }
     @Test void theExpiryIsReadFromMilliseconds() throws Exception {
