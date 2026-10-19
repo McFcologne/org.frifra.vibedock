@@ -59,8 +59,9 @@ These displays are tested on hardware:
 | Display | What it is | Bought at |
 | --- | --- | --- |
 | VibeTV M1 | 240×240 desk display, ESP8266 | Vibe TV, <https://vibetv.shop/> |
-| Waveshare ESP32-S3-Touch-LCD-1.47 | ESP32-S3 1.47inch Touch Display Development Board (without pin header), 172×320, 262K colours, 2.4 GHz Wi-Fi and BLE 5, 240 MHz LX7 dual core | Amazon |
-| Waveshare ESP32-C6-Touch-LCD-1.69 | ESP32-C6 1.69 inch Touch Display Dev Board, 240×280, 262K colours, 32-bit RISC-V, Wi-Fi 6, IEEE 802.15.4 (Zigbee 3.0, Thread) and Bluetooth 5 | Amazon |
+| Waveshare ESP32-S3-Touch-LCD-1.47 | ESP32-S3 1.47inch Touch Display Development Board (without pin header), 172×320, 262K colours, 2.4 GHz Wi-Fi and BLE 5, 240 MHz LX7 dual core | Waveshare shop at Amazon |
+| Waveshare ESP32-C6-Touch-LCD-1.69 | ESP32-C6 1.69 inch Touch Display Dev Board, 240×280, 262K colours, 32-bit RISC-V, Wi-Fi 6, IEEE 802.15.4 (Zigbee 3.0, Thread) and Bluetooth 5 | Waveshare shop at Amazon |
+| Waveshare ESP32-S3-Touch-LCD-1.54 | ESP32-S3 1.54 inch Touch Display Development Board, 240×240, 262K colours, 2.4 GHz Wi-Fi and BLE 5, 240 MHz LX7 dual core, 16 MB flash, speaker and battery connector | Waveshare shop at Amazon |
 
 The VibeTV M1 comes with the seller's own firmware and app; this project replaces that firmware with its own (see
 [Installing the firmware](#installing-the-firmware)), after you have saved a full backup of the original. On the
