@@ -113,7 +113,7 @@ For a device with this firmware installed, you need:
 - A **2.4 GHz** Wi-Fi network with WPA2 or WPA2/WPA3 mixed security. WPA3-only, required PMF/802.11w and WPA Enterprise are unsupported. Hidden networks are not listed; use a visible network for setup.
 - A phone to scan the setup QR code and a browser for pairing. The server must be able to reach the device on port 80 for pairing; the device must reach the server's announced image address, normally port 10002.
 
-If the device still runs its original firmware, first follow [Build and test](#build-and-test) and [FLASHING.md](FLASHING.md). **The easiest way is the server administration: *Devices → Firmware* installs the firmware from Chrome or Edge over USB after downloading a full backup, and then pairs the device over the same cable (name, Wi-Fi from the networks the device sees, password); steps 1–4 below are then not needed.** Ready-made firmware (`vibedock-m1-<version>.bin` for the VibeTV M1, one image per board) is also attached to the GitHub releases of this private repository; flash it with the commands in [FLASHING.md](FLASHING.md). Create and verify a private full backup of your own device before installation. Later versions install over Wi-Fi from the device list.
+If the device still runs its original firmware, first follow [Build and test](#build-and-test) and [FLASHING.md](FLASHING.md). **The easiest way is the server administration: *Devices → Firmware* installs the firmware from Chrome or Edge over USB after downloading a full backup, and then pairs the device over the same cable (name, Wi-Fi from the networks the device sees, password); steps 1–4 below are then not needed.** Ready-made firmware (`vibedock-m1-<version>.bin` for the VibeTV M1, one image per board) is also attached to the GitHub releases of this repository; flash it with the commands in [FLASHING.md](FLASHING.md). Create and verify a private full backup of your own device before installation. Later versions install over Wi-Fi from the device list.
 
 ## Set up Wi-Fi and pair with the server
 
@@ -143,9 +143,9 @@ The pairing code changes after every restart. Five wrong codes lock pairing unti
 Open **Display** in the server administration to edit the default design. To edit one device, open **Devices → Edit design**. Both use the same editor:
 
 - **Uses default:** the device follows the default design, including future changes.
-- **Custom design:** the device has its own design. Turn this off and save to follow the default again.
+- **Custom design:** the device has its own design. Turn this off to follow the default again; changes save automatically.
 
-Select accounts for up to four usage bands, each with one full-width account, two half-width accounts or one compact row; the VibeTV M1 shows two full bands, one full and two compact ones or four compact ones. Reorder the bands, swap weather and mood, choose an emoji and select one of thirteen display themes. Weather shows its icon and temperature without a location label. The display update time and IP remain fixed parts of the context band. Swapping weather and mood also changes their available size: the left slot is shorter because of the IP below it.
+Select accounts for up to five usage bands (up to ten sources on a sufficiently large display), each with one full-width account, two half-width accounts or one compact row; the VibeTV M1 shows two full bands, one full and two compact ones or four compact ones. Reorder the bands, swap weather and mood, choose an emoji and select one of twenty display themes. Weather shows its icon and temperature without a location label. The display update time and IP remain fixed parts of the context band. Swapping weather and mood also changes their available size: the left slot is shorter because of the IP below it.
 
 The server renders the preview and the device image with the same renderer. Changing content, arrangement or theme requires no firmware rebuild. Current firmware supports the server-drawn IP anywhere the context band is placed; older firmware may require that band at the bottom.
 

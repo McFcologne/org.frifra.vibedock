@@ -57,7 +57,7 @@ const clients = {
       display: '320x240', web: {secret: webSecret, external: false, reloadSeconds: 30}, lastPullAt: now - 3600, lastPullIp: '192.168.1.40'})
   ]
 };
-const boards = ['vibedock-m1', 'esp32-cyd', 'lilygo-t-display', 'lilygo-t-display-s3', 'waveshare-s3-lcd-169', 'waveshare-s3-touch-lcd-147', 'waveshare-c6-touch-lcd-169', 'esp32-c3-st7789'];
+const boards = ['vibedock-m1', 'esp32-cyd', 'lilygo-t-display', 'lilygo-t-display-s3', 'waveshare-s3-lcd-169', 'waveshare-s3-touch-lcd-147', 'waveshare-s3-touch-lcd-154', 'waveshare-c6-touch-lcd-169', 'esp32-c3-st7789'];
 
 // ---- server ----
 const dir = own || await mkdtemp(path.join(tmpdir(), 'vibedock-docs-'));
@@ -140,7 +140,10 @@ try {
     const main = () => page.locator('main');
 
     // Sign-in
-    await go('/login'); await shot('01-login');
+    await go('/login');
+    await expect(page.getByRole('checkbox', {name: 'Stay signed in'})).toBeVisible();
+    await expect(page.getByRole('checkbox', {name: 'Stay signed in'})).toBeChecked();
+    await shot('01-login');
     await page.getByLabel('Username', {exact: true}).fill('admin'); await page.getByLabel('Password', {exact: true}).fill(password);
     await page.getByRole('button', {name: 'Sign in', exact: true}).click(); await page.waitForLoadState('networkidle');
 
@@ -153,7 +156,9 @@ try {
     await go('/admin/devices'); await shot('10-devices', page, {fullPage: true});
     await shot('11-device-card', page.locator('#device-vibedock-0a1b2c000002'));
     await shot('12-web-display-card', page.locator('#device-web-0123456789ab'));
-    await page.locator('[data-create-open="invite"]').click(); await shot('13-pair-device', page.locator('#invite'));
+    await page.locator('[data-create-open="invite"]').click();
+    await expect(page.locator('#invite [data-tls-pin-status]')).toHaveCount(0);
+    await shot('13-pair-device', page.locator('#invite'));
     await page.keyboard.press('Escape');
     await page.locator('[data-create-open="web"]').click(); await page.locator('#web-name').fill('Kitchen tablet');
     await shot('14-add-web-display', page.locator('#web')); await page.keyboard.press('Escape');
@@ -187,6 +192,7 @@ try {
       pair.querySelector('[data-net-value]').textContent = 'Example-WiFi';
       pair.querySelector('[data-pair-state]').textContent = 'vibedock-0a1b2c000002 · firmware ' + v + ' · 7 networks found';
     }, [version, 563664]);
+    await expect(page.locator('[data-pair-form] [data-tls-pin-status]')).toHaveCount(0);
     await shot('25-firmware-installed', page.locator('#web-flasher'));
 
     // Display editor
@@ -220,7 +226,9 @@ try {
 
     // Web display page as a browser shows it; last, because its pull records this browser's address
     const tablet = await context.newPage(); await tablet.setViewportSize({width: 900, height: 600});
-    await tablet.goto(`${API}/web/${webSecret}`); await tablet.waitForTimeout(800);
+    await tablet.goto(`${API}/web/${webSecret}`);
+    await expect(tablet.locator('.screen')).toHaveCSS('background-image', /url\(/);
+    await expect(tablet.locator('body')).toHaveCSS('background-color', 'rgb(244, 244, 240)');
     await tablet.screenshot({path: path.join(out, '16-web-display-page.png')}); console.log('  16-web-display-page'); await tablet.close();
 
     // Display images of the demo devices, as the devices show them

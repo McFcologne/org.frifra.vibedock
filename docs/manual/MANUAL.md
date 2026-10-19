@@ -563,6 +563,10 @@ digital photo frame. **Add web display** creates it:
   display's name; it then opens full screen, keeping the notch and the home indicator free.
 - The page asks every 3 seconds whether its image changed, so a new design, new usage data or the next photo appear
   within seconds; the reload interval stays as a fallback.
+- **Background and status bar:** before the first image loads, the page explicitly sets the selected theme’s
+  background colour. After every successful image load, it samples the top edge and updates the page background
+  and browser theme colour, including timed reloads, theme swipes and photo changes. The iPhone home-screen
+  status bar is translucent so the background shows through. If an image cannot be loaded, the last colour stays.
 - **Double tap** (or double click, or the space bar) starts or stops the slideshow, like on touch displays.
 - **Swipe** left or right on the page (or press ← →) to change the theme, in a slideshow the photo, like on touch
   displays; the web display then keeps it as its own design.
