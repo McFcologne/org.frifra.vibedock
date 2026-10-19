@@ -21,9 +21,9 @@ Wi-Fi.
   instance. This does not limit the number of Claude accounts configured on a server.
 - **Synology setup and TLS pin documentation:** the manual explains how to point `EXTERNAL_TLS_PROBE_URL` at a
   separate reverse proxy's LAN HTTPS listener and allow its destination port from the Docker source subnet in
-  the DSM firewall. It distinguishes external, NAS-host and container reachability. Pairing, USB setup and
-  network screenshots now show successful demo TLS pin inspection; screenshot generation uses a fixed locale,
-  time zone and refresh line.
+  the DSM firewall. It distinguishes external, NAS-host and container reachability. The network screenshot shows
+  successful demo TLS pin inspection; pairing and USB setup screenshots reflect the simplified forms. All
+  screenshots are refreshed for 0.2.4; generation uses a fixed locale, time zone and refresh line.
 - **Waveshare ESP32-S3-Touch-LCD-1.54:** new firmware build, tested on hardware (240×240 ST7789, CST816 touch).
   Its speaker plays start, connection, pairing and quota sounds; volume and mute on the device page and with the
   + / - buttons, with a volume bar on the display. The device page and the USB command `VIBEDOCK-BATTERY` show
