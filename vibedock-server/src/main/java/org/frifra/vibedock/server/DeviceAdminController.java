@@ -250,13 +250,18 @@ class DeviceAdminController {
             return org.springframework.http.ResponseEntity.ok(java.util.Map.of("page",page,"image",page+"/image.png"));}
         catch(IllegalArgumentException e){return org.springframework.http.ResponseEntity.badRequest().body(java.util.Map.of("error","The web display was already removed."));}
     }
-    /** The switch on the card: turns the device's picture by 180 degrees; the device is asked to pull right away. */
+    /**
+     * The orientation on the card: "rotation" turns the picture clockwise (0, 90, 180, 270; 90 and 270 on square panels),
+     * "flipped" (the earlier switch) by 180 degrees or back. The device is asked to pull right away.
+     */
     @PostMapping(value="/admin/clients/{identifier}/flip",produces="application/json") @ResponseBody org.springframework.http.ResponseEntity<java.util.Map<String,Object>> flip(
-            @PathVariable String identifier,@RequestParam(defaultValue="false") boolean flipped) throws IOException {
-        try{registry.setFlipped(identifier,flipped);
+            @PathVariable String identifier,@RequestParam(defaultValue="false") boolean flipped,@RequestParam(required=false) Integer rotation) throws IOException {
+        try{registry.get(identifier);}catch(IllegalArgumentException e){return org.springframework.http.ResponseEntity.badRequest().body(java.util.Map.of("error","The device was already removed."));}
+        try{
+            if(rotation!=null)registry.setRotation(identifier,rotation);else registry.setFlipped(identifier,flipped);
             try{poke.pullNow(List.of(registry.address(identifier)));}catch(IllegalArgumentException ignored){ /* learns it at its next poll */ }
-            return org.springframework.http.ResponseEntity.ok(java.util.Map.of("flipped",registry.flipped(identifier)));}
-        catch(IllegalArgumentException e){return org.springframework.http.ResponseEntity.badRequest().body(java.util.Map.of("error","The device was already removed."));}
+            return org.springframework.http.ResponseEntity.ok(java.util.Map.of("flipped",registry.flipped(identifier),"rotation",registry.rotation(identifier)));}
+        catch(IllegalArgumentException e){return org.springframework.http.ResponseEntity.badRequest().body(java.util.Map.of("error",e.getMessage()));}
     }
     record Order(List<String> ids) {}
     /** Order of the device cards after dragging one by its grip. */

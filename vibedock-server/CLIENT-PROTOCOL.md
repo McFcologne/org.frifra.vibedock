@@ -61,11 +61,37 @@ Right after flashing, the administration's browser flasher (*Devices › Firmwar
 | Command | Answer |
 | --- | --- |
 | `VIBEDOCK-HELLO` | `VIBEDOCK-READY {"identifier":"vibedock-…","name":"…","version":"0.1.0","paired":false,"board":"vibedock-m1","chip":"ESP8266"}` (also sent once at every start) |
+| `VIBEDOCK-BATTERY` | `VIBEDOCK-BATTERY {"supported":true,"voltageMv":3900,"estimatedPercent":80,"chargeSignal":"inactive","present":null}` (illustrative reading). Supported on `waveshare-s3-touch-lcd-154`; other boards return `supported:false`, null measurements and `chargeSignal:"unknown"`. |
 | `VIBEDOCK-SCAN` | `VIBEDOCK-NETWORKS [{"ssid":"…","rssi":-48,"open":false},…]`, the 12 strongest networks |
 | `VIBEDOCK-LOG` | `VIBEDOCK-LOG ["05-14 09:41:00 Start v0.1.0 vibedock-m1, Power on",…]`, the last 24 events oldest first: starts, Wi-Fi, pairing, server answers and why a connection failed (HTTP and TLS errors). Kept in `/log.txt` across restarts; no keys or passwords. **Devices → Troubleshooting → Read log over USB** shows it. |
 | `VIBEDOCK-SETUP {json}` | `VIBEDOCK-SETUP OK`, then the device restarts; or `VIBEDOCK-SETUP ERROR <reason>` |
 
+On `waveshare-s3-touch-lcd-154`, `VIBEDOCK-READY` additionally contains a `battery` object with the same fields. Battery readings are optional diagnostics; they do not change pairing or device authentication. `present` stays null: the charging circuit cannot reliably identify a missing cell while USB is connected. The level is a coarse voltage-only estimate (null outside the expected range), not a fuel gauge; a voltage or active charging signal does not prove a battery is fitted. An inactive signal does not mean full. `chargeSignal` is `unstable` when the short sample contains both levels; slower cycling may not be detected. During a TLS handshake only HELLO and LOG are handled; send BATTERY again afterwards.
+
 The setup JSON is the invitation of step 2 without `code`, plus `ssid` and `password` of the Wi-Fi. The server creates it with `POST /admin/firmware/setup` (`{"identifier","name","board"}`, CSRF-protected; `board` is what the device reported, or the board chosen on the page for firmware that reports none): it registers the device with a new key and returns `{"pairing":{…},"warnings":[…]}`; the browser adds the Wi-Fi, which never reaches the server. Addresses on the administration's own machine (localhost) are left out; with nothing else configured the setup is refused. The device appears under *Devices* as *Waiting for first pull* and reports its address with the first authenticated pull. That contact fixes its callback origin: `X-VibeDock-Device-IP` takes precedence over the socket peer so Docker/NAT does not supply the gateway address. With no valid header, the socket peer is used. IPv4 callbacks initially use that origin's `/24`, until a newer client supplies its mask once (see below); IPv6 stays at the original IP. The origin is persisted and cannot be changed by later reports; `GET /admin/firmware/setup/{identifier}` reports that. The browser sends a line in pieces of 128 bytes with 40 ms pauses, because the device keeps a 1 kB receive buffer, and repeats a line that got no answer. The commands are only reachable over the cable, which can rewrite the whole flash anyway.
+
+### Optional sound metadata
+
+An audio-capable client explicitly requests `X-VibeDock-Audio: 1` on its ordinary authenticated image pull.
+Only then the server sends `X-VibeDock-Quota`, on both 200 and 304 replies. Requests without that exact capability
+and `X-VibeDock-Preview: 1` requests get **no** quota header. Existing clients and servers keep working unchanged.
+The request is a capability opt-in, not authentication; the existing device key still protects the endpoint.
+
+The value is `v1;<window-id>:<remaining>;...`, or just `v1` when no valid windows are available. Each window id
+is the first twelve lowercase hex characters of SHA-256 of its source id followed by `f` (five-hour window)
+or `w` (weekly/single long window). Remaining is an integer in basis points, 0–10000 (10000 = 100%). There
+are at most 20 windows and 402 ASCII bytes, below the client's 420-byte parser bound. Only sources in the layout
+fitted to that display are sent, once each, with fresh `ok`/`partial` readings and valid, non-expired windows.
+No labels, credentials or provider tokens are included. Slideshow images keep the same configured-source metadata.
+
+The client validates the complete header before replacing its in-memory baseline. Initial and previously unseen windows
+are silent; each increase or decrease relative to the previous reading sounds once, without thresholds. Reaching
+10000 or 0 is a full/empty event (using the rise/fall melody instead of duplicating it). Same-kind changes in one
+response share a melody. Unchanged values are silent, including repeated 304 replies. Missing metadata resets
+the baseline; malformed data is ignored. Temporarily omitted windows in a valid `v1` header retain their
+last comparison values, so an expired window followed by a full refill still sounds. The cache holds at most
+20 windows: current entries take priority over absent ones, which may be evicted when capacity is reached. Preview pulls neither consume nor advance it. All this state is local
+to the display, so restarts establish a new silent baseline rather than replaying old notifications.
 
 ## 3. Image pull (device → server)
 
@@ -172,10 +198,14 @@ the next double tap or a restart of the server; a design without photos stays as
 
 ## 3e. Orientation (server → device)
 
-Every board except the VibeTV M1 (its case decides how it stands) gets `X-VibeDock-Orientation: flipped` or `upright`
-with every 200 and 304 answer, set with *Flip image* on the device card. A display mounted upside down turns its panel
-by 180 degrees, so the image, its own screens and the swipes are turned as well; it stores the setting and draws the
-next image completely. The image itself is the same in both cases. Firmware before 0.2.0 ignores the header.
+Every board except the VibeTV M1 (its case decides how it stands) gets `X-VibeDock-Orientation` with every 200 and
+304 answer, set with *Orientation* on the device card: `upright`, `flipped` (180 degrees), and on square panels also
+`rotated-90` and `rotated-270` (clockwise). The display turns its panel accordingly, so the image, its
+own screens and the swipes are turned as well; it stores the setting and draws the next image completely. The image
+itself is the same in every case. Firmware that does not know a value keeps its orientation: firmware before 0.2.0
+ignores the header, firmware before the quarter turns keeps its last `upright`/`flipped` state for `rotated-90` and
+`rotated-270`. The server stores the turn as `rotation` and keeps `flipped` set for 180 degrees, so an older server
+reads such a device as flipped.
 
 ## 3f. Diagnosis (device → server)
 
@@ -217,6 +247,7 @@ One firmware source builds for several boards (PlatformIO environments in `vibed
 | `lilygo-t-display-s3` | LilyGO T-Display-S3 (1.9" ST7789, 8-bit parallel) | ESP32-S3 | 170×320 | prepared |
 | `waveshare-s3-lcd-169` | Waveshare ESP32-S3-LCD-1.69 (ST7789V2) | ESP32-S3 | 240×280 | prepared |
 | `waveshare-s3-touch-lcd-147` | Waveshare ESP32-S3-Touch-LCD-1.47 (JD9853, AXS5106L touch) | ESP32-S3 | 172×320 | tested |
+| `waveshare-s3-touch-lcd-154` | Waveshare ESP32-S3-Touch-LCD-1.54 (ST7789, CST816 touch) | ESP32-S3 | 240×240 | tested |
 | `waveshare-c6-touch-lcd-169` | Waveshare ESP32-C6-Touch-LCD-1.69 (ST7789V2, CST816 touch; Arduino core 3) | ESP32-C6 | 240×280 | tested |
 | `esp32-c3-st7789` | ESP32-C3 with a 1.3" ST7789 (SCL 4, SDA 6, DC 2, RES 3, BLK 10) | ESP32-C3 | 240×240 | prepared |
 
@@ -276,6 +307,6 @@ USB setup JSON request. It omits only `pin`; `anchor` stays. Missing/false prese
 Re-pairing replaces an existing device pin; USB **Only pair** does not reinstall firmware. The M1 can start with
 the supplied pin, or learn its own after a full check; ESP32 boards currently always use the full check.
 
-The UI shows the external pin status and fingerprint under **Settings → Network** and in both pairing forms.
+The UI shows the external pin status and fingerprint under **Settings → Network**; the pairing forms only offer to leave the pin out.
 Successful status inspections are cached for one minute. **Devices → Troubleshooting → Server log** shows the
 recent application log, including resolver results, TLS errors and successful public-DNS routes.

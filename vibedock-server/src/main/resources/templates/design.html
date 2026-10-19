@@ -47,7 +47,7 @@
 </fieldset>
 </div>
 <div class="design-side">
-<aside class="card design-preview"><h3 class="section-label"><svg th:replace="~{fragments :: icon('monitor')}"></svg>Preview</h3><figure class="screen"><div class="device"><div class="device-front"><div class="device-glass"><img id="design-preview-image" width="240" height="240" src="/admin/preview.png" alt="Design preview rendered by the device image renderer"></div></div></div><figcaption id="design-preview-caption">Same renderer and image format as your device.</figcaption></figure><p id="preview-status" class="meta" role="status" aria-live="polite"></p></aside>
+<aside class="card design-preview"><h3 class="section-label"><svg th:replace="~{fragments :: icon('monitor')}"></svg>Preview</h3><figure class="screen"><div class="device"><div class="device-front"><div class="device-glass"><div class="device-screen"><img id="design-preview-image" width="240" height="240" src="/admin/preview.png" alt="Design preview rendered by the device image renderer"></div></div></div></div><figcaption id="design-preview-caption">Same renderer and image format as your device.</figcaption></figure><p id="preview-status" class="meta" role="status" aria-live="polite"></p></aside>
 <fieldset id="design-style-controls" disabled><section class="card"><h3 class="section-label"><svg th:replace="~{fragments :: icon('palette')}"></svg>Appearance</h3><label for="design-scheme">Style / theme</label><select id="design-scheme"></select>
 <p class="meta">Applies to the usage monitor.</p></section></fieldset>
 </div>

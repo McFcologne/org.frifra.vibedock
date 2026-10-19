@@ -33,7 +33,7 @@ class SupportFile {
                    int days,int pollSeconds,int ipRules,int sources,int displays,String testMode,boolean hostsHidden) {}
     record Source(String type,String label,boolean suspended,String status,Long observedAt) {}
     record Display(String identifier,String name,String board,String display,String firmware,String status,Long lastPullAt,String ip,
-                   boolean web,boolean ota,boolean otaNeedsPairing,boolean updating,String updateError,boolean flipped,boolean serverFooter) {}
+                   boolean web,boolean ota,boolean otaNeedsPairing,boolean updating,String updateError,boolean flipped,int rotation,boolean serverFooter) {}
     /** savedAt: when the server received it (its lines can be older); bootId, uptimeSeconds: the start it came from, when known. */
     record DeviceLog(String identifier,long savedAt,String source,String firmware,String board,String bootId,Long uptimeSeconds,List<String> lines) {}
     /** The problem in the user's words (all optional); displays: the identifiers of the displays it concerns. */
@@ -124,7 +124,7 @@ class SupportFile {
         var displays=new ArrayList<Display>();
         for(var v:registry.views())
             displays.add(new Display(v.identifier(),redactor.text(v.name()),v.board().id(),v.display().id(),v.firmware(),v.status(),v.lastPullAt(),
-                    redactor.text(v.ip()),v.web()!=null,v.ota(),v.otaNeedsPairing(),v.updating(),redactor.text(v.updateError()),v.flipped(),v.serverFooter()));
+                    redactor.text(v.ip()),v.web()!=null,v.ota(),v.otaNeedsPairing(),v.updating(),redactor.text(v.updateError()),v.flipped(),v.rotation(),v.serverFooter()));
         var deviceLogs=new ArrayList<DeviceLog>();
         for(String id:logs.identifiers())for(var entry:logs.list(id)){
             if(entry.savedAt()<since.toEpochMilli())continue;

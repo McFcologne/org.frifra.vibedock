@@ -83,8 +83,9 @@ button:disabled{opacity:.55;cursor:default}
   background:linear-gradient(180deg,#fbfaf7,#eeece6 70%,#e3e0d8);box-shadow:inset 0 max(1px,calc(var(--s)*.006)) 0 #fff,inset 0 calc(var(--s)*-.012) calc(var(--s)*.018) rgba(0,0,0,.06),0 0 0 max(1px,calc(var(--s)*.004)) #cfccc3,0 calc(var(--s)*.055) calc(var(--s)*.13) rgba(20,25,35,.16)}
 .device-glass{padding:min(calc(var(--s)*.018),1px);background:#0b0c0e}
 /* A new preview builds up from the top like the device draws it (device-state.js), over the previous image. */
-.device-glass.drawing{background-size:100% 100%;background-repeat:no-repeat;background-origin:content-box;background-clip:content-box}
-.device-glass.drawing img{background:transparent;animation:device-draw var(--draw,.6s) steps(24,end) both}
+/* The fixed screen area: the image, and while a new one builds up the previous one behind it, never beyond the screen. */
+.device-screen{position:relative;overflow:hidden;line-height:0}.device-screen.drawing{background-size:100% 100%;background-repeat:no-repeat}
+.device-screen.drawing img:not(.turn-old){background:transparent;animation:device-draw var(--draw,.6s) steps(24,end) both}
 @keyframes device-draw{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0 0 0 0)}}
 /* The black cases of the Waveshare touch boards (Board.previewCase), measured on the devices; --s is the screen width.
    ESP32-S3-Touch-LCD-1.47: a frame a little wider above and below the narrow screen, gently rounded screen corners.
@@ -100,6 +101,14 @@ button:disabled{opacity:.55;cursor:default}
 .device-front.case-c6{padding:calc(var(--s)*.08) calc(var(--s)*.09) calc(var(--s)*.19);border-radius:calc(var(--s)*.18)}
 .case-147 .device-glass,.case-c6 .device-glass{padding:0;overflow:hidden;background:#000;box-shadow:0 0 0 max(1px,calc(var(--s)*.006)) rgba(0,0,0,.8)}
 .case-147 .device-glass{border-radius:calc(var(--s)*.1)}.case-c6 .device-glass{border-radius:calc(var(--s)*.15)}
+/* Waveshare ESP32-S3-Touch-LCD-1.54 (measured on a photo; --s is the screen width): a white case with rounded corners,
+   a wide black glass around the square screen, three buttons on the top side (upright, 0°). */
+.device-front.case-154{position:relative;padding:calc(var(--s)*.055);border-radius:calc(var(--s)*.17);
+  background:linear-gradient(180deg,#ffffff,#f1f1ef 75%,#e6e6e2)}
+.case-154 .device-glass{padding:calc(var(--s)*.2);border-radius:calc(var(--s)*.12);background-color:#08090a;
+  box-shadow:inset 0 0 0 max(1px,calc(var(--s)*.006)) #000,inset 0 calc(var(--s)*.02) calc(var(--s)*.04) rgba(255,255,255,.06)}
+.device-front.case-154::before{content:"";position:absolute;top:calc(var(--s)*-.03);left:calc(var(--s)*.365);width:calc(var(--s)*.78);height:calc(var(--s)*.032);
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 780 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23ffffff'/%3E%3Cstop offset='.55' stop-color='%23ececE8'/%3E%3Cstop offset='1' stop-color='%23c9c9c3'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg fill='url(%23g)' stroke='%23b4b4ae' stroke-width='2'%3E%3Crect x='1' y='1' width='164' height='40' rx='14'/%3E%3Crect x='308' y='1' width='164' height='40' rx='14'/%3E%3Crect x='615' y='1' width='164' height='40' rx='14'/%3E%3C/g%3E%3Cg stroke='%23fff' stroke-opacity='.9' stroke-width='2' fill='none'%3E%3Cpath d='M14 4h138'/%3E%3Cpath d='M321 4h138'/%3E%3Cpath d='M628 4h138'/%3E%3C/g%3E%3C/svg%3E") 0 0/100% 100% no-repeat;filter:drop-shadow(0 calc(var(--s)*-.004) calc(var(--s)*.006) rgba(0,0,0,.18))}
 .device img{display:block;width:var(--s);height:calc(var(--s) * var(--ratio,1));background:#000}
 .device[role=button]{cursor:zoom-in;border-radius:calc(var(--s)*.11)}.device[role=button]:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
 .device-lightbox{border:0;padding:0;background:transparent;overflow:visible;max-width:none;max-height:none;cursor:zoom-out}
@@ -295,6 +304,7 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 .flash-pair .error-text{color:var(--err)}
 .link-button{background:none;border:0;padding:0;color:var(--accent);font-size:13px;text-decoration:underline;cursor:pointer;margin:0}
 .flash-pair-form [hidden]{display:none}
+.flash-pair-form .tls-pin-option{grid-column:1/-1;display:flex;align-items:center;gap:8px}
 .net-pick{position:relative;display:grid;gap:4px;font-size:12.5px}.net-pick-button{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;margin:0;text-align:left;font-weight:400;background:var(--card,#fff);color:var(--text);border:1px solid var(--line);font-size:14px}
 .net-pick-button svg{width:12px;height:12px;flex:none;color:var(--muted)}.net-pick-button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .net-pick-pop{position:absolute;z-index:20;top:100%;left:0;right:0;margin-top:4px;padding:6px;background:var(--card,#fff);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18)}
@@ -348,7 +358,8 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 .web-options{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:6px}.web-options .badge{margin:0}
 .client-card-footer button.small-button{font-size:12px;padding:8px 14px}
 .web-link .icon-button.copied{color:var(--ok);border-color:var(--ok)}
-.client-card .device-flip,.client-card .web-external,.client-card .card-actions form,.client-card .card-actions button,.client-card .switch{margin:0}.client-card .web-options .badge{margin:0}.switch{display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}.switch input{width:auto;margin:0}
+.web-options:has(.device-turn){align-items:baseline}.device-turn{display:inline-flex;align-items:baseline;gap:6px;font-size:12.5px;line-height:normal;margin:0}.device-turn .icon-button{align-self:center}.device-turn>*{margin:0}.client-card .device-turn{margin:0}.device-turn .turn-label{color:var(--muted)}.device-turn strong{min-width:2.4em}.client-card .device-turn .icon-button{width:22px;height:22px;border-radius:6px}.client-card .device-turn .icon-button svg{width:12px;height:12px}
+.device .device-front{transform:rotate(calc(-1 * var(--turn,0deg)));transition:transform .35s ease}.device .device-glass{position:relative;transform:rotate(var(--glass-turn,var(--turn,0deg)))}.device-screen .turn-old{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;background:transparent}.device-screen .turn-old~img{position:relative}.client-card .device-flip,.client-card .web-external,.client-card .card-actions form,.client-card .card-actions button,.client-card .switch{margin:0}.client-card .web-options .badge{margin:0}.switch{display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}.switch input{width:auto;margin:0}
 .switch:has(input:disabled){opacity:.55;cursor:not-allowed}
 /* Cards side by side share their height; the footer stays at the bottom. */
 .grid-2>.client-card{align-self:stretch;display:flex;flex-direction:column}.client-card>.client-body{flex:1}

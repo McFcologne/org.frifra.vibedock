@@ -73,6 +73,8 @@ class DesignService {
         if(display==null||activePhotos(design,display).isEmpty())return false;
         skipped.merge(display,step,Integer::sum);return true;
     }
+    /** Sound metadata stays available during a slideshow, for the sources configured on this display. */
+    String quotaHeader(Design design,DisplayType display){return QuotaHeader.create(usage.snapshot(),design.layout().fit(display));}
     /** The poll interval while a slideshow runs: one pull per photo, but not slower than the server's interval. */
     int pollSeconds(Design design,int server){return pollSeconds(design,server,null);}
     int pollSeconds(Design design,int server,String display){

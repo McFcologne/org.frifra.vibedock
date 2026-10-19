@@ -4,8 +4,9 @@ The release workflow publishes the section of the tagged version (`## 0.1.0` for
 
 ## 0.2.4
 
-Claude sign-in renewal fixed, with clearer Synology setup instructions and TLS pin examples.
-Update the server image; nothing to do on the displays.
+Claude sign-in renewal fixed, the Waveshare ESP32-S3-Touch-LCD-1.54 as a new tested board, quarter turns for square
+displays, clearer Synology setup instructions and TLS pin examples. Update the server image, then the displays over
+Wi-Fi.
 
 - **Claude sign-in renewal fixed:** the previous `claude auth status` command did not reliably renew stored
   credentials. The server now runs a minimal Haiku request through the official CLI, with no tools, skills,
@@ -22,6 +23,19 @@ Update the server image; nothing to do on the displays.
   the DSM firewall. It distinguishes external, NAS-host and container reachability. Pairing, USB setup and
   network screenshots now show successful demo TLS pin inspection; screenshot generation uses a fixed locale,
   time zone and refresh line.
+- **Waveshare ESP32-S3-Touch-LCD-1.54:** new firmware build, tested on hardware (240×240 ST7789, CST816 touch).
+  Its speaker plays start, connection, pairing and quota sounds; volume and mute on the device page and with the
+  + / - buttons, with a volume bar on the display. The device page and the USB command `VIBEDOCK-BATTERY` show
+  battery diagnostics.
+- **Quota sounds:** a display that asks for it with `X-VibeDock-Audio: 1` gets the remaining quota of its sources in
+  `X-VibeDock-Quota` and sounds on every rise and fall; other displays get no extra header.
+- **Orientation instead of Flip image:** the device card shows the orientation with a rotate button; square panels
+  turn in 90° steps (`rotated-90`, `rotated-270`), the others by 180°. Quarter turns need the new firmware; older
+  firmware keeps its orientation.
+- **Previews:** the 1.54 in its white case; every case has a fixed screen area, and a new image builds up from the
+  top as on the display.
+- **Pairing forms** only offer **Do not send TLS pin**; the pin status stays under **Settings → Network**.
+- **Backlight:** stays dimmable after full brightness, and the display no longer flashes at start.
 
 ## 0.2.3
 
