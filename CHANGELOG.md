@@ -2,6 +2,18 @@
 
 The release workflow publishes the section of the tagged version (`## 0.1.0` for the tag `v0.1.0` or `0.1.0`) above the list of commits that GitHub generates.
 
+## 0.2.4
+
+Claude sign-ins are really renewed now. Update the server image; nothing to do on the displays.
+
+- **Claude sign-in renewal fixed:** 0.2.1 renewed the token with `claude auth status`, which only reads the sign-in;
+  the Claude CLI renews its token (about eight hours) only before a model request. Half an hour before the expiry,
+  and once after it, the server now sends one minimal request through the official CLI (smallest model, no tools,
+  skills, MCP servers or saved session, an empty working folder) and logs "renewed until …". A sign-in that has
+  expired and cannot be renewed is tried again every six hours instead of every ten minutes.
+- **One Claude sign-in per server:** every renewal replaces the refresh token, so a second server or a local test
+  instance with the same sign-in makes the other one's copy invalid. Sign in on each server separately.
+
 ## 0.2.3
 
 The VibeTV M1 connects over https again after pairing, and the server finds its certificate pin in more networks.
