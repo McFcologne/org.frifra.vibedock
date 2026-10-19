@@ -43,6 +43,6 @@ public record Board(String id,String label,String chip,String display,String not
     public double drawSeconds(){return esp8266()?1.2:.5;}
     /** The case the administration draws around the preview (CSS class), null for the default light one. */
     public String previewCase(){
-        return switch(id){case "waveshare-s3-touch-lcd-147"->"case-147";case "waveshare-c6-touch-lcd-169"->"case-c6";case "waveshare-s3-touch-lcd-154"->"case-154";default->null;};
+        return switch(id){case "waveshare-s3-touch-lcd-147"->"case-147";case "waveshare-c6-touch-lcd-169"->"case-c6";case "waveshare-s3-touch-lcd-154"->"case-154";case "esp32-cyd"->"case-cyd";case "lilygo-t-display"->"case-tdisplay";case "lilygo-t-display-s3"->"case-tdisplay-s3";case "waveshare-s3-lcd-169"->"case-s3-169";case "esp32-c3-st7789"->"case-c3";default->null;};
     }
 }
