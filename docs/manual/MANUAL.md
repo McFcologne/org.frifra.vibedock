@@ -16,7 +16,7 @@ unable to operate VibeDock, in particular:
 - **Damage from flashing.** Writing firmware can make a device unusable ("bricked"), erase its original firmware and
   settings, or damage it, e.g. through a wrong board, an interrupted write, unsuitable cables, power supplies or
   adapters. Original firmware cannot be restored without your own full backup. Flashing voids any manufacturer
-  warranty and is done entirely at your own risk. Of the ESP32 builds only the Waveshare ESP32-S3-Touch-LCD-1.47 and ESP32-C6-Touch-LCD-1.69 have been tested on hardware; the others are prepared and untested.
+  warranty and is done entirely at your own risk. Of the ESP32 builds only the Waveshare ESP32-S3-Touch-LCD-1.47, ESP32-S3-Touch-LCD-1.54 and ESP32-C6-Touch-LCD-1.69 have been tested on hardware; the others are prepared and untested.
 - **Security.** No software is free of errors. We cannot guarantee that VibeDock is free of security
   vulnerabilities. The server encrypts provider sign-ins and tokens in its data directory; keep that directory and its backups private. The
   administration uses plain HTTP unless you put HTTPS in front of it, and displays talk to the server over the
@@ -59,8 +59,9 @@ These displays are tested on hardware:
 | Display | What it is | Bought at |
 | --- | --- | --- |
 | VibeTV M1 | 240×240 desk display, ESP8266 | Vibe TV, <https://vibetv.shop/> |
-| Waveshare ESP32-S3-Touch-LCD-1.47 | ESP32-S3 1.47inch Touch Display Development Board (without pin header), 172×320, 262K colours, 2.4 GHz Wi-Fi and BLE 5, 240 MHz LX7 dual core | Amazon |
-| Waveshare ESP32-C6-Touch-LCD-1.69 | ESP32-C6 1.69 inch Touch Display Dev Board, 240×280, 262K colours, 32-bit RISC-V, Wi-Fi 6, IEEE 802.15.4 (Zigbee 3.0, Thread) and Bluetooth 5 | Amazon |
+| Waveshare ESP32-S3-Touch-LCD-1.47 | ESP32-S3 1.47inch Touch Display Development Board (without pin header), 172×320, 262K colours, 2.4 GHz Wi-Fi and BLE 5, 240 MHz LX7 dual core | Waveshare shop at Amazon |
+| Waveshare ESP32-C6-Touch-LCD-1.69 | ESP32-C6 1.69 inch Touch Display Dev Board, 240×280, 262K colours, 32-bit RISC-V, Wi-Fi 6, IEEE 802.15.4 (Zigbee 3.0, Thread) and Bluetooth 5 | Waveshare shop at Amazon |
+| Waveshare ESP32-S3-Touch-LCD-1.54 | ESP32-S3 1.54 inch Touch Display Development Board, 240×240, 262K colours, 2.4 GHz Wi-Fi and BLE 5, 240 MHz LX7 dual core, 16 MB flash, speaker and battery connector | Waveshare shop at Amazon |
 
 The VibeTV M1 comes with the seller's own firmware and app; this project replaces that firmware with its own (see
 [Installing the firmware](#installing-the-firmware)), after you have saved a full backup of the original. On the
@@ -512,7 +513,7 @@ The server checks the HTTPS certificate and sends its root certificate and, when
 certificate fully against the supplied root and learns its own pin. ESP32 boards currently always use the full
 check. After a certificate renewal the M1 does another full check; a root change requires pairing again.
 
-**Settings → Network** and both pairing forms show whether the server knows a pin and display its fingerprint.
+**Settings → Network** shows whether the server knows a pin and displays its fingerprint; the pairing forms only offer **Do not send TLS pin**.
 The route and target IP/port are shown explicitly, including **Public DNS fallback** and a **cached** marker when
 an earlier check is reused. **Certificate details** shows subject, issuer, validity dates, TLS version and SHA-256.
 **Check pin again** repeats the status query; successful checks are cached for one minute. The refresh button has
@@ -767,6 +768,7 @@ firmware card decides which image is shown, downloaded and installed:
 | LilyGO T-Display-S3 | ESP32-S3 | 1.9" ST7789 170×320 | prepared |
 | Waveshare ESP32-S3-LCD-1.69 | ESP32-S3 | 1.69" ST7789V2 240×280 | prepared |
 | Waveshare ESP32-S3-Touch-LCD-1.47 | ESP32-S3 | 1.47" JD9853 172×320 | tested |
+| Waveshare ESP32-S3-Touch-LCD-1.54 | ESP32-S3 | 1.54" ST7789 240×240, CST816 touch | tested |
 | Waveshare ESP32-C6-Touch-LCD-1.69 | ESP32-C6 | 1.69" ST7789V2 240×280 | tested |
 | ESP32-C3 with ST7789 240×240 | ESP32-C3 | e.g. C3 SuperMini | prepared |
 
@@ -919,7 +921,7 @@ polls.
 
 ## Touch displays
 
-Displays with a touch panel (Waveshare ESP32-S3-Touch-LCD-1.47 and ESP32-C6-Touch-LCD-1.69) react to swipes:
+Displays with a touch panel (Waveshare ESP32-S3-Touch-LCD-1.47, ESP32-S3-Touch-LCD-1.54 and ESP32-C6-Touch-LCD-1.69) react to swipes:
 
 | Swipe | Effect |
 | --- | --- |
@@ -930,11 +932,34 @@ Displays with a touch panel (Waveshare ESP32-S3-Touch-LCD-1.47 and ESP32-C6-Touc
 The scheme changes with the next image, right after the swipe. To follow the default design again, turn off
 *Custom design* for the display in the editor.
 
-## Displays mounted upside down
+## Sounds and battery on the Waveshare 1.54-inch touch display
 
-Every display except the VibeTV M1 (its case decides how it stands) has a *Flip image* switch on its card under
-**Devices**. It turns the picture by 180 degrees, also the display's own screens and the swipes; the display takes it
-over within seconds. The motion sensor of the Waveshare boards is not used: it decided too unreliably.
+This board's speaker plays short startup, connection, pairing and quota notifications. Open its local IP address
+and use **Sounds** to set volume, mute or play the test tone. The physical **+ / - buttons** change volume in steps
+of 10. Louder gives a short high beep, quieter a low boop; recognized swipes have a quiet sliding sound.
+Every volume-button press briefly shows a bar and percentage on the display, or **Muted** at zero.
+The notice disappears after 1.6 seconds and restores the picture without needing the server.
+Zero mutes all sounds, including this feedback; the default is 30%. The setting is saved after three seconds and survives restarts.
+
+With the updated server, every reported quota increase/decrease sounds, without thresholds. Full remaining
+quota uses the rising tune, empty the low beep. Initial and unchanged readings stay silent. Only audio-capable
+clients request the extra metadata, piggybacked on image replies; other devices get no extra header. Local tones
+also work with older servers. Sustained connection loss and subsequent recovery sound once each.
+
+The **Battery** card shows measured voltage, a coarse estimated level and the charging signal. Reload to take
+another reading. These readings do not prove a battery is fitted or full while USB supplies power; battery
+presence stays **Unknown**. USB serial command `VIBEDOCK-BATTERY` returns the same diagnostic values.
+Tested on hardware: display colours, touch, audio, the short volume and swipe cues and the volume controls work.
+Battery presence and operation without USB have not been established. No motion-based rotation or microphone recording is implemented.
+
+## Displays mounted upside down or turned
+
+Every display except the VibeTV M1 (its case decides how it stands) shows its **Orientation** on its card under
+**Devices**. The rotate button beside it turns by 180 degrees, on displays with a square panel (e.g. the Waveshare
+1.54") by 90 degrees clockwise, and saves at once. The card shows the case as the display is mounted, the picture on
+it upright. The display's own screens and the swipes turn as well; the
+display takes it over within seconds. Quarter turns need firmware that knows them: older firmware keeps its
+orientation until it is updated. The motion sensor of the Waveshare boards is not used: it decided too unreliably.
 
 ## Read the display log
 

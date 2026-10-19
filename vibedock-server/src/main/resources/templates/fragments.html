@@ -22,10 +22,10 @@
     </details>
   </div>
 </th:block>
+<!-- Pairing forms only offer to leave the pin out; its status and the certificate are under Settings › Network. -->
 <th:block th:fragment="tlsPinOption">
-  <th:block th:replace="~{fragments :: tlsPin}"></th:block>
-  <label class="check"><input type="checkbox" name="omitTlsPin"> Do not send TLS pin (test full certificate verification)</label>
-  <small class="meta">The root certificate is still sent. The display verifies HTTPS itself and can learn its own pin after a successful connection.</small>
+  <label class="check tls-pin-option" title="The root certificate is still sent. The display verifies HTTPS itself and learns its own pin after a successful connection.">
+    <input type="checkbox" name="omitTlsPin"> Do not send TLS pin (test full certificate verification)</label>
 </th:block>
 <head th:fragment="head(title)">
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">

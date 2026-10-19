@@ -4,6 +4,14 @@
 #include <math.h>
 // Pure timing and format rules of the VibeDock client (protocol v2), shared with the native test.
 namespace client_policy {
+// Coarse voltage-only estimate for a single Li-ion cell, following the Waveshare 1.54-inch example.
+// This is not a fuel gauge or battery-presence detector; a charger without a cell can also show a voltage.
+constexpr int batteryEstimate(uint32_t millivolts) {
+  return millivolts < 3000 || millivolts > 4350 ? -1 :
+      millivolts < 3520 ? 1 : millivolts < 3640 ? 20 : millivolts < 3760 ? 40 :
+      millivolts < 3880 ? 60 : millivolts < 4000 ? 80 : 100;
+}
+
 constexpr uint32_t minPollSeconds = 10, maxPollSeconds = 3600, defaultPollSeconds = 30;
 constexpr uint8_t maxPairingAttempts = 5;
 constexpr uint32_t clampPoll(uint32_t seconds) {
@@ -182,8 +190,15 @@ inline uint32_t diagCheck(const DiagRecord &r) {
 inline bool diagValid(const DiagRecord &r) {
   return r.magic == diagMagic && r.check == diagCheck(r) && r.boot != 0 && phaseName(r.phase) != nullptr && r.intent <= 3;
 }
-// X-VibeDock-Orientation: "flipped" turns the picture by 180 degrees, "upright" turns it back; anything else keeps it.
-constexpr bool flippedOf(const char *orientation, bool current) {
-  return orientation[0] == 'f' && orientation[1] == 'l' ? true : orientation[0] == 'u' && orientation[1] == 'p' ? false : current;
+// X-VibeDock-Orientation as quarter turns clockwise: "upright" 0, "rotated-90" 1, "flipped" 2, "rotated-270" 3. The
+// quarter turns only on a square panel (the picture would not fit otherwise); anything else keeps the current turn.
+constexpr bool sameText(const char *a, const char *b) { return *a == *b && (*a == 0 || sameText(a + 1, b + 1)); }
+constexpr uint8_t turnsOf(const char *orientation, uint8_t current, bool square) {
+  return sameText(orientation, "upright") ? 0 : sameText(orientation, "flipped") ? 2
+       : square && sameText(orientation, "rotated-90") ? 1 : square && sameText(orientation, "rotated-270") ? 3 : current;
+}
+// A swipe on the panel turned into the picture's directions: the touch coordinates do not turn with the picture.
+inline void turnSwipe(int &dx, int &dy, uint8_t turns) {
+  for (uint8_t i = 0; i < turns % 4; i++) { int x = dx; dx = dy; dy = -x; }
 }
 }

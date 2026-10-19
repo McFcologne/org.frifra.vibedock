@@ -16,21 +16,24 @@
   // one, which stays behind it as the glass's background. Other changes (new values, the same theme) appear at once,
   // as the device only redraws the few rows that changed.
   const drawn = (part, fresh) => {
-    const image = part.querySelector('img'), next = fresh.querySelector('img');
+    const image = part.querySelector('img:not(.turn-old)'), next = fresh.querySelector('img:not(.turn-old)');
     if (!image || !next || image.getAttribute('src') === next.getAttribute('src')) return;
     const loaded = new Image(); loaded.src = next.src;
     loaded.decode().catch(() => {}).then(() => {
       const whole = next.dataset.look !== image.dataset.look; image.dataset.look = next.dataset.look || '';
       if (whole && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        part.style.backgroundImage = `url("${image.currentSrc || image.src}")`; part.classList.add('drawing');
+        const screen = image.closest('.device-screen') || part;
+        screen.style.backgroundImage = `url("${image.currentSrc || image.src}")`; screen.classList.add('drawing');
       }
       image.src = next.getAttribute('src');
+      // The enlarged preview copies the card only now, with the new image in it (admin-ui.js).
+      document.dispatchEvent(new CustomEvent('vibedock:preview-drawn', { detail: part }));
     });
   };
   // Also for the copy in the enlarged preview (admin-ui.js), which runs the same animation.
   document.addEventListener('animationend', event => {
-    const glass = event.target.closest?.('.device-glass.drawing'); if (!glass) return;
-    glass.classList.remove('drawing'); glass.style.backgroundImage = '';
+    const screen = event.target.closest?.('.device-screen.drawing'); if (!screen || event.target.classList.contains('turn-old')) return;
+    screen.classList.remove('drawing'); screen.style.backgroundImage = '';
   });
   const delay = () => cards().some(c => c.dataset.updating === 'true') ? 5000 : 10000;
   let timer, running = false;

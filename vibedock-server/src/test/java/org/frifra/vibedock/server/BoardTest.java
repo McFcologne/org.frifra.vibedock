@@ -20,7 +20,7 @@ class BoardTest {
         var boards=new LinkedHashMap<String,String>();
         for(var b:Board.INVENTORY)boards.put(b.id(),b.tested()?"tested":"prepared");
         Assertions.assertEquals(boards,hardware);
-        Assertions.assertEquals(Set.of("vibedock-m1","waveshare-s3-touch-lcd-147","waveshare-c6-touch-lcd-169"),
+        Assertions.assertEquals(Set.of("vibedock-m1","waveshare-s3-touch-lcd-147","waveshare-s3-touch-lcd-154","waveshare-c6-touch-lcd-169"),
                 new HashSet<>(Board.INVENTORY.stream().filter(Board::tested).map(Board::id).toList()));
     }
 }

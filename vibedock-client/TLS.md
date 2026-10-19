@@ -27,7 +27,7 @@ store. This is a server-side alternative for local DNS rewrites; it changes no c
 An explicit `EXTERNAL_TLS_PROBE_URL` takes precedence. If no live route is reachable, the certificate-log fallback
 can supply a root only, without a pin. Invalid certificates and hostname mismatches remain errors.
 
-**Settings → Network** and both pairing forms show whether the server knows a pin. **Do not send TLS pin** keeps
+**Settings → Network** shows whether the server knows a pin. **Do not send TLS pin** keeps
 the root but omits the pin for that pairing, allowing the M1's full-check path to be tested. Re-pairing clears the
 old pin when none is supplied; USB **Only pair** keeps the installed firmware. Resolver results and TLS probe
 errors are available under **Devices → Troubleshooting → Server log**. See the

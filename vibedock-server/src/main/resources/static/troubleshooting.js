@@ -145,7 +145,7 @@ opener.addEventListener('submit', async event => {
         + `Poll ${s.pollSeconds} s · ${s.ipRules} IP rules · ${s.sources} data sources · ${s.displays} displays${s.testMode ? ' · ' + s.testMode : ''}`, true),
       section(`Data sources (${data.sources.length})`, data.sources.map(x => `${x.label} (${x.type})${x.suspended ? ' paused' : ''}: ${x.status ?? '-'}, ${when(x.observedAt)}`).join('\n'), true),
       section(`Displays (${data.displays.length})`, data.displays.map(d => `${d.name} · ${d.identifier} · ${d.board} · ${d.display} · firmware ${d.firmware ?? '-'} · ${d.status}, last pull ${when(d.lastPullAt)} · ${d.ip}`
-        + `${d.web ? ' · web display' : ''}${d.ota ? ' · Wi-Fi updates' : ''}${d.updating ? ' · updating' : ''}${d.updateError ? ' · update error: ' + d.updateError : ''}${d.flipped ? ' · flipped' : ''}`).join('\n'), true),
+        + `${d.web ? ' · web display' : ''}${d.ota ? ' · Wi-Fi updates' : ''}${d.updating ? ' · updating' : ''}${d.updateError ? ' · update error: ' + d.updateError : ''}${d.rotation ? ' · turned ' + d.rotation + '°' : d.flipped ? ' · flipped' : ''}`).join('\n'), true),
       ...data.deviceLogs.map(l => section(`Display log ${l.identifier} · ${when(l.savedAt)} · ${l.source} · ${l.firmware ?? '-'} · ${l.board ?? '-'}`, l.lines.join('\n'))),
       section(`Server log (${data.serverLog.length} lines)`, data.serverLog.join('\n')),
       section(`Access log (${data.accessLog.length} lines)`, data.accessLog.join('\n')), rawSection);

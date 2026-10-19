@@ -1,9 +1,84 @@
 #include <string>
+#include <cstdio>
+#include "../firmware/src/sound_policy.h"
+#include "../firmware/src/volume_overlay.h"
 #include "../firmware/src/client_policy.h"
 #include <cassert>
 #include <limits>
 int main(){
   using namespace client_policy;
+  {
+    sound_policy::VolumeOverlay overlay; uint16_t row[240];
+    for(int i=0;i<240;i++)row[i]=uint16_t(i);
+    assert(!overlay.savedRow(0)); overlay.capture(95,row,240); assert(!overlay.savedRow(0));
+    overlay.capture(96,row,240); assert(overlay.savedRow(0)[0]==20 && overlay.savedRow(0)[199]==219);
+    overlay.show(100); assert(overlay.visible(1699)); assert(overlay.expired(1700));
+    overlay.show(1600); assert(overlay.visible(2000)); // another press extends the notice
+    row[20]=1234; overlay.capture(96,row,240); assert(overlay.savedRow(0)[0]==1234); // restore the NEW picture
+    overlay.capture(96,row,200); assert(overlay.savedRow(0)[0]==1234); // reject incompatible rows
+    overlay.dismiss(); assert(!overlay.visible(2000) && !overlay.expired(2000));
+    overlay.show(0xfffffff0u); assert(overlay.visible(100)); assert(overlay.expired(1600));
+    assert(!overlay.savedRow(-1) && !overlay.savedRow(48));
+  }
+  {
+    using namespace sound_policy;
+    assert(clampVolume(-1)==0 && clampVolume(101)==100 && clampVolume(30)==30);
+    auto quiet=[](Changes c){return !c.up&&!c.down&&!c.full&&!c.empty;};
+    // A provider reset can briefly omit the expired window before fresh readings arrive.
+    Quotas rollover;
+    assert(quiet(rollover.update("v1;0123456789abf:2000")));
+    assert(quiet(rollover.update("v1")));
+    assert(quiet(rollover.update("v1")));
+    auto refilled=rollover.update("v1;0123456789abf:10000");
+    assert(refilled.full && !refilled.up && !refilled.down && !refilled.empty);
+    assert(quiet(rollover.update("v1;0123456789abf:10000")));
+    Quotas q;
+    assert(quiet(q.update("v1;0123456789abf:5000"))); // initial snapshot is silent
+    assert(quiet(q.update("v1;0123456789abf:5000"))); // includes repeated HTTP 304 metadata
+    auto c=q.update("v1;0123456789abf:4999"); assert(c.down&&!c.up); // even 0.01%, no threshold
+    c=q.update("v1;0123456789abf:5000"); assert(c.up&&!c.full);
+    c=q.update("v1;0123456789abf:10000"); assert(c.full&&!c.up);
+    c=q.update("v1;0123456789abf:0"); assert(c.empty&&!c.down);
+    assert(quiet(q.update("v1;0123456789abf:0")));
+    assert(quiet(q.update("v1"))); // missing window preserves its last comparison value
+    c=q.update("v1;0123456789abf:3000;0123456789abw:7000"); assert(c.up && !c.down);
+    assert(quiet(q.update("v1;0123456789abw:7000;0123456789abf:3000"))); // order independent
+    for(const char *bad:{"v2;0123456789abf:3000","v1;", "v1;a", "v1;0123456789abf:",
+        "v1;0123456789abf:10001","v1;0123456789abf:-1","v1;0123456789abf:2x",
+        "v1;0123456789abf:1;0123456789abf:2"}) assert(quiet(q.update(bad)));
+    assert(quiet(q.update("v1;0123456789abf:3000;0123456789abw:7000"))); // malformed metadata did not advance state
+    c=q.update("v1;0123456789abf:3001;0123456789abw:6999"); assert(c.up&&c.down);
+    assert(quiet(q.update(""))); assert(quiet(q.update("v1;0123456789abf:10000"))); // old server / pairing reset
+    // One window can expire while another stays present and changes.
+    Quotas independent;
+    assert(quiet(independent.update("v1;0123456789abf:2000;0123456789abw:9000")));
+    c=independent.update("v1;0123456789abw:8999"); assert(c.down && !c.full);
+    c=independent.update("v1;0123456789abf:10000;0123456789abw:8999"); assert(c.full && !c.down);
+    // Retention is bounded: 20 current windows displace old absent ones; new windows still start silently.
+    Quotas bounded;
+    assert(quiet(bounded.update("v1;fffffffffffff:1000")));
+    std::string many="v1";
+    for(unsigned i=0;i<20;i++) { char value[32]; snprintf(value,sizeof(value),";%012xf:5000",i); many+=value; }
+    assert(quiet(bounded.update(many.c_str()))); assert(quiet(bounded.update(many.c_str())));
+    assert(quiet(bounded.update("v1;fffffffffffff:10000")));
+    Connection state;
+    assert(state.update(false,0)==0); assert(state.update(false,9000)==0);
+    assert(state.update(true,10000)==1); assert(state.update(true,11000)==0);
+    assert(state.update(false,12000)==0); assert(state.update(true,13000)==0); // short outage stays quiet
+    assert(state.update(false,14000)==0); assert(state.update(false,18999)==0);
+    assert(state.update(false,19000)==-1); assert(state.update(false,25000)==0);
+    assert(state.update(true,26000)==1); assert(state.update(true,27000)==0);
+    Connection wrap; assert(wrap.update(true,0xfffff000u)==1);
+    assert(wrap.update(false,0xfffffff0u)==0); assert(wrap.update(false,5000)==-1);
+  }
+  // A disconnected/invalid ADC must never become a plausible percentage. Estimates are bounded and monotonic.
+  assert(batteryEstimate(0) == -1); assert(batteryEstimate(2999) == -1);
+  assert(batteryEstimate(4351) == -1); assert(batteryEstimate(0xffffffffu) == -1);
+  assert(batteryEstimate(3300) == 1); assert(batteryEstimate(3700) == 40); assert(batteryEstimate(4200) == 100);
+  for (uint32_t mv = 3000; mv <= 4350; ++mv) {
+    assert(batteryEstimate(mv) >= 0 && batteryEstimate(mv) <= 100);
+    if (mv > 3000) assert(batteryEstimate(mv) >= batteryEstimate(mv - 1));
+  }
   assert(clampPoll(1)==10);assert(clampPoll(30)==30);assert(clampPoll(99999)==3600);
   assert(!pullDue(29999,0,30));assert(pullDue(30000,0,30));assert(pullDue(10000,0,5));
   assert(!imageStale(89999,0,30));assert(imageStale(90000,0,30));
@@ -34,7 +109,14 @@ int main(){
   assert(swipeOf(-60,10)==Swipe::Left);assert(swipeOf(60,-20)==Swipe::Right);assert(swipeOf(5,-50)==Swipe::Up);assert(swipeOf(0,80)==Swipe::Down);
   assert(swipeOf(25,0)==Swipe::None);assert(swipeOf(50,40)==Swipe::None);assert(swipeOf(-45,28)==Swipe::Left);assert(swipeOf(30,0)==Swipe::Right);assert(swipeOf(0,0)==Swipe::None);
   assert(nextBrightness(100,true)==100);assert(nextBrightness(100,false)==85);assert(nextBrightness(20,false)==10);assert(nextBrightness(10,true)==25);
-  assert(flippedOf("flipped",false));assert(!flippedOf("upright",true));assert(flippedOf("",true));assert(!flippedOf("",false));assert(!flippedOf("x",false));
+  // Orientation: upright and flipped on every panel, the quarter turns only on square ones; unknown keeps the turn.
+  assert(turnsOf("flipped",0,false)==2);assert(turnsOf("upright",3,true)==0);assert(turnsOf("",1,true)==1);assert(turnsOf("x",2,false)==2);
+  assert(turnsOf("rotated-90",0,true)==1);assert(turnsOf("rotated-270",0,true)==3);assert(turnsOf("rotated-90",2,false)==2);
+  assert(turnsOf("rotated-9",2,true)==2);assert(turnsOf("flipped-x",1,true)==1);
+  // Swipes turn with the picture: a quarter turn twice is the flip (both directions negated).
+  { int dx=10,dy=-3; turnSwipe(dx,dy,0); assert(dx==10&&dy==-3); turnSwipe(dx,dy,1); assert(dx==-3&&dy==-10);
+    dx=10;dy=-3; turnSwipe(dx,dy,2); assert(dx==-10&&dy==3); dx=10;dy=-3; turnSwipe(dx,dy,3); assert(dx==3&&dy==10);
+    dx=10;dy=-3; turnSwipe(dx,dy,4); assert(dx==10&&dy==-3); }
   assert(isTap(3,-4,120));assert(!isTap(20,0,100));assert(!isTap(0,0,500));
   assert(doubleTap(1000,1300));assert(!doubleTap(1000,1500));assert(!doubleTap(0,100));
   assert(clampBrightness(0)==10);assert(clampBrightness(255)==100);

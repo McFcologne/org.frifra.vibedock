@@ -12,6 +12,11 @@
 #include <TFT_eSPI.h>
 #include "client_policy.h"
 #include "touch.h"
+#include "battery.h"
+#include "audio.h"
+#ifdef VIBEDOCK_AUDIO_ES8311
+#include "volume_overlay.h"
+#endif
 #if defined(VIBEDOCK_BOOT_TRACE) && defined(ESP32) && ESP_ARDUINO_VERSION_MAJOR >= 3
 #include "esp32-hal-periman.h"  // the pin owners in the start diagnosis
 #endif
@@ -44,8 +49,8 @@ String servers[2]; uint8_t serverCount = 0, serverIndex = 0, storedIndex = 0;
 uint32_t pollSeconds = client_policy::defaultPollSeconds;
 uint8_t brightness = 100;  // backlight in percent; touch boards change it with swipes up and down
 String pendingGesture;  // a swipe for the server (X-VibeDock-Gesture), sent with the next image pull
-bool upsideDown = false;  // mounted upside down: the picture is turned by 180 degrees (set in the administration)
-void applyOrientation(bool flipped);
+uint8_t turns = 0;  // how the display is mounted: the picture turned clockwise in quarter turns (set in the administration)
+void applyOrientation(uint8_t next);
 client_policy::ToneSettings toneSettings;  // colour correction of the panel, set on the status page
 client_policy::Tone panelTone;
 
@@ -227,6 +232,44 @@ constexpr uint16_t MUTED = 0x8CB5, TRACK = 0x29A8, DONE = 0x362B, ACTIVE = 0x7EB
 uint32_t drawnRows[TFT_WIDTH > TFT_HEIGHT ? TFT_WIDTH : TFT_HEIGHT];  // hash of each drawn image row; only changed rows are pushed to the display
 bool imageOnScreen = false;  // a server image fills the screen, IP included; the device draws no footer over it
 void forgetRows() { for (auto &h : drawnRows) h = 0; }
+// Only the main task touches the panel; the audio task reports button activity through an atomic flag.
+#ifdef VIBEDOCK_AUDIO_ES8311
+sound_policy::VolumeOverlay volumeOverlay;
+#endif
+void volumeFeedback(bool force=false) {
+#ifdef VIBEDOCK_AUDIO_ES8311
+  bool touched=audio::takeVolumeInteraction(); auto now=millis();
+  if(touched) volumeOverlay.show(now);
+  if(volumeOverlay.expired(now)) {
+    for(int row=0;row<volumeOverlay.height;row++) if(auto data=volumeOverlay.savedRow(row))
+      panel.pushImage(volumeOverlay.x,volumeOverlay.y+row,volumeOverlay.width,1,const_cast<uint16_t*>(data));
+    volumeOverlay.dismiss(); return;
+  }
+  if(!volumeOverlay.visible(now) || (!touched&&!force)) return;
+  constexpr uint16_t background=0x1082;
+  panel.fillRoundRect(volumeOverlay.x,volumeOverlay.y,volumeOverlay.width,volumeOverlay.height,8,background);
+  panel.drawRoundRect(volumeOverlay.x,volumeOverlay.y,volumeOverlay.width,volumeOverlay.height,8,MUTED);
+  panel.setTextColor(TFT_WHITE,background);
+  panel.drawCentreString(audio::volume() ? String(F("Volume "))+String(audio::volume())+" %" : String(F("Muted")),120,volumeOverlay.y+6,2);
+  panel.fillRoundRect(volumeOverlay.x+12,volumeOverlay.y+31,176,6,3,TRACK);
+  int filled=176*audio::volume()/100;
+  if(filled) panel.fillRoundRect(volumeOverlay.x+12,volumeOverlay.y+31,filled,6,3,ACTIVE);
+#else
+  (void)force;
+#endif
+}
+void imageRow(int row,int width,uint16_t *pixels) {
+#ifdef VIBEDOCK_AUDIO_ES8311
+  volumeOverlay.capture(row,pixels,width);
+  if(volumeOverlay.visible(millis()) && row>=volumeOverlay.y && row<volumeOverlay.y+volumeOverlay.height) {
+    panel.pushImage(0,row,volumeOverlay.x,1,pixels);
+    panel.pushImage(volumeOverlay.x+volumeOverlay.width,row,width-volumeOverlay.x-volumeOverlay.width,1,
+        pixels+volumeOverlay.x+volumeOverlay.width);
+    return;
+  }
+#endif
+  panel.pushImage(0,row,width,1,pixels);
+}
 // Shows the own screen on the panel: scaled to fit and centred, the rest black. No-op when the panel is 240 x 240.
 uint32_t lastPresent = 0;
 void present(bool force = true) {
@@ -241,11 +284,15 @@ void present(bool force = true) {
   for (int y = 0; y < side; y++) {
     int sy = client_policy::sourceOf(y, side, 240);
     for (int x = 0; x < side; x++) line[x] = canvas.readPixel(client_policy::sourceOf(x, side, 240), sy);
+#ifdef VIBEDOCK_AUDIO_ES8311
+    volumeOverlay.capture(top+y,line,side);
+#endif
     panel.pushImage(left, top + y, side, 1, line);
   }
 #else
   (void)force;
 #endif
+  volumeFeedback(true);
 }
 // The footer is redrawn only when its text or background changes; a periodic full redraw made the bottom row flicker.
 void spin();
@@ -384,7 +431,10 @@ bool writeConfig() {
   JsonDocument doc;
   doc["identifier"] = identifier; doc["name"] = deviceName;
   doc["ssid"] = ssid; doc["password"] = password; doc["key"] = key; doc["poll"] = pollSeconds; doc["pin"] = pin;
-  doc["verified"] = networkVerified; doc["brightness"] = brightness; doc["flipped"] = upsideDown;
+  doc["verified"] = networkVerified; doc["brightness"] = brightness; doc["flipped"] = turns == 2; doc["turns"] = turns;
+#ifdef VIBEDOCK_AUDIO_ES8311
+  doc["volume"] = audio::volume();
+#endif
   JsonObject t = doc["tone"].to<JsonObject>();
   t["gamma"] = toneSettings.gamma; t["red"] = toneSettings.red; t["green"] = toneSettings.green; t["blue"] = toneSettings.blue;
   t["custom"] = !(toneSettings == client_policy::ToneSettings());  // calibrated on the status page
@@ -410,7 +460,11 @@ bool loadConfig() {
       for (JsonVariant url : doc["servers"].as<JsonArray>()) if (serverCount < 2) servers[serverCount++] = url.as<String>();
       serverIndex = storedIndex = serverCount ? std::min<uint8_t>(doc["server"] | 0, serverCount - 1) : 0;
       brightness = client_policy::clampBrightness(doc["brightness"] | 100);
-      upsideDown = doc["flipped"] | false;
+#ifdef VIBEDOCK_AUDIO_ES8311
+      audio::setVolume(doc["volume"] | 30);
+#endif
+      // "flipped" alone: saved by firmware before quarter turns (and still written for it after a downgrade).
+      turns = (doc["turns"] | (doc["flipped"] | false ? 2 : 0)) % 4;
       client_policy::ToneSettings d; JsonObject t = doc["tone"];
       long gamma = t["gamma"] | long(d.gamma), red = t["red"] | long(d.red), green = t["green"] | long(d.green), blue = t["blue"] | long(d.blue);
       // Only a calibration made on this display is kept; otherwise the board's defaults apply.
@@ -639,6 +693,7 @@ void showSetupCode(const String &name, const String &secret) {
   present();
 }
 void startPortal() {
+  audio::play(audio::Cue::PairWifi);
   diagPhase(Phase::Portal);
   mode = Mode::Portal; logEvent(String(F("Wi-Fi setup opened")) + (wifiProblem.isEmpty() ? String() : ": " + wifiProblem));
   WiFi.mode(WIFI_AP_STA);
@@ -677,6 +732,7 @@ void showPairing() {
   present();
 }
 void enterPairing() {
+  audio::play(audio::Cue::PairWifi);
   mode = Mode::Pairing; wrongCodes = 0; haveImage = false; staleScreen = true; etag = "";
   uint8_t random[4]; platform::randomBytes(random, sizeof(random));
   uint32_t value = (uint32_t(random[0]) << 24 | uint32_t(random[1]) << 16 | uint32_t(random[2]) << 8 | random[3]) % 1000000;
@@ -791,6 +847,7 @@ void handlePair() {
 }
 // ---- image pull (device -> server) ----
 void unpair() {
+  audio::quotas("");  // a different pairing starts with a silent quota baseline
   key = ""; pin = ""; serverCount = 0; etag = ""; lastStatus = 0; forgetAnchor(); platform::clearOtaKey(); LittleFS.remove("/ota.pem"); saveConfig(); enterPairing();
 }
 // Reads the rows of an image and hands each one to onRow; onRow returns false to abort.
@@ -810,6 +867,7 @@ template <typename Row> bool readRows(WiFiClient *stream, const client_policy::I
             + String(size.height) + F(" after ") + String(millis() - began) + " ms";
         return false;
       }
+      volumeFeedback();
       int count = stream->read(bytes + received, length - received);
       if (count > 0) { received += count; progress = millis(); }
       if (millis() - lastFooter >= 250) footer();
@@ -835,7 +893,7 @@ bool readImage(WiFiClient *stream, const client_policy::ImageSize &size, uint32_
       int s = client_policy::sourceOf(x, width, size.width);
       pixels[x] = panelTone.apply(client_policy::pixel(bytes[2 * s], bytes[2 * s + 1]));
     }
-    for (int row = from; row < to && row < height; row++) { panel.pushImage(0, row, width, 1, pixels); drawnRows[row] = hash; }
+    for (int row = from; row < to && row < height; row++) { imageRow(row, width, pixels); drawnRows[row] = hash; }
     return true;
   }, timeout);
 }
@@ -859,8 +917,12 @@ struct ImageRequest {
 File *uploadFile = nullptr; String uploadRequest;
 int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
   if (!r.http.begin(*r.client, url)) return HTTPC_ERROR_CONNECTION_FAILED;
-  const char *wanted[] = {"ETag", "X-VibeDock-Image-Format", "X-VibeDock-Poll-Seconds", "X-VibeDock-Tls-Pin", "X-VibeDock-Redraw", "X-VibeDock-Update", "x-MD5", "X-VibeDock-Length", "X-VibeDock-Send-Log", "X-VibeDock-Orientation"};
-  r.http.collectHeaders(wanted, 10);
+  const char *wanted[] = {"ETag", "X-VibeDock-Image-Format", "X-VibeDock-Poll-Seconds", "X-VibeDock-Tls-Pin", "X-VibeDock-Redraw", "X-VibeDock-Update", "x-MD5", "X-VibeDock-Length", "X-VibeDock-Send-Log", "X-VibeDock-Orientation"
+#ifdef VIBEDOCK_AUDIO_ES8311
+      , "X-VibeDock-Quota"
+#endif
+  };
+  r.http.collectHeaders(wanted, sizeof(wanted)/sizeof(wanted[0]));
   // HTTP/1.0: a reverse proxy (Synology) then cannot answer chunked; the body ends with the connection or its length.
   r.http.useHTTP10(true);
   r.http.setTimeout(r.verified ? 15000 : 5000);
@@ -885,6 +947,9 @@ int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
     uploadFile->seek(0);  // again from the start when a second TLS attempt follows
     return r.http.sendRequest("POST", uploadFile, uploadFile->size());
   }
+#ifdef VIBEDOCK_AUDIO_ES8311
+  if (conditional && audio::available()) r.http.addHeader("X-VibeDock-Audio", "1");
+#endif
   if (!conditional) r.http.addHeader("X-VibeDock-Preview", "1");  // the status page's copy; leaves a forced redraw for the screen
   return r.http.GET();
 }
@@ -1029,7 +1094,12 @@ void pull() {
     failedInRow = 0; pendingGesture = "";  // the server has it (an older one ignores it)
     if (storedIndex != serverIndex) saveConfig();  // flash only when the answering address changes
   }
-  if (code == 200 || code == 304) { learnPin(request); updateError = ""; }
+  if (code == 200 || code == 304) {
+    learnPin(request); updateError = "";
+#ifdef VIBEDOCK_AUDIO_ES8311
+    audio::quotas(http.header("X-VibeDock-Quota").c_str());
+#endif
+  }
   String offered = code == 200 || code == 304 ? http.header("X-VibeDock-Update") : "";
   String logRequest = code == 200 || code == 304 ? http.header("X-VibeDock-Send-Log") : "";
   if (code > 0 && http.hasHeader("X-VibeDock-Poll-Seconds")) {
@@ -1037,8 +1107,11 @@ void pull() {
     if (poll != pollSeconds) { pollSeconds = poll; saveConfig(); }
   }
   if ((code == 200 || code == 304) && http.hasHeader("X-VibeDock-Orientation")) {
-    bool flipped = client_policy::flippedOf(http.header("X-VibeDock-Orientation").c_str(), upsideDown);
-    if (flipped != upsideDown) { applyOrientation(flipped); saveConfig(); logEvent(flipped ? "Picture flipped" : "Picture upright", true); }
+    uint8_t next = client_policy::turnsOf(http.header("X-VibeDock-Orientation").c_str(), turns, panel.width() == panel.height());
+    if (next != turns) {
+      applyOrientation(next); saveConfig();
+      logEvent(next == 0 ? String(F("Picture upright")) : next == 2 ? String(F("Picture flipped")) : String(F("Picture turned ")) + String(next * 90) + F(" degrees"), true);
+    }
   }
   client_policy::ImageSize size;
   if (code == 200 && !validImage(http, size))
@@ -1109,6 +1182,7 @@ String statusLine(String &css) {
   css = "ok"; return "Connected";
 }
 void colourCard();
+void audioCard();
 void statusPage() {
   bool paired = mode == Mode::Paired;
   pageStart(html(deviceName));
@@ -1124,8 +1198,36 @@ void statusPage() {
   if (!paired) body += F("<p class=\"muted\">Enter this IP address and the pairing code shown on the display in the VibeDock administration.</p>");
   body += F("</section>");
   web.sendContent(body);
+  auto power = battery::read();
+  if (power.supported) {
+    String card = F("<section class=\"card\"><h2>Battery</h2><dl><dt>Measured voltage</dt><dd>");
+    card += String(power.millivolts / 1000.0, 2) + F(" V</dd><dt>Estimated level</dt><dd>");
+    card += power.estimatedPercent < 0 ? String(F("Unknown")) : String("~") + String(power.estimatedPercent) + " %";
+    card += F("</dd><dt>Charging signal</dt><dd>"); card += power.chargeSignal;
+    card += F("</dd><dt>Battery present</dt><dd>Unknown</dd></dl><p class=\"muted\">Voltage-based estimate only. "
+        "USB power and charging affect the reading. A voltage or charging signal does not prove a battery is fitted; "
+        "an inactive signal does not mean it is full. Reload this page to measure again.</p></section>");
+    web.sendContent(card);
+  }
+  audioCard();
   if (paired) colourCard();
   pageEnd();
+}
+// Audio controls stay local to the device; no server setting or credentials are needed.
+void audioCard() {
+#ifdef VIBEDOCK_AUDIO_ES8311
+  if (!audio::available()) {
+    web.sendContent(F("<section class=\"card\"><h2>Sounds</h2><p>Audio unavailable: codec initialization failed.</p></section>")); return;
+  }
+  web.sendContent(String(F("<section class=\"card\"><h2>Sounds</h2><form method=\"post\" action=\"/audio\">"
+      "<label class=\"f\">Volume (0 = mute) <input type=\"range\" name=\"volume\" min=\"0\" max=\"100\" step=\"10\" value=\""))
+      + String(audio::volume()) + F("\"></label>"));
+  web.sendContent(String(F("<p>Current volume: ")) + String(audio::volume()) + F(" %</p><button>Save volume</button>"
+      "<button name=\"test\" value=\"1\">Save and play test tone</button><button name=\"mute\" value=\"1\">Mute</button>"
+      "</form><p class=\"muted\">The + and - buttons adjust volume in steps of 10. Settings survive restarts. "
+      "Each reported quota increase or decrease sounds once; full uses the rising melody, empty the low beep. "
+      "A sustained connection loss sounds once. Pairing prompts do not repeat continuously.</p></section>"));
+#endif
 }
 // Colour correction of this panel. Every change is applied when a slider is released and the image is redrawn,
 // so the display can be compared with the server preview right away; the BMP above stays uncorrected.
@@ -1164,6 +1266,24 @@ void colourCard() {
 uint32_t configChangedAt = 0; bool configDirty = false;
 void saveLater() { configDirty = true; configChangedAt = millis(); }
 void savePending() { if (configDirty && millis() - configChangedAt >= 3000) { configDirty = false; saveConfig(); } }
+void saveAudio() {
+#ifdef VIBEDOCK_AUDIO_ES8311
+  if (!audio::available()) { web.send(503, "text/plain", "Audio unavailable"); return; }
+  String value = web.arg("volume");
+  if (!web.hasArg("mute") && (value.isEmpty() || value.length() > 3 || value.toInt() < 0 || value.toInt() > 100)) {
+    web.send(400, "text/plain", "Invalid volume"); return;
+  }
+  for (char c : value) if (c < '0' || c > '9') { web.send(400, "text/plain", "Invalid volume"); return; }
+  auto before = audio::volume();
+  audio::setVolume(web.hasArg("mute") ? 0 : value.toInt()); audio::showVolume(); saveLater();
+  if (web.hasArg("test")) audio::play(audio::Cue::Up);
+  else if (audio::volume() > before) audio::play(audio::Cue::Louder);
+  else if (audio::volume() < before) audio::play(audio::Cue::Quieter);
+  web.sendHeader("Location", "/", true); web.send(303, "text/plain", "");
+#else
+  web.send(404, "text/plain", "Audio not supported");
+#endif
+}
 void saveColours() {
   using namespace client_policy;
   if (web.hasArg("reset")) toneSettings = ToneSettings();
@@ -1224,6 +1344,9 @@ void startPairingServer() {
   serveIcons();
   web.on("/image.bmp", HTTP_GET, imagePage);
   web.on("/colours", HTTP_POST, saveColours);
+#ifdef VIBEDOCK_AUDIO_ES8311
+  web.on("/audio", HTTP_POST, saveAudio);
+#endif
   web.on("/pull", HTTP_POST, handlePullRequest);
   web.on("/pair", HTTP_POST, handlePair);
   web.onNotFound([] { web.send(404, "text/plain", ""); });
@@ -1235,9 +1358,28 @@ void startPairingServer() {
 // identifier (VIBEDOCK-HELLO), the networks in reach (VIBEDOCK-SCAN) and then sends Wi-Fi and pairing in one line
 // (VIBEDOCK-SETUP {json}). Only reachable over the cable, which can rewrite the whole flash anyway.
 String serialLine;
+void batteryJson(JsonObject target) {
+  auto power = battery::read();
+  target["supported"] = power.supported;
+  target["present"] = nullptr;  // the charging circuit has no reliable battery-presence output
+  target["voltageMv"] = nullptr; target["estimatedPercent"] = nullptr;
+  target["chargeSignal"] = power.chargeSignal;
+  if (power.supported) {
+    target["voltageMv"] = power.millivolts;
+    if (power.estimatedPercent >= 0) target["estimatedPercent"] = power.estimatedPercent;
+  }
+}
+void serialBattery() {
+  JsonDocument doc; batteryJson(doc.to<JsonObject>());
+  Serial.print(F("VIBEDOCK-BATTERY ")); serializeJson(doc, Serial); Serial.println();
+}
 void serialReady() {
   JsonDocument doc; doc["identifier"] = identifier; doc["name"] = deviceName; doc["version"] = VIBEDOCK_VERSION; doc["paired"] = !key.isEmpty();
   doc["board"] = VIBEDOCK_BOARD; doc["chip"] = VIBEDOCK_CHIP;
+  // Leave HELLO lightweight on other boards, including the ESP8266 TLS callback.
+#ifdef VIBEDOCK_BATTERY_ADC
+  batteryJson(doc["battery"].to<JsonObject>());
+#endif
   Serial.print(F("VIBEDOCK-READY ")); serializeJson(doc, Serial); Serial.println();
 }
 void serialNetworks() {
@@ -1280,7 +1422,13 @@ void serialPoll(bool duringTls = false) {
         quickBootPending = false; LittleFS.remove("/boots"); logEvent(F("USB console: this start is not counted as a power cycle"));
       }
       if (duringTls && line != "VIBEDOCK-HELLO" && line != "VIBEDOCK-LOG") continue;
-      if (line == "VIBEDOCK-HELLO") serialReady();
+      if (line == "VIBEDOCK-HELLO") {
+        serialReady();
+#ifdef VIBEDOCK_AUDIO_ES8311
+        if (!duringTls && key.isEmpty()) audio::pairingUsb(millis());
+#endif
+      }
+      else if (line == "VIBEDOCK-BATTERY") serialBattery();
       else if (line == "VIBEDOCK-SCAN") serialNetworks();
       else if (line == "VIBEDOCK-LOG") serialLog();
       else if (line.startsWith("VIBEDOCK-SETUP ")) serialSetup(line.substring(strlen("VIBEDOCK-SETUP ")));
@@ -1362,11 +1510,13 @@ void setup() {
   canvas.setColorDepth(VIBEDOCK_CANVAS); canvas.createSprite(240, 240); canvas.fillSprite(TFT_BLACK);
   BOOT_TRACE("canvas ready");
 #endif
-  pinMode(TFT_BL, OUTPUT); digitalWrite(TFT_BL, TFT_BACKLIGHT_ON);
+  // Dark until the saved brightness is known: a dimmed display no longer flashes at full brightness on every start.
+  pinMode(TFT_BL, OUTPUT); digitalWrite(TFT_BL, TFT_BACKLIGHT_ON == HIGH ? LOW : HIGH);
 #if VIBEDOCK_TOUCH
   BOOT_TRACE("touch");
   touch::begin();
 #endif
+  battery::begin();
   BOOT_TRACE("wifi");
   WiFi.persistent(false); WiFi.mode(WIFI_STA);
   // No modem sleep: with it the access point holds incoming packets until the next beacon, and phone hotspots drop
@@ -1380,9 +1530,14 @@ void setup() {
   BOOT_TRACE("first screen drawn");
   // The start with its boot id, kind and the run before first, then the platform's reset text (it may be long).
   logEvent(String(F("Start v" VIBEDOCK_VERSION " " VIBEDOCK_BOARD ": ")) + diagStart() + "; " + platform::resetReason());
-  if (!platform::mountStorage() || !loadConfig()) { message("Storage error", Step::None, true); return; }
-  if (brightness < 100) platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness);
-  if (upsideDown) applyOrientation(true);
+  if (!platform::mountStorage() || !loadConfig()) { platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, 100); message("Storage error", Step::None, true); return; }
+  platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness);
+#ifdef VIBEDOCK_AUDIO_ES8311
+  if (audio::begin()) { audio::takeVolumeInteraction(); logEvent(F("Audio ready (ES8311)")); audio::play(audio::Cue::Boot); }
+  else logEvent(F("Audio unavailable: ES8311/I2S initialization failed"));
+#endif
+  if (turns % 2 && panel.width() != panel.height()) turns = 0;  // a quarter turn does not fit a rectangular panel
+  if (turns) applyOrientation(turns);
   loadLog();
   loadAnchor(); loadOtaKey();
   serialReady();
@@ -1422,8 +1577,9 @@ void touchPoll() {
   if (!touching || ++idle < 3) return;
   touching = false; idle = 0;
   int dx = lastX - startX, dy = lastY - startY;
-  if (upsideDown) { dx = -dx; dy = -dy; }  // the panel's coordinates do not turn with the picture
+  client_policy::turnSwipe(dx, dy, turns);  // the panel's coordinates do not turn with the picture
   auto swipe = client_policy::swipeOf(dx, dy);
+  if (swipe != client_policy::Swipe::None) audio::play(audio::Cue::Swipe);
   // The release is noticed 60 ms late (see above): that time is not part of the touch.
   if (swipe == client_policy::Swipe::None && client_policy::isTap(dx, dy, millis() - touchedAt > 60 ? millis() - touchedAt - 60 : 0)) {
     if (!client_policy::doubleTap(lastTap, millis())) { lastTap = millis(); return; }
@@ -1445,10 +1601,11 @@ void touchPoll() {
 }
 #endif
 
-// Turns the picture by 180 degrees or back (Flip image in the administration); the next pull draws every row.
-void applyOrientation(bool flipped) {
-  upsideDown = flipped;
-  panel.setRotation((VIBEDOCK_ROTATION + (flipped ? 2 : 0)) % 4);
+// Turns the picture clockwise in quarter turns (Flip image or Rotate image in the administration); the next pull draws
+// every row.
+void applyOrientation(uint8_t next) {
+  turns = next % 4;
+  panel.setRotation((VIBEDOCK_ROTATION + turns) % 4);
   forgetRows();
   if (imageOnScreen) { etag = ""; lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u; }  // the image again, every row
   else present(true);
@@ -1456,7 +1613,13 @@ void applyOrientation(bool flipped) {
 
 void loop() {
   serialPoll();
+  if (audio::takeVolumeChange()) saveLater();
+  volumeFeedback();
   savePending();
+#ifdef VIBEDOCK_AUDIO_ES8311
+  audio::connection(mode == Mode::Paired && WiFi.status() == WL_CONNECTED &&
+      (lastStatus == 200 || lastStatus == 304) && !staleScreen, millis());
+#endif
 #if VIBEDOCK_TOUCH
   touchPoll();
 #endif

@@ -58,18 +58,40 @@
     } catch { box.checked = !box.checked; }
     box.disabled = false;
   });
-  // Devices: the flip switch saves in place; the device turns its picture with its next pull (asked right away).
-  document.addEventListener('change', async event => {
-    const box = event.target.closest('[data-device-flip]'); if (!box) return;
-    const body = new URLSearchParams({ flipped: String(box.checked) });
+  // Devices: the orientation. Each click on the rotate button turns by 90 degrees (square panels) or 180 degrees and
+  // saves at once; the card turns with it and the device with its next pull (asked right away).
+  document.addEventListener('click', async event => {
+    const button = event.target.closest('[data-turn-next]'); if (!button) return;
+    const form = button.closest('[data-turn]'), device = form.closest('.client-card')?.querySelector('.device');
+    const saved = Number(form.dataset.turn || 0), next = (saved + Number(form.dataset.turnStep || 180)) % 360;
+    const glass = device?.querySelector('.device-glass');
+    // The case turns with the picture in it (the glass keeps its turn); then the display draws the new picture
+    // upright, row by row from the top, over the previous one, which stays turned until it is drawn over.
+    const show = degrees => {
+      form.querySelector('[data-turn-value]').textContent = degrees + '°';
+      const before = parseFloat(getComputedStyle(device || form).getPropertyValue('--turn')) || 0;
+      if (!device || !glass || before === degrees) return;
+      glass.style.setProperty('--glass-turn', before + 'deg'); device.style.setProperty('--turn', degrees + 'deg');
+      clearTimeout(glass.turnTimer); glass.querySelector('.turn-old')?.remove();
+      glass.turnTimer = setTimeout(() => {
+        const image = glass.querySelector('img:not(.turn-old)'), screen = image?.closest('.device-screen');
+        if (image && screen && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          const old = image.cloneNode(); old.className = 'turn-old'; old.removeAttribute('data-client-preview'); old.alt = '';
+          old.style.transform = `rotate(${before - degrees}deg)`; screen.prepend(old);
+          image.addEventListener('animationend', () => old.remove(), { once: true });
+          screen.classList.remove('drawing'); void screen.offsetWidth; screen.classList.add('drawing');
+        }
+        glass.style.setProperty('--glass-turn', degrees + 'deg');
+      }, 350);
+    };
     const token = document.querySelector('meta[name="csrf-token"]').content, header = document.querySelector('meta[name="csrf-header"]').content;
-    box.disabled = true;
+    show(next); button.disabled = true;
     try {
-      const response = await fetch(box.form.action, { method: 'POST', body, headers: { Accept: 'application/json', [header]: token } });
+      const response = await fetch(form.action, { method: 'POST', body: new URLSearchParams({ rotation: String(next) }), headers: { Accept: 'application/json', [header]: token } });
       if (!response.ok) throw new Error(String(response.status));
-      box.checked = (await response.json()).flipped;
-    } catch { box.checked = !box.checked; }
-    box.disabled = false;
+      form.dataset.turn = String((await response.json()).rotation);
+    } catch { /* stays as saved */ }
+    show(Number(form.dataset.turn)); button.disabled = false;
   });
   // Cards with a grip (devices, data sources) are reordered like the bands in the design editor: drag the card (not
   // from a button, field or link), the card under it is outlined, dropping places it there. The arrow keys on the grip
@@ -131,9 +153,10 @@
     copy.querySelectorAll('[id]').forEach(element => element.removeAttribute('id'));
     return copy;
   };
-  document.addEventListener('vibedock:devices-refreshed', () => {
-    if (lightbox && lightbox.open && shown && shown.isConnected) lightbox.replaceChildren(enlarged(shown));
-  });
+  const follow = () => { if (lightbox && lightbox.open && shown && shown.isConnected) lightbox.replaceChildren(enlarged(shown)); };
+  document.addEventListener('vibedock:devices-refreshed', follow);
+  // A new image is set only after it loaded (device-state.js): then copy again, also when the refresh came first.
+  document.addEventListener('vibedock:preview-drawn', event => { if (shown && shown.contains(event.detail)) follow(); });
   for (const device of document.querySelectorAll('.device')) {
     if (!device.querySelector('img')) continue;
     device.tabIndex = 0; device.title = 'Click to enlarge';
