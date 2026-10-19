@@ -3,6 +3,7 @@
 // at revision 5157db7c888e476fd57f8a95020800377447478f (16 kHz, MCLK 256 x sample rate).
 #include "audio.h"
 #ifdef VIBEDOCK_AUDIO_ES8311
+#include "sound_policy.h"
 #include <Arduino.h>
 #include <Wire.h>
 #include <driver/i2s.h>

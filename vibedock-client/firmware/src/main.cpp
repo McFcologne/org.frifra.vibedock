@@ -1420,7 +1420,9 @@ void serialPoll(bool duringTls = false) {
       if (duringTls && line != "VIBEDOCK-HELLO" && line != "VIBEDOCK-LOG") continue;
       if (line == "VIBEDOCK-HELLO") {
         serialReady();
+#ifdef VIBEDOCK_AUDIO_ES8311
         if (!duringTls && key.isEmpty()) audio::pairingUsb(millis());
+#endif
       }
       else if (line == "VIBEDOCK-BATTERY") serialBattery();
       else if (line == "VIBEDOCK-SCAN") serialNetworks();
@@ -1607,8 +1609,10 @@ void loop() {
   if (audio::takeVolumeChange()) saveLater();
   volumeFeedback();
   savePending();
+#ifdef VIBEDOCK_AUDIO_ES8311
   audio::connection(mode == Mode::Paired && WiFi.status() == WL_CONNECTED &&
       (lastStatus == 200 || lastStatus == 304) && !staleScreen, millis());
+#endif
 #if VIBEDOCK_TOUCH
   touchPoll();
 #endif

@@ -3,7 +3,6 @@
 #include <stddef.h>
 #include <string.h>
 namespace sound_policy {
-enum class Cue : uint8_t { Boot, Connected, PairWifi, PairUsb, Up, Down, Lost, Full, Empty, Louder, Quieter, Swipe };
 constexpr uint8_t clampVolume(int value) { return value < 0 ? 0 : value > 100 ? 100 : uint8_t(value); }
 struct Changes { bool up=false, down=false, full=false, empty=false; };
 // v1;<13-character window id>:<remaining basis points>;... (0..10000, at most 20 windows).

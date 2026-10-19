@@ -75,7 +75,9 @@ entering setup/pairing; a USB HELLO while unpaired prompts at most once every 30
 The audio pinout follows the [manufacturer's example](https://github.com/waveshareteam/ESP32-S3-Touch-LCD-1.54/blob/5157db7c888e476fd57f8a95020800377447478f/examples/ESP32-S3-Touch-LCD-1.54-demo/Arduino-3.2.0/examples/01_i2s_audio/01_i2s_audio.ino):
 ES8311 at I2C 0x18 on SDA42/SCL41 shared with touch; MCLK8, BCLK9, LRCK10, data12, amplifier7.
 The physical volume buttons are GPIO4 (+) and GPIO0 (-); GPIO5 (PWR) is not used for volume. The firmware uses 16 kHz,
-16-bit stereo I2S with identical samples in both channels. Other boards compile without this audio driver.
+16-bit stereo I2S with identical samples in both channels. Other boards explicitly exclude the audio source and do not include its quota parser or overlay buffer.
+Before merging flash images, the build checks the linked ELF and application binary for accidental audio code,
+buffers and protocol strings and fails if any are found on a board without audio.
 
 ### Battery readings on the Waveshare ESP32-S3-Touch-LCD-1.54
 

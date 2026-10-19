@@ -1,7 +1,7 @@
 #pragma once
-#include "sound_policy.h"
+#include <stdint.h>
 namespace audio {
-using Cue = sound_policy::Cue;
+enum class Cue : uint8_t { Boot, Connected, PairWifi, PairUsb, Up, Down, Lost, Full, Empty, Louder, Quieter, Swipe };
 #ifdef VIBEDOCK_AUDIO_ES8311
 bool begin();
 bool available();
