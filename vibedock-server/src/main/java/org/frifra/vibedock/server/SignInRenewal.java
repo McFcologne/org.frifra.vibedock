@@ -19,9 +19,11 @@ import java.util.concurrent.TimeUnit;
  * Keeps CLI sign-ins fresh. VibeDock never refreshes tokens itself: shortly before a token expires it runs the official
  * CLI with a command that needs a valid sign-in and spends no usage, and the CLI renews the token in the source's own
  * folder. Grok Build: "grok models". Gemini CLI: "gemini --list-sessions", which signs in (renewing an expiring
- * token through the Google auth library) and lists the saved chats of an empty folder. Claude Code: "claude auth status
- * --json" in the source's folder (CLAUDE_CONFIG_DIR); its access token lives about eight hours. Whether a renewal
- * worked is read from the expiry in the file afterwards and logged.
+ * token through the Google auth library) and lists the saved chats of an empty folder. Claude Code renews its token
+ * (about eight hours) only before a model request, not for "claude auth status": one minimal request in print mode
+ * (smallest model, no tools, skills, MCP servers or session, own short system prompt, an empty working folder) with
+ * the source's folder as CLAUDE_CONFIG_DIR. Whether a renewal worked is read from the expiry in the file afterwards and
+ * logged.
  */
 @Component
 class SignInRenewal {
@@ -33,6 +35,13 @@ class SignInRenewal {
     static final long CLAUDE_RENEW_BEFORE_SECONDS=1800;
     /** A Claude renewal that changed nothing is tried again after this long, not with every poll. */
     static final long CLAUDE_RETRY_SECONDS=600;
+    /** Once the token has expired and a renewal failed, the refresh token is most likely gone too: tried rarely. */
+    static final long CLAUDE_EXPIRED_RETRY_SECONDS=6*3600;
+    /** The minimal request that makes the Claude CLI renew its token; its answer is discarded. */
+    static List<String> claudeCommand(String cli){
+        return List.of(cli,"-p","Reply with OK.","--model","haiku","--max-turns","1","--tools","","--strict-mcp-config",
+                "--disable-slash-commands","--no-session-persistence","--system-prompt","Reply with OK.");
+    }
     private static final long MIN_GAP_SECONDS=120;
     private final String grokCli,geminiCli,claudeCli;private final ObjectMapper json;
     @org.springframework.beans.factory.annotation.Autowired private SettingsStore settings;
@@ -70,13 +79,15 @@ class SignInRenewal {
         long expires=expiry(file,SignInRenewal::claudeExpiry),now=Instant.now().getEpochSecond();
         if(expires<=0||expires-now>CLAUDE_RENEW_BEFORE_SECONDS)return;
         Long previous=lastRun.get(folder);
-        if(previous!=null&&now-previous<CLAUDE_RETRY_SECONDS)return;
+        if(previous!=null&&now-previous<(expires<now?CLAUDE_EXPIRED_RETRY_SECONDS:CLAUDE_RETRY_SECONDS))return;
         lastRun.put(folder,now);
-        run("Claude",folder,List.of(claudeCli,"auth","status","--json"),Map.of("CLAUDE_CONFIG_DIR",folder.toString(),"NO_COLOR","1","TERM","dumb"),
+        run("Claude",folder,claudeCommand(claudeCli),Map.of("CLAUDE_CONFIG_DIR",folder.toString(),"NO_COLOR","1","TERM","dumb"),
                 CLAUDE_FOREIGN_CREDENTIALS);
         long after=expiry(file,SignInRenewal::claudeExpiry);
-        if(after>expires)log.info("Claude sign-in in {} renewed until {}",folder.getFileName(),Instant.ofEpochSecond(after));
-        else log.warn("Claude sign-in in {} not renewed (expires {}); sign in again if it has expired",folder.getFileName(),Instant.ofEpochSecond(expires));
+        if(after>expires){lastRun.remove(folder);log.info("Claude sign-in in {} renewed until {}",folder.getFileName(),Instant.ofEpochSecond(after));}
+        else if(expires<now)log.warn("Claude sign-in in {} expired at {} and could not be renewed; sign in again (next try in {} h)",
+                folder.getFileName(),Instant.ofEpochSecond(expires),CLAUDE_EXPIRED_RETRY_SECONDS/3600);
+        else log.warn("Claude sign-in in {} not renewed (expires {}); tried again in {} min",folder.getFileName(),Instant.ofEpochSecond(expires),CLAUDE_RETRY_SECONDS/60);
     }
     /** The expiry of the access token in Claude Code's .credentials.json (milliseconds there), 0 when missing. */
     static long claudeExpiry(JsonNode node){return epochSeconds(node.path("claudeAiOauth").path("expiresAt"));}
@@ -99,11 +110,13 @@ class SignInRenewal {
             Files.writeString(settings,"{\"security\":{\"auth\":{\"selectedType\":\"oauth-personal\"}}}\n",StandardCharsets.UTF_8);
     }
     private void run(String name,Path folder,List<String> command,Map<String,String> environment,List<String> removed){
-        SecretStore.Workspace workspace=null;Process process=null;
+        SecretStore.Workspace workspace=null;Process process=null;Path empty=null;
         try{
             Path actual=folder;
             if(settings!=null){workspace=settings.secrets.workspace(folder);actual=workspace.path;}
-            var builder=new ProcessBuilder(command).directory(actual.toFile()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD);
+            // Claude Code reads the working folder as its project: an empty one, not the sign-in folder.
+            if(name.equals("Claude"))empty=Files.createTempDirectory("vibedock-claude-renewal-");
+            var builder=new ProcessBuilder(command).directory((empty!=null?empty:actual).toFile()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD);
             builder.redirectInput(ProcessBuilder.Redirect.from(new java.io.File("/dev/null")));
             removed.forEach(builder.environment()::remove);
             for(var entry:environment.entrySet())builder.environment().put(entry.getKey(),entry.getValue().replace(folder.toString(),actual.toString()));
@@ -117,9 +130,14 @@ class SignInRenewal {
         finally{
             if(process!=null&&process.isAlive()){process.descendants().forEach(ProcessHandle::destroyForcibly);process.destroyForcibly();try{process.waitFor();}catch(InterruptedException e){Thread.currentThread().interrupt();}}
             if(workspace!=null)try{workspace.close();}catch(java.io.IOException e){log.error("Could not persist encrypted {} sign-in; check server storage",name);}
+            if(empty!=null)deleteTree(empty);
         }
     }
 
+    private static void deleteTree(Path dir){
+        try(var paths=Files.walk(dir)){paths.sorted(java.util.Comparator.reverseOrder()).forEach(p->{try{Files.deleteIfExists(p);}catch(java.io.IOException ignored){}});}
+        catch(java.io.IOException ignored){}
+    }
     private long expiry(Path file,java.util.function.ToLongFunction<JsonNode> reader){
         if(!Files.isRegularFile(file,LinkOption.NOFOLLOW_LINKS))return 0;
         try{return reader.applyAsLong(settings==null?json.readTree(file.toFile()):json.readTree(settings.secrets.read(file)));}catch(Exception e){return 0;}
