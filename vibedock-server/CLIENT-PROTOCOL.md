@@ -198,10 +198,14 @@ the next double tap or a restart of the server; a design without photos stays as
 
 ## 3e. Orientation (server → device)
 
-Every board except the VibeTV M1 (its case decides how it stands) gets `X-VibeDock-Orientation: flipped` or `upright`
-with every 200 and 304 answer, set with *Flip image* on the device card. A display mounted upside down turns its panel
-by 180 degrees, so the image, its own screens and the swipes are turned as well; it stores the setting and draws the
-next image completely. The image itself is the same in both cases. Firmware before 0.2.0 ignores the header.
+Every board except the VibeTV M1 (its case decides how it stands) gets `X-VibeDock-Orientation` with every 200 and
+304 answer, set with *Orientation* on the device card: `upright`, `flipped` (180 degrees), and on square panels also
+`rotated-90` and `rotated-270` (clockwise). The display turns its panel accordingly, so the image, its
+own screens and the swipes are turned as well; it stores the setting and draws the next image completely. The image
+itself is the same in every case. Firmware that does not know a value keeps its orientation: firmware before 0.2.0
+ignores the header, firmware before the quarter turns keeps its last `upright`/`flipped` state for `rotated-90` and
+`rotated-270`. The server stores the turn as `rotation` and keeps `flipped` set for 180 degrees, so an older server
+reads such a device as flipped.
 
 ## 3f. Diagnosis (device → server)
 
@@ -303,6 +307,6 @@ USB setup JSON request. It omits only `pin`; `anchor` stays. Missing/false prese
 Re-pairing replaces an existing device pin; USB **Only pair** does not reinstall firmware. The M1 can start with
 the supplied pin, or learn its own after a full check; ESP32 boards currently always use the full check.
 
-The UI shows the external pin status and fingerprint under **Settings → Network** and in both pairing forms.
+The UI shows the external pin status and fingerprint under **Settings → Network**; the pairing forms only offer to leave the pin out.
 Successful status inspections are cached for one minute. **Devices → Troubleshooting → Server log** shows the
 recent application log, including resolver results, TLS errors and successful public-DNS routes.

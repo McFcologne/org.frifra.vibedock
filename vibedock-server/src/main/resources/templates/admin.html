@@ -17,8 +17,8 @@
 </section>
 <aside class="card overview-display">
   <div class="card-head"><span class="icon"><svg th:replace="~{fragments :: icon('palette')}"></svg></span><h3>Default display</h3></div>
-  <figure class="screen"><div class="device"><div class="device-front"><div class="device-glass"><img width="240" height="240" alt="Preview of the VibeDock display" data-client-preview
-    src="/admin/preview.png" th:src="@{/admin/preview.png}"></div></div></div><figcaption>As shown on the VibeDock</figcaption></figure>
+  <figure class="screen"><div class="device"><div class="device-front"><div class="device-glass"><div class="device-screen"><img width="240" height="240" alt="Preview of the VibeDock display" data-client-preview
+    src="/admin/preview.png" th:src="@{/admin/preview.png}"></div></div></div></div><figcaption>As shown on the VibeDock</figcaption></figure>
   <div class="section-actions"><span class="meta" th:text="${defaultScheme}"></span><a class="button secondary" th:href="@{/admin/design}">Edit design</a></div>
 </aside>
 </div>

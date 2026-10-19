@@ -533,6 +533,37 @@ class AccessTest {
             clients.setFlipped(id,true);Assertions.assertFalse(clients.get(id).flipped());
         }finally{clients.remove(id);}
     }
+    @Test void squarePanelsTurnInQuarterStepsAndOlderFilesStayFlipped() throws Exception {
+        String key="ef".repeat(32),id="vibedock-turn",image="/api/v1/clients/"+id+"/image",flip="/admin/clients/"+id+"/flip";
+        clients.paired(id,"Desk",key,"192.168.1.34",80,"waveshare-s3-touch-lcd-154");
+        try{
+            var admin=(java.util.function.Function<String,org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder>)degrees->post(flip).param("rotation",degrees)
+                    .header("Accept","application/json").with(user("admin").roles("ADMIN")).with(csrf()).with(r->{r.setLocalPort(10001);return r;});
+            mvc.perform(admin.apply("90")).andExpect(status().isOk()).andExpect(jsonPath("$.rotation").value(90)).andExpect(jsonPath("$.flipped").value(false));
+            mvc.perform(get(image).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(8080);return r;})).andExpect(header().string("X-VibeDock-Orientation","rotated-90"));
+            mvc.perform(admin.apply("270")).andExpect(status().isOk());
+            mvc.perform(get(image).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(8080);return r;})).andExpect(header().string("X-VibeDock-Orientation","rotated-270"));
+            // 180 degrees is the flip of before, also for an older server reading the file.
+            mvc.perform(admin.apply("180")).andExpect(status().isOk()).andExpect(jsonPath("$.flipped").value(true));
+            Assertions.assertTrue(clients.get(id).flipped());
+            mvc.perform(admin.apply("45")).andExpect(status().isBadRequest());
+            // The earlier switch still works and turns back upright.
+            mvc.perform(post(flip).param("flipped","false").header("Accept","application/json").with(user("admin").roles("ADMIN")).with(csrf())
+                    .with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isOk()).andExpect(jsonPath("$.rotation").value(0));
+            // A rectangular panel only flips; a quarter turn saved before a change of board shows upright there.
+            mvc.perform(admin.apply("90")).andExpect(status().isOk());
+            clients.setBoard(id,"waveshare-c6-touch-lcd-169");
+            Assertions.assertEquals(0,clients.rotation(id));
+            mvc.perform(get(image).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(8080);return r;})).andExpect(header().string("X-VibeDock-Orientation","upright"));
+            mvc.perform(admin.apply("90")).andExpect(status().isBadRequest());
+        }finally{clients.remove(id);}
+    }
+    @Test void devicesSavedAsFlippedBeforeQuarterTurnsStayTurned() {
+        var device=new ClientRegistry.Device("id","name","hash","192.168.1.2",80,0,null,null,null,false,null,null,null,"waveshare-s3-touch-lcd-154",null,true);
+        Assertions.assertEquals(180,device.degrees());
+        Assertions.assertEquals(90,device.withRotation(90).degrees());Assertions.assertFalse(device.withRotation(90).flipped());
+        Assertions.assertTrue(device.withRotation(180).flipped());
+    }
     @Test void firmwareIsOfferedForDownloadAndDevicesReportTheirVersion() throws Exception {
         String key="ab".repeat(32);
         for(var client:clients.views())clients.remove(client.identifier());

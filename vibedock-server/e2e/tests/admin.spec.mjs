@@ -74,12 +74,17 @@ test('switching targets right after an edit saves it first',async ({page,app}) =
   await expect(page.locator('#design-scheme')).toBeDisabled();
 });
 
-test('flip image saves in place and only touch boards offer it',async ({page,app}) => {
+test('orientation turns on each click and saves at once; only touch boards offer it',async ({page,app}) => {
   await page.goto(app.baseURL+'/admin/devices');
-  const shelf=page.locator('#device-vibedock-e2e-shelf'), flip=shelf.getByLabel('Flip image');
-  await expect(page.locator('#device-vibedock-e2e-office').getByLabel('Flip image')).toHaveCount(0);
-  await expect(flip).not.toBeChecked();await shelf.getByText('Flip image',{exact:true}).click();await expect(flip).toBeChecked();await expect(flip).toBeEnabled();
-  await page.reload();await expect(flip).toBeChecked();
+  const shelf=page.locator('#device-vibedock-e2e-shelf'), value=shelf.locator('[data-turn-value]'), rotate=shelf.getByRole('button',{name:'Rotate by 180 degrees'});
+  await expect(page.locator('#device-vibedock-e2e-office [data-turn]')).toHaveCount(0);
+  await expect(value).toHaveText('0°');
+  // The rectangular 1.47 turns in 180° steps; the card turns with it.
+  await rotate.click();await expect(value).toHaveText('180°');await expect(rotate).toBeEnabled();
+  await expect(shelf.locator('.device')).toHaveAttribute('style',/--turn: ?180deg/);
+  await page.reload();await expect(value).toHaveText('180°');
+  await rotate.click();await expect(value).toHaveText('0°');await expect(rotate).toBeEnabled();
+  await page.reload();await expect(value).toHaveText('0°');
 });
 
 test('support file is created with a key shown once and opens again with it',async ({page,app}) => {
@@ -222,8 +227,11 @@ test('TLS pin status shows a known fingerprint and pairing can omit it',async ({
   await page.route('**/admin/tls-pin',route=>failed ? route.fulfill({status:503,body:'Unavailable'}) : route.fulfill({json:known
     ? {known:true,fingerprint:'ab'.repeat(20),message:'TLS pin available for https://external.example.org',route:'public-dns',target:'203.0.113.5:443',cached:true,certificate:{subject:'CN=external.example.org',issuer:'CN=Test issuer',notBefore:'2026-10-01T00:00:00Z',notAfter:'2026-12-01T00:00:00Z',sha256:'cd'.repeat(32),protocol:'TLSv1.3'}}
     : {known:false,fingerprint:null,message:'TLS pin unavailable: proxy not reachable'}}));
+  // The pairing form offers only to leave the pin out; status and certificate are under Settings › Network.
   await page.goto(app.baseURL+'/admin/devices');
   await page.locator('[data-create-open="invite"]').click();
+  await expect(page.locator('#invite [data-tls-pin-status]')).toHaveCount(0);
+  await page.goto(app.baseURL+'/admin/server');
   await expect(page.locator('[data-tls-pin-value]')).toHaveText('ab'.repeat(20));
   const refresh=page.getByRole('button',{name:'Check pin again'});
   await expect(refresh.locator('svg')).toBeVisible();
@@ -234,8 +242,6 @@ test('TLS pin status shows a known fingerprint and pairing can omit it',async ({
   await expect(page.locator('[data-cert-issuer]')).toHaveText('CN=Test issuer');
   await expect(page.locator('[data-cert-sha256]')).toHaveText('cd'.repeat(32));
   await expect(page.locator('[data-tls-pin-action]')).toHaveText(/Last refresh: .* · Pin available · \d+ ms/);
-  const omit=page.getByLabel('Do not send TLS pin', {exact:false});
-  await expect(omit).not.toBeChecked();await omit.check();
   known=false;await page.getByRole('button',{name:'Check pin again'}).click();
   await expect(page.locator('[data-tls-pin-message]')).toHaveText('TLS pin unavailable: proxy not reachable');
   await expect(page.locator('[data-tls-pin-route]')).toBeHidden();
@@ -245,6 +251,10 @@ test('TLS pin status shows a known fingerprint and pairing can omit it',async ({
   failed=true;await refresh.click();
   await expect(page.locator('[data-tls-pin-action]')).toHaveText(/Last refresh: .* · Failed · \d+ ms/);
   await expect(page.locator('[data-tls-pin-value]')).toBeHidden();await expect(refresh).toBeEnabled();
+  await page.goto(app.baseURL+'/admin/devices');
+  await page.locator('[data-create-open="invite"]').click();
+  const omit=page.getByLabel('Do not send TLS pin', {exact:false});
+  await expect(omit).not.toBeChecked();await omit.check();
   await page.getByLabel('Device IP',{exact:true}).fill('192.168.1.99');
   await page.getByLabel('Pairing code',{exact:true}).fill('123456');
   let submitted;

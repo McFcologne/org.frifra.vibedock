@@ -109,7 +109,14 @@ int main(){
   assert(swipeOf(-60,10)==Swipe::Left);assert(swipeOf(60,-20)==Swipe::Right);assert(swipeOf(5,-50)==Swipe::Up);assert(swipeOf(0,80)==Swipe::Down);
   assert(swipeOf(25,0)==Swipe::None);assert(swipeOf(50,40)==Swipe::None);assert(swipeOf(-45,28)==Swipe::Left);assert(swipeOf(30,0)==Swipe::Right);assert(swipeOf(0,0)==Swipe::None);
   assert(nextBrightness(100,true)==100);assert(nextBrightness(100,false)==85);assert(nextBrightness(20,false)==10);assert(nextBrightness(10,true)==25);
-  assert(flippedOf("flipped",false));assert(!flippedOf("upright",true));assert(flippedOf("",true));assert(!flippedOf("",false));assert(!flippedOf("x",false));
+  // Orientation: upright and flipped on every panel, the quarter turns only on square ones; unknown keeps the turn.
+  assert(turnsOf("flipped",0,false)==2);assert(turnsOf("upright",3,true)==0);assert(turnsOf("",1,true)==1);assert(turnsOf("x",2,false)==2);
+  assert(turnsOf("rotated-90",0,true)==1);assert(turnsOf("rotated-270",0,true)==3);assert(turnsOf("rotated-90",2,false)==2);
+  assert(turnsOf("rotated-9",2,true)==2);assert(turnsOf("flipped-x",1,true)==1);
+  // Swipes turn with the picture: a quarter turn twice is the flip (both directions negated).
+  { int dx=10,dy=-3; turnSwipe(dx,dy,0); assert(dx==10&&dy==-3); turnSwipe(dx,dy,1); assert(dx==-3&&dy==-10);
+    dx=10;dy=-3; turnSwipe(dx,dy,2); assert(dx==-10&&dy==3); dx=10;dy=-3; turnSwipe(dx,dy,3); assert(dx==3&&dy==10);
+    dx=10;dy=-3; turnSwipe(dx,dy,4); assert(dx==10&&dy==-3); }
   assert(isTap(3,-4,120));assert(!isTap(20,0,100));assert(!isTap(0,0,500));
   assert(doubleTap(1000,1300));assert(!doubleTap(1000,1500));assert(!doubleTap(0,100));
   assert(clampBrightness(0)==10);assert(clampBrightness(255)==100);

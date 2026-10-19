@@ -49,8 +49,8 @@ String servers[2]; uint8_t serverCount = 0, serverIndex = 0, storedIndex = 0;
 uint32_t pollSeconds = client_policy::defaultPollSeconds;
 uint8_t brightness = 100;  // backlight in percent; touch boards change it with swipes up and down
 String pendingGesture;  // a swipe for the server (X-VibeDock-Gesture), sent with the next image pull
-bool upsideDown = false;  // mounted upside down: the picture is turned by 180 degrees (set in the administration)
-void applyOrientation(bool flipped);
+uint8_t turns = 0;  // how the display is mounted: the picture turned clockwise in quarter turns (set in the administration)
+void applyOrientation(uint8_t next);
 client_policy::ToneSettings toneSettings;  // colour correction of the panel, set on the status page
 client_policy::Tone panelTone;
 
@@ -431,7 +431,7 @@ bool writeConfig() {
   JsonDocument doc;
   doc["identifier"] = identifier; doc["name"] = deviceName;
   doc["ssid"] = ssid; doc["password"] = password; doc["key"] = key; doc["poll"] = pollSeconds; doc["pin"] = pin;
-  doc["verified"] = networkVerified; doc["brightness"] = brightness; doc["flipped"] = upsideDown;
+  doc["verified"] = networkVerified; doc["brightness"] = brightness; doc["flipped"] = turns == 2; doc["turns"] = turns;
 #ifdef VIBEDOCK_AUDIO_ES8311
   doc["volume"] = audio::volume();
 #endif
@@ -463,7 +463,8 @@ bool loadConfig() {
 #ifdef VIBEDOCK_AUDIO_ES8311
       audio::setVolume(doc["volume"] | 30);
 #endif
-      upsideDown = doc["flipped"] | false;
+      // "flipped" alone: saved by firmware before quarter turns (and still written for it after a downgrade).
+      turns = (doc["turns"] | (doc["flipped"] | false ? 2 : 0)) % 4;
       client_policy::ToneSettings d; JsonObject t = doc["tone"];
       long gamma = t["gamma"] | long(d.gamma), red = t["red"] | long(d.red), green = t["green"] | long(d.green), blue = t["blue"] | long(d.blue);
       // Only a calibration made on this display is kept; otherwise the board's defaults apply.
@@ -1106,8 +1107,11 @@ void pull() {
     if (poll != pollSeconds) { pollSeconds = poll; saveConfig(); }
   }
   if ((code == 200 || code == 304) && http.hasHeader("X-VibeDock-Orientation")) {
-    bool flipped = client_policy::flippedOf(http.header("X-VibeDock-Orientation").c_str(), upsideDown);
-    if (flipped != upsideDown) { applyOrientation(flipped); saveConfig(); logEvent(flipped ? "Picture flipped" : "Picture upright", true); }
+    uint8_t next = client_policy::turnsOf(http.header("X-VibeDock-Orientation").c_str(), turns, panel.width() == panel.height());
+    if (next != turns) {
+      applyOrientation(next); saveConfig();
+      logEvent(next == 0 ? String(F("Picture upright")) : next == 2 ? String(F("Picture flipped")) : String(F("Picture turned ")) + String(next * 90) + F(" degrees"), true);
+    }
   }
   client_policy::ImageSize size;
   if (code == 200 && !validImage(http, size))
@@ -1532,7 +1536,8 @@ void setup() {
   if (audio::begin()) { audio::takeVolumeInteraction(); logEvent(F("Audio ready (ES8311)")); audio::play(audio::Cue::Boot); }
   else logEvent(F("Audio unavailable: ES8311/I2S initialization failed"));
 #endif
-  if (upsideDown) applyOrientation(true);
+  if (turns % 2 && panel.width() != panel.height()) turns = 0;  // a quarter turn does not fit a rectangular panel
+  if (turns) applyOrientation(turns);
   loadLog();
   loadAnchor(); loadOtaKey();
   serialReady();
@@ -1572,7 +1577,7 @@ void touchPoll() {
   if (!touching || ++idle < 3) return;
   touching = false; idle = 0;
   int dx = lastX - startX, dy = lastY - startY;
-  if (upsideDown) { dx = -dx; dy = -dy; }  // the panel's coordinates do not turn with the picture
+  client_policy::turnSwipe(dx, dy, turns);  // the panel's coordinates do not turn with the picture
   auto swipe = client_policy::swipeOf(dx, dy);
   if (swipe != client_policy::Swipe::None) audio::play(audio::Cue::Swipe);
   // The release is noticed 60 ms late (see above): that time is not part of the touch.
@@ -1596,10 +1601,11 @@ void touchPoll() {
 }
 #endif
 
-// Turns the picture by 180 degrees or back (Flip image in the administration); the next pull draws every row.
-void applyOrientation(bool flipped) {
-  upsideDown = flipped;
-  panel.setRotation((VIBEDOCK_ROTATION + (flipped ? 2 : 0)) % 4);
+// Turns the picture clockwise in quarter turns (Flip image or Rotate image in the administration); the next pull draws
+// every row.
+void applyOrientation(uint8_t next) {
+  turns = next % 4;
+  panel.setRotation((VIBEDOCK_ROTATION + turns) % 4);
   forgetRows();
   if (imageOnScreen) { etag = ""; lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u; }  // the image again, every row
   else present(true);

@@ -61,8 +61,9 @@ class DeviceApiController {
         // Only clients that explicitly support sound receive quota metadata. Preview pulls neither need nor consume it.
         if(QuotaHeader.requested(request.getHeader("X-VibeDock-Audio"),request.getHeader("X-VibeDock-Preview")))
             headers.set("X-VibeDock-Quota",designs.quotaHeader(registry.designFor(identifier),display));
-        // Mounted upside down: the device turns its panel by 180 degrees (also its own screens and the swipes).
-        if(registry.get(identifier).board().flippable())headers.set("X-VibeDock-Orientation",registry.flipped(identifier)?"flipped":"upright");
+        // Mounted turned: the device turns its panel (also its own screens and the swipes). "upright" and "flipped" as
+        // before; firmware that does not know "rotated-90"/"rotated-270" keeps its orientation.
+        if(registry.get(identifier).board().flippable())headers.set("X-VibeDock-Orientation",orientation(registry.rotation(identifier)));
         // A requested update over Wi-Fi: the device fetches /firmware after this pull and installs it if signed.
         firmware.info(registry.get(identifier).board()).filter(i->registry.updatePending(identifier,i.version())).ifPresent(i->headers.set("X-VibeDock-Update",i.version()));
         // A log requested in the administration: the display uploads it after this pull (POST .../log).
@@ -154,4 +155,6 @@ class DeviceApiController {
     private static byte[] sha256(byte[] data){
         try{return MessageDigest.getInstance("SHA-256").digest(data);}catch(Exception e){throw new IllegalStateException(e);}
     }
+    /** X-VibeDock-Orientation for a clockwise turn in degrees. */
+    static String orientation(int degrees){return switch(degrees){case 90->"rotated-90";case 180->"flipped";case 270->"rotated-270";default->"upright";};}
 }

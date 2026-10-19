@@ -512,7 +512,7 @@ The server checks the HTTPS certificate and sends its root certificate and, when
 certificate fully against the supplied root and learns its own pin. ESP32 boards currently always use the full
 check. After a certificate renewal the M1 does another full check; a root change requires pairing again.
 
-**Settings → Network** and both pairing forms show whether the server knows a pin and display its fingerprint.
+**Settings → Network** shows whether the server knows a pin and displays its fingerprint; the pairing forms only offer **Do not send TLS pin**.
 The route and target IP/port are shown explicitly, including **Public DNS fallback** and a **cached** marker when
 an earlier check is reused. **Certificate details** shows subject, issuer, validity dates, TLS version and SHA-256.
 **Check pin again** repeats the status query; successful checks are cached for one minute. The refresh button has
@@ -952,11 +952,14 @@ The owner has confirmed hardware testing: display colours, touch, audio and volu
 amplifier-startup fix for the short volume/swipe cues still needs confirmation. Battery presence and operation
 without USB have not been established. No motion-based rotation or microphone recording is implemented.
 
-## Displays mounted upside down
+## Displays mounted upside down or turned
 
-Every display except the VibeTV M1 (its case decides how it stands) has a *Flip image* switch on its card under
-**Devices**. It turns the picture by 180 degrees, also the display's own screens and the swipes; the display takes it
-over within seconds. The motion sensor of the Waveshare boards is not used: it decided too unreliably.
+Every display except the VibeTV M1 (its case decides how it stands) shows its **Orientation** on its card under
+**Devices**. The rotate button beside it turns by 180 degrees, on displays with a square panel (e.g. the Waveshare
+1.54") by 90 degrees clockwise, and saves at once. The card shows the case as the display is mounted, the picture on
+it upright. The display's own screens and the swipes turn as well; the
+display takes it over within seconds. Quarter turns need firmware that knows them: older firmware keeps its
+orientation until it is updated. The motion sensor of the Waveshare boards is not used: it decided too unreliably.
 
 ## Read the display log
 

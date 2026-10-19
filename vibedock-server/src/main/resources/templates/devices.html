@@ -63,8 +63,8 @@
     <form th:if="${client.web == null}" th:action="@{/admin/clients/{id}/refresh(id=${client.identifier})}" method="post"><button class="icon-button" title="Force refresh: redraw the whole screen now" aria-label="Force refresh">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4h-4"/></svg></button></form></div>
   <div class="client-body">
-    <div class="device" th:style="${'--ratio:' + (1.0 * client.display.height / client.display.width)}"><div class="device-front" th:classappend="${client.board.previewCase()}"><div class="device-glass" data-live="preview" th:style="${'--draw:' + client.board.drawSeconds() + 's'}"><img width="160" height="160" alt="Current status image for this device" data-client-preview th:attr="data-look=${previewLooks[client.identifier]}"
-         th:src="@{/admin/clients/{id}/preview.png(id=${client.identifier},v=${previewVersions[client.identifier]})}"></div></div></div>
+    <div class="device" th:style="${'--ratio:' + (1.0 * client.display.height / client.display.width) + ';--turn:' + client.rotation + 'deg'}"><div class="device-front" th:classappend="${client.board.previewCase()}"><div class="device-glass" data-live="preview" th:style="${'--draw:' + client.board.drawSeconds() + 's'}"><div class="device-screen"><img width="160" height="160" alt="Current status image for this device" data-client-preview th:attr="data-look=${previewLooks[client.identifier]}"
+         th:src="@{/admin/clients/{id}/preview.png(id=${client.identifier},v=${previewVersions[client.identifier]})}"></div></div></div></div>
     <div th:if="${client.web != null}" th:with="base=${webBases[client.identifier]},page=${base + '/web/' + client.web.secret}">
       <p class="meta" data-live="ip"><th:block th:if="${client.lastPullAt != null}">From <strong th:text="${client.ip}"></strong> · </th:block>every
         <th:block th:text="${client.web.reloadSeconds + ' s'}"></th:block> · <th:block th:text="${#strings.arraySplit(client.display.label, '·')[0].trim()}"></th:block></p>
@@ -100,9 +100,13 @@
         <span class="badge ok" th:if="${firmwareVersion != null and client.firmware == firmwareVersion}">Latest version installed</span>
         <p class="notice error" th:if="${client.updateError != null}" th:text="${'Last update failed: ' + client.updateError}"></p></div>
       <div class="web-options"><p class="badge design-badge" data-live="design" th:classappend="${client.overridden} ? 'custom'" th:text="${client.overridden ? 'Custom design' : 'Uses default'}"></p>
-        <form th:if="${client.board.flippable()}" class="device-flip" th:action="@{/admin/clients/{id}/flip(id=${client.identifier})}" method="post">
-          <label class="switch" title="The display is mounted upside down: it turns its picture, its own screens and the swipes by 180 degrees">
-            <input type="checkbox" name="flipped" value="true" th:checked="${client.flipped}" data-device-flip><span>Flip image</span></label></form></div>
+        <form th:if="${client.board.flippable()}" class="device-turn" th:action="@{/admin/clients/{id}/flip(id=${client.identifier})}" method="post"
+              th:attr="data-turn=${client.rotation},data-turn-step=${client.board.rotatable() ? 90 : 180}"
+              th:title="${client.board.rotatable() ? 'How the display is mounted: it turns its picture, its own screens and the swipes clockwise in quarter turns' : 'The display is mounted upside down: it turns its picture, its own screens and the swipes by 180 degrees'}">
+          <span class="turn-label">Orientation</span> <strong data-turn-value th:text="${client.rotation + '°'}">0°</strong>
+          <button type="button" class="icon-button" data-turn-next th:attr="aria-label=${client.board.rotatable() ? 'Rotate by 90 degrees' : 'Rotate by 180 degrees'}"
+                  th:title="${client.board.rotatable() ? 'Rotate by 90°' : 'Rotate by 180°'}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4h-4"/></svg></button>
+        </form></div>
       <p class="notice error" th:if="${failedClient == client.identifier}" th:text="${failedClientMessage}"></p>
     </div>
   </div>

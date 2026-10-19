@@ -30,6 +30,10 @@ public record Board(String id,String label,String chip,String display,String not
     public boolean esp8266(){return chip.equals("ESP8266");}
     /** The picture can be turned by 180 degrees in the administration; the VibeTV M1's case decides how it stands. */
     public boolean flippable(){return !id.equals(M1.id());}
+    /** Square panels can also stand turned by 90 degrees; on the others the picture would not fit. */
+    public boolean rotatable(){return flippable()&&displayType().width()==displayType().height();}
+    /** The turns (clockwise degrees) the administration offers for this board. */
+    public List<Integer> rotations(){return rotatable()?List.of(0,90,180,270):flippable()?List.of(0,180):List.of(0);}
     /**
      * About how long the display takes to draw a whole new image (the preview on the device card builds up as slowly):
      * shortened for the administration, the ESP8266 slower than the ESP32 boards.
@@ -39,6 +43,6 @@ public record Board(String id,String label,String chip,String display,String not
     public double drawSeconds(){return esp8266()?1.2:.5;}
     /** The case the administration draws around the preview (CSS class), null for the default light one. */
     public String previewCase(){
-        return switch(id){case "waveshare-s3-touch-lcd-147"->"case-147";case "waveshare-c6-touch-lcd-169"->"case-c6";default->null;};
+        return switch(id){case "waveshare-s3-touch-lcd-147"->"case-147";case "waveshare-c6-touch-lcd-169"->"case-c6";case "waveshare-s3-touch-lcd-154"->"case-154";default->null;};
     }
 }
