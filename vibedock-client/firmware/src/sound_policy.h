@@ -7,7 +7,7 @@ enum class Cue : uint8_t { Boot, Connected, PairWifi, PairUsb, Up, Down, Lost, F
 constexpr uint8_t clampVolume(int value) { return value < 0 ? 0 : value > 100 ? 100 : uint8_t(value); }
 struct Changes { bool up=false, down=false, full=false, empty=false; };
 // v1;<13-character window id>:<remaining basis points>;... (0..10000, at most 20 windows).
-// Validate the complete header before touching the baseline. Missing/new windows establish silent baselines.
+// Validate the complete header before touching the baseline. New windows establish silent baselines; temporarily missing windows keep their last reading.
 class Quotas {
   struct Value { char id[14] = {}; uint16_t remaining = 0; };
   Value previous[20]; uint8_t count = 0;
@@ -37,6 +37,13 @@ class Quotas {
         if(next[i].remaining==0) changes.empty=true; else changes.down=true;
       }
       break;
+    }
+    // A reset/failed provider poll can omit a window for several image pulls. Keep its last reading so the
+    // subsequent refill is audible. Current windows take priority; retain absent ones only within the 20-entry bound.
+    for(uint8_t j=0;j<count && size<20;j++) {
+      bool found=false;
+      for(uint8_t i=0;i<size;i++) if(strcmp(next[i].id,previous[j].id)==0) { found=true; break; }
+      if(!found) next[size++]=previous[j];
     }
     memcpy(previous,next,sizeof(next)); count=size; return changes;
   }

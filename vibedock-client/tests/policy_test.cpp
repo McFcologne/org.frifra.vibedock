@@ -1,4 +1,5 @@
 #include <string>
+#include <cstdio>
 #include "../firmware/src/sound_policy.h"
 #include "../firmware/src/volume_overlay.h"
 #include "../firmware/src/client_policy.h"
@@ -23,6 +24,14 @@ int main(){
     using namespace sound_policy;
     assert(clampVolume(-1)==0 && clampVolume(101)==100 && clampVolume(30)==30);
     auto quiet=[](Changes c){return !c.up&&!c.down&&!c.full&&!c.empty;};
+    // A provider reset can briefly omit the expired window before fresh readings arrive.
+    Quotas rollover;
+    assert(quiet(rollover.update("v1;0123456789abf:2000")));
+    assert(quiet(rollover.update("v1")));
+    assert(quiet(rollover.update("v1")));
+    auto refilled=rollover.update("v1;0123456789abf:10000");
+    assert(refilled.full && !refilled.up && !refilled.down && !refilled.empty);
+    assert(quiet(rollover.update("v1;0123456789abf:10000")));
     Quotas q;
     assert(quiet(q.update("v1;0123456789abf:5000"))); // initial snapshot is silent
     assert(quiet(q.update("v1;0123456789abf:5000"))); // includes repeated HTTP 304 metadata
@@ -31,8 +40,8 @@ int main(){
     c=q.update("v1;0123456789abf:10000"); assert(c.full&&!c.up);
     c=q.update("v1;0123456789abf:0"); assert(c.empty&&!c.down);
     assert(quiet(q.update("v1;0123456789abf:0")));
-    assert(quiet(q.update("v1"))); // source disappeared, its later return establishes a baseline
-    assert(quiet(q.update("v1;0123456789abf:3000;0123456789abw:7000")));
+    assert(quiet(q.update("v1"))); // missing window preserves its last comparison value
+    c=q.update("v1;0123456789abf:3000;0123456789abw:7000"); assert(c.up && !c.down);
     assert(quiet(q.update("v1;0123456789abw:7000;0123456789abf:3000"))); // order independent
     for(const char *bad:{"v2;0123456789abf:3000","v1;", "v1;a", "v1;0123456789abf:",
         "v1;0123456789abf:10001","v1;0123456789abf:-1","v1;0123456789abf:2x",
@@ -40,6 +49,18 @@ int main(){
     assert(quiet(q.update("v1;0123456789abf:3000;0123456789abw:7000"))); // malformed metadata did not advance state
     c=q.update("v1;0123456789abf:3001;0123456789abw:6999"); assert(c.up&&c.down);
     assert(quiet(q.update(""))); assert(quiet(q.update("v1;0123456789abf:10000"))); // old server / pairing reset
+    // One window can expire while another stays present and changes.
+    Quotas independent;
+    assert(quiet(independent.update("v1;0123456789abf:2000;0123456789abw:9000")));
+    c=independent.update("v1;0123456789abw:8999"); assert(c.down && !c.full);
+    c=independent.update("v1;0123456789abf:10000;0123456789abw:8999"); assert(c.full && !c.down);
+    // Retention is bounded: 20 current windows displace old absent ones; new windows still start silently.
+    Quotas bounded;
+    assert(quiet(bounded.update("v1;fffffffffffff:1000")));
+    std::string many="v1";
+    for(unsigned i=0;i<20;i++) { char value[32]; snprintf(value,sizeof(value),";%012xf:5000",i); many+=value; }
+    assert(quiet(bounded.update(many.c_str()))); assert(quiet(bounded.update(many.c_str())));
+    assert(quiet(bounded.update("v1;fffffffffffff:10000")));
     Connection state;
     assert(state.update(false,0)==0); assert(state.update(false,9000)==0);
     assert(state.update(true,10000)==1); assert(state.update(true,11000)==0);

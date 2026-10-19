@@ -60,7 +60,10 @@ There are **no quota thresholds**: each observed rise or fall sounds, including 
 point precision). Reaching 100% remaining uses the rising melody; reaching zero uses the low beep. These endpoint
 events replace the ordinary rise/fall for that window, so one change does not sound twice. Changes of the same
 kind in multiple windows of one response share one melody; if different kinds occur, they are queued. The first
-reading after boot, a new/returning source, and unchanged readings are silent. No history is written to flash.
+reading after boot, a previously unseen source, and unchanged readings are silent. Temporarily missing windows
+keep their last comparison value, so a quota reset still sounds after the expired window briefly disappears.
+The cache is bounded to 20 windows, prioritizing currently reported windows; absent entries can be evicted when
+new windows fill it. No history is written to flash.
 
 Only a working audio client asks for `X-VibeDock-Audio: 1`. The server then adds `X-VibeDock-Quota` to normal
 image replies, including HTTP 304, for sources fitted to this display's layout (also during a photo slideshow).

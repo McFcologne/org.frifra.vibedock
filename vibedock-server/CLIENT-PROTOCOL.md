@@ -84,11 +84,13 @@ are at most 20 windows and 402 ASCII bytes, below the client's 420-byte parser b
 fitted to that display are sent, once each, with fresh `ok`/`partial` readings and valid, non-expired windows.
 No labels, credentials or provider tokens are included. Slideshow images keep the same configured-source metadata.
 
-The client validates the complete header before replacing its in-memory baseline. Initial/new/returning windows
+The client validates the complete header before replacing its in-memory baseline. Initial and previously unseen windows
 are silent; each increase or decrease relative to the previous reading sounds once, without thresholds. Reaching
 10000 or 0 is a full/empty event (using the rise/fall melody instead of duplicating it). Same-kind changes in one
 response share a melody. Unchanged values are silent, including repeated 304 replies. Missing metadata resets
-the baseline; malformed data is ignored. Preview pulls neither consume nor advance it. All this state is local
+the baseline; malformed data is ignored. Temporarily omitted windows in a valid `v1` header retain their
+last comparison values, so an expired window followed by a full refill still sounds. The cache holds at most
+20 windows: current entries take priority over absent ones, which may be evicted when capacity is reached. Preview pulls neither consume nor advance it. All this state is local
 to the display, so restarts establish a new silent baseline rather than replaying old notifications.
 
 ## 3. Image pull (device → server)
