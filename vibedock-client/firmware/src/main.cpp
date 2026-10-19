@@ -1506,7 +1506,8 @@ void setup() {
   canvas.setColorDepth(VIBEDOCK_CANVAS); canvas.createSprite(240, 240); canvas.fillSprite(TFT_BLACK);
   BOOT_TRACE("canvas ready");
 #endif
-  pinMode(TFT_BL, OUTPUT); digitalWrite(TFT_BL, TFT_BACKLIGHT_ON);
+  // Dark until the saved brightness is known: a dimmed display no longer flashes at full brightness on every start.
+  pinMode(TFT_BL, OUTPUT); digitalWrite(TFT_BL, TFT_BACKLIGHT_ON == HIGH ? LOW : HIGH);
 #if VIBEDOCK_TOUCH
   BOOT_TRACE("touch");
   touch::begin();
@@ -1525,12 +1526,12 @@ void setup() {
   BOOT_TRACE("first screen drawn");
   // The start with its boot id, kind and the run before first, then the platform's reset text (it may be long).
   logEvent(String(F("Start v" VIBEDOCK_VERSION " " VIBEDOCK_BOARD ": ")) + diagStart() + "; " + platform::resetReason());
-  if (!platform::mountStorage() || !loadConfig()) { message("Storage error", Step::None, true); return; }
+  if (!platform::mountStorage() || !loadConfig()) { platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, 100); message("Storage error", Step::None, true); return; }
+  platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness);
 #ifdef VIBEDOCK_AUDIO_ES8311
   if (audio::begin()) { audio::takeVolumeInteraction(); logEvent(F("Audio ready (ES8311)")); audio::play(audio::Cue::Boot); }
   else logEvent(F("Audio unavailable: ES8311/I2S initialization failed"));
 #endif
-  if (brightness < 100) platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness);
   if (upsideDown) applyOrientation(true);
   loadLog();
   loadAnchor(); loadOtaKey();

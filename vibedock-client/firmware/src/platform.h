@@ -149,20 +149,25 @@ inline String freeHeap() {
 #endif
 }
 
-// Backlight brightness in percent by PWM; 100 drives the pin fully on as before.
+// Backlight brightness in percent by PWM; 100 drives the pin fully on. Once the PWM is attached the pin stays on it,
+// also at 100 %: switching it back to a plain output (pinMode) detaches the PWM, and later dimming had no effect.
 inline void backlight(uint8_t pin, bool activeHigh, uint8_t percent) {
-  if (percent >= 100) { pinMode(pin, OUTPUT); digitalWrite(pin, activeHigh ? HIGH : LOW); return; }
+  if (percent > 100) percent = 100;
   uint32_t duty = uint32_t(percent) * 255 / 100; if (!activeHigh) duty = 255 - duty;
 #if defined(ESP8266)
+  // The ESP8266 core stops its PWM waveform in digitalWrite itself.
+  if (percent >= 100) { pinMode(pin, OUTPUT); digitalWrite(pin, activeHigh ? HIGH : LOW); return; }
   analogWriteRange(255); analogWrite(pin, duty);
 #elif ESP_ARDUINO_VERSION_MAJOR >= 3
   static bool attached = false;
-  if (!attached) attached = ledcAttach(pin, 5000, 8);
-  ledcWrite(pin, duty);
+  if (!attached && percent < 100) attached = ledcAttach(pin, 5000, 8);
+  if (attached) ledcWrite(pin, duty);
+  else { pinMode(pin, OUTPUT); digitalWrite(pin, activeHigh ? HIGH : LOW); }
 #else
   static bool attached = false;
-  if (!attached) { ledcSetup(0, 5000, 8); ledcAttachPin(pin, 0); attached = true; }
-  ledcWrite(0, duty);
+  if (!attached && percent < 100) { ledcSetup(0, 5000, 8); ledcAttachPin(pin, 0); attached = true; }
+  if (attached) ledcWrite(0, duty);
+  else { pinMode(pin, OUTPUT); digitalWrite(pin, activeHigh ? HIGH : LOW); }
 #endif
 }
 inline bool mountStorage() {
