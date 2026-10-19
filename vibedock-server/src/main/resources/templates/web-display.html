@@ -1,14 +1,15 @@
 <!doctype html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:style="${'--display-background:' + background}">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex"><meta name="referrer" content="no-referrer"><title th:text="${'VibeDock · ' + name}">VibeDock</title>
 <!-- Home screen (iOS web clip, Android): full screen, the display icon and the display's name. -->
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#000000">
+<!-- Let the dynamic page background show through the iOS home-screen status bar. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="theme-color" content="#000000" th:content="${background}">
 <meta name="apple-mobile-web-app-title" th:content="${name}">
 <link rel="apple-touch-icon" th:href="${icon}"><link rel="icon" type="image/png" th:href="${icon}">
 <style>
-html,body{margin:0;height:100%;background:#000;overflow:hidden;touch-action:manipulation}
+html,body{margin:0;height:100%;background:var(--display-background,#000);overflow:hidden;touch-action:manipulation}
 /* The image area leaves out the notch and the home indicator; opened from the home screen also the blurred edge
    below the status bar. */
 .screen{position:fixed;top:env(safe-area-inset-top);right:env(safe-area-inset-right);bottom:env(safe-area-inset-bottom);left:env(safe-area-inset-left);
@@ -34,16 +35,17 @@ html,body{margin:0;height:100%;background:#000;overflow:hidden;touch-action:mani
     next.onerror = () => { stale.textContent = last ? 'offline · last image ' + time(last) : 'offline'; stale.style.display = 'inline-block'; };
     next.src = url;
   }
-  // The page and the status bar (theme-color; iOS also samples the page) take the colour of the image's top edge, also
-  // after a swipe to another theme, instead of keeping the first one.
+  // Inspect EVERY successfully loaded image, including timed reloads and photo/theme changes. The theme's
+  // server-rendered CSS background is only the initial fallback, before the first image has loaded.
   const theme = document.querySelector('meta[name="theme-color"]'), probe = document.createElement('canvas');
   function tint(image) {
     try {
       probe.width = 1; probe.height = 1; const context = probe.getContext('2d', { willReadFrequently: true });
       context.drawImage(image, Math.floor(image.naturalWidth / 2), 0, 1, 1, 0, 0, 1, 1);
       const [r, g, b] = context.getImageData(0, 0, 1, 1).data, colour = 'rgb(' + r + ',' + g + ',' + b + ')';
-      document.documentElement.style.background = colour; body.style.background = colour; theme.setAttribute('content', colour);
-    } catch { /* keeps the colour it has */ }
+      document.documentElement.style.setProperty('--display-background', colour);
+      theme.setAttribute('content', colour);
+    } catch { /* keeps the last successful colour */ }
   }
   async function check() {
     if (document.hidden) return;

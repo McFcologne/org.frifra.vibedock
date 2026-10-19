@@ -36,6 +36,9 @@ Wi-Fi.
   top as on the display.
 - **Pairing forms** only offer **Do not send TLS pin**; the pin status stays under **Settings → Network**.
 - **Backlight:** stays dimmable after full brightness, and the display no longer flashes at start.
+- **Web display:** the page starts with its theme’s background colour and updates the CSS background and browser
+  theme colour from every successfully loaded image, including timed reloads and theme/photo changes. The iPhone
+  home-screen status bar is translucent so the page background shows through.
 
 ## 0.2.3
 
