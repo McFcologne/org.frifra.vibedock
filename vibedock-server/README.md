@@ -4,7 +4,21 @@
 
 The server reads the usage of Codex, Claude, Cursor, Grok and Gemini accounts (*data sources*), exposes compact JSON to allowed source IPs, and renders the status image for every device it has paired; the devices pull it. Legacy delivery to up to three manually configured devices remains available separately. It does not install or update firmware.
 
-Sign-in uses the official CLIs bundled in the Docker image; the server reads the credentials they save. Codex, Claude (including corporate SSO) and Grok are in use with real business and private accounts. The server renews no tokens itself: Grok and Gemini sign-ins are kept fresh by running their official CLIs without sending model prompts; Claude Code renews its token (about eight hours) only before a model request, so the server sends one minimal request through the official CLI shortly before it expires (smallest model, no tools, skills, MCP servers or saved session, an empty working folder). Codex uses the tokens its client saved. An expired token that cannot be renewed produces `authentication_required` until the next sign-in; the server then tries again only every six hours. Two servers with the same Claude sign-in lock each other out: every renewal replaces the refresh token. Long-term unattended operation without a new sign-in is not demonstrated.
+Sign-in uses the official CLIs bundled in the Docker image; the server reads the credentials they save. Codex,
+Claude (including corporate SSO) and Grok are in use with real business and private accounts. Grok and Gemini
+sign-ins are kept fresh by running their official CLIs without sending model prompts. Codex uses the tokens its
+client saved.
+
+For Claude, the server runs a minimal Haiku request through the official CLI to trigger token renewal, with no
+tools, skills, MCP servers or saved session, in an empty working folder. These real model requests count toward
+the account's usage. Attempts start 30 minutes before expiry and repeat every ten minutes if renewal has not
+succeeded, including the first eligible attempt after expiry. After a failed attempt with an already-expired
+token, retries are spaced six hours apart. The server logs a successful renewal only when the stored expiry
+advances; credentials that remain invalid produce `authentication_required` and may require a new sign-in.
+
+Use separate Claude sign-ins for each server instance rather than copying credentials: refresh-token rotation
+can invalidate another instance's copy. Multiple Claude accounts on one server are supported. Long-term
+unattended operation without a new sign-in is not demonstrated.
 
 ## Administration at a glance
 

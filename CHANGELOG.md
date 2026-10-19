@@ -4,15 +4,24 @@ The release workflow publishes the section of the tagged version (`## 0.1.0` for
 
 ## 0.2.4
 
-Claude sign-ins are really renewed now. Update the server image; nothing to do on the displays.
+Claude sign-in renewal fixed, with clearer Synology setup instructions and TLS pin examples.
+Update the server image; nothing to do on the displays.
 
-- **Claude sign-in renewal fixed:** 0.2.1 renewed the token with `claude auth status`, which only reads the sign-in;
-  the Claude CLI renews its token (about eight hours) only before a model request. Half an hour before the expiry,
-  and once after it, the server now sends one minimal request through the official CLI (smallest model, no tools,
-  skills, MCP servers or saved session, an empty working folder) and logs "renewed until …". A sign-in that has
-  expired and cannot be renewed is tried again every six hours instead of every ten minutes.
-- **One Claude sign-in per server:** every renewal replaces the refresh token, so a second server or a local test
-  instance with the same sign-in makes the other one's copy invalid. Sign in on each server separately.
+- **Claude sign-in renewal fixed:** the previous `claude auth status` command did not reliably renew stored
+  credentials. The server now runs a minimal Haiku request through the official CLI, with no tools, skills,
+  MCP servers or saved session, in an empty working folder. These are real model requests and count toward
+  the account's usage. Attempts start 30 minutes before the access token expires and repeat every ten minutes
+  if it has not been renewed, including the first eligible attempt after expiry. Only after a failed attempt
+  with an already-expired token does the retry interval increase to six hours. The server reports
+  "renewed until …" only when the stored expiry has advanced.
+- **Separate Claude sign-ins for each server instance:** do not copy the same sign-in to another server or local
+  test instance. Refresh-token rotation can invalidate the other instance's copy; sign in separately on each
+  instance. This does not limit the number of Claude accounts configured on a server.
+- **Synology setup and TLS pin documentation:** the manual explains how to point `EXTERNAL_TLS_PROBE_URL` at a
+  separate reverse proxy's LAN HTTPS listener and allow its destination port from the Docker source subnet in
+  the DSM firewall. It distinguishes external, NAS-host and container reachability. Pairing, USB setup and
+  network screenshots now show successful demo TLS pin inspection; screenshot generation uses a fixed locale,
+  time zone and refresh line.
 
 ## 0.2.3
 
