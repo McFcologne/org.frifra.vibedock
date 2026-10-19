@@ -773,6 +773,12 @@ firmware card decides which image is shown, downloaded and installed:
 
 *Tested*: runs on real hardware (installation over USB, pairing, images; on the Waveshare boards also touch). *Prepared*: builds, with the settings the tested boards called for, but has not run on hardware yet.
 
+How every board shows the same design, rendered by the server in the board's own screen size and drawn in the case
+the administration uses for it. The boards marked *prepared, untested* have not run on hardware yet; their picture shows
+what the server sends, not that the board displays it correctly:
+
+<img src="images/26-boards.png" width="80%" alt="All boards with the same design in their screen sizes">
+
 Below the board, the firmware card shows file, size, SHA-256, chip and flash address, and the displays of this board
 with their installed version. **Download** saves the image; **Update to … over Wi-Fi** updates a paired display.
 
