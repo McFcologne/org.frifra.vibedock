@@ -229,6 +229,44 @@ try {
       const image = await page.request.get(`${B}/admin/clients/${identifier}/preview.png`);
       await writeFile(path.join(out, name + '.png'), await image.body()); console.log('  ' + name);
     }
+    // Every board in its case with a real image in its screen size, one screen pixel per CSS pixel: the test bench
+    // reports one board after the other, and the devices page's own markup and styles show them side by side.
+    const shown = [];
+    for (const [board, display, name, tested] of [
+      ['vibedock-m1', 'vibedock-m1', 'VibeTV M1', true], ['waveshare-s3-touch-lcd-154', 'vibedock-m1', 'Waveshare ESP32-S3-Touch-LCD-1.54', true],
+      ['waveshare-s3-touch-lcd-147', '172x320', 'Waveshare ESP32-S3-Touch-LCD-1.47', true], ['waveshare-c6-touch-lcd-169', '240x280', 'Waveshare ESP32-C6-Touch-LCD-1.69', true],
+      ['esp32-cyd', '320x240', 'Cheap Yellow Display', false], ['lilygo-t-display', '135x240', 'LilyGO T-Display', false],
+      ['lilygo-t-display-s3', '170x320', 'LilyGO T-Display-S3', false], ['waveshare-s3-lcd-169', '240x280', 'Waveshare ESP32-S3-LCD-1.69', false],
+      ['esp32-c3-st7789', 'vibedock-m1', 'ESP32-C3 with ST7789', false]]) {
+      const bench = 'vibedock-0a1b2c000003';
+      await go('/admin/devices');
+      const saved = await page.evaluate(async ([bench, display]) => {
+        const meta = n => document.querySelector(`meta[name="csrf-${n}"]`).content;
+        const response = await fetch(`/admin/designs/${bench}`, {method: 'POST', headers: {'Content-Type': 'application/json', [meta('header')]: meta('token')},
+          body: JSON.stringify({mood: '😎', scheme: 'midnight', weatherLocation: 'London, GB', inherit: false, display,
+            layout: {bands: [{type: 'usage', sources: ['00000000-0000-4000-8000-000000000001']}, {type: 'usage', sources: ['00000000-0000-4000-8000-000000000002']}, {type: 'context', moodLeft: false}]}})});
+        return response.status;
+      }, [bench, display]);
+      if (saved !== 200) throw new Error(`Display ${display} not saved: ${saved}`);
+      await pull(bench, {'X-VibeDock-Ota': '1', 'X-VibeDock-Board': board, 'X-VibeDock-Device-IP': '192.168.1.23', 'X-VibeDock-Firmware': version});
+      await go('/admin/devices');
+      const image = await page.request.get(`${B}/admin/clients/${bench}/preview.png`);
+      const [width] = display === 'vibedock-m1' ? [240] : display.split('x').map(Number);
+      const markup = await page.locator(`#device-${bench} .device`).evaluate((device, [src, width]) => {
+        const copy = device.cloneNode(true); copy.style.setProperty('--s', width + 'px');
+        copy.querySelectorAll('[data-live],[data-client-preview]').forEach(e => { e.removeAttribute('data-live'); e.removeAttribute('data-client-preview'); });
+        const img = copy.querySelector('img'); img.src = src; img.removeAttribute('width'); img.removeAttribute('height'); return copy.outerHTML;
+      }, ['data:image/png;base64,' + (await image.body()).toString('base64'), width]);
+      shown.push({markup, name, display: display === 'vibedock-m1' ? '240×240' : display.replace('x', '×'), tested});
+    }
+    await go('/admin/devices');
+    await page.locator('main').evaluate((main, shown) => {
+      main.innerHTML = '<div class="board-renderings" style="display:flex;flex-wrap:wrap;gap:40px 36px;align-items:flex-end;justify-content:center;padding:36px 28px">'
+        + shown.map(b => `<figure style="margin:0;text-align:center;font-size:13px;line-height:1.4">${b.markup}<figcaption style="margin-top:18px"><strong>${b.name}</strong><br>${b.display} · `
+          + (b.tested ? 'tested' : '<span style="color:#b45309;font-weight:600">prepared, untested</span>') + '</figcaption></figure>').join('') + '</div>';
+    }, shown);
+    await page.waitForFunction(() => [...document.querySelectorAll('.board-renderings img')].every(i => i.complete));
+    await shot('26-boards', page.locator('.board-renderings'));
     // The logo for the title page and the page header of the PDF (docs/logo.svg, transparent background)
     const logo = await context.newPage(); await logo.setViewportSize({width: 256, height: 256});
     const svg = await readFile(path.join(server, '../docs/logo.svg'), 'utf8');

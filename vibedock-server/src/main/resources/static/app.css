@@ -109,6 +109,46 @@ button:disabled{opacity:.55;cursor:default}
   box-shadow:inset 0 0 0 max(1px,calc(var(--s)*.006)) #000,inset 0 calc(var(--s)*.02) calc(var(--s)*.04) rgba(255,255,255,.06)}
 .device-front.case-154::before{content:"";position:absolute;top:calc(var(--s)*-.03);left:calc(var(--s)*.365);width:calc(var(--s)*.78);height:calc(var(--s)*.032);
   background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 780 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23ffffff'/%3E%3Cstop offset='.55' stop-color='%23ececE8'/%3E%3Cstop offset='1' stop-color='%23c9c9c3'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg fill='url(%23g)' stroke='%23b4b4ae' stroke-width='2'%3E%3Crect x='1' y='1' width='164' height='40' rx='14'/%3E%3Crect x='308' y='1' width='164' height='40' rx='14'/%3E%3Crect x='615' y='1' width='164' height='40' rx='14'/%3E%3C/g%3E%3Cg stroke='%23fff' stroke-opacity='.9' stroke-width='2' fill='none'%3E%3Cpath d='M14 4h138'/%3E%3Cpath d='M321 4h138'/%3E%3Cpath d='M628 4h138'/%3E%3C/g%3E%3C/svg%3E") 0 0/100% 100% no-repeat;filter:drop-shadow(0 calc(var(--s)*-.004) calc(var(--s)*.006) rgba(0,0,0,.18))}
+/* The prepared boards, from the makers' drawings and photos (--s is the screen width; offsets are mm / active width).
+   Cheap Yellow Display: yellow PCB 86 x 50 mm, screen 57.6 x 43.2 mm, shifted away from the micro-USB end (right). */
+.device-front.case-cyd{position:relative;padding:calc(var(--s)*.059) calc(var(--s)*.295) calc(var(--s)*.059) calc(var(--s)*.2);border-radius:calc(var(--s)*.07);
+  background:linear-gradient(180deg,#f7cf2e,#e8b70f);box-shadow:inset 0 0 0 max(1px,calc(var(--s)*.004)) #c99a06,0 calc(var(--s)*.03) calc(var(--s)*.08) rgba(20,25,35,.22)}
+.device-front.case-cyd::after{content:"";position:absolute;right:calc(var(--s)*-.02);top:calc(50% - var(--s)*.07);width:calc(var(--s)*.05);height:calc(var(--s)*.14);
+  border-radius:calc(var(--s)*.01);background:linear-gradient(90deg,#b8bcc2,#e9ebee 60%,#9ea3aa)}
+.case-cyd .device-glass{padding:0;background:#000}
+/* LilyGO T-Display: black PCB 51.5 x 25 mm, screen 14.9 x 24.9 mm, white TTGO label at the top, two buttons and USB-C
+   at the bottom. */
+.device-front.case-tdisplay{position:relative;padding:calc(var(--s)*.65) calc(var(--s)*.32) calc(var(--s)*1.14) calc(var(--s)*.36);
+  border-radius:calc(var(--s)*.06) calc(var(--s)*.06) calc(var(--s)*.14) calc(var(--s)*.14);
+  background:linear-gradient(#f2f2f2,#f2f2f2) 50% calc(var(--s)*.05)/calc(var(--s)*.55) calc(var(--s)*.26) no-repeat,#151617;
+  box-shadow:inset 0 0 0 max(1px,calc(var(--s)*.008)) #000,0 calc(var(--s)*.05) calc(var(--s)*.12) rgba(10,12,16,.35)}
+.device-front.case-tdisplay::before{content:"";position:absolute;bottom:calc(var(--s)*.07);left:calc(var(--s)*.17);width:calc(var(--s)*.24);height:calc(var(--s)*.3);
+  border-radius:calc(var(--s)*.04);background:#e8e8e6;box-shadow:calc(var(--s)*1.13) 0 0 #e8e8e6}
+.device-front.case-tdisplay::after{content:"";position:absolute;bottom:calc(var(--s)*-.12);left:calc(50% - var(--s)*.3);width:calc(var(--s)*.6);height:calc(var(--s)*.18);
+  border-radius:calc(var(--s)*.06);background:linear-gradient(#9ea3aa,#e9ebee 45%,#b8bcc2)}
+.case-tdisplay .device-glass{padding:0;background:#000;box-shadow:0 0 0 calc(var(--s)*.07) #050505}
+/* LilyGO T-Display-S3 in its shell: black, 70 x 32 mm, screen 22.7 x 42.7 mm, the orange button insert at the USB end. */
+.device-front.case-tdisplay-s3{position:relative;padding:calc(var(--s)*.42) calc(var(--s)*.2) calc(var(--s)*.72);border-radius:calc(var(--s)*.22);
+  background:linear-gradient(180deg,#2b2d31,#18191c);box-shadow:inset 0 max(1px,calc(var(--s)*.01)) max(1px,calc(var(--s)*.02)) rgba(255,255,255,.18),
+    inset 0 0 0 max(1px,calc(var(--s)*.008)) #060607,0 calc(var(--s)*.05) calc(var(--s)*.12) rgba(10,12,16,.38)}
+.device-front.case-tdisplay-s3::before{content:"";position:absolute;bottom:calc(var(--s)*.2);left:calc(var(--s)*.22);width:calc(var(--s)*.26);height:calc(var(--s)*.14);
+  border-radius:calc(var(--s)*.05);background:#f07c22;box-shadow:calc(var(--s)*.88) 0 0 #f07c22}
+.case-tdisplay-s3 .device-glass{padding:calc(var(--s)*.04);border-radius:calc(var(--s)*.04);background:#000}
+/* Waveshare ESP32-S3-LCD-1.69 (no case): the black glass 30.1 x 37.4 mm with rounded corners over the board, the screen
+   28 x 32.6 mm with a 5 mm corner radius, the ribbon edge at the bottom; USB-C left, three buttons right. */
+.device-front.case-s3-169{position:relative;padding:calc(var(--s)*.042) calc(var(--s)*.0375) calc(var(--s)*.129);border-radius:calc(var(--s)*.184);
+  background:#050506;box-shadow:inset 0 max(1px,calc(var(--s)*.008)) max(1px,calc(var(--s)*.016)) rgba(255,255,255,.22),0 0 0 max(1px,calc(var(--s)*.012)) #1d4f9e,
+    0 calc(var(--s)*.05) calc(var(--s)*.12) rgba(10,12,16,.38)}
+.device-front.case-s3-169::before{content:"";position:absolute;right:calc(var(--s)*-.04);top:30%;width:calc(var(--s)*.03);height:calc(var(--s)*.12);border-radius:calc(var(--s)*.01);
+  background:#a9aaa6;box-shadow:0 calc(var(--s)*.32) 0 #a9aaa6,0 calc(var(--s)*.64) 0 #a9aaa6}
+.device-front.case-s3-169::after{content:"";position:absolute;left:calc(var(--s)*-.05);top:calc(55% - var(--s)*.05);width:calc(var(--s)*.04);height:calc(var(--s)*.32);
+  border-radius:calc(var(--s)*.015);background:linear-gradient(90deg,#9ea3aa,#e9ebee 50%,#b8bcc2)}
+.case-s3-169 .device-glass{padding:0;overflow:hidden;border-radius:calc(var(--s)*.179);background:#000}
+/* ESP32-C3 with a 1.3" ST7789 module (wired by hand, no case): the usual blue module with its pin row at the top. */
+.device-front.case-c3{position:relative;padding:calc(var(--s)*.4) calc(var(--s)*.09) calc(var(--s)*.21);border-radius:calc(var(--s)*.04);
+  background:repeating-linear-gradient(90deg,#d7b04a 0 calc(var(--s)*.05),transparent calc(var(--s)*.05) calc(var(--s)*.109)) 50% calc(var(--s)*.12)/calc(var(--s)*.76) calc(var(--s)*.07) no-repeat,
+    linear-gradient(180deg,#2a5db0,#1f4c96);box-shadow:inset 0 0 0 max(1px,calc(var(--s)*.006)) #173a74,0 calc(var(--s)*.04) calc(var(--s)*.1) rgba(10,20,40,.3)}
+.case-c3 .device-glass{padding:calc(var(--s)*.03);background:#0a0a0b}
 .device img{display:block;width:var(--s);height:calc(var(--s) * var(--ratio,1));background:#000}
 .device[role=button]{cursor:zoom-in;border-radius:calc(var(--s)*.11)}.device[role=button]:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
 .device-lightbox{border:0;padding:0;background:transparent;overflow:visible;max-width:none;max-height:none;cursor:zoom-out}
