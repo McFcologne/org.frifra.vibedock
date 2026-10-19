@@ -5,7 +5,8 @@ The release workflow publishes the section of the tagged version (`## 0.1.0` for
 ## 0.2.4
 
 Claude sign-in renewal fixed, the Waveshare ESP32-S3-Touch-LCD-1.54 as a new tested board, quarter turns for square
-displays, clearer Synology setup instructions and TLS pin examples. Update the server image, then the displays over
+displays, settings and preview cases for the prepared boards, a web display in the colour of its image, clearer
+Synology setup instructions and TLS pin examples. Update the server image, then the displays over
 Wi-Fi.
 
 - **Claude sign-in renewal fixed:** the previous `claude auth status` command did not reliably renew stored
@@ -27,15 +28,20 @@ Wi-Fi.
   Its speaker plays start, connection, pairing and quota sounds; volume and mute on the device page and with the
   + / - buttons, with a volume bar on the display. The device page and the USB command `VIBEDOCK-BATTERY` show
   battery diagnostics.
-- **Quota sounds:** a display that asks for it with `X-VibeDock-Audio: 1` gets the remaining quota of its sources in
+- **Quota sounds:** a display with a speaker (currently the 1.54) that asks for it with `X-VibeDock-Audio: 1` gets the remaining quota of its sources in
   `X-VibeDock-Quota` and sounds on every rise and fall; other displays get no extra header.
 - **Orientation instead of Flip image:** the device card shows the orientation with a rotate button; square panels
   turn in 90° steps (`rotated-90`, `rotated-270`), the others by 180°. Quarter turns need the new firmware; older
   firmware keeps its orientation.
-- **Previews:** the 1.54 in its white case; every case has a fixed screen area, and a new image builds up from the
-  top as on the display.
+- **Previews:** the 1.54 in its white case; every case has a fixed screen area. When turned, the picture turns with
+  the case and the new one draws from the top as on the display.
 - **Pairing forms** only offer **Do not send TLS pin**; the pin status stays under **Settings → Network**.
 - **Backlight:** stays dimmable after full brightness, and the display no longer flashes at start.
+- **Prepared boards:** settings from the makers' documentation (LilyGO T-Display: power pin 14; Waveshare
+  ESP32-S3-LCD-1.69: colour order RGB, power hold on pin 41) and a preview case for each. They remain untested on
+  hardware; the manual shows all boards with real renderings in their screen sizes.
+- **Web display:** the page and the status bar (also of the iPhone home screen app) take the colour of the current
+  image, also after a swipe to another theme.
 
 ## 0.2.3
 
