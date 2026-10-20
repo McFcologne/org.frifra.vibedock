@@ -46,6 +46,17 @@ public class SettingsStore {
         static String typeLabel(String type){return switch(type){case "codex"->"Codex";case "claude"->"Claude";case "grok"->"Grok";case "gemini"->"Gemini";default->"Cursor";};}
     }
     public record Device(String name,String url,String token,boolean enabled) {}
+    /**
+     * How often the sources are asked for their usage (PollPace): dynamic learns each source's interval between the
+     * shortest and the longest one; fixed asks at the shortest and only backs off up to the longest after HTTP 429.
+     */
+    public record UsagePolling(boolean dynamic,int minMinutes,int maxMinutes) {
+        public static final UsagePolling DEFAULT=new UsagePolling(true,1,10);
+        public UsagePolling {
+            if(minMinutes<PollPace.MIN_MINUTES||maxMinutes>PollPace.MAX_MINUTES||minMinutes>maxMinutes)
+                throw new IllegalArgumentException("Update intervals must be "+PollPace.MIN_MINUTES+"–"+PollPace.MAX_MINUTES+" minutes, the shortest not above the longest");
+        }
+    }
     public record Settings(List<String> allowedIps,List<Account> accounts,List<Device> devices) {
         public Settings { allowedIps=List.copyOf(allowedIps); accounts=List.copyOf(accounts); devices=List.copyOf(devices); }
         /** The two default sources a new server starts with, ids "codex" and "claude". */
@@ -93,6 +104,18 @@ public class SettingsStore {
         return new Credential(node.path("token").asText(""),node.path("accountId").asText(""));
     }
     public Settings get() { return current; }
+    private Path pollingFile(){return directory.resolve("usage-polling.json");}
+    private volatile UsagePolling polling;
+    /** The update interval of the sources; the default until it is saved once. */
+    public UsagePolling polling() {
+        var known=polling;if(known!=null)return known;
+        try{known=Files.exists(pollingFile())?json.readValue(pollingFile().toFile(),UsagePolling.class):UsagePolling.DEFAULT;}
+        catch(IOException|RuntimeException e){known=UsagePolling.DEFAULT;}
+        return polling=known;
+    }
+    public synchronized void savePolling(UsagePolling next) throws IOException {
+        writePrivate(pollingFile(),json.writeValueAsBytes(next));polling=next;
+    }
     /**
      * Gives sources of earlier versions (ids "codex", "claude" or derived from their name) a random id; their sign-in
      * folder stays. Returns old id → new id, also for "codex" and "claude" when a design may still name them.

@@ -2,6 +2,17 @@
 
 The release workflow publishes the section of the tagged version (`## 0.1.0` for the tag `v0.1.0` or `0.1.0`) above the list of commits that GitHub generates.
 
+## 0.2.5
+
+Fewer rate limited answers from the providers. Update the server image; nothing to do on the displays.
+
+- **Update interval of the data sources:** *Data sources → Update interval* chooses between a fixed and a dynamic
+  interval, with a shortest and a longest one (default dynamic, 1 to 10 minutes). Dynamic learns for every source
+  how often its provider answers: each HTTP 429 adds a minute, an hour without one tries a minute less, and a 429 at
+  that shorter interval waits two, then four hours before the next try. Before, a source went straight back to one
+  minute after each successful answer and soon ran into the limit again. The card of each source shows its current
+  interval, and the server log every change.
+
 ## 0.2.4
 
 Claude sign-in renewal fixed, the Waveshare ESP32-S3-Touch-LCD-1.54 as a new tested board, quarter turns for square

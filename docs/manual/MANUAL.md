@@ -697,6 +697,22 @@ stops polling (the display shows it as paused), **Remove data source** deletes i
 
 <img src="images/41-source-manage.png" width="70%" alt="Manage a data source">
 
+## Update interval
+
+The server asks every source for its usage on its own schedule; **Updates** on the source's card shows the current
+interval. **Update interval** below the sources sets how it is chosen:
+
+- **Dynamic** (default): every source learns how often its provider answers. A *rate limited* answer (HTTP 429)
+  makes its interval one minute longer, up to the **longest** interval; only the next request waits twice as long.
+  After an hour without a rate limited answer it tries one minute less, down to the **shortest** interval. If that
+  is rate limited again, it goes back up and waits two, then four hours before it tries again. The card marks such
+  an interval as *learned*; the server log shows every change (`interval 2 → 3 min`).
+- **Fixed**: every source is asked at the shortest interval. After a rate limited answer it waits twice as long,
+  up to the longest interval, and returns to the shortest one with the next answer.
+
+Shortest and longest are 1 to 60 minutes (default 1 and 10). While a source is rate limited, the display keeps its
+last values and shows *Rate limited*.
+
 ## Export and import
 
 **Export** writes all data sources with their stored sign-ins into one file, encrypted with a password of at least

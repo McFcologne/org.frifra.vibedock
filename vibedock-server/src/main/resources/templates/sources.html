@@ -71,7 +71,9 @@
     <span class="badge" th:if="${source.suspended}">Paused</span>
     <span class="badge" th:unless="${source.suspended}" th:with="reading=${sourceStates.get(source.id)}" th:attr="data-source-badge=${source.id},data-status=${reading == null ? 'waiting' : reading.status}" th:classappend="${reading != null and reading.status == 'ok'} ? 'ok'" th:text="${reading == null ? 'Not available' : (reading.status == 'ok' ? 'Current' : #strings.replace(reading.status,'_',' '))}"></span></div>
   <div class="source-state"><span>Sign-in</span><span th:text="${source.configured ? (source.type == 'cursor' ? 'Key stored' : 'Credentials stored') : 'Not connected'}"></span>
-    <span>Data</span><span th:with="reading=${sourceStates.get(source.id)}" th:text="${source.suspended ? 'Paused: not polled, the display shows it as paused' : (reading != null and reading.status == 'ok' ? 'Current usage available' : 'Not available')}"></span></div>
+    <span>Data</span><span th:with="reading=${sourceStates.get(source.id)}" th:text="${source.suspended ? 'Paused: not polled, the display shows it as paused' : (reading != null and reading.status == 'ok' ? 'Current usage available' : 'Not available')}"></span>
+    <th:block th:unless="${source.suspended}" th:with="minutes=${intervals.get(source.id)}"><span>Updates</span><span data-source-interval
+      th:text="${minutes == null ? 'Not polled yet' : 'Every ' + minutes + ' min' + (polling.dynamic and minutes > polling.minMinutes ? ' (learned)' : '')}"></span></th:block></div>
   <div class="source-manage"><span class="meta">Provider account</span>
     <button type="button" class="secondary small" th:attr="data-dialog-open=${'manage-'+source.id}">Manage</button></div>
   <dialog class="source-dialog" th:id="${'manage-'+source.id}" th:attr="aria-labelledby=${'manage-title-'+source.id}">
@@ -116,6 +118,25 @@
 <small style="margin:-6px 0 18px">After a successful browser sign-in, credentials are stored in the Docker data directory, separately for every source. Use the sign-in button to renew expired or revoked credentials.</small>
 <div class="savebar" data-dirty-actions th:unless="${#lists.isEmpty(sources)}"><button>Save data sources</button></div>
 </form>
+
+<section class="card" id="update-interval">
+  <div class="card-head"><h2 class="grow">Update interval</h2><span class="badge" th:text="${polling.dynamic ? 'Dynamic' : 'Fixed'}">Dynamic</span></div>
+  <form th:action="@{/admin/sources/polling}" method="post" autocomplete="off" data-dirty-form>
+    <div class="polling-fields">
+      <div><label for="polling-mode">Mode</label>
+        <select id="polling-mode" name="mode"><option value="dynamic" th:selected="${polling.dynamic}">Dynamic</option><option value="fixed" th:selected="${!polling.dynamic}">Fixed</option></select></div>
+      <div><label for="polling-min">Shortest, minutes</label><input id="polling-min" name="minMinutes" type="number" min="1" max="60" required th:value="${polling.minMinutes}"></div>
+      <div><label for="polling-max">Longest, minutes</label><input id="polling-max" name="maxMinutes" type="number" min="1" max="60" required th:value="${polling.maxMinutes}"></div>
+    </div>
+    <small><strong>Dynamic</strong> learns for every source how often its provider answers: each <em>rate limited</em> answer (HTTP 429)
+      adds a minute, up to the longest interval; after an hour without one it tries a minute less, down to the shortest. If that
+      shorter interval is rate limited again, the source waits two, then four hours before the next try.
+      <strong>Fixed</strong> asks at the shortest interval and only waits longer, up to the longest, after a rate limited answer.</small>
+    <p class="notice" th:if="${pollingMessage}" th:text="${pollingMessage}"></p>
+    <p class="notice error" th:if="${pollingError}" th:text="${pollingError}"></p>
+    <div class="form-actions" data-dirty-actions><button>Save update interval</button></div>
+  </form>
+</section>
 
 </main>
 <footer th:replace="~{fragments :: footer}"></footer>
