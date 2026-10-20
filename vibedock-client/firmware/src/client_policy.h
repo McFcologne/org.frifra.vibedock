@@ -32,8 +32,9 @@ constexpr uint32_t pullRequestMs = 5000;
 constexpr bool pullRequestAllowed(uint32_t now, uint32_t lastRequest) { return uint32_t(now - lastRequest) >= pullRequestMs; }
 constexpr bool pairingLocked(uint8_t wrongAttempts) { return wrongAttempts >= maxPairingAttempts; }
 // Power-cycling three times, each time within quickBootMs after power-on, resets the device to factory settings.
+// Ten seconds: boards with a start sound and a slower start (Waveshare 1.54) left too little time with five.
 constexpr uint8_t resetPowerCycles = 3;
-constexpr uint32_t quickBootMs = 5000;
+constexpr uint32_t quickBootMs = 10000;
 constexpr bool factoryResetDue(uint8_t quickBoots) { return quickBoots >= resetPowerCycles; }
 // Reset reasons of the ESP8266 SDK: 0 power on, 6 external reset. Many boards report 6 when plugged in, because
 // their reset line rises after the supply; both count as a power cycle. Watchdog, exception and software
