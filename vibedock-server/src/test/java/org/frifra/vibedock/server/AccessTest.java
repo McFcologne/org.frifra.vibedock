@@ -558,6 +558,28 @@ class AccessTest {
             mvc.perform(admin.apply("90")).andExpect(status().isBadRequest());
         }finally{clients.remove(id);}
     }
+    @Test void aCircleGestureTurnsThePictureAndTheSamePullAnswersWithIt() throws Exception {
+        String key="fa".repeat(32),id="vibedock-circle",image="/api/v1/clients/"+id+"/image";
+        clients.paired(id,"Desk",key,"192.168.1.35",80,"waveshare-s3-touch-lcd-154");
+        try{
+            var circle=(java.util.function.Function<String,org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder>)gesture->get(image)
+                    .header("Authorization","Bearer "+key).header("X-VibeDock-Gesture",gesture).with(r->{r.setLocalPort(8080);return r;});
+            mvc.perform(circle.apply("turn-clockwise")).andExpect(header().string("X-VibeDock-Orientation","rotated-90"));
+            mvc.perform(circle.apply("turn-clockwise")).andExpect(header().string("X-VibeDock-Orientation","flipped"));
+            Assertions.assertTrue(clients.get(id).flipped());
+            mvc.perform(circle.apply("turn-counterclockwise")).andExpect(header().string("X-VibeDock-Orientation","rotated-90"));
+            mvc.perform(circle.apply("turn-counterclockwise")).andExpect(header().string("X-VibeDock-Orientation","upright"));
+            mvc.perform(circle.apply("turn-counterclockwise")).andExpect(header().string("X-VibeDock-Orientation","rotated-270"));
+            // A rectangular panel only flips, in either direction.
+            clients.setBoard(id,"waveshare-s3-touch-lcd-147");
+            mvc.perform(circle.apply("turn-clockwise")).andExpect(header().string("X-VibeDock-Orientation","flipped"));
+            mvc.perform(circle.apply("turn-counterclockwise")).andExpect(header().string("X-VibeDock-Orientation","upright"));
+            // The VibeTV M1 has neither touch nor a turn; the gesture changes nothing.
+            clients.setBoard(id,"vibedock-m1");
+            mvc.perform(circle.apply("turn-clockwise")).andExpect(status().isOk()).andExpect(header().doesNotExist("X-VibeDock-Orientation"));
+            Assertions.assertEquals(0,clients.rotation(id));
+        }finally{clients.remove(id);}
+    }
     @Test void devicesSavedAsFlippedBeforeQuarterTurnsStayTurned() {
         var device=new ClientRegistry.Device("id","name","hash","192.168.1.2",80,0,null,null,null,false,null,null,null,"waveshare-s3-touch-lcd-154",null,true);
         Assertions.assertEquals(180,device.degrees());

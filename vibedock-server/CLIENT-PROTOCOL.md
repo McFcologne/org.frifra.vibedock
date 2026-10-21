@@ -195,6 +195,11 @@ older servers. Swipes up and down change the backlight on the display only (10�
 A double tap sends `X-VibeDock-Gesture: photos-toggle`: the server starts the slideshow of the display's design when
 it does not run and stops it when it does, whatever its schedule or the editor's switch say, for that display until
 the next double tap or a restart of the server; a design without photos stays as it is.
+A circle drawn with one finger sends `X-VibeDock-Gesture: turn-clockwise` or `turn-counterclockwise`: the server sets
+the display's orientation (3e) to the next one in that direction, by a quarter turn on square panels and otherwise
+between upright and flipped, and answers this pull with the new `X-VibeDock-Orientation`. The firmware counts a touch
+as a circle when its points go round their centre by at least 300° on an average radius of at least 35 pixels and end
+near their start.
 
 ## 3e. Orientation (server → device)
 

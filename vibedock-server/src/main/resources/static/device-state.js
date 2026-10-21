@@ -49,6 +49,10 @@
           if (!next) continue;
           for (const part of card.querySelectorAll('[data-live]')) swap(part, next.querySelector(`[data-live="${part.dataset.live}"]`));
           card.dataset.updating = next.dataset.updating;
+          // The orientation, changed on the display (a circle gesture): the card turns as after a click (admin-ui.js).
+          const form = card.querySelector('[data-turn]'), nextForm = next.querySelector('[data-turn]');
+          if (form && nextForm && form.dataset.turn !== nextForm.dataset.turn)
+            document.dispatchEvent(new CustomEvent('vibedock:turned', { detail: { form, degrees: Number(nextForm.dataset.turn) } }));
         }
         for (const part of document.querySelectorAll('[data-live-page]')) swap(part, page.querySelector(`[data-live-page="${part.dataset.livePage}"]`));
         document.dispatchEvent(new Event('vibedock:devices-refreshed'));  // an enlarged preview follows (admin-ui.js)

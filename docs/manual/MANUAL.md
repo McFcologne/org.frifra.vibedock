@@ -938,8 +938,10 @@ Displays with a touch panel (Waveshare ESP32-S3-Touch-LCD-1.47, ESP32-S3-Touch-L
 | left / right | next / previous colour scheme; the display keeps it as its own design (*Custom design* in the editor) |
 | up / down | brighter / darker (10–100 %), stored on the display |
 | double tap | photos on or off: starts the slideshow of the display's design or stops it, whatever its schedule or the editor's switch say (until the next double tap or a restart of the server) |
+| circle | turns the picture: a circle clockwise turns it clockwise, counter-clockwise the other way; by 90° on the square 1.54, between upright and upside down on the others. The device card shows the new orientation (see [Displays mounted upside down or turned](#displays-mounted-upside-down-or-turned)) |
 
-The scheme changes with the next image, right after the swipe. To follow the default design again, turn off
+Draw the circle with one finger in one go, at least about a third of the screen wide and within three seconds; it does not
+have to be round or end exactly where it started. The scheme changes with the next image, right after the swipe. To follow the default design again, turn off
 *Custom design* for the display in the editor.
 
 ## Sounds and battery on the Waveshare 1.54-inch touch display
@@ -966,7 +968,7 @@ Battery presence and operation without USB have not been established. No motion-
 
 Every display except the VibeTV M1 (its case decides how it stands) shows its **Orientation** on its card under
 **Devices**. The rotate button beside it turns by 180 degrees, on displays with a square panel (e.g. the Waveshare
-1.54") by 90 degrees clockwise, and saves at once. The card shows the case as the display is mounted, the picture on
+1.54") by 90 degrees clockwise, and saves at once. On touch displays a circle drawn with one finger does the same, in the direction of the circle. The card shows the case as the display is mounted, the picture on
 it upright. The display's own screens and the swipes turn as well; the
 display takes it over within seconds. Quarter turns need firmware that knows them: older firmware keeps its
 orientation until it is updated. The motion sensor of the Waveshare boards is not used: it decided too unreliably.
