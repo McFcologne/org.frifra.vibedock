@@ -33,8 +33,11 @@ function modules(dir) {
 }
 modules(at('/usr/local/lib/node_modules'));
 entries.push({name:'Node.js',version:process.version,license:'Distribution license & third-party notices',text:`Node.js ${process.version}\nUpstream distribution notices: https://github.com/nodejs/node/blob/${process.version}/LICENSE`});
-const artwork = at('/app/twemoji/LICENSE-GRAPHICS');
-if (fs.existsSync(artwork)) entries.push({name:'Twemoji artwork',version:process.env.TWEMOJI_VERSION ?? '',license:'See bundled LICENSE-GRAPHICS',text:read(artwork)});
+// The Twemoji graphics versioned in the repository (third-party/twemoji): its version, origin and attribution
+// (README.md), then the full license text (LICENSE-GRAPHICS).
+const artwork = at('/app/twemoji/LICENSE-GRAPHICS'), artworkOrigin = at('/app/twemoji/README.md'), artworkVersion = at('/app/twemoji/VERSION');
+if (fs.existsSync(artwork)) entries.push({name:'Twemoji artwork',version:fs.existsSync(artworkVersion) ? read(artworkVersion).trim() : '',
+  license:'CC-BY-4.0',text:(fs.existsSync(artworkOrigin) ? read(artworkOrigin) + '\n\nLICENSE-GRAPHICS\n\n' : '') + read(artwork)});
 // Debian/Ubuntu copyright files include the installed fonts and their upstream notices.
 const statusFile = at('/var/lib/dpkg/status');
 if (fs.existsSync(statusFile)) for (const stanza of read(statusFile).split(/\n\s*\n/)) {

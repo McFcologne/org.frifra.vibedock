@@ -85,8 +85,8 @@ board with the browser flasher. Nothing has to be installed next to it.
   Pi 4/5 (arm64) or a Mac/PC with Docker Desktop. The image exists for **amd64** and **arm64**.
 - **Docker Engine with the Compose plugin 2.17 or later** (`docker compose version`), or Docker Desktop.
 - Two free TCP ports: **10001** (administration) and **10002** (displays, web displays, usage API).
-- For building from the sources: Git, access to the repository, and internet access during the build (Maven, npm,
-  Twemoji). The first build takes several minutes.
+- For building from the sources: Git, access to the repository, and internet access during the build (Maven, npm;
+  the emoji graphics are part of the repository). The first build takes several minutes.
 - At run time the server needs internet access to the providers and to the weather service (Open-Meteo).
 
 Choose one of three ways:
@@ -1131,8 +1131,8 @@ DOCS_PDF=../docs/manual/vibedock-manual.pdf ./scripts/docs.sh   # screenshots an
 - `DOCS_PDF` also makes the PDF; it needs pandoc, XeLaTeX (TeX Live) and the DejaVu fonts. Title page, page header
   and footer, headings and frames are defined in `docs/manual/style/manual.tex`. `keep-with-figure.lua` next to it moves a
   heading to the next page together with its first picture when both do not fit.
-- `EMOJI_DIR` points to the Twemoji SVGs (`assets/svg`; the 72×72 PNGs work too); without it the script downloads the
-  pinned Twemoji release once.
+- `EMOJI_DIR` points to another Twemoji SVG folder (the 72×72 PNGs work too); without it the script uses the
+  graphics versioned in the repository (`third-party/twemoji/svg`), the same as the server and the Docker image.
 - `PLAYWRIGHT_CHROMIUM` uses an installed Chromium instead of Playwright's own.
 
 **In the Docker image.** Every Docker build (Compose, `scripts/image.sh`, the release workflow) runs the same script
@@ -1164,7 +1164,7 @@ footer also holds every license text. The most important ones:
 | esptool-js (Espressif) | Flashing from the browser | Apache-2.0 |
 | Codex CLI, Gemini CLI | Sign-in to the providers | Apache-2.0 |
 | Claude Code, Grok Build | Sign-in to the providers | Licenses of Anthropic and xAI |
-| Twemoji graphics | Emoji on the displays | CC-BY 4.0 |
+| Twemoji 17.0.3 graphics (Twitter, Inc. and other contributors; unmodified, `third-party/twemoji`) | Emoji on the displays | CC BY 4.0 |
 | Open-Meteo | Weather data | CC-BY 4.0 (attribution) |
 | ArduinoJson, QRCode | Firmware | MIT |
 | TFT_eSPI | Firmware, display driver | FreeBSD and MIT (per file) |

@@ -79,7 +79,7 @@ jobs:
         run: |
           v="${{ needs.version.outputs.version }}"
           # The labels link the image to this repository on ghcr.io (also for tags built before they were added).
-          docker buildx build --platform "linux/${{ matrix.arch }}" --build-context git=../.git \
+          docker buildx build --platform "linux/${{ matrix.arch }}" --build-context git=../.git --build-context twemoji=../third-party/twemoji \
             --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
             --label "org.opencontainers.image.description=VibeDock server: AI usage on small desk displays" \
             --label "org.opencontainers.image.licenses=Apache-2.0" --label "org.opencontainers.image.version=$v" \

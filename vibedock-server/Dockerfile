@@ -1,4 +1,3 @@
-ARG TWEMOJI_VERSION=17.0.3
 # MANUAL=skip leaves out the manual (PDF and its screenshots), for quick local builds; the administration then shows no
 # manual link.
 ARG MANUAL=full
@@ -26,26 +25,24 @@ RUN --mount=type=bind,from=git,target=/repo.git --mount=type=cache,id=vibedock-p
              && sh ../scripts/images.sh /out; }; }; \
     fi
 
-# The JAR and the emoji set do not depend on the target platform: built natively, also when building for another one.
+# The Twemoji graphics versioned in the repository (third-party/twemoji, graphics CC BY 4.0; origin and checksum in
+# its README.md), passed as the build context "twemoji" (compose.yaml, scripts/image.sh, the release workflow). The
+# same files serve the tests, the manual and the server. Without that context this stage stops the build.
+FROM --platform=$BUILDPLATFORM alpine:3.22 AS twemoji
+RUN echo "The Twemoji graphics are missing: build with --build-context twemoji=../third-party/twemoji (see compose.yaml)" >&2 && exit 1
+
+# The JAR does not depend on the target platform: built natively, also when building for another one.
 FROM --platform=$BUILDPLATFORM maven:3.9.11-eclipse-temurin-21 AS build
 WORKDIR /build
 COPY pom.xml .
 RUN mvn -B dependency:go-offline
+# Where the server and the tests look for them from /build (Twemoji.locate): ../third-party/twemoji/svg.
+COPY --from=twemoji / /third-party/twemoji
 # The usage API contract; a test checks real answers against it.
 COPY usage.schema.json ./
 COPY src ./src
 COPY --from=version /version /version
 RUN mvn -B verify -Drevision="$(cat /version)"
-
-# Twemoji SVGs (graphics CC-BY 4.0) for the emoji in the status image, sharp at any size; Java2D cannot draw colour
-# emoji fonts.
-FROM --platform=$BUILDPLATFORM alpine:3.22 AS twemoji
-ARG TWEMOJI_VERSION
-ARG TWEMOJI_SHA256=a0855654b633045ae2337537e77f1bb4361162f7fcd910e613eaab1d6d9c5fca
-RUN wget -qO /tmp/twemoji.tgz "https://github.com/jdecked/twemoji/archive/refs/tags/v${TWEMOJI_VERSION}.tar.gz" \
-    && echo "${TWEMOJI_SHA256}  /tmp/twemoji.tgz" | sha256sum -c - \
-    && tar xzf /tmp/twemoji.tgz -C /tmp "twemoji-${TWEMOJI_VERSION}/assets/svg" "twemoji-${TWEMOJI_VERSION}/LICENSE-GRAPHICS" \
-    && mkdir /twemoji && mv "/tmp/twemoji-${TWEMOJI_VERSION}/assets/svg" "/tmp/twemoji-${TWEMOJI_VERSION}/LICENSE-GRAPHICS" /twemoji/
 
 FROM --platform=$BUILDPLATFORM node:22-bookworm-slim AS node
 
@@ -63,10 +60,9 @@ RUN ln -s /usr/local/lib/node_modules/@openai/codex/bin/codex.js /usr/local/bin/
     && ln -s /usr/local/lib/node_modules/@xai-official/grok/bin/grok-native /usr/local/bin/grok \
     && ln -s /usr/local/lib/node_modules/@google/gemini-cli/bundle/gemini.js /usr/local/bin/gemini \
     && mkdir -p /app /data && chown -R 10001:10001 /app /data
-COPY --from=twemoji /twemoji /app/twemoji
+COPY --from=twemoji / /app/twemoji
 COPY scripts/license-inventory.mjs /app/license-inventory.mjs
-ARG TWEMOJI_VERSION
-RUN TWEMOJI_VERSION="$TWEMOJI_VERSION" node /app/license-inventory.mjs
+RUN node /app/license-inventory.mjs
 
 # The user manual (docs/manual) as PDF, linked in the administration's footer: the screenshots are taken again from
 # these sources with the demo data (scripts/docs.sh), then pandoc makes the PDF, ending with the
@@ -84,12 +80,11 @@ COPY e2e/package.json e2e/package-lock.json ./e2e/
 RUN cd e2e && npm ci --silent && npx playwright install --with-deps chromium
 COPY scripts ./scripts
 COPY e2e/docs ./e2e/docs
-COPY --from=twemoji /twemoji/svg /twemoji
 COPY --from=runtime /app/legal/components.json /legal/components.json
 RUN --mount=type=bind,from=git,target=/repo.git mkdir -p /out && if git --git-dir=/repo.git rev-parse -q --verify HEAD >/dev/null; then \
       git --git-dir=/repo.git archive HEAD docs/manual docs/logo.svg | tar -x -C / \
       && DOCS_COMMIT=$(git --git-dir=/repo.git rev-parse HEAD) DOCS_STAMP=$(git --git-dir=/repo.git show -s --format=%ct HEAD) \
-         EMOJI_DIR=/twemoji DOCS_VERSION="$(cat /version)" DOCS_PDF=/out/vibedock-manual.pdf LICENSE_INVENTORY=/legal/components.json sh scripts/docs.sh; \
+         DOCS_VERSION="$(cat /version)" DOCS_PDF=/out/vibedock-manual.pdf LICENSE_INVENTORY=/legal/components.json sh scripts/docs.sh; \
     fi
 
 FROM alpine:3.22 AS manual-skip

@@ -206,7 +206,7 @@ The administration footer shows the build version and links to README, the PDF m
 
 - Quota endpoints and fields follow [CodexBar](https://github.com/steipete/CodexBar) 0.63.0 by Peter Steinberger, pinned to commit [`f3e718c`](https://github.com/steipete/CodexBar/tree/f3e718c897d5ed76af4e07182df899c722118546); additional integrations are documented in [PROVIDERS.md](vibedock-server/PROVIDERS.md).
 - Provider sign-in uses the official Codex, Claude Code, Grok Build and Gemini CLI clients. Cursor uses its team Admin API.
-- Emoji graphics: [Twemoji](https://github.com/jdecked/twemoji) (CC-BY 4.0). Weather: [Open-Meteo](https://open-meteo.com/). Installed component notices are listed in the administration under **Licenses & notices**.
+- Emoji graphics: [Twemoji](https://github.com/jdecked/twemoji) 17.0.3 by Twitter, Inc. and other contributors (CC BY 4.0), unmodified in [`third-party/twemoji`](third-party/twemoji/README.md). Weather: [Open-Meteo](https://open-meteo.com/). Installed component notices are listed in the administration under **Licenses & notices**.
 - Display hardware of the VibeTV M1: Vibe TV (see [Hardware](#hardware)). See also the [feasibility assessment](VibeDock-Feasibility-Codex-Claude.md).
 
 ## Safety notes
