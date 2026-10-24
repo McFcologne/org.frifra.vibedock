@@ -150,6 +150,37 @@ constexpr Swipe swipeOf(int dx, int dy) {
 constexpr int maxTapMove = 12; constexpr uint32_t maxTapMs = 350, doubleTapMs = 400;
 constexpr bool isTap(int dx, int dy, uint32_t heldMs) { return distance(dx) < maxTapMove && distance(dy) < maxTapMove && heldMs < maxTapMs; }
 constexpr bool doubleTap(uint32_t lastTap, uint32_t now) { return lastTap != 0 && now - lastTap < doubleTapMs; }
+// A circle drawn with one finger turns the picture (the touch controllers report only one finger). The points of a
+// touch, every 20 ms, must go round their centre by at least minCircleDegrees on an average radius of at least
+// minCircleRadius pixels, never cut close through the centre (no back and forth), and end near where they started.
+// A circle slower than the points held (about three seconds) does not count.
+enum class Circle : uint8_t { None, Clockwise, CounterClockwise };
+constexpr uint16_t maxCirclePoints = 160; constexpr float minCircleDegrees = 300; constexpr int minCircleRadius = 35;
+struct TouchPath {
+  int16_t x[maxCirclePoints], y[maxCirclePoints]; uint16_t count = 0; bool overflow = false;
+  void clear() { count = 0; overflow = false; }
+  void add(int16_t px, int16_t py) { if (count < maxCirclePoints) { x[count] = px; y[count] = py; count++; } else overflow = true; }
+  // In panel coordinates (y downwards): a positive sweep turns clockwise on the screen.
+  Circle circle() const {
+    if (overflow || count < 12) return Circle::None;
+    float cx = 0, cy = 0;
+    for (uint16_t i = 0; i < count; i++) { cx += x[i]; cy += y[i]; }
+    cx /= count; cy /= count;
+    float radius = 0, nearest = 1e9f, sweep = 0, previous = atan2f(y[0] - cy, x[0] - cx);
+    for (uint16_t i = 0; i < count; i++) {
+      float r = sqrtf((x[i] - cx) * (x[i] - cx) + (y[i] - cy) * (y[i] - cy)); radius += r; if (r < nearest) nearest = r;
+      if (i == 0) continue;
+      float angle = atan2f(y[i] - cy, x[i] - cx), step = angle - previous;
+      if (step > float(M_PI)) step -= 2 * float(M_PI); else if (step < -float(M_PI)) step += 2 * float(M_PI);
+      sweep += step; previous = angle;
+    }
+    radius /= count;
+    float gap = sqrtf(float((x[count - 1] - x[0]) * (x[count - 1] - x[0]) + (y[count - 1] - y[0]) * (y[count - 1] - y[0])));
+    if (radius < minCircleRadius || nearest < radius * 0.4f || gap > radius * 1.2f) return Circle::None;
+    float degrees = sweep * 180 / float(M_PI);
+    return degrees >= minCircleDegrees ? Circle::Clockwise : degrees <= -minCircleDegrees ? Circle::CounterClockwise : Circle::None;
+  }
+};
 // Backlight in percent: swipes up and down change it in steps, never below minBrightness (the screen stays readable).
 constexpr uint8_t minBrightness = 10, brightnessStep = 15;
 constexpr uint8_t clampBrightness(long v) { return v < minBrightness ? minBrightness : v > 100 ? 100 : uint8_t(v); }

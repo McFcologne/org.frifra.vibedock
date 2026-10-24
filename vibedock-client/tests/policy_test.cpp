@@ -8,6 +8,26 @@
 int main(){
   using namespace client_policy;
   {
+    // Circles drawn with one finger, as the touch controller reports them every 20 ms.
+    auto draw=[](TouchPath &p,float cx,float cy,float r,float startDeg,float sweepDeg,int points,float wobble=0){
+      p.clear();
+      for(int i=0;i<points;i++){ float a=(startDeg+sweepDeg*i/(points-1))*float(M_PI)/180; float rr=r+(i%2?wobble:-wobble);
+        p.add(int16_t(cx+rr*cosf(a)),int16_t(cy+rr*sinf(a))); }
+    };
+    TouchPath p;
+    draw(p,120,120,60,-90,350,50); assert(p.circle()==Circle::Clockwise);              // y points down: clockwise
+    draw(p,120,120,60,-90,-350,50); assert(p.circle()==Circle::CounterClockwise);
+    draw(p,100,140,50,30,320,40,6); assert(p.circle()==Circle::Clockwise);             // anywhere, a little uneven
+    draw(p,120,120,60,-90,240,50); assert(p.circle()==Circle::None);                   // two thirds: no turn
+    draw(p,120,120,20,-90,360,50); assert(p.circle()==Circle::None);                   // too small
+    draw(p,120,120,60,-90,350,8); assert(p.circle()==Circle::None);                    // too few points
+    draw(p,120,120,60,-90,350,200); assert(p.circle()==Circle::None);                  // slower than the points held
+    p.clear(); for(int i=0;i<60;i++) p.add(int16_t(i%2?40:200),int16_t(120));          // back and forth, no circle
+    assert(p.circle()==Circle::None);
+    p.clear(); for(int i=0;i<40;i++) p.add(int16_t(40+4*i),int16_t(120)); assert(p.circle()==Circle::None);  // a swipe
+    draw(p,120,120,60,-90,700,80); assert(p.circle()==Circle::Clockwise);              // two rounds: still one turn
+  }
+  {
     sound_policy::VolumeOverlay overlay; uint16_t row[240];
     for(int i=0;i<240;i++)row[i]=uint16_t(i);
     assert(!overlay.savedRow(0)); overlay.capture(95,row,240); assert(!overlay.savedRow(0));

@@ -60,30 +60,40 @@
   });
   // Devices: the orientation. Each click on the rotate button turns by 90 degrees (square panels) or 180 degrees and
   // saves at once; the card turns with it and the device with its next pull (asked right away).
+  // The case turns with the picture in it (the glass keeps its turn); then the display draws the new picture
+  // upright, row by row from the top, over the previous one, which stays turned until it is drawn over.
+  const showTurn = (form, degrees) => {
+    const device = form.closest('.client-card')?.querySelector('.device'), glass = device?.querySelector('.device-glass');
+    form.querySelector('[data-turn-value]').textContent = degrees + '°';
+    const before = parseFloat(getComputedStyle(device || form).getPropertyValue('--turn')) || 0;
+    // The shorter way round: from 270° on to 0° turns a quarter further, not three quarters back.
+    let step = ((degrees - before) % 360 + 360) % 360; if (step > 180) step -= 360;
+    const target = before + step;
+    if (!device || !glass || target === before) return;
+    glass.style.setProperty('--glass-turn', before + 'deg'); device.style.setProperty('--turn', target + 'deg');
+    clearTimeout(glass.turnTimer); glass.querySelector('.turn-old')?.remove();
+    glass.turnTimer = setTimeout(() => {
+      const image = glass.querySelector('img:not(.turn-old)'), screen = image?.closest('.device-screen');
+      if (image && screen && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        const old = image.cloneNode(); old.className = 'turn-old'; old.removeAttribute('data-client-preview'); old.alt = '';
+        old.style.transform = `rotate(${before - target}deg)`; screen.prepend(old);
+        image.addEventListener('animationend', () => old.remove(), { once: true });
+        screen.classList.remove('drawing'); void screen.offsetWidth; screen.classList.add('drawing');
+      }
+      glass.style.setProperty('--glass-turn', target + 'deg');
+    }, 350);
+  };
+  // Turned on the display itself (a circle on a touch display): the card follows like after a click (device-state.js).
+  document.addEventListener('vibedock:turned', event => {
+    const {form, degrees} = event.detail;
+    if (form.querySelector('[data-turn-next]')?.disabled) return;  // a click of its own is still being saved
+    form.dataset.turn = String(degrees); showTurn(form, degrees);
+  });
   document.addEventListener('click', async event => {
     const button = event.target.closest('[data-turn-next]'); if (!button) return;
-    const form = button.closest('[data-turn]'), device = form.closest('.client-card')?.querySelector('.device');
+    const form = button.closest('[data-turn]');
     const saved = Number(form.dataset.turn || 0), next = (saved + Number(form.dataset.turnStep || 180)) % 360;
-    const glass = device?.querySelector('.device-glass');
-    // The case turns with the picture in it (the glass keeps its turn); then the display draws the new picture
-    // upright, row by row from the top, over the previous one, which stays turned until it is drawn over.
-    const show = degrees => {
-      form.querySelector('[data-turn-value]').textContent = degrees + '°';
-      const before = parseFloat(getComputedStyle(device || form).getPropertyValue('--turn')) || 0;
-      if (!device || !glass || before === degrees) return;
-      glass.style.setProperty('--glass-turn', before + 'deg'); device.style.setProperty('--turn', degrees + 'deg');
-      clearTimeout(glass.turnTimer); glass.querySelector('.turn-old')?.remove();
-      glass.turnTimer = setTimeout(() => {
-        const image = glass.querySelector('img:not(.turn-old)'), screen = image?.closest('.device-screen');
-        if (image && screen && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
-          const old = image.cloneNode(); old.className = 'turn-old'; old.removeAttribute('data-client-preview'); old.alt = '';
-          old.style.transform = `rotate(${before - degrees}deg)`; screen.prepend(old);
-          image.addEventListener('animationend', () => old.remove(), { once: true });
-          screen.classList.remove('drawing'); void screen.offsetWidth; screen.classList.add('drawing');
-        }
-        glass.style.setProperty('--glass-turn', degrees + 'deg');
-      }, 350);
-    };
+    const show = degrees => showTurn(form, degrees);
     const token = document.querySelector('meta[name="csrf-token"]').content, header = document.querySelector('meta[name="csrf-header"]').content;
     show(next); button.disabled = true;
     try {

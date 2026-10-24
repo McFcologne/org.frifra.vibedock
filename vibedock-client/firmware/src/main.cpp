@@ -1576,16 +1576,28 @@ uint32_t lastTouchPoll = 0;
 void touchPoll() {
   static bool touching = false; static int16_t startX, startY, lastX, lastY; static uint8_t idle = 0;
   static uint32_t touchedAt = 0, lastTap = 0;
+  static client_policy::TouchPath path;  // the points of this touch, for the circle gesture
   if (millis() - lastTouchPoll < 20) return;
   lastTouchPoll = millis();
   int16_t x, y;
   if (touch::read(x, y)) {
-    if (!touching) { touching = true; startX = x; startY = y; touchedAt = millis(); }
-    lastX = x; lastY = y; idle = 0; return;
+    if (!touching) { touching = true; startX = x; startY = y; touchedAt = millis(); path.clear(); }
+    lastX = x; lastY = y; idle = 0; path.add(x, y); return;
   }
   // Released only after 60 ms without a point: the controllers drop single readings during a swipe.
   if (!touching || ++idle < 3) return;
   touching = false; idle = 0;
+  // A circle turns the picture (the server sets the orientation and sends it back with the answer to this gesture);
+  // the direction does not depend on how the panel is turned. Before the swipes: a circle may end some way off.
+  auto circle = path.circle();
+  if (circle != client_policy::Circle::None) {
+    if (mode != Mode::Paired) return;
+    audio::play(audio::Cue::Swipe);
+    pendingGesture = circle == client_policy::Circle::Clockwise ? "turn-clockwise" : "turn-counterclockwise";
+    logEvent(String(F("Touch: ")) + pendingGesture, true);
+    lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u;  // the new orientation right away
+    return;
+  }
   int dx = lastX - startX, dy = lastY - startY;
   client_policy::turnSwipe(dx, dy, turns);  // the panel's coordinates do not turn with the picture
   auto swipe = client_policy::swipeOf(dx, dy);
