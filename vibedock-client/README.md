@@ -130,7 +130,7 @@ If the device still runs its original firmware, first follow [Build and test](#b
 2. **Open Wi-Fi setup.** The captive portal usually opens automatically. Otherwise, open `http://192.168.4.1` while connected to the setup network; the address is also shown on the display.
 3. **Choose your network.** Select a nearby network, enter its password and press **Save and connect**. Networks are sorted by signal strength; **Scan again** refreshes the list. You can also type the network name. The device restarts and connects.
 4. **Pair in the administration.** When the display shows **Invite in the administration**, note its IP address and six-digit pairing code. In the server administration, open **Devices → Pair device**, enter both and confirm. Reconnect your phone to your normal network if necessary.
-5. **Check the result.** The device receives its server addresses, access key and polling interval, then pulls its display image. The default interval is **30 seconds**. Its IP remains visible on the display.
+5. **Check the result.** The device receives its server addresses, access key and fallback poll interval, then pulls its display image. After that it pulls when the server says the picture can change next; the fallback interval (default **30 seconds**) applies to older servers and after failed pulls. Its IP remains visible on the display.
 
 **HTTP pairing is unencrypted.** Use it only on a trusted home network: network attackers can read the device key or replace its TLS/OTA trust keys. The pairing form shows a warning but remains available. **Devices → Firmware → Only pair** over USB is an alternative without reinstalling firmware.
 
@@ -224,7 +224,7 @@ While starting or waiting for a current image, the device shows **Wi-Fi → Pair
 | **Invite in the administration** / **Waiting for invitation** | Wi-Fi is connected. Pair using the IP and code on the display. |
 | **Connected** | The last server request succeeded. An unchanged image also counts as a successful update. |
 | **Server unreachable** | The connection failed. Check server availability and the announced addresses. The reason (TCP, DNS or the TLS error) is shown below, wrapped, with the failed address at the bottom. After a connection failure the device tries the next announced address right away (an answer that stalled after the TLS handshake first at the same address; then at the polling interval); the bottom line shows the address being tried. |
-| **Updates missing** | No successful image pull for three polling intervals; the old view is hidden to avoid showing stale data. At the default interval this is 90 seconds. |
+| **Updates missing** | No successful image pull for three fallback poll intervals, or for two intervals after the pull the server announced; the old view is hidden to avoid showing stale data. At the default interval this is at least 90 seconds. |
 | **Network not found**, **Wrong password** or **Connection failed (WPA2?)** | Check Wi-Fi credentials, signal and compatible network security. |
 | **Waiting for &lt;network&gt;** | A previously working network is unavailable. The device retries every 15 seconds and resumes automatically when it returns. |
 | **Image aborted** | An image transfer did not finish. Check connectivity and server status; the device will retry. |
@@ -238,16 +238,16 @@ The footer shows `IP: -- (no Wi-Fi)` without a connection and `Browser: 192.168.
 
 ### Change Wi-Fi while keeping pairing
 
-1. Unplug and reconnect power twice in quick succession, each interruption within about five seconds of startup.
+1. Unplug and reconnect power twice in quick succession, each interruption within about ten seconds of startup.
 2. On the second start, the display shows **Unplug now for factory reset** and **or wait: Wi-Fi setup**.
-3. **Leave the power connected** and wait about five seconds. The setup network opens.
+3. **Leave the power connected** and wait until ten seconds after startup. The setup network opens.
 4. Scan the new QR code and enter the new network settings. Pairing, device key and server addresses remain saved.
 
 ### Factory reset
 
 Use this when you want to clear the device configuration. It removes Wi-Fi settings, pairing, server addresses and local colour settings.
 
-1. Perform three quick power cycles, each within about five seconds of startup. At the second start, the display prompts **Unplug now for factory reset**.
+1. Perform three quick power cycles, each within about ten seconds of startup. At the second start, the display prompts **Unplug now for factory reset**.
 2. On the third start, the device deletes its configuration and the ESP8266's saved Wi-Fi credentials, restarts and opens setup.
 3. Configure Wi-Fi and pair again. The server replaces the old registration with the same device identifier.
 
@@ -357,7 +357,7 @@ A successful test exits with code 0 and produces no output. It checks registrati
 
 Generated firmware, `firmware/.pio/`, and `.venv/` are excluded from Git. Builds embed neither Wi-Fi credentials nor provider tokens.
 
-Images are drawn one row at a time using a 480-byte input buffer and 240 16-bit pixels, instead of storing all 115200 bytes in RAM. The format is RGB565, most significant byte first. The image fills the whole screen. The device pulls the image with its key, accepts only complete 115 200-byte images with the expected format header (the size comes from that header, so a reverse proxy may drop `Content-Length`) and aborts after 8 seconds without data (15 seconds over https).
+Images are drawn one row at a time using one input row (two bytes per pixel, at most 960 bytes) and one row of 16-bit pixels, instead of storing the whole image in RAM (115,200 bytes at 240 × 240). The format is RGB565, most significant byte first, 16 to 480 pixels per side; the image is scaled to fill the whole screen. The device pulls the image with its key and accepts only complete images with the expected format header (the size comes from that header, so a reverse proxy may drop `Content-Length`). With current servers it usually receives only the changed rows (delta images, see [CLIENT-PROTOCOL.md](../vibedock-server/CLIENT-PROTOCOL.md)), checked against a hash over all rows; any doubt makes the next pull fetch the complete image. Reads abort after 8 seconds without data (15 seconds over https).
 
 References: [PlatformIO installation](https://docs.platformio.org/en/latest/core/installation/methods/pypi.html), [PlatformIO build command](https://docs.platformio.org/en/latest/core/userguide/cmd_run.html), [IntelliJ terminal](https://www.jetbrains.com/help/idea/terminal-emulator.html), [IntelliJ external tools](https://www.jetbrains.com/help/idea/configuring-third-party-tools.html).
 
@@ -374,10 +374,10 @@ After preparing and verifying the backup, `scripts/flash.sh [board]` detects the
 | Area | Implementation |
 | --- | --- |
 | Protocol | [Version 2](../vibedock-server/CLIENT-PROTOCOL.md): the server invites once; the device then pulls images. The server can request a pull with `POST /pull`, rate-limited to once every five seconds. |
-| Image | 240×240 RGB565, most significant byte first, exactly 115,200 bytes and the expected format header. Incomplete transfers are rejected. |
-| Memory and redraw | One 480-byte input row plus 240 16-bit pixels; no full framebuffer. Row hashes avoid redrawing unchanged image rows. |
+| Image | RGB565, most significant byte first, 16–480 px per side as named in the format header (240 × 240: 115,200 bytes), scaled to the screen. Delta images (`rgb565-delta-be-WxH`) carry only changed row spans and are checked by length, payload hash and a hash over all rows. Incomplete or failed transfers are rejected; the next pull gets the complete image. |
+| Memory and redraw | One input row (at most 960 bytes) plus one row of 16-bit pixels; no full framebuffer for server images. Row hashes avoid redrawing unchanged rows and are the basis for delta images. |
 | IP footer | Current server images carry the IP reported by the device (`X-VibeDock-Footer: server`). On its own status screens, the device draws the footer itself. |
-| Polling | Default 30 seconds; server-provided values are clamped to 10–3,600 seconds. Image reads use an eight-second abort limit; the browser BMP proxy has a separate transfer limit. |
+| Polling | Every answer announces the next pull (`X-VibeDock-Next-Pull`: 2 s to 10 minutes, 2 minutes for displays the server cannot reach directly). The fallback poll interval (default 30 seconds, clamped to 10–3,600 seconds) applies to older servers and after failed pulls. Image reads use an eight-second abort limit (15 seconds over https); the browser BMP proxy has a separate transfer limit. |
 | Version | Compiled in from the Git tag by `firmware/version.py`, like the server: `0.1.0` on the tag `0.1.0` (or `v0.1.0`), `0.1.0-3-g<commit>` after it, `-dirty` with uncommitted changes. |
 | Persistence | `/standalone.json` in LittleFS stores Wi-Fi, identifier, pairing credentials, server addresses and colour settings. Treat the file and device backups as private. The setup-network password is never stored. |
 | HTTPS | Pairing supplies a trusted root and certificate fingerprint. Normal requests check the fingerprint; after certificate renewal, root/hostname/validity verification allows learning a new fingerprint. Certificate checks require time from NTP (`pool.ntp.org`). Verification fails closed. The VibeTV M1 speaks TLS 1.3 (Mbed TLS; the full check once, then the pinned certificate) and TLS 1.2 only for servers that refuse 1.3; the ESP32 boards TLS 1.2. See [TLS.md](TLS.md). |

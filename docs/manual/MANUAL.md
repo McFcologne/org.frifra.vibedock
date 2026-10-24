@@ -36,7 +36,7 @@ liability are in sections 7 and 8 of the Apache License 2.0 (see [License](#lice
 
 VibeDock shows how much of your AI coding plans is left (Claude, Codex, Grok, Gemini, Cursor and others) on small
 desk displays. The **server** signs in to the providers, reads the usage, renders one image per display and
-serves it; the **displays** fetch their image every 30 seconds over Wi-Fi. A display can be a VibeTV M1, another
+serves it; the **displays** fetch it over Wi-Fi when it can change, usually only the parts that changed. A display can be a VibeTV M1, another
 supported ESP32 board, or any browser or program that loads a web page or a PNG (a *web display*).
 
 This manual walks through every page of the administration and through installing the firmware on a display.
@@ -607,6 +607,8 @@ columns on a desktop, with identical example data rendered by the same code as t
 the theme to the design selected under **Design for**, and saves it right away. For an inherited device design,
 enable **Custom design** first, or change the default design instead.
 
+<img src="images/35-theme-catalog.png" width="100%" alt="Theme gallery with the switches of this installation">
+
 **The toggle beside each theme name** controls which themes this installation offers. Switching it off removes a theme from
 new selections and skips it when swiping through themes on a display or web display. Existing default and device
 designs keep the theme they already use, and their other settings can still be edited. Enable the theme again to
@@ -1100,7 +1102,7 @@ valid for 10 minutes and for one log.
 
 > Opening the USB port restarts the VibeTV M1. Read the log only after the display has finished what you want to
 > see: it shows an image or *Server unreachable*. An https connection takes the M1 a few seconds, and the first
-> attempt at an address can come only with the next poll (30 seconds by default).
+> attempt at an address can come only with the next pull.
 
 | Log line | Meaning and what to do |
 | --- | --- |

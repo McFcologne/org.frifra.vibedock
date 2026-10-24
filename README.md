@@ -141,7 +141,7 @@ Docker Hub (`mcfcologne/vibedock-server`) and on GitHub (`ghcr.io/mcfcologne/vib
 | --- | --- |
 | Administration | `http://<host>:10001/admin` (network-wide by default, plain HTTP) |
 | Public usage API and device image pull | `http://<host>:10002` |
-| Persistent data | `vibedock-server/docker.data/` (plaintext credentials; excluded from Git) |
+| Persistent data | `vibedock-server/docker.data/` (credential fields encrypted, readable with the private `.installation-id` in the same directory: keep it private; excluded from Git) |
 
 1. Open **Data sources**, add accounts as needed and use **Manage** to sign in or configure the Cursor team key.
 2. Connect the display by USB and open **Devices → Firmware** in Chrome or Edge (administration over HTTPS or on `localhost`): download a full backup, install the firmware and pair it right there with name and Wi-Fi.
