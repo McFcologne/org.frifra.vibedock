@@ -21,29 +21,44 @@ export function usbPairing(pair, { port = () => undefined, setPort = () => {}, b
   async function closeConsole() { if (console_) { const c = console_; console_ = undefined; await c.close(); } }
   // Every way out (Cancel, Escape, the other pairing way, a restart): the port is freed and the form goes back to its
   // first step, so nothing can be sent over a connection that is closed. Whether the area shows stays with the page.
-  async function close() { await closeConsole(); pairAsk.hidden = false; pairForm.hidden = true; say(''); }
+  // A connection still being set up belongs to an attempt; close() starts a new one, so the old attempt notices after
+  // each wait that it was given up, and closes a port it opened only afterwards.
+  let attempt = 0;
+  async function close() { attempt++; await closeConsole(); pairAsk.hidden = false; pairForm.hidden = true; say(''); }
 
-  pair.querySelectorAll('[data-pair-skip]').forEach(b => b.addEventListener('click', async () => { await closeConsole(); askToPair(); onSkip(); }));
+  pair.querySelectorAll('[data-pair-skip]').forEach(b => b.addEventListener('click', async () => { await close(); askToPair(); onSkip(); }));
   pair.querySelector('[data-pair-start]').addEventListener('click', async () => {
+    const mine = ++attempt, current = () => mine === attempt;
     pairAsk.hidden = true; say('Connecting to the display …');
+    let opened;
     try {
       serialPort = port() ?? await chooseDisplayPort(); setPort(serialPort);
+      if (!current()) return;
       if (!serialPort) { pairAsk.hidden = false; say(''); return; }
       // Boards with the chip's own USB (ESP32-S3, -C3) come back as a new port after their restart.
       // Choosing none ends it here, without the browser's own dialog on top.
-      try { console_ = await openConsole(); }
+      try { opened = await openConsole(); }
       catch {
+        if (!current()) return;
         serialPort = await chooseDisplayPort(); setPort(serialPort);
+        if (!current()) return;
         if (!serialPort) { pairAsk.hidden = false; say(''); return; }
-        console_ = await openConsole();
+        opened = await openConsole();
       }
+      // Given up while the port opened (Cancel, Escape, Wi-Fi): close it again instead of keeping it.
+      if (!current()) { await opened.close(); return; }
+      console_ = opened;
       device = await hello();
       const list = await scanNetworks();
+      if (!current()) return;
       choose(list[0]?.ssid ?? '');
       pairForm.elements.name.value = device.name || '';
       pairForm.hidden = false; pairForm.elements.password.focus();
       say(`${device.identifier} · firmware ${device.version}${list.length ? ` · ${list.length} networks found` : ''}`);
-    } catch (error) { await closeConsole(); pairAsk.hidden = false; say(error.message, true); }
+    } catch (error) {
+      if (!current()) { if (opened && opened !== console_) await opened.close().catch(() => {}); return; }
+      await closeConsole(); pairAsk.hidden = false; say(error.message, true);
+    }
   });
   // The networks the display sees, strongest first; empty when it does not answer (the name can be typed instead).
   async function scanNetworks() {

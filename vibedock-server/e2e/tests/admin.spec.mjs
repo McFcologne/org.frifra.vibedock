@@ -464,6 +464,33 @@ test('leaving USB pairing frees the port and starts the form again, also with Es
   await page.getByRole('button',{name:'Pair device'}).click();await expect(form).toBeHidden();await expect(start).toBeVisible();
 });
 
+test('a port that opens only after switching to Wi-Fi is closed again',async ({page,app}) => {
+  await page.addInitScript(() => {
+    let release;window.gate=new Promise(r=>{release=r;});window.release=()=>release();window.portOpen=false;
+    const port = { getInfo: () => ({ usbVendorId: 0x303a, usbProductId: 0x1001 }), async setSignals() {},
+      async open() {
+        await window.gate;const self = this;window.portOpen = true;
+        this.readable = new ReadableStream({ start(controller) { self.controller = controller; } });
+        this.writable = new WritableStream({ write() {} });
+      },
+      async close() { window.portOpen = false; try { this.controller.close(); } catch { /* closed */ } } };
+    Object.defineProperty(navigator, 'serial', { configurable: true, value: { getPorts: async () => [], requestPort: async () => port } });
+  });
+  await page.goto(app.baseURL+'/admin/devices');
+  await page.getByRole('button',{name:'Pair device'}).click();
+  const panel=page.locator('#invite');await panel.locator('.pair-method label',{hasText:'USB'}).click();
+  await panel.getByRole('button',{name:'Pair now'}).click();
+  await expect(panel.locator('[data-pair-state]')).toHaveText('Connecting to the display …');
+  // Wi-Fi while the port is still opening; it opens afterwards and must not stay open.
+  await panel.locator('.pair-method label',{hasText:'Wi-Fi'}).click();
+  await page.evaluate(()=>window.release());
+  await expect.poll(()=>page.evaluate(()=>window.portOpen)).toBe(false);
+  await page.waitForTimeout(500);expect(await page.evaluate(()=>window.portOpen)).toBe(false);
+  await panel.locator('.pair-method label',{hasText:'USB'}).click();
+  await expect(panel.getByRole('button',{name:'Pair now'})).toBeVisible();await expect(panel.locator('[data-pair-form]')).toBeHidden();
+  await expect(panel.locator('[data-pair-state]')).toHaveText('');
+});
+
 test('the firmware page shows the same USB pairing form under Only pair',async ({page,app}) => {
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.addInitScript(() => Object.defineProperty(navigator, 'serial', { configurable: true, value: { getPorts: async () => [], requestPort: async () => { throw new DOMException('No port selected', 'NotFoundError'); } } }));
