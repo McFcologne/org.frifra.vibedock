@@ -1296,7 +1296,7 @@ void statusPage() {
       "<dt>IP address</dt><dd>") + currentIp() + F("</dd><dt>Wi-Fi</dt><dd>") + html(WiFi.SSID()) + " (" + String(WiFi.RSSI()) + F(" dBm)</dd>");
   if (paired) {
     body += String(F("<dt>Server</dt><dd>")) + html(servers[serverIndex]) + F("</dd><dt>Last update</dt><dd>")
-        + (haveImage ? String((millis() - lastImage) / 1000) + F(" s ago") : String("-")) + F("</dd><dt>Poll interval</dt><dd>")
+        + (haveImage ? String((millis() - lastImage) / 1000) + F(" s ago") : String("-")) + F("</dd><dt>Fallback poll interval</dt><dd>")
         + String(pollSeconds) + F(" s</dd>") + (pullWaitMs ? String(F("<dt>Next pull</dt><dd>in "))
         + String((pullWaitMs - min(pullWaitMs, uint32_t(millis() - lastPull)) + 999) / 1000) + F(" s")
         + (pullPending ? F(" (new readings expected)") : F(" (as announced by the server)")) + F("</dd>") : String());

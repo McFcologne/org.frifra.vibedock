@@ -125,7 +125,7 @@ X-VibeDock-Board: vibedock-m1
 | **304** | image unchanged since the given `ETag` (no body) |
 | **401** | unknown device or wrong key; the device was removed and returns to pairing mode |
 
-The endpoint exists only on the public port. Unknown identifiers and wrong keys get the same **401**. The IP allowlist of `/api/v1/usage` does not apply; the device key is the authorization. The device uses the poll interval from the latest `X-VibeDock-Poll-Seconds` (10–3600 s, default 30, set in the administration UI); current firmware pulls when `X-VibeDock-Next-Pull` says instead (section 3h). While a display shows a slideshow, it gets the time of one photo when that is shorter (at least 10 s). In a slideshow, a swipe (section 3d) shows the next or previous photo instead of changing the colour scheme.
+The endpoint exists only on the public port. Unknown identifiers and wrong keys get the same **401**. The IP allowlist of `/api/v1/usage` does not apply; the device key is the authorization. The device uses the poll interval from the latest `X-VibeDock-Poll-Seconds` (10–3600 s, default 30, *Fallback poll interval* in the administration UI); current firmware pulls when `X-VibeDock-Next-Pull` says instead (section 3h) and uses the poll interval only as a fallback. While a display shows a slideshow, it gets the time of one photo when that is shorter (at least 10 s). In a slideshow, a swipe (section 3d) shows the next or previous photo instead of changing the colour scheme.
 
 **Immediate pull (server → device):** after a design is saved, the server sends `POST http://<device IP>:<port>/pull` without a body to the affected devices (the default design: every device that follows it). After a restart it sends the same request to every paired device as soon as the first usage readings are collected (at most one minute after start). The device answers **202** and pulls in its next loop; at most one such pull every 5 seconds: a request within that pause (also **202**) is pulled when it is over (firmware before 0.2.0 answers **429** and pulls at its next poll), **409** while it is not paired. The request carries nothing secret and needs no key, because the pull that follows is authenticated as usual. Devices the server cannot reach pull at their next poll.
 
@@ -293,6 +293,10 @@ when the picture of this display can change next, so the display pulls then inst
 - At most 600 s for displays that took an immediate pull (`POST /pull`, section 2) within the last day, so design
   changes still reach them at once; at most 120 s for the others (behind NAT, only through the external address),
   which see design changes with their next pull. At least 2 s.
+
+All sources are polled together on the full minute and published at the end of that collection, so several providers
+do not make a display pull more often than once a minute (plus pending answers). The server log adds the announced
+time to each image transfer line (`next=58 s (current)`).
 
 Firmware that follows it sends `X-VibeDock-Schedule: 1` with its screen pulls; the server then expects its next pull at
 the announced time (section *Status*). It still uses `X-VibeDock-Poll-Seconds` until the first answer, after failed

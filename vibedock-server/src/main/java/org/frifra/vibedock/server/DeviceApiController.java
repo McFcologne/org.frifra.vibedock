@@ -98,7 +98,7 @@ class DeviceApiController {
         boolean forced=!preview&&registry.takeForcedRefresh(identifier);
         if(forced){headers.remove(HttpHeaders.ETAG);headers.set("X-VibeDock-Redraw","1");}
         else if(tag.equals(etag)){
-            logTransfer(identifier,preview?"preview unchanged (304)":"unchanged (304)",fullBytes,0);
+            logTransfer(identifier,preview?"preview unchanged (304)":"unchanged (304)",fullBytes,0,next);
             return new ResponseEntity<>(headers,HttpStatus.NOT_MODIFIED);
         }
         // Capability and exact panel size are required: deltas cannot be scaled without a framebuffer.
@@ -112,16 +112,17 @@ class DeviceApiController {
                 headers.set("X-VibeDock-Payload",p.payload());headers.set("X-VibeDock-Length",String.valueOf(pixels.length));
             }
         }
-        logTransfer(identifier,preview?"preview full":headers.containsKey("X-VibeDock-Base")?"delta":"full",fullBytes,pixels.length);
+        logTransfer(identifier,preview?"preview full":headers.containsKey("X-VibeDock-Base")?"delta":"full",fullBytes,pixels.length,next);
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
         return new ResponseEntity<>(pixels,headers,HttpStatus.OK);
     }
     /** Response payload selected for transmission; excludes transport overhead and is not a receipt acknowledgement. */
-    private static void logTransfer(String device,String mode,int full,int payload){
+    private static void logTransfer(String device,String mode,int full,int payload,PullSchedule.Next next){
+        String announced=next.seconds()+" s ("+(next.pending()?"pending":"current")+")";
         // Unchanged images (304) come with every poll: only at debug level, so the log keeps its other events.
-        if(payload==0){log.debug("Image transfer {}: {}",device,mode);return;}
-        log.info("Image transfer {}: {}, full={} bytes, payload={} bytes, saved={} bytes ({}%)",device,mode,full,payload,full-payload,
-                String.format(Locale.ROOT,"%.1f",full==0?0:100.0*(full-payload)/full));
+        if(payload==0){log.debug("Image transfer {}: {}, next={}",device,mode,announced);return;}
+        log.info("Image transfer {}: {}, full={} bytes, payload={} bytes, saved={} bytes ({}%), next={}",device,mode,full,payload,full-payload,
+                String.format(Locale.ROOT,"%.1f",full==0?0:100.0*(full-payload)/full),announced);
     }
     /**
      * A swipe on a touch display or a web display page: the next (1) or previous (-1) colour scheme. The display keeps

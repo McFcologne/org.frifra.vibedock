@@ -83,7 +83,8 @@ class AccessTest {
                 .with(r->{r.setLocalPort(8080);r.setRemoteAddr("192.168.1.21");return r;}))
                 .andExpect(status().isOk()).andExpect(header().string("X-VibeDock-Redraw","1"))
                 .andExpect(header().string("X-VibeDock-Image-Format","rgb565-be-240x240")).andExpect(header().doesNotExist("ETag"));
-        Assertions.assertTrue(output.getOut().contains("full=115200 bytes, payload=115200 bytes, saved=0 bytes (0.0%)"));
+        Assertions.assertTrue(output.getOut().contains("full=115200 bytes, payload=115200 bytes, saved=0 bytes (0.0%), next="));
+        Assertions.assertTrue(output.getOut().matches("(?s).*delta, full=115200 bytes, payload=\\d+ bytes, saved=\\d+ bytes \\([0-9.]+%\\), next=\\d+ s \\((current|pending)\\).*"));
         Assertions.assertFalse(output.getOut().contains("unchanged (304)"),"304 only at debug level");
     }
     @Test void everyAnswerAnnouncesTheNextPullAlsoA304() throws Exception {
