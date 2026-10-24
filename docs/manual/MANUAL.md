@@ -623,6 +623,8 @@ both weather/mood positions and the available display sizes. Numeric quotas keep
 use their own bar colours, with a warning colour below 20% remaining (E-Ink stays monochrome). No firmware update
 is needed.
 
+<!-- page break -->
+
 ## Bands
 
 A design is a list of **bands** from top to bottom. A usage band holds:
