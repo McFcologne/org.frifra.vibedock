@@ -240,6 +240,18 @@ start per display (the last 20); a header from older firmware is simply absent. 
 handler, kept in RTC memory as well; they are decoded with the ELF of that firmware (`addr2line -pfiaC -e firmware.elf
 <addresses>`, see `vibedock-client/FLASHING.md`, *Decoding a crash*). The full backtrace stays on the serial port.
 
+## 3g. Battery power saving (server → device, experimental)
+
+Only the Waveshare ESP32-S3-Touch-LCD-1.54, which measures its battery, gets `X-VibeDock-Power-Saving` with every 200
+and 304 answer: `battery` when *Battery power saving* is switched on on its device card, otherwise `off`. The display
+stores the setting. With `battery` it saves power while it runs on its battery: no USB host sends frames (checked by the
+USB start-of-frame counter of the ESP32-S3) and the charging signal is inactive, two readings 5 s apart. Then it switches
+on Wi-Fi modem sleep, runs its CPU at 80 MHz instead of 240 MHz and dims the backlight to 10 % after a minute without
+touch or volume button; the next touch only wakes it. USB power or charging ends it, as does `off`. A charger without
+data lines next to a full cell also counts as battery operation. The status page, `VIBEDOCK-BATTERY` and the `battery`
+object of `VIBEDOCK-HELLO` show `powerSource` (`battery`, `usb`) and `powerSaving` (`off`, `allowed`, `active`).
+Firmware before this ignores the header.
+
 ## Boards
 
 One firmware source builds for several boards (PlatformIO environments in `vibedock-client/firmware/platformio.ini`, the server's inventory in `Board.java`):

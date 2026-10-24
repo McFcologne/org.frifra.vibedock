@@ -988,6 +988,23 @@ presence stays **Unknown**. USB serial command `VIBEDOCK-BATTERY` returns the sa
 Tested on hardware: display colours, touch, audio, the short volume and swipe cues and the volume controls work.
 Battery presence and operation without USB have not been established. No motion-based rotation or microphone recording is implemented.
 
+### Battery power saving (experimental)
+
+The device card of a Waveshare 1.54 has the switch **Battery power saving** (marked *experimental*). It is off by
+default. Switched on, the display saves power while it runs on its battery, that is without a computer on its USB port
+and without charging:
+
+- Wi-Fi modem sleep, which VibeDock otherwise switches off because some access points and phone hotspots then delay or
+  drop packets;
+- the processor at 80 MHz instead of 240 MHz;
+- the backlight dims to 10 % after a minute without touch or volume button. The next touch only wakes it; swipe again
+  for the gesture.
+
+Plugging into a computer or a charger that charges ends it within about ten seconds. A charger without data lines and a
+full battery counts as battery operation; that does no harm. The display's status page shows **Power source** and
+**Power saving** in the *Battery* card. Not yet tested on hardware: how long a battery lasts with and without it, and
+whether every access point keeps up with modem sleep. If the display misses updates on battery, switch it off again.
+
 ## Displays mounted upside down or turned
 
 Every display except the VibeTV M1 (its case decides how it stands) shows its **Orientation** on its card under

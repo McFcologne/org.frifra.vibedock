@@ -552,6 +552,34 @@ class AccessTest {
             clients.setFlipped(id,true);Assertions.assertFalse(clients.get(id).flipped());
         }finally{clients.remove(id);}
     }
+    @Test void batteryPowerSavingIsAnExperimentalSwitchOfTheBoardsThatMeasureTheirBattery() throws Exception {
+        String key="ef".repeat(32),id="vibedock-power",image="/api/v1/clients/"+id+"/image",admin="/admin/clients/"+id+"/power-saving";
+        clients.paired(id,"Kitchen",key,"192.168.1.35",80,"waveshare-s3-touch-lcd-154");
+        try{
+            var pull=get(image).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(8080);return r;});
+            var toggle=(java.util.function.Function<String,org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder>)enabled->post(admin).param("enabled",enabled)
+                    .header("Accept","application/json").with(user("admin").roles("ADMIN")).with(csrf()).with(r->{r.setLocalPort(10001);return r;});
+            // Off until switched on; the device learns it with every pull, also with a 304.
+            mvc.perform(pull).andExpect(header().string("X-VibeDock-Power-Saving","off"));
+            mvc.perform(toggle.apply("true")).andExpect(status().isOk()).andExpect(jsonPath("$.enabled").value(true));
+            Assertions.assertTrue(clients.get(id).powerSaving());
+            var tag=mvc.perform(pull).andExpect(header().string("X-VibeDock-Power-Saving","battery")).andReturn().getResponse().getHeader("ETag");
+            mvc.perform(get(image).header("Authorization","Bearer "+key).header("If-None-Match",tag).with(r->{r.setLocalPort(8080);return r;}))
+                    .andExpect(status().isNotModified()).andExpect(header().string("X-VibeDock-Power-Saving","battery"));
+            // Pairing again keeps it.
+            clients.paired(id,"Kitchen",key,"192.168.1.35",80,"waveshare-s3-touch-lcd-154");
+            Assertions.assertTrue(clients.get(id).powerSaving());
+            mvc.perform(toggle.apply("false")).andExpect(status().isOk()).andExpect(jsonPath("$.enabled").value(false));
+            mvc.perform(pull).andExpect(header().string("X-VibeDock-Power-Saving","off"));
+            // Boards that cannot measure their battery: no switch, no header.
+            clients.setBoard(id,"waveshare-s3-touch-lcd-147");
+            mvc.perform(toggle.apply("true")).andExpect(status().isBadRequest());
+            mvc.perform(pull).andExpect(header().doesNotExist("X-VibeDock-Power-Saving"));
+            Assertions.assertFalse(clients.get(id).powerSaving());
+        }finally{clients.remove(id);}
+        mvc.perform(post("/admin/clients/missing/power-saving").param("enabled","true").header("Accept","application/json")
+                .with(user("admin").roles("ADMIN")).with(csrf()).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isBadRequest());
+    }
     @Test void squarePanelsTurnInQuarterStepsAndOlderFilesStayFlipped() throws Exception {
         String key="ef".repeat(32),id="vibedock-turn",image="/api/v1/clients/"+id+"/image",flip="/admin/clients/"+id+"/flip";
         clients.paired(id,"Desk",key,"192.168.1.34",80,"waveshare-s3-touch-lcd-154");

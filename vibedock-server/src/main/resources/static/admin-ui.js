@@ -42,18 +42,20 @@
     if (event.defaultPrevented || (form.method || '').toLowerCase() !== 'post') return;
     try { sessionStorage.setItem('vibedock-scroll', JSON.stringify({ path: location.pathname, y: window.scrollY, at: Date.now() })); } catch (e) { /* storage blocked */ }
   });
-  // Web displays: the external address switch saves in place and swaps the links, without reloading the page.
+  // Device switches save in place, without reloading the page: the external address of web displays (swaps the
+  // links) and the experimental battery power saving.
   document.addEventListener('change', async event => {
-    const box = event.target.closest('[data-web-external]'); if (!box) return;
+    const box = event.target.closest('[data-web-external],[data-power-saving]'); if (!box) return;
     const form = box.form, card = form.closest('.client-card'), body = new URLSearchParams(new FormData(form));
-    if (!box.checked) body.set('external', 'false');
+    if (!box.checked) body.set(box.name, 'false');
     const token = document.querySelector('meta[name="csrf-token"]').content, header = document.querySelector('meta[name="csrf-header"]').content;
     box.disabled = true;
     try {
       const response = await fetch(form.action, { method: 'POST', body, headers: { Accept: 'application/json', [header]: token } });
       if (!response.ok) throw new Error(String(response.status));
-      const links = await response.json();
-      card.querySelectorAll('.web-link').forEach((row, i) => { const url = i === 0 ? links.page : links.image;
+      const answer = await response.json();
+      if (box.matches('[data-power-saving]')) box.checked = answer.enabled;
+      else card.querySelectorAll('.web-link').forEach((row, i) => { const url = i === 0 ? answer.page : answer.image;
         row.querySelector('code').textContent = url; row.querySelector('[data-copy]').dataset.copy = url; const open = row.querySelector('a'); if (open) open.href = url; });
     } catch { box.checked = !box.checked; }
     box.disabled = false;

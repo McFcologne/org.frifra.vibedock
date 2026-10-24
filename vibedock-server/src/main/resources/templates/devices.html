@@ -106,7 +106,11 @@
           <span class="turn-label">Orientation</span> <strong data-turn-value th:text="${client.rotation + '°'}">0°</strong>
           <button type="button" class="icon-button" data-turn-next th:attr="aria-label=${client.board.rotatable() ? 'Rotate by 90 degrees' : 'Rotate by 180 degrees'}"
                   th:title="${client.board.rotatable() ? 'Rotate by 90°' : 'Rotate by 180°'}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4h-4"/></svg></button>
-        </form></div>
+        </form>
+        <form th:if="${client.board.batteryPowerSaving()}" class="power-saving" th:action="@{/admin/clients/{id}/power-saving(id=${client.identifier})}" method="post">
+          <label class="switch" title="Experimental: on battery (no USB host, not charging) the display uses Wi-Fi modem sleep, runs at 80 MHz and dims its backlight after a minute without touch. USB power switches it back.">
+            <input type="checkbox" name="enabled" value="true" th:checked="${client.powerSaving}" data-power-saving>
+            <span>Battery power saving</span> <span class="badge experimental">experimental</span></label></form></div>
       <p class="notice error" th:if="${failedClient == client.identifier}" th:text="${failedClientMessage}"></p>
     </div>
   </div>

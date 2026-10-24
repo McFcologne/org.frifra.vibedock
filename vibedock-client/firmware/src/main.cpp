@@ -51,6 +51,11 @@ uint8_t brightness = 100;  // backlight in percent; touch boards change it with 
 String pendingGesture;  // a swipe for the server (X-VibeDock-Gesture), sent with the next image pull
 uint8_t turns = 0;  // how the display is mounted: the picture turned clockwise in quarter turns (set in the administration)
 void applyOrientation(uint8_t next);
+// Experimental battery power saving (boards with VIBEDOCK_BATTERY_ADC): allowed in the administration, active only on
+// battery. See powerPoll.
+bool powerSavingAllowed = false, powerSaving = false, dimmed = false;
+client_policy::PowerSource powerSource;
+uint32_t lastActivity = 0, lastPowerCheck = 0;
 client_policy::ToneSettings toneSettings;  // colour correction of the panel, set on the status page
 client_policy::Tone panelTone;
 
@@ -432,6 +437,7 @@ bool writeConfig() {
   doc["identifier"] = identifier; doc["name"] = deviceName;
   doc["ssid"] = ssid; doc["password"] = password; doc["key"] = key; doc["poll"] = pollSeconds; doc["pin"] = pin;
   doc["verified"] = networkVerified; doc["brightness"] = brightness; doc["flipped"] = turns == 2; doc["turns"] = turns;
+  doc["powerSaving"] = powerSavingAllowed;
 #ifdef VIBEDOCK_AUDIO_ES8311
   doc["volume"] = audio::volume();
 #endif
@@ -465,6 +471,7 @@ bool loadConfig() {
 #endif
       // "flipped" alone: saved by firmware before quarter turns (and still written for it after a downgrade).
       turns = (doc["turns"] | (doc["flipped"] | false ? 2 : 0)) % 4;
+      powerSavingAllowed = doc["powerSaving"] | false;
       client_policy::ToneSettings d; JsonObject t = doc["tone"];
       long gamma = t["gamma"] | long(d.gamma), red = t["red"] | long(d.red), green = t["green"] | long(d.green), blue = t["blue"] | long(d.blue);
       // Only a calibration made on this display is kept; otherwise the board's defaults apply.
@@ -931,6 +938,9 @@ int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
 #ifdef VIBEDOCK_AUDIO_ES8311
       , "X-VibeDock-Quota"
 #endif
+#ifdef VIBEDOCK_BATTERY_ADC
+      , "X-VibeDock-Power-Saving"
+#endif
   };
   r.http.collectHeaders(wanted, sizeof(wanted)/sizeof(wanted[0]));
   // HTTP/1.0: a reverse proxy (Synology) then cannot answer chunked; the body ends with the connection or its length.
@@ -1123,6 +1133,16 @@ void pull() {
       logEvent(next == 0 ? String(F("Picture upright")) : next == 2 ? String(F("Picture flipped")) : String(F("Picture turned ")) + String(next * 90) + F(" degrees"), true);
     }
   }
+#ifdef VIBEDOCK_BATTERY_ADC
+  // Battery power saving, switched in the administration ("battery" or "off"); powerPoll applies it right away.
+  if ((code == 200 || code == 304) && http.hasHeader("X-VibeDock-Power-Saving")) {
+    bool allowed = http.header("X-VibeDock-Power-Saving") == "battery";
+    if (allowed != powerSavingAllowed) {
+      powerSavingAllowed = allowed; saveConfig(); lastPowerCheck = millis() - client_policy::powerCheckMs;
+      logEvent(allowed ? F("Battery power saving allowed (experimental)") : F("Battery power saving switched off"), true);
+    }
+  }
+#endif
   client_policy::ImageSize size;
   if (code == 200 && !validImage(http, size))
     logEvent(String(F("Image not accepted: format \"")) + http.header("X-VibeDock-Image-Format") + F("\", ") + String(http.getSize()) + F(" bytes announced"), true);
@@ -1214,6 +1234,10 @@ void statusPage() {
     card += String(power.millivolts / 1000.0, 2) + F(" V</dd><dt>Estimated level</dt><dd>");
     card += power.estimatedPercent < 0 ? String(F("Unknown")) : String("~") + String(power.estimatedPercent) + " %";
     card += F("</dd><dt>Charging signal</dt><dd>"); card += power.chargeSignal;
+    card += F("</dd><dt>Power source</dt><dd>"); card += powerSource.battery ? F("Battery") : F("USB or charging");
+    card += F("</dd><dt>Power saving</dt><dd>");
+    card += !powerSavingAllowed ? F("Off (set in the administration)") : powerSaving ? (dimmed ? F("On, backlight dimmed") : F("On"))
+        : F("Allowed, waits for battery operation");
     card += F("</dd><dt>Battery present</dt><dd>Unknown</dd></dl><p class=\"muted\">Voltage-based estimate only. "
         "USB power and charging affect the reading. A voltage or charging signal does not prove a battery is fitted; "
         "an inactive signal does not mean it is full. Reload this page to measure again.</p></section>");
@@ -1374,6 +1398,8 @@ void batteryJson(JsonObject target) {
   target["present"] = nullptr;  // the charging circuit has no reliable battery-presence output
   target["voltageMv"] = nullptr; target["estimatedPercent"] = nullptr;
   target["chargeSignal"] = power.chargeSignal;
+  target["powerSource"] = power.supported ? (powerSource.battery ? "battery" : "usb") : "unknown";
+  target["powerSaving"] = !powerSavingAllowed ? "off" : powerSaving ? "active" : "allowed";
   if (power.supported) {
     target["voltageMv"] = power.millivolts;
     if (power.estimatedPercent >= 0) target["estimatedPercent"] = power.estimatedPercent;
@@ -1569,6 +1595,45 @@ void setup() {
     if (online) message("Connecting to server", Step::Server); else showWaiting();
   }
 }
+// ---- experimental battery power saving ----
+// Allowed in the administration (X-VibeDock-Power-Saving) and active only on battery, i.e. without USB host and without
+// charging, two readings 5 s apart (client_policy::PowerSource): Wi-Fi modem sleep, the CPU at 80 MHz and the backlight
+// dimmed after a minute without touch or button. USB power or charging switches back to the normal mode. Modem sleep
+// was switched off for all boards because some access points and phone hotspots then delay or drop packets; on battery
+// that risk is taken for the runtime.
+// Touch or a button: restarts the dimming time; true when it woke the dimmed backlight (that touch does nothing else).
+bool powerWake() {
+  lastActivity = millis();
+  if (!dimmed) return false;
+  dimmed = false; platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness);
+  return true;
+}
+void setPowerSaving(bool on) {
+  if (on == powerSaving) return;
+  powerSaving = on;
+#if defined(ESP32)
+  static const uint32_t normalMhz = getCpuFrequencyMhz();
+  WiFi.setSleep(on);  // modem sleep (minimum) on battery, none as at the start otherwise
+  setCpuFrequencyMhz(on ? 80 : normalMhz);
+#endif
+  if (on) lastActivity = millis(); else powerWake();
+  logEvent(on ? F("Power saving on: Wi-Fi modem sleep, 80 MHz, dims after 60 s") : F("Power saving off"), true);
+}
+void powerPoll() {
+#ifdef VIBEDOCK_BATTERY_ADC
+  if (millis() - lastPowerCheck >= client_policy::powerCheckMs) {
+    lastPowerCheck = millis();
+    bool charging = strcmp(battery::read().chargeSignal, "inactive") != 0;
+    if (powerSource.update(client_policy::onBattery(battery::usbHost(), charging)))
+      logEvent(powerSource.battery ? F("Power: battery") : F("Power: USB or charging"), true);
+    setPowerSaving(powerSavingAllowed && powerSource.battery && mode == Mode::Paired);
+  }
+  if (powerSaving && !dimmed && client_policy::dimDue(millis(), lastActivity)) {
+    dimmed = true; platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, client_policy::dimmedBrightness(brightness));
+  }
+#endif
+}
+
 #if VIBEDOCK_TOUCH
 // Swipes: left and right switch the colour scheme on the server (paired displays only), up and down the brightness.
 // A double tap starts or stops the slideshow of the design on the server, whatever its schedule says.
@@ -1577,16 +1642,18 @@ void touchPoll() {
   static bool touching = false; static int16_t startX, startY, lastX, lastY; static uint8_t idle = 0;
   static uint32_t touchedAt = 0, lastTap = 0;
   static client_policy::TouchPath path;  // the points of this touch, for the circle gesture
+  static bool waking = false;  // this touch woke the dimmed backlight: it does nothing else
   if (millis() - lastTouchPoll < 20) return;
   lastTouchPoll = millis();
   int16_t x, y;
   if (touch::read(x, y)) {
-    if (!touching) { touching = true; startX = x; startY = y; touchedAt = millis(); path.clear(); }
+    if (!touching) { touching = true; startX = x; startY = y; touchedAt = millis(); path.clear(); waking = powerWake(); }
     lastX = x; lastY = y; idle = 0; path.add(x, y); return;
   }
   // Released only after 60 ms without a point: the controllers drop single readings during a swipe.
   if (!touching || ++idle < 3) return;
   touching = false; idle = 0;
+  if (waking) { waking = false; return; }
   // A circle turns the picture (the server sets the orientation and sends it back with the answer to this gesture);
   // the direction does not depend on how the panel is turned. Before the swipes: a circle may end some way off.
   auto circle = path.circle();
@@ -1635,7 +1702,8 @@ void applyOrientation(uint8_t next) {
 
 void loop() {
   serialPoll();
-  if (audio::takeVolumeChange()) saveLater();
+  if (audio::takeVolumeChange()) { saveLater(); powerWake(); }
+  powerPoll();
   volumeFeedback();
   savePending();
 #ifdef VIBEDOCK_AUDIO_ES8311

@@ -87,6 +87,20 @@ test('orientation turns on each click and saves at once; only touch boards offer
   await page.reload();await expect(value).toHaveText('0°');
 });
 
+test('battery power saving is an experimental switch only on the board that measures its battery',async ({page,app}) => {
+  await page.goto(app.baseURL+'/admin/devices');
+  await expect(page.locator('#device-vibedock-e2e-office [data-power-saving]')).toHaveCount(0);
+  await expect(page.locator('#device-vibedock-e2e-shelf [data-power-saving]')).toHaveCount(0);
+  const desk=page.locator('#device-vibedock-e2e-desk'), toggle=desk.getByRole('checkbox',{name:/Battery power saving/});
+  await expect(desk.locator('.power-saving .badge')).toHaveText('experimental');
+  await expect(toggle).not.toBeChecked();
+  const saved=page.waitForResponse(r=>r.url().endsWith('/power-saving')&&r.request().method()==='POST');
+  await toggle.check();expect((await (await saved).json()).enabled).toBe(true);
+  await page.reload();await expect(toggle).toBeChecked();
+  await toggle.uncheck();await expect(toggle).toBeEnabled();
+  await page.reload();await expect(toggle).not.toBeChecked();
+});
+
 test('support file is created with a key shown once and opens again with it',async ({page,app}) => {
   await page.goto(app.baseURL+'/admin/troubleshooting');
   const download=page.waitForEvent('download');
@@ -102,7 +116,7 @@ test('support file is created with a key shown once and opens again with it',asy
   await expect(page.locator('[data-support-open-error]')).toContainText('Wrong key');
   await open.getByLabel('Key').fill(key);await open.getByRole('button',{name:'Open',exact:true}).click();
   const contents=page.locator('[data-support-contents]');
-  await expect(contents).toContainText('Displays (2)');await expect(contents).toContainText('Shelf');
+  await expect(contents).toContainText('Displays (3)');await expect(contents).toContainText('Shelf');
   await expect(contents).toContainText('Shelf stays dark');await expect(contents).toContainText('Black after the update');
   // Raw: the whole content as JSON, to copy or download.
   const raw=JSON.parse(await page.locator('[data-support-raw]').textContent());

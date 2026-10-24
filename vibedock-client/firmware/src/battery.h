@@ -4,6 +4,9 @@
 #pragma once
 #include <Arduino.h>
 #include "client_policy.h"
+#if defined(ESP32) && defined(VIBEDOCK_BATTERY_ADC) && defined(CONFIG_IDF_TARGET_ESP32S3)
+#include "soc/usb_serial_jtag_reg.h"
+#endif
 
 namespace battery {
 struct Reading {
@@ -16,6 +19,17 @@ inline void begin() {
 #if defined(ESP32) && defined(VIBEDOCK_BATTERY_ADC) && defined(VIBEDOCK_BATTERY_CHARGE)
   pinMode(VIBEDOCK_BATTERY_CHARGE, INPUT_PULLUP);
   analogSetPinAttenuation(VIBEDOCK_BATTERY_ADC, ADC_11db);
+#endif
+}
+// A USB host is attached: it sends a start-of-frame every millisecond, which the ESP32-S3's USB serial/JTAG unit
+// counts. A charger or power bank without data lines sends none. Only on boards with battery sensing.
+inline bool usbHost() {
+#if defined(ESP32) && defined(VIBEDOCK_BATTERY_ADC) && defined(CONFIG_IDF_TARGET_ESP32S3)
+  uint32_t first = REG_READ(USB_SERIAL_JTAG_FRAM_NUM_REG) & USB_SERIAL_JTAG_SOF_FRAME_INDEX;
+  delay(3);
+  return (REG_READ(USB_SERIAL_JTAG_FRAM_NUM_REG) & USB_SERIAL_JTAG_SOF_FRAME_INDEX) != first;
+#else
+  return true;
 #endif
 }
 inline Reading read() {
