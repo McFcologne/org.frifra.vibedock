@@ -287,6 +287,64 @@ Pixels are sent row by row from the top left: `width` pixels per row, `height` r
 
 Older firmware (no `X-VibeDock-Footer` header) still draws its IP footer over rows 220–239, columns 0–149; for it the server keeps the weather/mood band at the bottom, where the server's IP corner lies under the device's.
 
+### Optional delta images (v1)
+
+New firmware sends `X-VibeDock-Delta: 1` on screen image pulls, together with its actual
+`X-VibeDock-Display` size. This does not change the pairing protocol. Old firmware receives full images;
+new firmware works with old servers. Web displays keep PNG. Device status-page preview pulls do not opt in.
+
+The server always renders a complete RGB565 image and computes its ETag from those full pixels, even when it
+sends only a delta. It retains up to three complete images per device, for ten minutes, with global limits of
+128 devices and 12 MiB of pixel data (plus bounded metadata). Cache entries are in RAM only. Eviction or restart
+simply causes a full image. A missing/unknown base ETag, different dimensions, a slideshow photo, preview,
+forced redraw or a delta at least as large as the full image also uses the existing full format.
+
+A delta **200** response has:
+
+| Header | Value |
+| --- | --- |
+| `X-VibeDock-Image-Format` | `rgb565-delta-be-<width>x<height>`; exact panel size, never scaled |
+| `X-VibeDock-Base` | Exact ETag from the device's conditional request |
+| `ETag` | ETag of the complete resulting image |
+| `X-VibeDock-Length` | Exact delta body length, including terminator; also used when a proxy removes Content-Length |
+| `X-VibeDock-Payload` | Eight lowercase hex digits: FNV-1a-32 of all body bytes |
+| `X-VibeDock-Check` | Eight lowercase hex digits: FNV-1a-32 of the resulting row hashes, serialized as big-endian uint32 values |
+
+All integers in the body are unsigned, big-endian. Each section is:
+
+```
+y:u16, rowCount:u16, x:u16, width:u16
+rowCount × rowHash:u32
+rowCount × width × RGB565 pixel:u16
+```
+
+A final `y = 0xffff` (two bytes only) ends the body. No trailing bytes are allowed. Sections contain ascending,
+disjoint groups of rows; each row appears at most once. Coordinates, nonzero counts and widths must be within
+the panel. Adjacent changed rows with the same changed horizontal extent are grouped together. Other unchanged
+rows and pixels are omitted. Row hashes cover the **whole uncorrected new row**, using `client_policy::rowHash`:
+FNV-1a-32 (offset `2166136261`, multiplier `16777619`, modulo 2^32), mapping a zero result to 1. The payload and
+row-table checks use ordinary FNV-1a without this zero mapping. These are error checks, not authentication.
+
+The firmware accepts a delta only over a complete, unscaled image with a matching base ETag and valid row
+state. Local setup/error screens, orientation or colour correction invalidate this basis. It reads one span
+at a time into the existing row buffer, applies colour correction and updates the panel. Volume overlays are
+local to the device; changes also update their saved background pixels. No full framebuffer is allocated.
+
+The new ETag is committed only after the exact length, terminator, payload checksum and row-table checksum
+have passed. After any rejected, interrupted or invalid delta, the firmware clears its ETag and row hashes and
+requests a full image on its retry (normally after one second). A partial picture may be visible until that
+retry succeeds. The row-table check validates bookkeeping, not a physical readback of the panel. TLS continues
+to protect HTTPS traffic; none of its certificate checks change.
+
+**Transfer diagnostics:** every device RGB565 pull logs `Image transfer <device>: <mode>, full=<M> bytes,
+payload=<N> bytes, saved=<M-N> bytes (<P>%)`. Modes distinguish delta, full image, preview and unchanged **304**.
+Savings have one decimal place and always compare with the full RGB565 image: full images save 0%, **304**
+saves 100% with zero body bytes. A **304** was already available before delta support, so that percentage is
+not an additional delta saving. Numbers describe the selected response body, not HTTP/TLS overhead, TCP
+retransmissions or proof of reception. The next device ETag identifies the accepted complete image. The device
+logs successful deltas as `Image delta: <N> bytes, <ms> ms`. Hardware tests are needed to quantify airtime and
+battery savings.
+
 ## Status in the administration UI
 
 | Status | Meaning |

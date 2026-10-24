@@ -20,6 +20,12 @@ Use separate Claude sign-ins for each server instance rather than copying creden
 can invalidate another instance's copy. Multiple Claude accounts on one server are supported. Long-term
 unattended operation without a new sign-in is not demonstrated.
 
+Paired displays with delta-capable firmware receive only changed RGB565 spans when their previous full image
+is still in the server's bounded RAM history and a patch is smaller. The server always renders and retains
+complete images; older clients continue to receive full images. No persistent data migration or setting is
+needed. The server log compares each device image response's payload size with its full RGB565 size (HTTP/TLS
+overhead excluded). See [delta transfer, limits and recovery](CLIENT-PROTOCOL.md#optional-delta-images-v1).
+
 ## Administration at a glance
 
 The top navigation uses **Overview**, **Devices**, **Display**, **Data sources** and **Settings**. Light/dark administration appearance is saved in the browser and is independent of each device's display theme. The footer shows the build version, README link and a dedicated **Licenses & notices** page.

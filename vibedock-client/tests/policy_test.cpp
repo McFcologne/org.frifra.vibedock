@@ -1,4 +1,7 @@
 #include <string>
+#include <vector>
+#include <cstring>
+#include "../firmware/src/delta_image.h"
 #include <cstdio>
 #include "../firmware/src/sound_policy.h"
 #include "../firmware/src/volume_overlay.h"
@@ -7,6 +10,43 @@
 #include <limits>
 int main(){
   using namespace client_policy;
+  {
+    ImageSize size;assert(parseImageFormat("rgb565-delta-be-16x16",size,true));
+    assert(!parseImageFormat("rgb565-delta-be-16x16",size));
+    uint32_t parsed;assert(parseHash("0776765d",parsed)&&parsed==0x0776765d);
+    for(auto text:{"", "0", "1234567g", "123456789", "ABCDEF00"})assert(!parseHash(text,parsed));
+    assert(deltaLength("22",512,parsed)&&parsed==22);
+    for(auto text:{"", "1", "512", "999999999999", "22x", "-1"})assert(!deltaLength(text,512,parsed));
+    // Same bytes as ImageDeltaTest.sharedFirmwareVector (Java): two adjacent 16-pixel rows, one changed pixel each.
+    std::vector<uint8_t> patch={0,0,0,2,0,0,0,1,0x07,0x76,0x76,0x5d,0x07,0x76,0x76,0x5d,0xab,0xcd,0xab,0xcd,0xff,0xff};
+    uint8_t target[512]={},row[32]={},scratch[2*maxImageSide];uint32_t rows[16],expected[16];
+    for(int y=0;y<16;y++)rows[y]=expected[y]=rowHash(row,32);
+    row[0]=0xab;row[1]=0xcd;expected[0]=expected[1]=rowHash(row,32);
+    assert(expected[0]==0x0776765d);
+    auto payloadHash=[](const std::vector<uint8_t> &data){uint32_t h=2166136261u;for(auto b:data)h=hashByte(h,b);return h;};
+    auto decode=[&](const std::vector<uint8_t> &data,uint32_t payload,uint32_t state){
+      size_t at=0;return readDelta(size,uint32_t(data.size()),payload,state,rows,scratch,[&](uint8_t *out,size_t n){
+        if(at+n>data.size())return false;
+        memcpy(out,data.data()+at,n);at+=n;return true;
+      },[&](uint16_t y,uint16_t x,uint16_t w,const uint8_t *pixels){
+        assert(y<16&&x+w<=16);memcpy(target+2*(16*y+x),pixels,2*w);return true;
+      });
+    };
+    assert(rowsHash(expected,16)==0x3e29e1f9u&&payloadHash(patch)==0x48b8b2a2u);
+    assert(decode(patch,payloadHash(patch),rowsHash(expected,16)));
+    assert(target[0]==0xab&&target[1]==0xcd&&target[32]==0xab&&target[33]==0xcd);
+    assert(rowsHash(rows,16)==rowsHash(expected,16));
+    assert(!decode(patch,payloadHash(patch)^1,rowsHash(expected,16)));
+    rows[10]^=1;assert(!decode(patch,payloadHash(patch),rowsHash(expected,16)));
+    for(size_t n=0;n<patch.size();n++){
+      auto truncated=std::vector<uint8_t>(patch.begin(),patch.begin()+n);
+      assert(!decode(truncated,payloadHash(truncated),rowsHash(expected,16)));
+    }
+    for(auto index:{0,2,4,6}){auto bad=patch;bad[index]=0xff;assert(!decode(bad,payloadHash(bad),rowsHash(expected,16)));}
+    auto trailing=patch;trailing.push_back(0);assert(!decode(trailing,payloadHash(trailing),rowsHash(expected,16)));
+    auto duplicate=patch;duplicate.insert(duplicate.end()-2,patch.begin(),patch.end()-2);
+    assert(!decode(duplicate,payloadHash(duplicate),rowsHash(expected,16)));
+  }
   {
     // Circles drawn with one finger, as the touch controller reports them every 20 ms.
     auto draw=[](TouchPath &p,float cx,float cy,float r,float startDeg,float sweepDeg,int points,float wobble=0){
@@ -32,6 +72,9 @@ int main(){
     for(int i=0;i<240;i++)row[i]=uint16_t(i);
     assert(!overlay.savedRow(0)); overlay.capture(95,row,240); assert(!overlay.savedRow(0));
     overlay.capture(96,row,240); assert(overlay.savedRow(0)[0]==20 && overlay.savedRow(0)[199]==219);
+    uint16_t span[]={500,501,502};overlay.captureSpan(96,19,span,3);
+    assert(overlay.savedRow(0)[0]==501&&overlay.savedRow(0)[1]==502&&overlay.savedRow(0)[2]==22);
+    overlay.captureSpan(97,20,span,3);assert(!overlay.savedRow(1));
     overlay.show(100); assert(overlay.visible(1699)); assert(overlay.expired(1700));
     overlay.show(1600); assert(overlay.visible(2000)); // another press extends the notice
     row[20]=1234; overlay.capture(96,row,240); assert(overlay.savedRow(0)[0]==1234); // restore the NEW picture

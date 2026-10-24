@@ -95,8 +95,8 @@ inline bool validLogRequest(const char *text) {
 // Any size within the limits is accepted and scaled to the screen.
 constexpr uint16_t maxImageSide = 480;
 struct ImageSize { uint16_t width = 0, height = 0; uint32_t bytes() const { return 2u * width * height; } };
-inline bool parseImageFormat(const char *text, ImageSize &size) {
-  const char *prefix = "rgb565-be-";
+inline bool parseImageFormat(const char *text, ImageSize &size, bool delta = false) {
+  const char *prefix = delta ? "rgb565-delta-be-" : "rgb565-be-";
   for (int i = 0; prefix[i]; i++, text++) if (*text != prefix[i]) return false;
   auto number = [](const char *&t, char end, uint16_t &out) {
     uint32_t value = 0; int digits = 0;

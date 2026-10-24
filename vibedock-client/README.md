@@ -147,6 +147,19 @@ The pairing code changes after every restart. Five wrong codes lock pairing unti
 
 </details>
 
+## Image transfer
+
+The server always renders a complete image. With matching new server and firmware versions, screen pulls
+advertise delta support: after the first full image, the server can send only changed RGB565 spans. The device
+uses its row buffer, not a full framebuffer, and applies the same colour correction. Unchanged images still
+use HTTP 304. Old servers and old firmware retain the existing full-image path.
+
+A missing basis, interrupted or invalid delta triggers a full-image retry. Force refresh, slideshow photos,
+scaled images and the status-page preview use full images. The server keeps a bounded, temporary image history;
+there is no configuration or data migration. Its log compares payload bytes with the full image, and the device
+logs successful delta size and read time. These byte savings do not establish battery or airtime savings on
+hardware. See [the wire format and recovery rules](../vibedock-server/CLIENT-PROTOCOL.md#optional-delta-images-v1).
+
 ## Change what a device displays
 
 Open **Display** in the server administration to edit the default design. To edit one device, open **Devices → Edit design**. Both use the same editor:

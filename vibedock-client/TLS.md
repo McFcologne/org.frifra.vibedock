@@ -141,7 +141,9 @@ instead of aborting.
   as quick power cycles.
 - **A reverse proxy may drop `Content-Length`.** The Synology answered the image chunked (`-1 bytes announced`), and
   the firmware discarded every image after `HTTP 200`. Requests now go out as HTTP/1.0 with `Accept-Encoding:
-  identity`, the image size comes from `X-VibeDock-Image-Format`, the update size from `X-VibeDock-Length`.
+  identity`, full image size comes from `X-VibeDock-Image-Format`; delta and update sizes come from `X-VibeDock-Length`.
+  Delta responses additionally check the exact body length, terminator and payload checksum (see
+  [the image protocol](../vibedock-server/CLIENT-PROTOCOL.md#optional-delta-images-v1)).
 - **Closed connections keep memory.** A regular close leaves the connection in TCP TIME_WAIT for two minutes with its
   lwIP memory; with a pull every 30 s about 800 bytes were missing, and every handshake after the first failed with
   `out of memory` in the certificate check. The client aborts the TCP connection after the TLS close notify instead.
