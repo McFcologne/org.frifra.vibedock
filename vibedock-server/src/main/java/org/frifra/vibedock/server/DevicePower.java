@@ -23,7 +23,7 @@ class DevicePower {
     /** "battery", optionally ";level=" 0–100 (rounded to steps of 20 by the device); anything else is not a battery. */
     static Optional<StatusImage.Battery> parse(String header){
         if(header==null)return Optional.empty();
-        var parts=header.trim().split(";");
+        var parts=header.trim().split(";",-1);
         if(!parts[0].trim().equals("battery"))return Optional.empty();
         Integer level=null;
         for(int i=1;i<parts.length;i++){

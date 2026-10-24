@@ -572,6 +572,11 @@ class AccessTest {
                     .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk()).andReturn().getResponse().getHeader("ETag");
             Assertions.assertNotEquals(usb,onBattery);
             Assertions.assertEquals(usb,mvc.perform(pull).andReturn().getResponse().getHeader("ETag"));
+            // Malformed power reports are ignored; the ordinary image and its conditional response stay available.
+            for(String report:new String[]{";",";;"," ; ; "})
+                mvc.perform(get(image).header("Authorization","Bearer "+key).header("X-VibeDock-Power",report)
+                        .header("If-None-Match",usb).with(r->{r.setLocalPort(8080);return r;}))
+                        .andExpect(status().isNotModified()).andExpect(header().string("ETag",usb));
             // Pairing again keeps it.
             clients.paired(id,"Kitchen",key,"192.168.1.35",80,"waveshare-s3-touch-lcd-154");
             Assertions.assertTrue(clients.get(id).powerSaving());

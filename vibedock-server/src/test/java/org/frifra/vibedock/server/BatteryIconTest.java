@@ -48,6 +48,10 @@ class BatteryIconTest {
         Assertions.assertEquals(new StatusImage.Battery(40),power.battery("a"));
         power.report("a",null);Assertions.assertNull(power.battery("a"));
     }
+    @Test void malformedPowerHeadersAreIgnored(){
+        for(String header:new String[]{""," ",";",";;"," ; ; ","unknown"})
+            Assertions.assertEquals(Optional.empty(),DevicePower.parse(header),header);
+    }
     private BufferedImage image(Scheme scheme,Layout layout,StatusImage.Battery battery,UsageService.Snapshot snap) throws Exception {
         var look=new StatusImage.Look(null,scheme,null,"13°",layout,battery);
         return ImageIO.read(new ByteArrayInputStream(renderer.render(snap,"192.168.1.50",look,DisplayType.M1).png()));
