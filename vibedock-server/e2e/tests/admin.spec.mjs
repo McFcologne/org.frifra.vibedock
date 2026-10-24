@@ -255,9 +255,32 @@ for(const width of [1024,360]) for(const dark of [false,true]) {
   });
 }
 
+test('editor preview fits the complete case and clears the previous case when switching targets',async ({page,app}) => {
+  await editor(page,app);
+  for(const width of [1024,360]) {
+    await page.setViewportSize({width,height:850});
+    for(const [target,caseName] of [['vibedock-e2e-desk','case-154'],['vibedock-e2e-shelf','case-147'],['default',null]]) {
+      await page.locator('#design-target').selectOption(target);
+      await expect(page.locator('#preview-status')).toContainText('device renderer');
+      await expect.poll(()=>page.locator('.design-preview .device').evaluate(device=>{
+        const front=device.querySelector('.device-front'), image=device.querySelector('img'), screen=device.querySelector('.device-screen');
+        return {cases:[...front.classList].filter(c=>c.startsWith('case-')),
+          fits:device.getBoundingClientRect().width<=device.parentElement.clientWidth+1,
+          unclipped:image.getBoundingClientRect().width<=screen.getBoundingClientRect().width+1};
+      })).toEqual({cases:caseName?[caseName]:[],fits:true,unclipped:true});
+    }
+  }
+});
+
 test('previews open the whole device enlarged and close again',async ({page,app}) => {
-  for(const path of ['/admin','/admin/devices','/admin/design']){
+  for(const [path,target] of [['/admin'],['/admin/devices'],['/admin/design'],['/admin/design','vibedock-e2e-desk']]){
     await page.goto(app.baseURL+path);
+    if(target){
+      await expect(page.locator('#design-target')).toBeEnabled();
+      await page.locator('#design-target').selectOption(target);
+      await expect(page.locator('.design-preview .case-154')).toBeVisible();
+      await expect.poll(()=>page.locator('.design-preview .device').evaluate(device=>device.style.getPropertyValue('--s'))).not.toBe('');
+    }
     const device=page.locator('main .device[role="button"]').first(), dialog=page.locator('dialog.device-lightbox');
     const small=await device.boundingBox();
     await device.click();await expect(dialog).toBeVisible();

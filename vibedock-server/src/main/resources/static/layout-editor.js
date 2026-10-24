@@ -201,9 +201,20 @@
   }
   // The case takes the display's shape before the new image arrives (it would otherwise follow it late).
   function fitCase() {
+    if (!draft) return;
     const type = target === 'default' ? {width: 240, height: 240} : displayOf(draft.display), preview = document.querySelector('.design-preview .device');
-    if (preview && type) preview.style.setProperty('--ratio', String(type.height / type.width));
+    if (!preview || !type) return;
+    preview.style.setProperty('--ratio', String(type.height / type.width));
+    // --s is the active screen width, not the width of the complete case. Fit the measured case, including
+    // its glass and bezel, so a wide frame cannot clip the fixed-width image inside it.
+    preview.style.removeProperty('--s');
+    const available = preview.parentElement.clientWidth - 2;
+    const screenWidth = parseFloat(getComputedStyle(preview).getPropertyValue('--s'));
+    const caseWidth = preview.getBoundingClientRect().width;
+    if (available > 0 && caseWidth > available)
+      preview.style.setProperty('--s', (screenWidth * available / caseWidth) + 'px');
   }
+  new ResizeObserver(fitCase).observe(document.querySelector('.design-preview .screen'));
   function loadTarget() {
     labels();
     const design = target === 'default' ? catalog.defaults : device().design;
@@ -213,7 +224,10 @@
     $('#inheritance-description').textContent = inherit ? 'Follows the default design, including future changes.' : 'This device has its own complete design. Turn off the override to follow the default again.';
     // The preview in the device's case (Board.previewCase), the default design in the VibeTV M1's.
     const front = document.querySelector('.design-preview .device-front');
-    if (front) { front.classList.remove('case-147', 'case-c6'); if (target !== 'default' && device().previewCase) front.classList.add(device().previewCase); }
+    if (front) {
+      for (const name of [...front.classList]) if (name.startsWith('case-')) front.classList.remove(name);
+      if (target !== 'default' && device().previewCase) front.classList.add(device().previewCase);
+    }
     // Fitting the browser is for web displays only.
     const fit = $('#design-display').querySelector('option[value="fit"]');
     if (fit) { fit.hidden = fit.disabled = target === 'default' || !device().web; }
