@@ -13,7 +13,7 @@ are never written down here or anywhere in the repository.
 | Releases (JAR, Docker image files, firmware) | <https://github.com/McFcologne/org.frifra.vibedock/releases> |
 | Docker image on GitHub | `ghcr.io/mcfcologne/vibedock-server` – <https://github.com/McFcologne/org.frifra.vibedock/pkgs/container/vibedock-server> |
 | Docker image on Docker Hub | `mcfcologne/vibedock-server` – <https://hub.docker.com/r/mcfcologne/vibedock-server> |
-| Release notes | [`CHANGELOG.md`](CHANGELOG.md), the section `## <version>` |
+| Release notes | [`CHANGELOG.md`](CHANGELOG.md), the section `## <version>`; until the release, one file per pull request in [`changelog.d/`](changelog.d/README.md) |
 | Docker Hub description | [`docs/DOCKERHUB.md`](docs/DOCKERHUB.md), sent with every image publication |
 
 Both registries carry the same images: `<version>` and `latest` (only for a plain `x.y.z`) as one image for `amd64` and
@@ -70,7 +70,9 @@ A workflow that uses a new third-party action fails until that action is added t
 
 ## Making a release
 
-1. Add a section `## X.Y.Z` to `CHANGELOG.md` and merge everything into `main`.
+1. Merge everything into `main`. Then add a section `## X.Y.Z` to `CHANGELOG.md`: a short introduction (what changed,
+   what to update), then the bullets of the files in `changelog.d/` (one file per merged pull request). Delete those
+   files, except its README, and merge that change as well.
 2. Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 3. Wait for *Release VibeDock* (about 15 minutes). The release appears once all files are uploaded.
 
