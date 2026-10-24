@@ -593,6 +593,25 @@ on the right is rendered by the server exactly as the display will show it. Ever
 
 <img src="images/30-display-default.png" width="100%" alt="Default design">
 
+## Themes
+
+**Appearance → Browse all themes** jumps to the gallery below the editor. It shows all thirty-five themes in five
+columns on a desktop, with identical example data rendered by the same code as the displays. **Use theme** applies
+the theme to the design selected under **Design for**, and saves it right away. For an inherited device design,
+enable **Custom design** first, or change the default design instead.
+
+**The toggle beside each theme name** controls which themes this installation offers. Switching it off removes a theme from
+new selections and skips it when swiping through themes on a display or web display. Existing default and device
+designs keep the theme they already use, and their other settings can still be edited. Enable the theme again to
+make it selectable. At least one theme must stay enabled. These choices are stored in `themes.json` in the data
+directory and survive server updates and restarts; include the file in data-directory backups.
+
+The additional looks are **Mission Control**, **Departure Board**, **Nordic**, **Hi-Fi**, **Solarized**, **Pixel Quest**,
+**Bauhaus**, **E-Ink**, **Industrial**, **Porcelain**, **GitHub Dark**, **VS Code**, **Terminal**, **Git Diff** and **Debugger**. All support full-width, half-width and compact usage bands,
+both weather/mood positions and the available display sizes. Numeric quotas keep their meaning; the new themes
+use their own bar colours, with a warning colour below 20% remaining (E-Ink stays monochrome). No firmware update
+is needed.
+
 ## Bands
 
 A design is a list of **bands** from top to bottom. A usage band holds:
@@ -657,11 +676,13 @@ the aspect ratio:
 
 ## Appearance and mood
 
-**Style / theme** sets colours and look of the usage monitor; the twenty themes:
+**Style / theme** sets colours and look of the usage monitor; the thirty-five themes:
 
-<img src="themes.png" width="100%" alt="The twenty display themes with example data">
+<img src="themes.png" width="100%" alt="The thirty-five display themes with example data">
 
 The mood button opens the emoji picker with quick picks, search and all emoji; *None* leaves the slot empty.
+Handheld LCD uses a dark contour around emoji; Blueprint uses a light contour with darker facial details, so
+smileys stay recognisable against their backgrounds, also on scaled web displays.
 
 <img src="images/34-emoji-picker.png" width="100%" alt="Emoji picker">
 

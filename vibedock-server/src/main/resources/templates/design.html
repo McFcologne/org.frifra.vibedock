@@ -49,10 +49,17 @@
 <div class="design-side">
 <aside class="card design-preview"><h3 class="section-label"><svg th:replace="~{fragments :: icon('monitor')}"></svg>Preview</h3><figure class="screen"><div class="device"><div class="device-front"><div class="device-glass"><div class="device-screen"><img id="design-preview-image" width="240" height="240" src="/admin/preview.png" alt="Design preview rendered by the device image renderer"></div></div></div></div><figcaption id="design-preview-caption">Same renderer and image format as your device.</figcaption></figure><p id="preview-status" class="meta" role="status" aria-live="polite"></p></aside>
 <fieldset id="design-style-controls" disabled><section class="card"><h3 class="section-label"><svg th:replace="~{fragments :: icon('palette')}"></svg>Appearance</h3><label for="design-scheme">Style / theme</label><select id="design-scheme"></select>
-<p class="meta">Applies to the usage monitor.</p></section></fieldset>
+<p class="meta">Applies to the usage monitor. <a href="#design-themes">Browse all themes</a></p></section></fieldset>
 </div>
 </div>
 </form>
+<section class="card theme-catalog" id="design-themes" aria-labelledby="theme-catalog-title">
+  <div class="card-head"><h3 class="grow" id="theme-catalog-title">Themes</h3><span class="badge" id="theme-count"></span></div>
+  <p class="meta">Choose a look for the design above. Enable or disable themes for this entire instance, including swipes on displays.
+    Existing designs keep their theme when it is disabled. Keep at least one theme enabled.</p>
+  <p id="theme-message" role="status" aria-live="polite" class="meta"></p>
+  <div class="theme-grid" id="theme-grid"></div>
+</section>
 </main>
 <footer th:replace="~{fragments :: footer}"></footer>
 <dialog id="emoji-picker" class="emoji-picker" aria-label="Choose an emoji" data-catalog="/admin/emoji.json" data-images="/admin/twemoji/">
