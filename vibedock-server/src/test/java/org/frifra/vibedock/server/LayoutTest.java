@@ -29,6 +29,10 @@ class LayoutTest {
                 "codex",new UsageService.Provider(variant==2?"authentication_required":"ok",variant==2?null:1800000000L,variant==2?null:window,window),
                 "claude",new UsageService.Provider(variant==1?"rate_limited":"ok",1800000000L,window,variant==2?null:window)));
     }
+    /** A 240 px wide RGB565 image with the IP corner (20 rows from top, columns 0-149) blanked. */
+    private static byte[] withoutIpCorner(byte[] rgb565,int top){
+        var copy=rgb565.clone();for(int y=top;y<top+20;y++)Arrays.fill(copy,y*480,y*480+300,(byte)0);return copy;
+    }
     @Test void defaultIsPixelIdenticalToTheFrozenRendererInEveryTheme() throws Exception {
         var before=new LegacyStatusImage("Europe/Berlin");var after=new StatusImage("Europe/Berlin");
         // The frozen renderer knows the schemes up to Classic Windows; the later ones have no earlier image.
@@ -37,8 +41,8 @@ class LayoutTest {
             var oldLook=new LegacyStatusImage.Look(icon(44),scheme,weather?icon(24):null,weather?"13°":null);
             var look=new StatusImage.Look(icon(44),scheme,weather?icon(24):null,weather?"13°":null,Layout.DEFAULT);
             var expected=before.render(snapshot(variant),"192.168.1.50",oldLook);var actual=after.render(snapshot(variant),"192.168.1.50",look);
-            assertArrayEquals(expected.rgb565(),actual.rgb565(),scheme+" variant "+variant+" weather "+weather);
-            assertArrayEquals(expected.png(),actual.png(),scheme+" PNG");
+            // Except the IP corner (rows 220-239, columns 0-149): the IP is now drawn straight over the background.
+            assertArrayEquals(withoutIpCorner(expected.rgb565(),220),withoutIpCorner(actual.rgb565(),220),scheme+" variant "+variant+" weather "+weather);
         }
     }
     @Test void customLayoutsKeepTheFooterAndWirePixelsForEveryTheme() throws Exception {
@@ -47,16 +51,16 @@ class LayoutTest {
         for(var scheme:Scheme.values())for(var order:orders)for(boolean moodLeft:List.of(false,true)){
             var layout=layout(order,moodLeft);
             var actual=renderer.render(snapshot(0),"192.168.1.50",new StatusImage.Look(icon(44),scheme,icon(24),"13°",layout));
-            var original=renderer.render(snapshot(0),"192.168.1.50",new StatusImage.Look(icon(44),scheme,icon(24),"13°"));
             assertEquals(115200,actual.rgb565().length);
             if(order.equals(List.of(0,1,2))&&!moodLeft){
                 Files.createDirectories(Path.of("target/layout-previews"));
                 Files.write(Path.of("target/layout-previews/"+scheme.id()+".png"),actual.png());
             }
-            // The IP corner moves with the weather/mood band and looks the same wherever it is.
+            // The IP corner moves with the weather/mood band: another IP changes only that corner.
             int context=order.indexOf(2)*Layout.USAGE_HEIGHT+36;
-            for(int y=0;y<20;y++)assertArrayEquals(Arrays.copyOfRange(original.rgb565(),(220+y)*480,(220+y)*480+300),
-                    Arrays.copyOfRange(actual.rgb565(),(context+y)*480,(context+y)*480+300),scheme+" IP corner "+order);
+            var otherIp=renderer.render(snapshot(0),"10.0.0.7",new StatusImage.Look(icon(44),scheme,icon(24),"13°",layout));
+            assertFalse(Arrays.equals(actual.rgb565(),otherIp.rgb565()),scheme+" IP drawn "+order);
+            assertArrayEquals(withoutIpCorner(actual.rgb565(),context),withoutIpCorner(otherIp.rgb565(),context),scheme+" IP corner "+order);
             var png=javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(actual.png()));
             for(int y=0;y<240;y++)for(int x=0;x<240;x++){
                 int offset=(y*240+x)*2,value=(actual.rgb565()[offset]&255)<<8|(actual.rgb565()[offset+1]&255);

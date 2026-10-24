@@ -211,17 +211,16 @@ public class StatusImage {
             if(weatherIcon!=null)icon(g,scheme,weatherIcon,w-6-iw(weatherIcon),y+4);
             if(look.weatherText()!=null)right(g,scheme,look.weatherText(),w-6,y+50,16,desktopText(scheme));
         }
-        // IP corner in the device's footer style; the mood may reach into the rest of the bottom row. A text with a
-        // space (web displays: "VibeDock server v0.2.0") is drawn as it is, shortened to the corner.
-        // On narrow screens the corner ends before the mood: the text gets smaller, then shorter.
-        g.setColor(new Color(ThemeArtwork.footerBackground(scheme)));g.fillRect(0,y+36,Math.min(150,w),20);
+        // IP corner, drawn straight over the background like the other texts of the band; the mood may reach into the
+        // rest of the bottom row. A text with a space (web displays: "VibeDock server v0.2.0") is drawn as it is,
+        // shortened to the corner. On narrow screens the corner ends before the mood: the text gets smaller, then shorter.
         // Rounded panels: the text starts where the corner leaves room near the bottom edge.
         int left=Math.max(10,inset(4)+3),size=12,room=Math.min(150,w)-4-left;
         int moodMargin=Math.max(6,inset(12));
         if(rightMood!=null)room=Math.min(room,w-moodMargin-iw(rightMood)-4-left);
-        String full=ip.contains(" ")?ip:"IP: "+ip,label=fit(g,Scheme.MIDNIGHT,full,size,room);
-        if(!full.equals(label)){size=10;label=fit(g,Scheme.MIDNIGHT,full,size,room);}
-        if(label!=null)text(g,Scheme.MIDNIGHT,label,left,y+51,size,scheme.light()?0x000000:0xffffff,false);
+        String full=ip.contains(" ")?ip:"IP: "+ip,label=fit(g,scheme,full,size,room);
+        if(!full.equals(label)){size=10;label=fit(g,scheme,full,size,room);}
+        if(label!=null)text(g,scheme,label,left,y+51,size,desktopText(scheme),false);
         // Mood right, in front of the IP corner. Developer themes raise it another 6 px inside the same slot.
         if(rightMood!=null)put(g,rightMood,w-moodMargin-iw(rightMood),y+50-ih(rightMood)-(scheme.developer()?6:0));
     }
