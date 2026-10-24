@@ -147,6 +147,30 @@ The pairing code changes after every restart. Five wrong codes lock pairing unti
 
 </details>
 
+## When the display pulls
+
+The server tells the display with every answer when its picture can change next (`X-VibeDock-Next-Pull`): shortly
+after the next poll of the sources it shows, a stale reading or the next photo. The display pulls then instead of
+every poll interval, so with sources polled every minute it pulls once a minute and no longer gets a **304** in
+between; with longer intervals it pulls less often. While a source is still being asked (`state=pending`) it comes back
+when the poll should be done, at most every 2, 5, 10, then 30 s. Upper limit: 10 minutes for displays the server can
+ask for an immediate pull, 2 minutes for the others. Failed pulls, immediate pull requests and older servers use the
+poll interval as before. The status page shows the next pull. See
+[the protocol](../vibedock-server/CLIENT-PROTOCOL.md#3h-next-pull-server--device).
+
+## Image transfer
+
+The server always renders a complete image. With matching new server and firmware versions, screen pulls
+advertise delta support: after the first full image, the server can send only changed RGB565 spans. The device
+uses its row buffer, not a full framebuffer, and applies the same colour correction. Unchanged images still
+use HTTP 304. Old servers and old firmware retain the existing full-image path.
+
+A missing basis, interrupted or invalid delta triggers a full-image retry. Force refresh, slideshow photos,
+scaled images and the status-page preview use full images. The server keeps a bounded, temporary image history;
+there is no configuration or data migration. Its log compares payload bytes with the full image; the device log
+notes failed deltas only. These byte savings do not establish battery or airtime savings on
+hardware. See [the wire format and recovery rules](../vibedock-server/CLIENT-PROTOCOL.md#optional-delta-images-v1).
+
 ## Change what a device displays
 
 Open **Display** in the server administration to edit the default design. To edit one device, open **Devices → Edit design**. Both use the same editor:

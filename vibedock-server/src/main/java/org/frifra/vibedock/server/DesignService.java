@@ -95,6 +95,17 @@ class DesignService {
     int pollSeconds(Design design,int server,String display){
         return activePhotos(design,display).isEmpty()?server:Math.min(server,Math.max(ClientRegistry.MIN_POLL,design.photos().seconds()));
     }
+    /** The next time of day the design's slideshow starts or stops by its schedule (epoch seconds), else null. */
+    Long nextPhotoBoundary(Design design){
+        var p=design.photos();
+        if(p==null||p.paused()||p.images().isEmpty()||p.from()==null)return null;
+        var now=java.time.ZonedDateTime.now(clock);Long next=null;
+        for(String time:java.util.List.of(p.from(),p.to())){
+            var at=now.with(java.time.LocalTime.parse(time));if(!at.isAfter(now))at=at.plusDays(1);
+            long s=at.toEpochSecond();next=next==null?s:Math.min(next,s);
+        }
+        return next;
+    }
     /** The device image for a design with the current usage data; weather appears once a reading is cached. */
     StatusImage.Image render(Design design,String ip) throws IOException {return render(design,ip,DisplayType.M1);}
     /** The image in the resolution of a display type, the design fitted to it. */

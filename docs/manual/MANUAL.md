@@ -752,6 +752,27 @@ last values and shows *Rate limited*.
 
 <img src="images/44-import-sources.png" width="80%" alt="Import data sources">
 
+## How little data a display needs
+
+The server renders every picture completely, but a display with current firmware only receives what changed, and
+only when something can have changed:
+
+- **Changed parts only.** The server keeps the last pictures of each display in memory and sends just the changed
+  spans of rows: usually a few hundred bytes to a few KB instead of 112.5 KB for a 240 × 240 picture. Whole pictures
+  still come after a start, a theme change, a forced refresh, for slideshow photos and whenever the display or the
+  server is not sure what the display shows.
+- **Pulls when new readings are due.** Every answer tells the display when its picture can change next: shortly after
+  the next poll of the sources it shows. The display pulls then instead of every 30 s; while a source is still being
+  asked, it comes back a few seconds later. At most every 10 minutes (2 minutes if the server cannot reach the display
+  directly), so design changes and status still arrive.
+
+Measured on a Waveshare 1.54 with readings every minute: 16 picture updates in 20 minutes took 20 KB instead of
+1.84 MB of whole pictures (98.9 % less); the typical update was 0.2 to 3 KB, a design change in the editor 4 to 12 KB.
+The figures count the picture data, not HTTP headers or TLS. The server log shows each transfer with the bytes saved
+and the announced next pull (`Image transfer …: delta, full=115200 bytes, payload=638 bytes, saved=… (99.4%),
+next=58 s (current)`). Older firmware keeps receiving whole pictures every poll interval; a firmware update over
+Wi-Fi is all it takes.
+
 # Settings
 
 **Settings** holds the server's network addresses, who may read its API, the old push connection, the
@@ -765,8 +786,11 @@ legacy connection.
 The **internal address** (LAN) and an optional **external address** (e.g. a public host name) of the server's
 public port 10002. Without an internal address the server takes the one this page was opened with. The addresses
 are sent to a display when it is paired: it tries the address that answered last, then the other one, so a display
-moves between home and away by itself. The **poll interval** (10–3600 s) reaches paired displays with their next
-pull. Web display links use these addresses too.
+moves between home and away by itself. The **fallback poll interval** (10–3600 s, default 30) reaches paired
+displays with their next pull. Current firmware does not pull in this rhythm: every answer tells it when its picture
+can change next, after the next poll of the sources it shows (all sources are polled together on the full minute, so
+several providers do not make it pull more often). The interval applies to older firmware, after a failed pull and
+before the first answer, and as grace before *Updates missing*. Web display links use these addresses too.
 
 ## Read-only API access
 
@@ -933,7 +957,7 @@ the display log ([Troubleshooting a display](#troubleshooting-a-display)), so a 
 | *Server unreachable* with the progress row | Wi-Fi works, but no server address answered, and there is no detail. | Check the addresses under **Settings** and that port 10002 is reachable. |
 | *Server unreachable* with a reason (table below) | Wi-Fi works; the reason says where the connection stopped. The bottom line names the address that failed, during the next attempt `trying <address>`. After a failure the display tries its other address right away. | See the reasons below. |
 | *Image aborted*, with `no data for … s at row …` or `connection closed at row …` | The server answered, but the image did not arrive completely. While an image is shown, the display first retries once without this screen. | Mostly a lossy network (phone hotspot, weak signal). If it stays, read the log. |
-| *Updates missing* | No successful pull for three polling intervals (90 s at the default); the old image is hidden so that no stale numbers show. | Check that the server runs; the log names the failing pulls. |
+| *Updates missing* | No successful pull for three polling intervals (90 s at the default), or two intervals after the time the server announced for the next pull; the old image is hidden so that no stale numbers show. | Check that the server runs; the log names the failing pulls. |
 | *Update failed*, with the reason | An update over Wi-Fi did not install; the running firmware stays. The administration shows the same reason. | It is tried again after a restart of the display; otherwise install over USB. |
 | *Unplug now for factory reset*, *or wait: Wi-Fi setup* | The second quick power cycle. | Wait to open the Wi-Fi setup (pairing stays), or unplug once more for a factory reset. |
 | *Factory reset* | The third quick power cycle: Wi-Fi, pairing and server addresses are deleted. | Set the display up again. |
@@ -1097,6 +1121,7 @@ valid for 10 minutes and for one log.
 | `… after TLS; sent …, got …` | The encrypted connection works; the HTTP request failed afterwards (for example read timeout or connection lost). Check the reverse proxy and the server's access log for the request. |
 | `Image shown, read in … ms` | The first image after a start or a problem arrived completely. |
 | `Image aborted: no data for 8 s at row …` / `connection closed at row …` | The answer started but the image did not arrive completely; over https the traffic figures follow. |
+| `Image aborted: invalid delta, length or checksum` / `delta transfer interrupted` / `unsupported image or delta basis` | A partial update did not fit what the display shows or did not arrive completely; the display fetches the whole picture right away. Now and then is harmless; every time points to a proxy changing the answers. |
 | `Image not accepted: format …, … bytes announced` | The server's answer was not a VibeDock image: no or a wrong image format, typically a wrong address or a reverse proxy that answers itself. A missing `Content-Length` is fine. |
 | `Trying <address> next` | The display switches to its other server address. |
 | `Clock set (NTP)` | The time is known; https needs it. Without this line check that the display can reach `pool.ntp.org`. |

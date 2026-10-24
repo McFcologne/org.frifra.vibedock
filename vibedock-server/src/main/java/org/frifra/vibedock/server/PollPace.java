@@ -28,6 +28,8 @@ final class PollPace {
     PollPace(SettingsStore.UsagePolling polling){this.polling=polling;minutes=polling.minMinutes();}
 
     int minutes(){return minutes;}
+    /** When the source is polled next (epoch seconds); 0 or past while it is due. */
+    long nextAt(){return nextAt;}
     boolean limited(){return limited;}
     boolean dynamic(){return polling.dynamic();}
     /** Minutes until the next poll, rounded up; at least the interval. */

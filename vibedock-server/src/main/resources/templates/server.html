@@ -15,9 +15,9 @@
     <label for="external-url">External address (optional, e.g. a public host name)</label>
     <input id="external-url" name="externalUrl" th:value="${externalUrl}" placeholder="https://vibedock.example.com">
     <th:block th:replace="~{fragments :: tlsPin}"></th:block>
-    <label for="poll-seconds">Poll interval in seconds (10–3600)</label>
+    <label for="poll-seconds">Fallback poll interval in seconds (10–3600)</label>
     <input id="poll-seconds" name="pollSeconds" type="number" min="10" max="3600" th:value="${pollSeconds}">
-    <small>Devices try the address that answered last, then the other one. Addresses are sent when a device is invited; the poll interval reaches paired devices with their next pull. An empty internal address is derived from the host used to open this page.</small>
+    <small>Devices try the address that answered last, then the other one. Addresses are sent when a device is invited. Current firmware pulls when the server announces new readings; this interval applies to older firmware, after failed pulls and as grace before <em>Updates missing</em>, and reaches paired devices with their next pull. An empty internal address is derived from the host used to open this page.</small>
     <p class="notice" th:if="${settingsMessage}" th:text="${settingsMessage}"></p>
     <p class="notice error" th:if="${settingsError}" th:text="${settingsError}"></p>
     <div class="form-actions" data-dirty-actions><button>Save network settings</button></div>
