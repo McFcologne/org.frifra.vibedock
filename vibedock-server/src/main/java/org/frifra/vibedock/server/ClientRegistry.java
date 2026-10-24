@@ -41,9 +41,15 @@ public class ClientRegistry {
      * the device learns it with every pull (X-VibeDock-Orientation). Never for the VibeTV M1, whose case decides.
      * rotation: the turn of the picture in clockwise degrees (0, 90, 180, 270; 90 and 270 on square panels only);
      * missing in older files, where flipped decides. flipped stays set for 180, so an older server reads it as before.
+     * powerSaving: experimental battery power saving, for boards that measure their battery (Board.batteryPowerSaving);
+     * the device learns it with every pull (X-VibeDock-Power-Saving). Missing in older files: off.
      */
     record Device(String identifier,String name,String keyHash,String ip,int port,long pairedAt,Long lastPullAt,String lastPullIp,Design design,
-                  boolean serverFooter,String firmware,String display,Web web,String board,String callbackNetwork,boolean flipped,Integer rotation) {
+                  boolean serverFooter,String firmware,String display,Web web,String board,String callbackNetwork,boolean flipped,Integer rotation,boolean powerSaving) {
+        Device(String identifier,String name,String keyHash,String ip,int port,long pairedAt,Long lastPullAt,String lastPullIp,Design design,
+               boolean serverFooter,String firmware,String display,Web web,String board,String callbackNetwork,boolean flipped,Integer rotation){
+            this(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,callbackNetwork,flipped,rotation,false);
+        }
         Device(String identifier,String name,String keyHash,String ip,int port,long pairedAt,Long lastPullAt,String lastPullIp,Design design,
                boolean serverFooter,String firmware,String display,Web web,String board,String callbackNetwork,boolean flipped){
             this(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,callbackNetwork,flipped,null);
@@ -58,17 +64,18 @@ public class ClientRegistry {
                boolean serverFooter,String firmware,String display,Web web,String board){
             this(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,null);
         }
-        Device withCallbackNetwork(String network){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,network,flipped,rotation);}
-        Device withCallbackOrigin(String origin){return new Device(identifier,name,keyHash,origin,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,null,flipped,rotation);}
-        Device pulled(long at,String peer,boolean footer,String version){return new Device(identifier,name,keyHash,ip,port,pairedAt,at,peer,design,footer,version,display,web,board,callbackNetwork,flipped,rotation);}
-        Device withDesign(Design next){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,next,serverFooter,firmware,display,web,board,callbackNetwork,flipped,rotation);}
-        Device withName(String next){return new Device(identifier,next,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,callbackNetwork,flipped,rotation);}
-        Device withDisplay(String next){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,next,web,board,callbackNetwork,flipped,rotation);}
-        Device withWeb(Web next){return new Device(identifier,name,hash(next.secret()),ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,next,board,callbackNetwork,flipped,rotation);}
-        Device withRotation(int degrees){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,callbackNetwork,degrees==180,degrees);}
+        Device withCallbackNetwork(String network){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,network,flipped,rotation,powerSaving);}
+        Device withCallbackOrigin(String origin){return new Device(identifier,name,keyHash,origin,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,null,flipped,rotation,powerSaving);}
+        Device pulled(long at,String peer,boolean footer,String version){return new Device(identifier,name,keyHash,ip,port,pairedAt,at,peer,design,footer,version,display,web,board,callbackNetwork,flipped,rotation,powerSaving);}
+        Device withDesign(Design next){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,next,serverFooter,firmware,display,web,board,callbackNetwork,flipped,rotation,powerSaving);}
+        Device withName(String next){return new Device(identifier,next,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,callbackNetwork,flipped,rotation,powerSaving);}
+        Device withDisplay(String next){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,next,web,board,callbackNetwork,flipped,rotation,powerSaving);}
+        Device withWeb(Web next){return new Device(identifier,name,hash(next.secret()),ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,next,board,callbackNetwork,flipped,rotation,powerSaving);}
+        Device withRotation(int degrees){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,callbackNetwork,degrees==180,degrees,powerSaving);}
         /** The turn in clockwise degrees: the saved rotation, else 180 for a device saved as flipped. */
+        Device withPowerSaving(boolean next){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,display,web,board,callbackNetwork,flipped,rotation,next);}
         int degrees(){return rotation!=null?rotation:flipped?180:0;}
-        Device withBoard(String next,String nextDisplay){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,nextDisplay,web,next,callbackNetwork,flipped,rotation);}
+        Device withBoard(String next,String nextDisplay){return new Device(identifier,name,keyHash,ip,port,pairedAt,lastPullAt,lastPullIp,design,serverFooter,firmware,nextDisplay,web,next,callbackNetwork,flipped,rotation,powerSaving);}
         DisplayType displayType(){return DisplayType.of(display);}
         Board boardType(){return Board.of(board);}
     }
@@ -95,7 +102,7 @@ public class ClientRegistry {
      * update is requested and not yet installed; updateError: why its last update over Wi-Fi failed.
      */
     public record View(String identifier,String name,String ip,String status,Long lastPullAt,Design design,boolean overridden,boolean serverFooter,String firmware,
-                       boolean ota,boolean otaNeedsPairing,boolean updating,String updateError,DisplayType display,Web web,Board board,boolean flipped,int rotation) {}
+                       boolean ota,boolean otaNeedsPairing,boolean updating,String updateError,DisplayType display,Web web,Board board,boolean flipped,int rotation,boolean powerSaving) {}
     private final Path file;
     private final ObjectMapper json;
     private final Clock clock;
@@ -176,7 +183,8 @@ public class ClientRegistry {
         if(next.size()>=100)throw new IllegalArgumentException("At most 100 clients");
         next.add(new Device(id,name.trim(),hash(key),ip,port,clock.instant().getEpochSecond(),null,null,previous.map(Device::design).orElse(null),
                 previous.map(Device::serverFooter).orElse(false),previous.map(Device::firmware).orElse(null),previous.map(Device::display).orElse(null),null,
-                previous.map(Device::board).orElse(null),callbackNetwork,previous.map(Device::flipped).orElse(false),previous.map(Device::rotation).orElse(null)));
+                previous.map(Device::board).orElse(null),callbackNetwork,previous.map(Device::flipped).orElse(false),previous.map(Device::rotation).orElse(null),
+                previous.map(Device::powerSaving).orElse(false)));
         save(state.withDevices(next));
         if(board!=null)setBoard(id,board);
     }
@@ -253,6 +261,13 @@ public class ClientRegistry {
         int next=d.web()!=null?0:degrees;
         if(next==d.degrees()&&(d.rotation()!=null||next==0))return;
         List<Device> list=new ArrayList<>(state.devices());list.replaceAll(x->x.identifier().equals(id)?x.withRotation(next):x);save(state.withDevices(list));
+    }
+    /** Experimental battery power saving on or off; only for boards that measure their battery. */
+    public synchronized void setPowerSaving(String id,boolean enabled) throws IOException {
+        var d=find(id);
+        if(enabled&&(d.web()!=null||!d.boardType().batteryPowerSaving()))throw new IllegalArgumentException("This display has no battery power saving");
+        if(d.powerSaving()==enabled)return;
+        List<Device> list=new ArrayList<>(state.devices());list.replaceAll(x->x.identifier().equals(id)?x.withPowerSaving(enabled):x);save(state.withDevices(list));
     }
     public synchronized boolean flipped(String id){return rotation(id)==180;}
     /** The turn the device shows, 0 when its board cannot show the saved one (e.g. after a change of board). */
@@ -367,7 +382,8 @@ public class ClientRegistry {
         String status=d.lastPullAt()==null?(d.web()!=null?"Not connected yet":"Waiting for first pull")
                 :now-d.lastPullAt()>3L*interval?(d.web()!=null?"Not connected":"Updates missing"):"Connected";
         return new View(d.identifier(),d.name(),d.lastPullIp()==null?d.ip():d.lastPullIp(),status,d.lastPullAt(),design(d),d.design()!=null,d.serverFooter(),d.firmware(),
-                otaCapable.contains(d.identifier()),otaWithoutKey.contains(d.identifier()),updateRequested.containsKey(d.identifier()),updateErrors.get(d.identifier()),d.displayType(),d.web(),d.boardType(),effectiveRotation(d)==180,effectiveRotation(d));
+                otaCapable.contains(d.identifier()),otaWithoutKey.contains(d.identifier()),updateRequested.containsKey(d.identifier()),updateErrors.get(d.identifier()),d.displayType(),d.web(),d.boardType(),effectiveRotation(d)==180,effectiveRotation(d),
+                d.web()==null&&d.boardType().batteryPowerSaving()&&d.powerSaving());
     }
     private void save(State next) throws IOException {
         Path temp=Files.createTempFile(file.getParent(),"clients-",".tmp");

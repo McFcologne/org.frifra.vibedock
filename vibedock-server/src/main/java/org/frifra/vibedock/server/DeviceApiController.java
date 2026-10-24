@@ -65,6 +65,8 @@ class DeviceApiController {
         // Mounted turned: the device turns its panel (also its own screens and the swipes). "upright" and "flipped" as
         // before; firmware that does not know "rotated-90"/"rotated-270" keeps its orientation.
         if(registry.get(identifier).board().flippable())headers.set("X-VibeDock-Orientation",orientation(registry.rotation(identifier)));
+        // Experimental battery power saving: "battery" lets the display save power while it runs on its battery.
+        if(registry.get(identifier).board().batteryPowerSaving())headers.set("X-VibeDock-Power-Saving",registry.get(identifier).powerSaving()?"battery":"off");
         // A requested update over Wi-Fi: the device fetches /firmware after this pull and installs it if signed.
         firmware.info(registry.get(identifier).board()).filter(i->registry.updatePending(identifier,i.version())).ifPresent(i->headers.set("X-VibeDock-Update",i.version()));
         // A log requested in the administration: the display uploads it after this pull (POST .../log).

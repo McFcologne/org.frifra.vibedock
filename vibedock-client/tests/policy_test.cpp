@@ -99,6 +99,19 @@ int main(){
     assert(batteryEstimate(mv) >= 0 && batteryEstimate(mv) <= 100);
     if (mv > 3000) assert(batteryEstimate(mv) >= batteryEstimate(mv - 1));
   }
+  const uint32_t beforeWrapPower=std::numeric_limits<uint32_t>::max()-1000;
+  // Battery power saving: battery only without USB host and without charging; a change needs two readings in a row.
+  assert(onBattery(false,false)); assert(!onBattery(true,false)); assert(!onBattery(false,true)); assert(!onBattery(true,true));
+  {
+    PowerSource source;
+    assert(!source.update(false)); assert(!source.battery);
+    assert(!source.update(true)); assert(!source.battery);       // one reading is not enough
+    assert(!source.update(false)); assert(!source.update(true));  // flickering never switches
+    assert(source.update(true)); assert(source.battery);
+    assert(!source.update(true)); assert(!source.update(false)); assert(source.update(false)); assert(!source.battery);
+  }
+  assert(!dimDue(59999,0)); assert(dimDue(60000,0)); assert(!dimDue(5000,beforeWrapPower)); assert(dimDue(59000,beforeWrapPower));
+  assert(dimmedBrightness(100)==minBrightness); assert(dimmedBrightness(minBrightness)==minBrightness);
   assert(clampPoll(1)==10);assert(clampPoll(30)==30);assert(clampPoll(99999)==3600);
   assert(!pullDue(29999,0,30));assert(pullDue(30000,0,30));assert(pullDue(10000,0,5));
   assert(!imageStale(89999,0,30));assert(imageStale(90000,0,30));
