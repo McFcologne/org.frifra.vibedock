@@ -18,4 +18,5 @@ try { saved = localStorage.getItem(KEY) === 'usb' ? 'usb' : 'wifi'; } catch { /*
 show(panel.dataset.createError === 'true' ? 'wifi' : saved, false);
 for (const choice of panel.querySelectorAll('[name="pair-method"]')) choice.addEventListener('change', () => show(choice.value));
 for (const link of panel.querySelectorAll('[data-pair-method-switch]')) link.addEventListener('click', () => show(link.dataset.pairMethodSwitch));
-cancel.addEventListener('click', () => pairing.close());
+// However the dialog closes (Cancel, Escape, a pairing that is done): the port is freed and the form starts again.
+new MutationObserver(() => { if (panel.hidden) pairing.close(); }).observe(panel, { attributes: true, attributeFilter: ['hidden'] });

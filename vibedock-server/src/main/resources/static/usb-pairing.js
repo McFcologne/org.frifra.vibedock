@@ -19,6 +19,9 @@ export function usbPairing(pair, { port = () => undefined, setPort = () => {}, b
   const openConsole = () => openSerialConsole(serialPort);
   const hello = () => console_.hello();
   async function closeConsole() { if (console_) { const c = console_; console_ = undefined; await c.close(); } }
+  // Every way out (Cancel, Escape, the other pairing way, a restart): the port is freed and the form goes back to its
+  // first step, so nothing can be sent over a connection that is closed. Whether the area shows stays with the page.
+  async function close() { await closeConsole(); pairAsk.hidden = false; pairForm.hidden = true; say(''); }
 
   pair.querySelectorAll('[data-pair-skip]').forEach(b => b.addEventListener('click', async () => { await closeConsole(); askToPair(); onSkip(); }));
   pair.querySelector('[data-pair-start]').addEventListener('click', async () => {
@@ -111,6 +114,7 @@ export function usbPairing(pair, { port = () => undefined, setPort = () => {}, b
   document.addEventListener('mousedown', e => { if (!picker.contains(e.target)) closePicker(false); });
   pairForm.addEventListener('submit', async event => {
     event.preventDefault();
+    if (!console_) { await close(); say('The connection to the display was closed. Choose Pair now again.', true); return; }
     if (!pairForm.elements.ssid.value) { say('Choose the Wi-Fi network first.', true); openPicker(); return; }
     const button = pairForm.querySelector('[type=submit]'); button.disabled = true;
     try {
@@ -141,5 +145,5 @@ export function usbPairing(pair, { port = () => undefined, setPort = () => {}, b
     } catch (error) { say(error.message, true); }
     finally { button.disabled = false; }
   });
-  return { ask: askToPair, close: closeConsole, say };
+  return { ask: askToPair, close, say };
 }

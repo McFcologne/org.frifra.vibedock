@@ -37,6 +37,7 @@ if (!('serial' in navigator) || !window.isSecureContext) {
   };
   // Connects to the port (chosen by the user, or the one already allowed after the page switched to the right board).
   const connect = port => run(async () => {
+    await closeConsole();  // the pairing's console holds the port esptool needs
     serialPort = port; pair.hidden = true;
     transport = new Transport(port, true);
     loader = new ESPLoader({ transport, baudrate: Number($('#flash-baud').value), terminal });
