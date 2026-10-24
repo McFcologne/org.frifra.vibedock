@@ -89,6 +89,11 @@ class DeviceAdminController {
         var targets=new java.util.ArrayList<LogTarget>();
         for(var c:registry.views())if(c.web()==null)targets.add(target(c));
         model.addAttribute("targets",targets);model.addAttribute("keep",DeviceLogs.KEEP);model.addAttribute("displays",registry.views());
+        // The board names for the port choice (serial-console.js), which shows each display by what it reports over USB.
+        var boards=new java.util.ArrayList<java.util.Map<String,Object>>();
+        for(var b:Board.INVENTORY)boards.add(java.util.Map.of("id",b.id(),"label",b.label(),"chip",b.chip()));
+        try{model.addAttribute("boardLabels",new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(boards));}
+        catch(com.fasterxml.jackson.core.JsonProcessingException e){model.addAttribute("boardLabels","[]");}
         return "troubleshooting";
     }
     record LogUpload(String firmware,String board,List<String> lines) {}

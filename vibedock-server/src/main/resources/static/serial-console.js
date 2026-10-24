@@ -43,8 +43,8 @@ export async function openConsole(serialPort) {
       finally { writer.releaseLock(); }
     },
     // Asks until the device answers; it may still be starting or trying its old Wi-Fi.
-    async hello() {
-      for (let attempt = 0; attempt < 20; attempt++) {
+    async hello(attempts = 20) {
+      for (let attempt = 0; attempt < attempts; attempt++) {
         const answer = console_.wait('VIBEDOCK-READY ', 1500);
         await console_.send('VIBEDOCK-HELLO');
         try { return JSON.parse((await answer).slice('VIBEDOCK-READY '.length)); } catch (e) { if (e.message !== 'timeout') throw e; }
@@ -91,4 +91,76 @@ export async function restart(serialPort) {
     await serialPort.setSignals({ dataTerminalReady: false, requestToSend: true }); await sleep(150);
     await serialPort.setSignals({ dataTerminalReady: false, requestToSend: false });
   } finally { await serialPort.close(); }
+}
+
+// ---- choosing a display's port ----
+// The browser names a port by its USB chip ("USB JTAG/serial debug unit", "USB Serial"); a board cannot change that.
+// The browser's choice shows only the USB chips of the boards; ports allowed before are listed by the display's own
+// name, which each one tells over USB (VIBEDOCK-HELLO), so the browser's choice is only needed for a new display.
+const USB_CHIPS = [
+  { usbVendorId: 0x303a, label: 'Espressif USB (ESP32-S3, -C3, -C6)' },
+  { usbVendorId: 0x1a86, label: 'WCH USB serial (CH340, CH9102)' },
+  { usbVendorId: 0x10c4, label: 'Silicon Labs USB serial (CP210x)' },
+  { usbVendorId: 0x0403, label: 'FTDI USB serial' },
+  { usbVendorId: 0x067b, label: 'Prolific USB serial' }
+];
+export const usbFilters = USB_CHIPS.map(({ usbVendorId }) => ({ usbVendorId }));
+export const requestDisplayPort = () => navigator.serial.requestPort({ filters: usbFilters });
+const chipLabel = port => USB_CHIPS.find(c => c.usbVendorId === port.getInfo().usbVendorId)?.label ?? 'USB serial port';
+
+// What a port allowed before is: the display's answer to VIBEDOCK-HELLO (a few short tries), or null.
+async function identify(port) {
+  let console_;
+  try { console_ = await openConsole(port); return await console_.hello(3); }
+  catch { return null; }
+  finally { await console_?.close(); }
+}
+function boardLabel(id) {
+  try { return JSON.parse(document.querySelector('[data-boards]')?.dataset.boards || '[]').find(b => b.id === id)?.label || id; }
+  catch { return id; }
+}
+// The port to use: chosen from the displays allowed before (by name), or a new one from the browser's choice. Null
+// when cancelled. Without ports allowed before, the browser's choice opens right away.
+export async function chooseDisplayPort() {
+  const known = (await navigator.serial.getPorts()).filter(p => usbFilters.some(f => f.usbVendorId === p.getInfo().usbVendorId));
+  if (!known.length) return requestDisplayPort();
+  const dialog = document.createElement('dialog');
+  dialog.className = 'source-dialog port-dialog';
+  dialog.innerHTML = `<div class="dialog-head"><h3 class="grow">Choose the display</h3>
+      <button type="button" class="ghost dialog-close" data-close aria-label="Close">×</button></div>
+    <p class="meta" data-port-state>Asking the connected displays for their names …</p>
+    <ul class="port-list" data-port-list></ul>
+    <div class="form-actions"><button type="button" class="secondary" data-port-other>Another display …</button></div>`;
+  document.body.append(dialog);
+  return new Promise(resolve => {
+    let result = null;
+    const finish = value => { result = value; dialog.close(); };
+    dialog.addEventListener('close', () => { dialog.remove(); resolve(result); });
+    dialog.querySelector('[data-close]').addEventListener('click', () => finish(null));
+    dialog.querySelector('[data-port-other]').addEventListener('click', async () => {
+      try { finish(await requestDisplayPort()); } catch { /* none chosen: stay */ }
+    });
+    dialog.showModal();
+    (async () => {
+      const list = dialog.querySelector('[data-port-list]');
+      for (const port of known) {
+        const item = document.createElement('li'), choose = document.createElement('button');
+        choose.type = 'button'; choose.className = 'port-choice'; choose.disabled = true;
+        choose.innerHTML = '<strong></strong><span class="meta"></span>';
+        choose.querySelector('strong').textContent = 'Asking …'; choose.querySelector('span').textContent = chipLabel(port);
+        item.append(choose); list.append(item);
+        const info = await identify(port);
+        if (!dialog.open) return;
+        if (info) {
+          choose.querySelector('strong').textContent = info.name || info.identifier;
+          choose.querySelector('span').textContent = `${info.identifier} · ${boardLabel(info.board || 'vibedock-m1')} · firmware ${info.version}`;
+        } else {
+          choose.querySelector('strong').textContent = 'No VibeDock answer';
+          choose.querySelector('span').textContent = `${chipLabel(port)}: other firmware, in its bootloader, or in use elsewhere`;
+        }
+        choose.disabled = false; choose.addEventListener('click', () => finish(port));
+      }
+      dialog.querySelector('[data-port-state]').textContent = 'Displays allowed in this browser before; connect a new one with “Another display …”.';
+    })();
+  });
 }

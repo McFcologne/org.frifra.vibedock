@@ -818,14 +818,20 @@ Needs Chrome or Edge on a computer, and the administration opened over HTTPS or 
 <img src="images/22-firmware-flasher.png" width="100%" alt="Install from the browser">
 
 1. **Connect the display by USB** and close other programs that use its serial port (e.g. a serial monitor).
-   Choose the **Speed** (115200 is the most reliable) and press **Connect**, then choose the serial port in the
-   browser's dialog. The page checks the chip: when it is not the chosen board's and only one board of the
+   Choose the **Speed** (115200 is the most reliable) and press **Connect**, then choose the display. The page checks the chip: when it is not the chosen board's and only one board of the
    installation has it (e.g. the ESP32-C6), the page switches to that board and connects again by itself; boards
    that share a chip (the ESP32-S3 boards) you choose yourself.
 2. **Back up the whole flash** with **Download backup** and keep the file private: it is the only way back to the
    current firmware and contains the display's Wi-Fi and pairing data. Without a download, confirm that you have a
    verified full backup.
 3. **Install** writes the firmware at 0x0. The display restarts and keeps its settings.
+
+**Choosing the display.** The browser names serial ports by their USB chip (*USB JTAG/serial debug unit*, *USB
+Serial*), which no firmware can change. Displays connected in this browser before are therefore listed by the page
+itself, each with its name, identifier, board and firmware as it reports them over USB; *No VibeDock answer* is a
+board with other firmware, one in its bootloader or a port in use elsewhere. **Another display …** opens the
+browser's dialog for a new one; it lists only the USB chips of the boards, not the computer's other serial ports.
+The same choice opens for **Restart display**, **Only pair** and **Read log over USB**.
 
 After the installation the page offers to **pair this device now** over the same cable: enter a **Name**, choose
 the **Wi-Fi** from the networks the display sees (**Refresh networks** scans again, for example after switching on a hotspot) and enter the **Wi-Fi password**, then **Send to the display**.
