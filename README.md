@@ -110,13 +110,13 @@ The administration's light/dark appearance is independent of the display theme. 
 
 ## Display themes
 
-<p align="center"><img src="docs/manual/themes.png" width="820" alt="The thirty display themes with example data"></p>
+<p align="center"><img src="docs/manual/themes.png" width="820" alt="The thirty-five display themes with example data"></p>
 
 **Display → Themes** shows every theme in a five-column gallery, rendered with the same sample readings. Choose a
 theme for the default or a device override, or disable it for the whole instance. Disabled themes are skipped by
 display swipes and cannot be newly selected; existing designs keep their saved look. At least one theme stays enabled.
-The ten additional looks are Mission Control, Departure Board, Nordic, Hi-Fi, Solarized, Pixel Quest, Bauhaus,
-E-Ink, Industrial and Porcelain. These are server-rendered; no firmware update is needed.
+The fifteen additional looks are Mission Control, Departure Board, Nordic, Hi-Fi, Solarized, Pixel Quest, Bauhaus,
+E-Ink, Industrial, Porcelain, GitHub Dark, VS Code, Terminal, Git Diff and Debugger. These are server-rendered; no firmware update is needed.
 
 The default layout remains available unchanged: two full-width usage bands followed by weather/mood, update time and IP. Half-width widgets and a different band order are optional. Current firmware supports moving the entire weather/mood band; the editor warns when older firmware needs it at the bottom.
 

@@ -130,7 +130,9 @@ public class StatusImage {
                 :p.status().equals("ok")?null:DeviceSender.statusLabel(p.status());
         // Narrow screens: the status is shortened to the room the title leaves.
         g.setFont(new Font(scheme.font(),Font.BOLD,scheme.style==Scheme.Style.TERMINAL?15:16));
-        int room=w-20-g.getFontMetrics().stringWidth((scheme.style==Scheme.Style.TERMINAL?"> ":"")+title)-8;
+        int titleWidth=g.getFontMetrics().stringWidth((scheme.style==Scheme.Style.TERMINAL?"> ":"")+title);
+        if(scheme.developer()&&status!=null)titleWidth=Math.min(titleWidth,w/2-12);
+        int room=w-20-titleWidth-8;
         if(status!=null&&!scheme.windowed())
             status=fit(g,scheme,scheme.style==Scheme.Style.TERMINAL?status.toUpperCase(Locale.ROOT):status,10,room);
         switch(scheme.style){
@@ -144,7 +146,7 @@ public class StatusImage {
             case MACOS -> macosWindow(g,scheme,title,status,top,4,w-8,height-(bottom?6:3));
             case CONSOLE -> console(g,scheme,title,status,top,2,w-4,height-(bottom?6:3));
             default -> {
-                text(g,scheme,title,10,top,16,scheme.title,true);
+                if(!ThemeArtwork.heading(g,scheme,title,10,top,status!=null?Math.min(w-20,w/2-12):w-20,16))text(g,scheme,title,10,top,16,scheme.title,true);
                 if(status!=null)right(g,scheme,status,w-10,top,10,scheme.warning);
                 // Newsprint: a thin rule below the heading, like a column.
                 if(scheme.style==Scheme.Style.PRINT){g.setColor(new Color(scheme.text));g.fillRect(10,top+4,w-20,1);}
@@ -161,6 +163,7 @@ public class StatusImage {
      */
     private void context(Graphics2D g,UsageService.Snapshot snapshot,String ip,Look look,Layout.Context band,int y){
         var scheme=look.scheme();
+        if(scheme.style==Scheme.Style.CODE){g.setColor(new Color(ThemeArtwork.footerBackground(scheme)));g.fillRect(0,y,w,56);}
         // Time of the newest provider reading, not of this rendering: the image (and its ETag) only changes with new data.
         var observed=snapshot.providers().values().stream().map(UsageService.Provider::observedAt).filter(Objects::nonNull).max(Long::compare);
         String time=observed.map(t->DateTimeFormatter.ofPattern("HH:mm").withZone(zone).format(Instant.ofEpochSecond(t))).orElse("--:--");
@@ -194,7 +197,7 @@ public class StatusImage {
         // IP corner in the device's footer style; the mood may reach into the rest of the bottom row. A text with a
         // space (web displays: "VibeDock server v0.2.0") is drawn as it is, shortened to the corner.
         // On narrow screens the corner ends before the mood: the text gets smaller, then shorter.
-        g.setColor(new Color(scheme.background));g.fillRect(0,y+36,Math.min(150,w),20);
+        g.setColor(new Color(ThemeArtwork.footerBackground(scheme)));g.fillRect(0,y+36,Math.min(150,w),20);
         // Rounded panels: the text starts where the corner leaves room near the bottom edge.
         int left=Math.max(10,inset(4)+3),size=12,room=Math.min(150,w)-4-left;
         int moodMargin=Math.max(6,inset(12));
@@ -202,8 +205,8 @@ public class StatusImage {
         String full=ip.contains(" ")?ip:"IP: "+ip,label=fit(g,Scheme.MIDNIGHT,full,size,room);
         if(!full.equals(label)){size=10;label=fit(g,Scheme.MIDNIGHT,full,size,room);}
         if(label!=null)text(g,Scheme.MIDNIGHT,label,left,y+51,size,scheme.light()?0x000000:0xffffff,false);
-        // Mood right with the same 6 px margin to the right and bottom edge of the band, in front of everything.
-        if(rightMood!=null)put(g,rightMood,w-moodMargin-iw(rightMood),y+50-ih(rightMood));
+        // Mood right, in front of the IP corner. Developer themes raise it another 6 px inside the same slot.
+        if(rightMood!=null)put(g,rightMood,w-moodMargin-iw(rightMood),y+50-ih(rightMood)-(scheme.developer()?6:0));
     }
     /** The update time centred on the screen, kept between from and to; left out when it does not fit. */
     private void centredTime(Graphics2D g,Scheme scheme,String time,int from,int to,int baseline){
@@ -260,7 +263,7 @@ public class StatusImage {
             case FLUENT -> fluentWindow(g,scheme,title,null,22,2,w/2-4,height-(bottom?6:3));
             case MACOS -> macosWindow(g,scheme,title,null,22,2,w/2-4,height-(bottom?6:3));
             case CONSOLE -> console(g,scheme,title,null,22,2,w/2-4,height-(bottom?6:3));
-            default -> text(g,scheme,(scheme.style==Scheme.Style.TERMINAL?"> ":"")+title,6,top,10,scheme.title,true);
+            default -> {if(!ThemeArtwork.heading(g,scheme,title,6,top,w/2-12,10))text(g,scheme,(scheme.style==Scheme.Style.TERMINAL?"> ":"")+title,6,top,10,scheme.title,true);}
         }
         if(!p.status().equals("ok")){
             String status=p.status().equals("rate_limited")?"Limited":DeviceSender.statusLabel(p.status());
@@ -272,7 +275,7 @@ public class StatusImage {
         else{compactWindow(g,scheme,"5h",p.fiveHour(),45);compactWindow(g,scheme,"Week",p.week(),74);}
     }
     private void compactWindow(Graphics2D g,Scheme scheme,String label,ProviderClient.Window q,int y){
-        if(miniWindow(g,scheme,label,q,0,y,w/2))text(g,scheme,reset(q),6,y+10,8,scheme.muted,false);
+        if(miniWindow(g,scheme,label,q,0,y,w/2))text(g,scheme,ThemeArtwork.reset(scheme,reset(q)),6,y+10,8,scheme.muted,false);
     }
     /** Label, small bar and remaining percent in a column from x0 that is span wide; false without readings. */
     private boolean miniWindow(Graphics2D g,Scheme scheme,String label,ProviderClient.Window q,int x0,int y,int span){
@@ -307,8 +310,10 @@ public class StatusImage {
             default -> {
                 boolean terminal=scheme.style==Scheme.Style.TERMINAL;
                 g.setFont(new Font(scheme.font(),Font.BOLD,13));
-                int room=w-20-g.getFontMetrics().stringWidth((terminal?"> ":"")+title)-8;
-                text(g,scheme,terminal?"> "+title.toUpperCase(Locale.ROOT):title,10,top,13,scheme.title,true);
+                int titleWidth=g.getFontMetrics().stringWidth((terminal?"> ":"")+title);
+                if(scheme.developer()&&status!=null)titleWidth=Math.min(titleWidth,w/2-12);
+                int room=w-20-titleWidth-8;
+                if(!ThemeArtwork.heading(g,scheme,title,10,top,status!=null?Math.min(w-20,w/2-12):w-20,13))text(g,scheme,terminal?"> "+title.toUpperCase(Locale.ROOT):title,10,top,13,scheme.title,true);
                 if(status!=null){status=fit(g,scheme,terminal?status.toUpperCase(Locale.ROOT):status,10,room);if(status!=null)right(g,scheme,status,w-10,top,10,scheme.warning);}
             }
         }
@@ -345,7 +350,7 @@ public class StatusImage {
                     if(fill>0)g.fillRect(x+2,top+2,fill,height-3);
                 }
                 right(g,scheme,String.format(Locale.ROOT,"%.0f %%",left),right,y,12,scheme.text);
-                text(g,scheme,reset(q),x,y+13,10,scheme.muted,false);
+                text(g,scheme,ThemeArtwork.reset(scheme,reset(q)),x,y+13,10,scheme.muted,false);
             } else right(g,scheme,"--",right,y,12,scheme.muted);
             return;
         }
@@ -353,7 +358,7 @@ public class StatusImage {
             double left=Math.max(0,Math.min(100,100-q.usedPercent()));
             bar(g,scheme,x,top,width,height,left);
             right(g,scheme,String.format(Locale.ROOT,"%.0f %%",left),right,y,12,scheme.text);
-            text(g,scheme,reset(q),x,y+13,10,scheme.muted,false);
+            text(g,scheme,ThemeArtwork.reset(scheme,reset(q)),x,y+13,10,scheme.muted,false);
         } else{bar(g,scheme,x,top,width,height,-1);right(g,scheme,"--",right,y,12,scheme.muted);}
     }
     /**

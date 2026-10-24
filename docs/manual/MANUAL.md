@@ -595,7 +595,7 @@ on the right is rendered by the server exactly as the display will show it. Ever
 
 ## Themes
 
-**Appearance → Browse all themes** jumps to the gallery below the editor. It shows all thirty themes in five
+**Appearance → Browse all themes** jumps to the gallery below the editor. It shows all thirty-five themes in five
 columns on a desktop, with identical example data rendered by the same code as the displays. **Use theme** applies
 the theme to the design selected under **Design for**, and saves it right away. For an inherited device design,
 enable **Custom design** first, or change the default design instead.
@@ -607,7 +607,7 @@ make it selectable. At least one theme must stay enabled. These choices are stor
 directory and survive server updates and restarts; include the file in data-directory backups.
 
 The additional looks are **Mission Control**, **Departure Board**, **Nordic**, **Hi-Fi**, **Solarized**, **Pixel Quest**,
-**Bauhaus**, **E-Ink**, **Industrial** and **Porcelain**. All support full-width, half-width and compact usage bands,
+**Bauhaus**, **E-Ink**, **Industrial**, **Porcelain**, **GitHub Dark**, **VS Code**, **Terminal**, **Git Diff** and **Debugger**. All support full-width, half-width and compact usage bands,
 both weather/mood positions and the available display sizes. Numeric quotas keep their meaning; the new themes
 use their own bar colours, with a warning colour below 20% remaining (E-Ink stays monochrome). No firmware update
 is needed.
@@ -676,9 +676,9 @@ the aspect ratio:
 
 ## Appearance and mood
 
-**Style / theme** sets colours and look of the usage monitor; the thirty themes:
+**Style / theme** sets colours and look of the usage monitor; the thirty-five themes:
 
-<img src="themes.png" width="100%" alt="The thirty display themes with example data">
+<img src="themes.png" width="100%" alt="The thirty-five display themes with example data">
 
 The mood button opens the emoji picker with quick picks, search and all emoji; *None* leaves the slot empty.
 Handheld LCD uses a dark contour around emoji; Blueprint uses a light contour with darker facial details, so

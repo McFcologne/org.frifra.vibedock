@@ -30,7 +30,10 @@ class ThemesImageTest {
             new Example(Scheme.NORDIC,"😎","⛅","13°"),new Example(Scheme.HI_FI,"😎","⛅","13°"),
             new Example(Scheme.SOLARIZED,"😎","⛅","13°"),new Example(Scheme.PIXEL_QUEST,"😎","⛅","13°"),
             new Example(Scheme.BAUHAUS,"😎","⛅","13°"),new Example(Scheme.E_INK,"😎","⛅","13°"),
-            new Example(Scheme.INDUSTRIAL,"😎","⛅","13°"),new Example(Scheme.PORCELAIN,"😎","⛅","13°"));
+            new Example(Scheme.INDUSTRIAL,"😎","⛅","13°"),new Example(Scheme.PORCELAIN,"😎","⛅","13°"),
+            new Example(Scheme.GITHUB_DARK,"😎","⛅","13°"),new Example(Scheme.VS_CODE,"😎","⛅","13°"),
+            new Example(Scheme.TERMINAL,"😎","⛅","13°"),new Example(Scheme.GIT_DIFF,"😎","⛅","13°"),
+            new Example(Scheme.DEBUGGER,"😎","⛅","13°"));
 
     @Test void drawsEveryScheme() throws Exception {
         String emoji=System.getenv("VIBEDOCK_TWEMOJI");

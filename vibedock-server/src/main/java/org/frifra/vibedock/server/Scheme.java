@@ -35,7 +35,12 @@ public enum Scheme {
     BAUHAUS("Bauhaus",0xf1e8d5,0xb23927,0x252620,0x7d796c,0xd8cfbb,0xb23927,Style.BAUHAUS),
     E_INK("E-Ink",0xf5f4ee,0x232620,0x232620,0x66695e,0xdfdfd5,0x232620,Style.INK),
     INDUSTRIAL("Industrial",0x252a2c,0xf1aa50,0xeee9dc,0x959d9b,0x3e4646,0xf1aa50,Style.INDUSTRIAL),
-    PORCELAIN("Porcelain",0xf8f8f2,0x2453a1,0x253e66,0x6b7f99,0xdce5ee,0x9b452f,Style.PORCELAIN);
+    PORCELAIN("Porcelain",0xf8f8f2,0x2453a1,0x253e66,0x6b7f99,0xdce5ee,0x9b452f,Style.PORCELAIN),
+    GITHUB_DARK("GitHub Dark",0x0d1117,0x79c0ff,0xe6edf3,0x8b949e,0x212c25,0xffb84d,Style.GITHUB),
+    VS_CODE("VS Code",0x1f1f1f,0xdcdcaa,0xd4d4d4,0x9b9b9b,0x343434,0xffb84d,Style.CODE),
+    TERMINAL("Terminal",0x101410,0xb4e88c,0xd8e9d0,0x88a47e,0x233021,0xffb84d,Style.SHELL),
+    GIT_DIFF("Git Diff",0x161b22,0x79c0ff,0xe6edf3,0xa1acb8,0x643338,0xffb84d,Style.DIFF),
+    DEBUGGER("Debugger",0x191829,0xc4a5ff,0xe1def5,0xa39abb,0x34304b,0xffb84d,Style.DEBUG);
 
     /**
      * MODERN: rounded colour bars; TERMINAL: monospaced phosphor text with ASCII bars and scan lines; MAC: 1-bit
@@ -47,7 +52,8 @@ public enum Scheme {
      * coloured dot. The additional instrument, pixel and print styles are drawn by ThemeArtwork, within the same bands.
      */
     enum Style { MODERN, TERMINAL, MAC, WINDOWS, FLUENT, MACOS, CONSOLE, LCD, BLUEPRINT, NEON, PRINT,
-        MISSION, DEPARTURE, NORDIC, HIFI, SOLARIZED, QUEST, BAUHAUS, INK, INDUSTRIAL, PORCELAIN }
+        MISSION, DEPARTURE, NORDIC, HIFI, SOLARIZED, QUEST, BAUHAUS, INK, INDUSTRIAL, PORCELAIN, GITHUB, CODE, SHELL, DIFF, DEBUG }
+    boolean developer(){return ordinal()>=GITHUB_DARK.ordinal();}
     boolean illustrated(){return ordinal()>=MISSION_CONTROL.ordinal();}
     /** The four shades of the LCD style, darkest first: everything the style draws is reduced to them. */
     static final int[] LCD_SHADES={0x0f380f,0x306230,0x8bac0f,0x9bbc0f};
@@ -62,7 +68,7 @@ public enum Scheme {
     Scheme(String label,int background,int title,int text,int muted,int track,int warning,Style style){
         this.label=label;this.background=background;this.title=title;this.text=text;this.muted=muted;this.track=track;this.warning=warning;this.style=style;
     }
-    String font(){return switch(style){case TERMINAL,LCD,MISSION,DEPARTURE,HIFI,SOLARIZED,QUEST,INDUSTRIAL->"DejaVu Sans Mono";case PRINT,PORCELAIN->"DejaVu Serif";default->"DejaVu Sans";};}
+    String font(){return switch(style){case TERMINAL,LCD,MISSION,DEPARTURE,HIFI,SOLARIZED,QUEST,INDUSTRIAL,GITHUB,CODE,SHELL,DIFF,DEBUG->"DejaVu Sans Mono";case PRINT,PORCELAIN->"DejaVu Serif";default->"DejaVu Sans";};}
     /** Light schemes get dark footer text on the device. */
     boolean light(){int r=background>>16&255,g=background>>8&255,b=background&255;return (299*r+587*g+114*b)/1000>140;}
     @JsonValue public String id(){return name().toLowerCase(Locale.ROOT);}
