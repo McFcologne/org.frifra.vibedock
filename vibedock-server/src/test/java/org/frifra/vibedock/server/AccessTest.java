@@ -44,6 +44,66 @@ class AccessTest {
         store.save(new SettingsStore.Settings(List.of("127.0.0.1/32"),new SettingsStore.Credential("",""),new SettingsStore.Credential("",""),List.of()));
         usage.forgetPacing();usage.configurationChanged();
     }
+    @Test @org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)
+    void deltaTransfersReconstructTheFullImageAndKeepLegacyPreviewAndRedrawPaths(org.springframework.boot.test.system.CapturedOutput output) throws Exception {
+        String key="cd".repeat(32),id="vibedock-delta-test",path="/api/v1/clients/"+id+"/image";
+        clients.paired(id,"Delta",key,"192.168.1.20",80);
+        var base=mvc.perform(get(path).header("Authorization","Bearer "+key).header("X-VibeDock-Delta","1")
+                .header("X-VibeDock-Display","240x240").header("X-VibeDock-Footer","server")
+                .with(r->{r.setLocalPort(8080);r.setRemoteAddr("192.168.1.20");return r;}))
+                .andExpect(status().isOk()).andExpect(header().string("X-VibeDock-Image-Format","rgb565-be-240x240")).andReturn().getResponse();
+        String tag=base.getHeader("ETag");
+        // The reported IP changes just the footer. A legacy client still receives the complete image.
+        var full=mvc.perform(get(path).header("Authorization","Bearer "+key).header("If-None-Match",tag).header("X-VibeDock-Footer","server")
+                .with(r->{r.setLocalPort(8080);r.setRemoteAddr("192.168.1.21");return r;}))
+                .andExpect(status().isOk()).andExpect(header().string("X-VibeDock-Image-Format","rgb565-be-240x240")).andReturn().getResponse();
+        var patch=mvc.perform(get(path).header("Authorization","Bearer "+key).header("If-None-Match",tag)
+                .header("X-VibeDock-Delta","1").header("X-VibeDock-Display","240x240").header("X-VibeDock-Footer","server")
+                .with(r->{r.setLocalPort(8080);r.setRemoteAddr("192.168.1.21");return r;}))
+                .andExpect(status().isOk()).andExpect(header().string("X-VibeDock-Image-Format","rgb565-delta-be-240x240"))
+                .andExpect(header().string("X-VibeDock-Base",tag)).andReturn().getResponse();
+        Assertions.assertArrayEquals(full.getContentAsByteArray(),ImageDeltaTest.apply(base.getContentAsByteArray(),patch.getContentAsByteArray(),240));
+        Assertions.assertEquals(full.getHeader("ETag"),patch.getHeader("ETag"));
+        Assertions.assertTrue(output.getOut().contains("delta, full=115200 bytes, payload="+patch.getContentAsByteArray().length+" bytes, saved="));
+        for(String mode:List.of("preview","wrong-size","unknown-base","unsupported")){
+            var req=get(path).header("Authorization","Bearer "+key).header("If-None-Match",mode.equals("unknown-base")?"\"missing\"":tag)
+                    .header("X-VibeDock-Footer","server").header("X-VibeDock-Display",mode.equals("wrong-size")?"239x240":"240x240")
+                    .header("X-VibeDock-Delta",mode.equals("unsupported")?"2":"1");
+            if(mode.equals("preview"))req.header("X-VibeDock-Preview","1");
+            mvc.perform(req.with(r->{r.setLocalPort(8080);r.setRemoteAddr("192.168.1.21");return r;}))
+                    .andExpect(status().isOk()).andExpect(header().string("X-VibeDock-Image-Format","rgb565-be-240x240"))
+                    .andExpect(header().doesNotExist("X-VibeDock-Base"));
+        }
+        mvc.perform(get(path).header("Authorization","Bearer "+key).header("If-None-Match",patch.getHeader("ETag"))
+                .header("X-VibeDock-Delta","1").header("X-VibeDock-Footer","server")
+                .with(r->{r.setLocalPort(8080);r.setRemoteAddr("192.168.1.21");return r;})).andExpect(status().isNotModified());
+        clients.forceRefresh(id);
+        mvc.perform(get(path).header("Authorization","Bearer "+key).header("If-None-Match",patch.getHeader("ETag"))
+                .header("X-VibeDock-Delta","1").header("X-VibeDock-Display","240x240").header("X-VibeDock-Footer","server")
+                .with(r->{r.setLocalPort(8080);r.setRemoteAddr("192.168.1.21");return r;}))
+                .andExpect(status().isOk()).andExpect(header().string("X-VibeDock-Redraw","1"))
+                .andExpect(header().string("X-VibeDock-Image-Format","rgb565-be-240x240")).andExpect(header().doesNotExist("ETag"));
+        Assertions.assertTrue(output.getOut().contains("full=115200 bytes, payload=115200 bytes, saved=0 bytes (0.0%), next="));
+        Assertions.assertTrue(output.getOut().matches("(?s).*delta, full=115200 bytes, payload=\\d+ bytes, saved=\\d+ bytes \\([0-9.]+%\\), next=\\d+ s \\((current|pending)\\).*"));
+        Assertions.assertFalse(output.getOut().contains("unchanged (304)"),"304 only at debug level");
+    }
+    @Test void everyAnswerAnnouncesTheNextPullAlsoA304() throws Exception {
+        String key="ef".repeat(32),id="vibedock-next-pull",path="/api/v1/clients/"+id+"/image";
+        clients.paired(id,"Next",key,"192.168.1.20",80);
+        try{
+            var first=mvc.perform(get(path).header("Authorization","Bearer "+key).header("X-VibeDock-Schedule","1")
+                    .with(r->{r.setLocalPort(8080);r.setRemoteAddr("192.168.1.20");return r;}))
+                    .andExpect(status().isOk()).andExpect(header().string("X-VibeDock-Next-Pull",org.hamcrest.Matchers.matchesPattern("\\d+; state=(current|pending)")))
+                    .andReturn().getResponse();
+            mvc.perform(get(path).header("Authorization","Bearer "+key).header("If-None-Match",first.getHeader("ETag")).header("X-VibeDock-Schedule","1")
+                    .with(r->{r.setLocalPort(8080);r.setRemoteAddr("192.168.1.20");return r;}))
+                    .andExpect(status().isNotModified()).andExpect(header().exists("X-VibeDock-Next-Pull"));
+            // Never reached by an immediate pull: at most two minutes between pulls.
+            int seconds=Integer.parseInt(first.getHeader("X-VibeDock-Next-Pull").split(";")[0]);
+            Assertions.assertTrue(seconds>=2&&seconds<=PullSchedule.UNREACHABLE_SECONDS,"seconds "+seconds);
+            Assertions.assertEquals("Connected",clients.get(id).status());
+        }finally{clients.remove(id);}
+    }
     @Test void quotaMetadataRequiresAudioOptInAndSurvives304ButNotPreview() throws Exception {
         String key="ab".repeat(32),id="vibedock-audio-test",path="/api/v1/clients/"+id+"/image";
         clients.paired(id,"Audio",key,"192.168.1.20",80);

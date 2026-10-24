@@ -44,6 +44,28 @@ constexpr bool pullDue(uint32_t now, uint32_t lastPull, uint32_t pollSeconds) {
 constexpr bool imageStale(uint32_t now, uint32_t lastImage, uint32_t pollSeconds) {
   return uint32_t(now - lastImage) >= 3u * clampPoll(pollSeconds) * 1000u;
 }
+// The server's announced next pull (X-VibeDock-Next-Pull: "<seconds>; state=current|pending"): seconds 2-3600;
+// pending means a source of the display was still being asked. Anything else: the poll interval applies.
+constexpr uint32_t minNextPull = 2, maxNextPull = 3600;
+inline bool parseNextPull(const char *text, uint32_t &seconds, bool &pending) {
+  uint32_t value = 0; int digits = 0;
+  while (*text >= '0' && *text <= '9') { if (++digits > 5) return false; value = value * 10 + uint32_t(*text++ - '0'); }
+  if (!digits || value < minNextPull || value > maxNextPull) return false;
+  const char *current = "; state=current", *waiting = "; state=pending";
+  auto is = [](const char *a, const char *b) { while (*b) if (*a++ != *b++) return false; return *a == 0; };
+  if (is(text, current)) pending = false; else if (is(text, waiting)) pending = true; else return false;
+  seconds = value; return true;
+}
+// The announced wait counts only for a pull that ended well: after an aborted or refused image the poll interval
+// applies again (or the immediate retry), never a wait of up to ten minutes.
+constexpr uint32_t waitAfterImage(bool complete, uint32_t announcedMs) { return complete ? announcedMs : 0; }
+// A pull is due once the wait has passed (the announced one, or the poll interval); survives millis() rollover.
+constexpr bool waited(uint32_t now, uint32_t since, uint32_t ms) { return uint32_t(now - since) >= ms; }
+// Stale after three poll intervals without a successful pull, or two poll intervals after an announced longer wait.
+constexpr bool imageStale(uint32_t now, uint32_t lastImage, uint32_t pollSeconds, uint32_t waitMs) {
+  return uint32_t(now - lastImage) >= (waitMs + 2u * clampPoll(pollSeconds) * 1000u > 3u * clampPoll(pollSeconds) * 1000u
+      ? waitMs + 2u * clampPoll(pollSeconds) * 1000u : 3u * clampPoll(pollSeconds) * 1000u);
+}
 // After a failed connection the next announced server address is tried.
 constexpr uint8_t nextServer(uint8_t current, uint8_t count) { return count == 0 ? 0 : uint8_t((current + 1) % count); }
 // The server may ask for an immediate pull (POST /pull, e.g. after a design change); at most every 5 seconds.
@@ -95,8 +117,8 @@ inline bool validLogRequest(const char *text) {
 // Any size within the limits is accepted and scaled to the screen.
 constexpr uint16_t maxImageSide = 480;
 struct ImageSize { uint16_t width = 0, height = 0; uint32_t bytes() const { return 2u * width * height; } };
-inline bool parseImageFormat(const char *text, ImageSize &size) {
-  const char *prefix = "rgb565-be-";
+inline bool parseImageFormat(const char *text, ImageSize &size, bool delta = false) {
+  const char *prefix = delta ? "rgb565-delta-be-" : "rgb565-be-";
   for (int i = 0; prefix[i]; i++, text++) if (*text != prefix[i]) return false;
   auto number = [](const char *&t, char end, uint16_t &out) {
     uint32_t value = 0; int digits = 0;

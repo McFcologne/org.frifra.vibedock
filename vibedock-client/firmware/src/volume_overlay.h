@@ -16,6 +16,11 @@ class VolumeOverlay {
     if(row<y || row>=y+height || rowWidth!=screenWidth) return;
     memcpy(pixels+(row-y)*width,data+x,width*sizeof(uint16_t)); rows[row-y]=true;
   }
+  // A delta changes only part of an already captured row; keep the rest for overlay restoration.
+  void captureSpan(int row,int left,const uint16_t *data,int count) {
+    if(row<y||row>=y+height||!rows[row-y])return;
+    for(int i=0;i<count;i++)if(left+i>=x&&left+i<x+width)pixels[(row-y)*width+left+i-x]=data[i];
+  }
   void show(uint32_t now) { active=true; started=now; }
   bool visible(uint32_t now) const { return active && uint32_t(now-started)<duration; }
   bool expired(uint32_t now) const { return active && !visible(now); }

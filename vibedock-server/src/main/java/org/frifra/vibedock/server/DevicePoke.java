@@ -18,6 +18,8 @@ import java.util.List;
 class DevicePoke {
     private static final Logger log=LoggerFactory.getLogger(DevicePoke.class);
     private final HttpClient http;
+    /** Addresses that took an immediate pull, with the time (epoch seconds): such displays may wait longer between pulls. */
+    private final java.util.Map<ClientRegistry.Address,Long> reached=new java.util.concurrent.ConcurrentHashMap<>();
     @Value("${vibedock.polling:true}") private boolean enabled=true;
     DevicePoke(HttpClient http){this.http=http;}
 
@@ -39,7 +41,12 @@ class DevicePoke {
         return http.sendAsync(request,HttpResponse.BodyHandlers.discarding()).handle((response,error)->{
             if(error!=null){log.debug("Device at {} not reachable for an immediate pull: {}",device.ip(),error.toString());return Reach.UNREACHABLE;}
             if(response.statusCode()!=202){log.debug("Device at {} answered {} to an immediate pull",device.ip(),response.statusCode());return Reach.REFUSED;}
+            reached.put(device,System.currentTimeMillis()/1000);
             return Reach.ASKED;
         });
+    }
+    /** Whether a device at this address took an immediate pull within the last seconds. */
+    boolean reachedWithin(ClientRegistry.Address device,long seconds){
+        Long at=reached.get(device);return at!=null&&System.currentTimeMillis()/1000-at<=seconds;
     }
 }

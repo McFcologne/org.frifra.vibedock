@@ -125,7 +125,7 @@ X-VibeDock-Board: vibedock-m1
 | **304** | image unchanged since the given `ETag` (no body) |
 | **401** | unknown device or wrong key; the device was removed and returns to pairing mode |
 
-The endpoint exists only on the public port. Unknown identifiers and wrong keys get the same **401**. The IP allowlist of `/api/v1/usage` does not apply; the device key is the authorization. The device uses the poll interval from the latest `X-VibeDock-Poll-Seconds` (10–3600 s, default 30, set in the administration UI). While a display shows a slideshow, it gets the time of one photo when that is shorter (at least 10 s). In a slideshow, a swipe (section 3d) shows the next or previous photo instead of changing the colour scheme.
+The endpoint exists only on the public port. Unknown identifiers and wrong keys get the same **401**. The IP allowlist of `/api/v1/usage` does not apply; the device key is the authorization. The device uses the poll interval from the latest `X-VibeDock-Poll-Seconds` (10–3600 s, default 30, *Fallback poll interval* in the administration UI); current firmware pulls when `X-VibeDock-Next-Pull` says instead (section 3h) and uses the poll interval only as a fallback. While a display shows a slideshow, it gets the time of one photo when that is shorter (at least 10 s). In a slideshow, a swipe (section 3d) shows the next or previous photo instead of changing the colour scheme.
 
 **Immediate pull (server → device):** after a design is saved, the server sends `POST http://<device IP>:<port>/pull` without a body to the affected devices (the default design: every device that follows it). After a restart it sends the same request to every paired device as soon as the first usage readings are collected (at most one minute after start). The device answers **202** and pulls in its next loop; at most one such pull every 5 seconds: a request within that pause (also **202**) is pulled when it is over (firmware before 0.2.0 answers **429** and pulls at its next poll), **409** while it is not paired. The request carries nothing secret and needs no key, because the pull that follows is authenticated as usual. Devices the server cannot reach pull at their next poll.
 
@@ -277,6 +277,33 @@ One firmware source builds for several boards (PlatformIO environments in `vibed
 
 Each build yields `flash.bin`, written at `0x0` over USB (on ESP32 chips bootloader, partition table and app merged), and `firmware.bin`, the app for updates over Wi-Fi. The update format is the same on all chips (step 3a); on ESP32 chips the firmware checks the signature with mbedTLS itself before it activates the new app. https on ESP32 chips always uses the full check against the root from pairing (no SHA-1 fingerprint). The device's own screens are laid out for 240×240 and scaled to fit other panels; server images arrive in the panel's resolution.
 
+## 3h. Next pull (server → device)
+
+Every answer to an image pull, **200** and **304** alike, carries `X-VibeDock-Next-Pull: <seconds>; state=<current|pending>`:
+when the picture of this display can change next, so the display pulls then instead of every poll interval.
+
+- `state=current`: the sources the display shows (its layout fitted to its display type) have been asked; a **304**
+  really means nothing changed. The seconds run to the earliest of: the next poll of one of those sources plus the
+  time a collection takes (smoothed, about 2 s) and 2 s; the moment one of their readings turns stale; the next
+  photo of a running slideshow; the start or end of a scheduled one.
+- `state=pending`: one of those sources is due or being asked and its reading is not published yet. The seconds run
+  to when the collection should be done; repeated `pending` answers wait at least 2, 5, 10, then 30 s, so a slow
+  provider cannot make the display pull every second. A failed poll or HTTP 429 is done as well: the next answer is
+  `current` with the time of the next try.
+- At most 600 s for displays that took an immediate pull (`POST /pull`, section 2) within the last day, so design
+  changes still reach them at once; at most 120 s for the others (behind NAT, only through the external address),
+  which see design changes with their next pull. At least 2 s.
+
+All sources are polled together on the full minute and published at the end of that collection, so several providers
+do not make a display pull more often than once a minute (plus pending answers). The server log adds the announced
+time to each image transfer line (`next=58 s (current)`).
+
+Firmware that follows it sends `X-VibeDock-Schedule: 1` with its screen pulls; the server then expects its next pull at
+the announced time (section *Status*). It still uses `X-VibeDock-Poll-Seconds` until the first answer, after failed
+pulls, for immediate retries and when the header is missing (older servers). Older firmware ignores the header and
+keeps pulling every poll interval. The display's status page shows the next pull. Weather refreshes in the background
+at most every 15 minutes and appears with the next pull after that, so it can show up to one wait later than before.
+
 ## Image format
 
 Pixels are sent row by row from the top left: `width` pixels per row, `height` rows as named in `X-VibeDock-Image-Format`, two bytes per pixel, most significant byte first, 5 red, 6 green and 5 blue bits. No compression. The administration UI shows a PNG of the same pixels.
@@ -287,16 +314,75 @@ Pixels are sent row by row from the top left: `width` pixels per row, `height` r
 
 Older firmware (no `X-VibeDock-Footer` header) still draws its IP footer over rows 220–239, columns 0–149; for it the server keeps the weather/mood band at the bottom, where the server's IP corner lies under the device's.
 
+### Optional delta images (v1)
+
+New firmware sends `X-VibeDock-Delta: 1` on screen image pulls, together with its actual
+`X-VibeDock-Display` size. This does not change the pairing protocol. Old firmware receives full images;
+new firmware works with old servers. Web displays keep PNG. Device status-page preview pulls do not opt in.
+
+The server always renders a complete RGB565 image and computes its ETag from those full pixels, even when it
+sends only a delta. It retains up to three complete images per device, for ten minutes, with global limits of
+128 devices and 12 MiB of pixel data (plus bounded metadata). Cache entries are in RAM only. Eviction or restart
+simply causes a full image. A missing/unknown base ETag, different dimensions, a slideshow photo, preview,
+forced redraw or a delta at least as large as the full image also uses the existing full format.
+
+A delta **200** response has:
+
+| Header | Value |
+| --- | --- |
+| `X-VibeDock-Image-Format` | `rgb565-delta-be-<width>x<height>`; exact panel size, never scaled |
+| `X-VibeDock-Base` | Exact ETag from the device's conditional request |
+| `ETag` | ETag of the complete resulting image |
+| `X-VibeDock-Length` | Exact delta body length, including terminator; also used when a proxy removes Content-Length |
+| `X-VibeDock-Payload` | Eight lowercase hex digits: FNV-1a-32 of all body bytes |
+| `X-VibeDock-Check` | Eight lowercase hex digits: FNV-1a-32 of the resulting row hashes, serialized as big-endian uint32 values |
+
+All integers in the body are unsigned, big-endian. Each section is:
+
+```
+y:u16, rowCount:u16, x:u16, width:u16
+rowCount × rowHash:u32
+rowCount × width × RGB565 pixel:u16
+```
+
+A final `y = 0xffff` (two bytes only) ends the body. No trailing bytes are allowed. Sections contain ascending,
+disjoint groups of rows; each row appears at most once. Coordinates, nonzero counts and widths must be within
+the panel. Adjacent changed rows with the same changed horizontal extent are grouped together. Other unchanged
+rows and pixels are omitted. Row hashes cover the **whole uncorrected new row**, using `client_policy::rowHash`:
+FNV-1a-32 (offset `2166136261`, multiplier `16777619`, modulo 2^32), mapping a zero result to 1. The payload and
+row-table checks use ordinary FNV-1a without this zero mapping. These are error checks, not authentication.
+
+The firmware accepts a delta only over a complete, unscaled image with a matching base ETag and valid row
+state. Local setup/error screens, orientation or colour correction invalidate this basis. It reads one span
+at a time into the existing row buffer, applies colour correction and updates the panel. Volume overlays are
+local to the device; changes also update their saved background pixels. No full framebuffer is allocated.
+
+The new ETag is committed only after the exact length, terminator, payload checksum and row-table checksum
+have passed. After any rejected, interrupted or invalid delta, the firmware clears its ETag and row hashes and
+requests a full image on its retry (normally after one second). A partial picture may be visible until that
+retry succeeds. The row-table check validates bookkeeping, not a physical readback of the panel. TLS continues
+to protect HTTPS traffic; none of its certificate checks change.
+
+**Transfer diagnostics:** every device RGB565 pull with an image logs `Image transfer <device>: <mode>,
+full=<M> bytes, payload=<N> bytes, saved=<M-N> bytes (<P>%)`; modes are delta, full image and preview. Savings
+have one decimal place and always compare with the full RGB565 image: full images save 0%. Unchanged images
+(**304**) come with every poll and are logged at debug level only. Numbers describe the selected response body,
+not HTTP/TLS overhead, TCP retransmissions or proof of reception. The next device ETag identifies the accepted
+complete image. The device log keeps its events as before (the first image after a start, aborted images); a
+successful delta adds no line, so the log is not filled and the flash not written with every image. Hardware
+tests are needed to quantify airtime and battery savings.
+
 ## Status in the administration UI
 
 | Status | Meaning |
 | --- | --- |
 | `Waiting for first pull` | paired, no pull yet |
-| `Connected` | last pull within three poll intervals |
-| `Updates missing` | no pull for more than three poll intervals |
+| `Connected` | last pull within three poll intervals, or within two poll intervals after the pull it announced (section 3h) |
+| `Updates missing` | no pull for longer than that |
 | `Not connected yet` / `Not connected` | web display: no fetch yet / none for three reload intervals (its page is closed) |
 
-`Remove device` deletes the device; its next pull gets **401** and it returns to pairing mode. The device shows `Updates missing` itself after three poll intervals without a successful pull.
+`Remove device` deletes the device; its next pull gets **401** and it returns to pairing mode. The device shows `Updates missing` itself after three poll intervals without a successful pull, or two poll
+intervals after a longer announced wait.
 
 ## Validation
 

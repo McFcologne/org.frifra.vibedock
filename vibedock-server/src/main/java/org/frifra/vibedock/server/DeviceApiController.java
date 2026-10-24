@@ -18,8 +18,11 @@ class DeviceApiController {
     private final ClientRegistry registry;private final DesignService designs;private final ServerAddresses addresses;private final TlsTrust trust;
     private final Firmware firmware;private final OtaSigning signing;private final DeviceLogs logs;private final AdminEvents events;private final DeviceDiagnostics diagnostics;
     private final DevicePower power;
+    private final ImageDelta delta;
+    private final PullSchedule schedule;
     DeviceApiController(ClientRegistry registry,DesignService designs,ServerAddresses addresses,TlsTrust trust,Firmware firmware,OtaSigning signing,DeviceLogs logs,AdminEvents events,
-                        DeviceDiagnostics diagnostics,DevicePower power){
+                        DeviceDiagnostics diagnostics,DevicePower power,ImageDelta delta,PullSchedule schedule){
+        this.delta=delta;this.schedule=schedule;
         this.power=power;this.logs=logs;this.events=events;this.diagnostics=diagnostics;this.registry=registry;this.designs=designs;this.addresses=addresses;this.trust=trust;this.firmware=firmware;this.signing=signing;
     }
     /** The device authenticates with its key; unknown devices and wrong keys get the same 401. */
@@ -59,9 +62,17 @@ class DeviceApiController {
         else swipe(registry,designs,events,identifier,"scheme-next".equals(gesture)?1:"scheme-previous".equals(gesture)?-1:0);
         var display=registry.displayType(identifier);
         byte[] pixels=designs.render(DesignService.forDevice(registry.designFor(identifier),serverFooter),peer,display,identifier).rgb565();
+        int fullBytes=pixels.length;
         String tag="\""+HexFormat.of().formatHex(Arrays.copyOf(sha256(pixels),12))+"\"";
         var headers=new HttpHeaders();headers.setETag(tag);headers.set("X-VibeDock-Image-Format",display.imageFormat());
         headers.set("X-VibeDock-Poll-Seconds",String.valueOf(designs.pollSeconds(registry.designFor(identifier),registry.pollSeconds(),identifier)));
+        // When the picture can change next: firmware that follows it (X-VibeDock-Schedule: 1) pulls then instead of
+        // every poll interval, also after a 304, and the server expects it then.
+        boolean previewPull="1".equals(request.getHeader("X-VibeDock-Preview"));
+        var next=schedule.next(identifier,display,previewPull);
+        headers.set("X-VibeDock-Next-Pull",next.header());
+        if(!previewPull&&"1".equals(request.getHeader("X-VibeDock-Schedule")))
+            registry.expectPull(identifier,next.seconds());
         // Only clients that explicitly support sound receive quota metadata. Preview pulls neither need nor consume it.
         if(QuotaHeader.requested(request.getHeader("X-VibeDock-Audio"),request.getHeader("X-VibeDock-Preview")))
             headers.set("X-VibeDock-Quota",designs.quotaHeader(registry.designFor(identifier),display));
@@ -83,10 +94,35 @@ class DeviceApiController {
         // 304 itself. The device then pulls the next image once without condition and learns the ETag again.
         // The device skips rows it already shows; X-VibeDock-Redraw makes it draw every row again.
         // The status page's preview copy (X-VibeDock-Preview) leaves a pending forced refresh for the screen.
-        if(!"1".equals(request.getHeader("X-VibeDock-Preview"))&&registry.takeForcedRefresh(identifier)){headers.remove(HttpHeaders.ETAG);headers.set("X-VibeDock-Redraw","1");}
-        else if(tag.equals(etag))return new ResponseEntity<>(headers,HttpStatus.NOT_MODIFIED);
+        boolean preview="1".equals(request.getHeader("X-VibeDock-Preview"));
+        boolean forced=!preview&&registry.takeForcedRefresh(identifier);
+        if(forced){headers.remove(HttpHeaders.ETAG);headers.set("X-VibeDock-Redraw","1");}
+        else if(tag.equals(etag)){
+            logTransfer(identifier,preview?"preview unchanged (304)":"unchanged (304)",fullBytes,0,next);
+            return new ResponseEntity<>(headers,HttpStatus.NOT_MODIFIED);
+        }
+        // Capability and exact panel size are required: deltas cannot be scaled without a framebuffer.
+        if(!preview&&designs.currentPhoto(registry.designFor(identifier),identifier).isEmpty()&&"1".equals(request.getHeader("X-VibeDock-Delta"))
+                &&(display.width()+"x"+display.height()).equals(request.getHeader("X-VibeDock-Display"))){
+            var patch=delta.exchange(identifier,forced?null:etag,tag,display.width(),display.height(),pixels,System.currentTimeMillis());
+            if(!forced&&patch.isPresent()){
+                var p=patch.get();pixels=p.bytes();
+                headers.set("X-VibeDock-Image-Format","rgb565-delta-be-"+display.width()+"x"+display.height());
+                headers.set("X-VibeDock-Base",etag);headers.set("X-VibeDock-Check",p.check());
+                headers.set("X-VibeDock-Payload",p.payload());headers.set("X-VibeDock-Length",String.valueOf(pixels.length));
+            }
+        }
+        logTransfer(identifier,preview?"preview full":headers.containsKey("X-VibeDock-Base")?"delta":"full",fullBytes,pixels.length,next);
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
         return new ResponseEntity<>(pixels,headers,HttpStatus.OK);
+    }
+    /** Response payload selected for transmission; excludes transport overhead and is not a receipt acknowledgement. */
+    private static void logTransfer(String device,String mode,int full,int payload,PullSchedule.Next next){
+        String announced=next.seconds()+" s ("+(next.pending()?"pending":"current")+")";
+        // Unchanged images (304) come with every poll: only at debug level, so the log keeps its other events.
+        if(payload==0){log.debug("Image transfer {}: {}, next={}",device,mode,announced);return;}
+        log.info("Image transfer {}: {}, full={} bytes, payload={} bytes, saved={} bytes ({}%), next={}",device,mode,full,payload,full-payload,
+                String.format(Locale.ROOT,"%.1f",full==0?0:100.0*(full-payload)/full),announced);
     }
     /**
      * A swipe on a touch display or a web display page: the next (1) or previous (-1) colour scheme. The display keeps
