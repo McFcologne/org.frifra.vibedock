@@ -56,6 +56,7 @@ public class StatusImage {
     }
     /** The scheme's icon look; the Mac's dithering keeps its pixel size on scaled images. */
     BufferedImage look(BufferedImage icon,Scheme scheme){
+        if(scheme.style==Scheme.Style.LCD||scheme.style==Scheme.Style.BLUEPRINT)return styled(icon,scheme,Math.max(1,(int)Math.round(scale)));
         if(icon==null||scale==1||scheme.style!=Scheme.Style.MAC)return styled(icon,scheme);
         var dithered=styled(resize(icon,iw(icon),ih(icon)),scheme);
         var out=new BufferedImage(icon.getWidth(),icon.getHeight(),BufferedImage.TYPE_INT_ARGB);var g=out.createGraphics();
@@ -79,7 +80,7 @@ public class StatusImage {
             g.setColor(new Color(scheme.background));g.fillRect(0,0,w,h);
             backdrop(g,scheme);
             // Classic Mac, Windows and the LCD: no anti-aliasing, crisp pixels like the originals.
-            boolean smooth=scheme.style!=Scheme.Style.MAC&&scheme.style!=Scheme.Style.WINDOWS&&scheme.style!=Scheme.Style.LCD;
+            boolean smooth=scheme.style!=Scheme.Style.MAC&&scheme.style!=Scheme.Style.WINDOWS&&scheme.style!=Scheme.Style.LCD&&scheme.style!=Scheme.Style.QUEST;
             g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,smooth?RenderingHints.VALUE_TEXT_ANTIALIAS_ON:RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,smooth?RenderingHints.VALUE_ANTIALIAS_ON:RenderingHints.VALUE_ANTIALIAS_OFF);
             // Usage bands shrink in proportion (to their minimum, see Layout.fit) when they need more than the screen
@@ -120,6 +121,8 @@ public class StatusImage {
         }
     }
     private void provider(Graphics2D g,Scheme scheme,String title,UsageService.Provider p,int top,int height,boolean bottom){
+        title=ThemeArtwork.title(scheme,title);
+        ThemeArtwork.band(g,scheme,0,top-22,w,height);
         if(p==null)p=new UsageService.Provider("unconfigured",null,null,null);
         // Rate limited with last known values: keep them and show the time they were read.
         boolean held=p.status().equals("rate_limited")&&p.observedAt()!=null&&(p.fiveHour()!=null||p.week()!=null);
@@ -127,7 +130,9 @@ public class StatusImage {
                 :p.status().equals("ok")?null:DeviceSender.statusLabel(p.status());
         // Narrow screens: the status is shortened to the room the title leaves.
         g.setFont(new Font(scheme.font(),Font.BOLD,scheme.style==Scheme.Style.TERMINAL?15:16));
-        int room=w-20-g.getFontMetrics().stringWidth((scheme.style==Scheme.Style.TERMINAL?"> ":"")+title)-8;
+        int titleWidth=g.getFontMetrics().stringWidth((scheme.style==Scheme.Style.TERMINAL?"> ":"")+title);
+        if(scheme.developer()&&status!=null)titleWidth=Math.min(titleWidth,w/2-12);
+        int room=w-20-titleWidth-8;
         if(status!=null&&!scheme.windowed())
             status=fit(g,scheme,scheme.style==Scheme.Style.TERMINAL?status.toUpperCase(Locale.ROOT):status,10,room);
         switch(scheme.style){
@@ -141,7 +146,7 @@ public class StatusImage {
             case MACOS -> macosWindow(g,scheme,title,status,top,4,w-8,height-(bottom?6:3));
             case CONSOLE -> console(g,scheme,title,status,top,2,w-4,height-(bottom?6:3));
             default -> {
-                text(g,scheme,title,10,top,16,scheme.title,true);
+                if(!ThemeArtwork.heading(g,scheme,title,10,top,status!=null?Math.min(w-20,w/2-12):w-20,16))text(g,scheme,title,10,top,16,scheme.title,true);
                 if(status!=null)right(g,scheme,status,w-10,top,10,scheme.warning);
                 // Newsprint: a thin rule below the heading, like a column.
                 if(scheme.style==Scheme.Style.PRINT){g.setColor(new Color(scheme.text));g.fillRect(10,top+4,w-20,1);}
@@ -158,6 +163,7 @@ public class StatusImage {
      */
     private void context(Graphics2D g,UsageService.Snapshot snapshot,String ip,Look look,Layout.Context band,int y){
         var scheme=look.scheme();
+        if(scheme.style==Scheme.Style.CODE){g.setColor(new Color(ThemeArtwork.footerBackground(scheme)));g.fillRect(0,y,w,56);}
         // Time of the newest provider reading, not of this rendering: the image (and its ETag) only changes with new data.
         var observed=snapshot.providers().values().stream().map(UsageService.Provider::observedAt).filter(Objects::nonNull).max(Long::compare);
         String time=observed.map(t->DateTimeFormatter.ofPattern("HH:mm").withZone(zone).format(Instant.ofEpochSecond(t))).orElse("--:--");
@@ -191,7 +197,7 @@ public class StatusImage {
         // IP corner in the device's footer style; the mood may reach into the rest of the bottom row. A text with a
         // space (web displays: "VibeDock server v0.2.0") is drawn as it is, shortened to the corner.
         // On narrow screens the corner ends before the mood: the text gets smaller, then shorter.
-        g.setColor(new Color(scheme.background));g.fillRect(0,y+36,Math.min(150,w),20);
+        g.setColor(new Color(ThemeArtwork.footerBackground(scheme)));g.fillRect(0,y+36,Math.min(150,w),20);
         // Rounded panels: the text starts where the corner leaves room near the bottom edge.
         int left=Math.max(10,inset(4)+3),size=12,room=Math.min(150,w)-4-left;
         int moodMargin=Math.max(6,inset(12));
@@ -199,8 +205,8 @@ public class StatusImage {
         String full=ip.contains(" ")?ip:"IP: "+ip,label=fit(g,Scheme.MIDNIGHT,full,size,room);
         if(!full.equals(label)){size=10;label=fit(g,Scheme.MIDNIGHT,full,size,room);}
         if(label!=null)text(g,Scheme.MIDNIGHT,label,left,y+51,size,scheme.light()?0x000000:0xffffff,false);
-        // Mood right with the same 6 px margin to the right and bottom edge of the band, in front of everything.
-        if(rightMood!=null)put(g,rightMood,w-moodMargin-iw(rightMood),y+50-ih(rightMood));
+        // Mood right, in front of the IP corner. Developer themes raise it another 6 px inside the same slot.
+        if(rightMood!=null)put(g,rightMood,w-moodMargin-iw(rightMood),y+50-ih(rightMood)-(scheme.developer()?6:0));
     }
     /** The update time centred on the screen, kept between from and to; left out when it does not fit. */
     private void centredTime(Graphics2D g,Scheme scheme,String time,int from,int to,int baseline){
@@ -210,7 +216,7 @@ public class StatusImage {
     }
     /** Light colour schemes: a thin grey outline keeps white icons (clouds, snow) visible. */
     private void icon(Graphics2D g,Scheme scheme,BufferedImage icon,int x,int y){
-        if(scheme.light()&&scheme.style==Scheme.Style.MODERN){
+        if(scheme.light()&&(scheme.style==Scheme.Style.MODERN||scheme.illustrated()&&scheme.style!=Scheme.Style.INK)){
             var mask=mask(icon,0x9aa0a6);
             for(int dy=-1;dy<=1;dy++)for(int dx=-1;dx<=1;dx++)if(dx!=0||dy!=0)put(g,mask,x+dx,y+dy);
         }
@@ -247,6 +253,8 @@ public class StatusImage {
     }
     /** Half-width provider: the theme's own window or heading at half width; compact text, nothing scaled. */
     private void compact(Graphics2D g,Scheme scheme,String title,UsageService.Provider p,int height,boolean bottom){
+        title=ThemeArtwork.title(scheme,title);
+        ThemeArtwork.band(g,scheme,0,0,w/2,height);
         if(p==null)p=new UsageService.Provider("unconfigured",null,null,null);
         int top=16;
         switch(scheme.style){
@@ -255,7 +263,7 @@ public class StatusImage {
             case FLUENT -> fluentWindow(g,scheme,title,null,22,2,w/2-4,height-(bottom?6:3));
             case MACOS -> macosWindow(g,scheme,title,null,22,2,w/2-4,height-(bottom?6:3));
             case CONSOLE -> console(g,scheme,title,null,22,2,w/2-4,height-(bottom?6:3));
-            default -> text(g,scheme,(scheme.style==Scheme.Style.TERMINAL?"> ":"")+title,6,top,10,scheme.title,true);
+            default -> {if(!ThemeArtwork.heading(g,scheme,title,6,top,w/2-12,10))text(g,scheme,(scheme.style==Scheme.Style.TERMINAL?"> ":"")+title,6,top,10,scheme.title,true);}
         }
         if(!p.status().equals("ok")){
             String status=p.status().equals("rate_limited")?"Limited":DeviceSender.statusLabel(p.status());
@@ -267,7 +275,7 @@ public class StatusImage {
         else{compactWindow(g,scheme,"5h",p.fiveHour(),45);compactWindow(g,scheme,"Week",p.week(),74);}
     }
     private void compactWindow(Graphics2D g,Scheme scheme,String label,ProviderClient.Window q,int y){
-        if(miniWindow(g,scheme,label,q,0,y,w/2))text(g,scheme,reset(q),6,y+10,8,scheme.muted,false);
+        if(miniWindow(g,scheme,label,q,0,y,w/2))text(g,scheme,ThemeArtwork.reset(scheme,reset(q)),6,y+10,8,scheme.muted,false);
     }
     /** Label, small bar and remaining percent in a column from x0 that is span wide; false without readings. */
     private boolean miniWindow(Graphics2D g,Scheme scheme,String label,ProviderClient.Window q,int x0,int y,int span){
@@ -286,6 +294,8 @@ public class StatusImage {
      * both windows side by side (a single window spans the width). No reset times.
      */
     private void row(Graphics2D g,Scheme scheme,String title,UsageService.Provider p,int y,int height,boolean bottom){
+        title=ThemeArtwork.title(scheme,title);
+        ThemeArtwork.band(g,scheme,0,y,w,height);
         if(p==null)p=new UsageService.Provider("unconfigured",null,null,null);
         boolean held=p.status().equals("rate_limited")&&p.observedAt()!=null&&(p.fiveHour()!=null||p.week()!=null);
         String status=held?"Limited \u00b7 "+DateTimeFormatter.ofPattern("HH:mm").withZone(zone).format(Instant.ofEpochSecond(p.observedAt()))
@@ -300,8 +310,10 @@ public class StatusImage {
             default -> {
                 boolean terminal=scheme.style==Scheme.Style.TERMINAL;
                 g.setFont(new Font(scheme.font(),Font.BOLD,13));
-                int room=w-20-g.getFontMetrics().stringWidth((terminal?"> ":"")+title)-8;
-                text(g,scheme,terminal?"> "+title.toUpperCase(Locale.ROOT):title,10,top,13,scheme.title,true);
+                int titleWidth=g.getFontMetrics().stringWidth((terminal?"> ":"")+title);
+                if(scheme.developer()&&status!=null)titleWidth=Math.min(titleWidth,w/2-12);
+                int room=w-20-titleWidth-8;
+                if(!ThemeArtwork.heading(g,scheme,title,10,top,status!=null?Math.min(w-20,w/2-12):w-20,13))text(g,scheme,terminal?"> "+title.toUpperCase(Locale.ROOT):title,10,top,13,scheme.title,true);
                 if(status!=null){status=fit(g,scheme,terminal?status.toUpperCase(Locale.ROOT):status,10,room);if(status!=null)right(g,scheme,status,w-10,top,10,scheme.warning);}
             }
         }
@@ -338,7 +350,7 @@ public class StatusImage {
                     if(fill>0)g.fillRect(x+2,top+2,fill,height-3);
                 }
                 right(g,scheme,String.format(Locale.ROOT,"%.0f %%",left),right,y,12,scheme.text);
-                text(g,scheme,reset(q),x,y+13,10,scheme.muted,false);
+                text(g,scheme,ThemeArtwork.reset(scheme,reset(q)),x,y+13,10,scheme.muted,false);
             } else right(g,scheme,"--",right,y,12,scheme.muted);
             return;
         }
@@ -346,7 +358,7 @@ public class StatusImage {
             double left=Math.max(0,Math.min(100,100-q.usedPercent()));
             bar(g,scheme,x,top,width,height,left);
             right(g,scheme,String.format(Locale.ROOT,"%.0f %%",left),right,y,12,scheme.text);
-            text(g,scheme,reset(q),x,y+13,10,scheme.muted,false);
+            text(g,scheme,ThemeArtwork.reset(scheme,reset(q)),x,y+13,10,scheme.muted,false);
         } else{bar(g,scheme,x,top,width,height,-1);right(g,scheme,"--",right,y,12,scheme.muted);}
     }
     /**
@@ -355,6 +367,7 @@ public class StatusImage {
      * coloured dot in the newspaper.
      */
     private void bar(Graphics2D g,Scheme scheme,int x,int top,int width,int height,double left){
+        if(scheme.illustrated()){ThemeArtwork.bar(g,scheme,x,top,width,height,left);return;}
         int fill=left<0?0:(int)Math.round(width*left/100);
         switch(scheme.style){
             case LCD -> {
@@ -533,7 +546,12 @@ public class StatusImage {
      * newspaper, 1-bit ordered dithering for the Mac (the LCD reduces the whole image to its shades, see encode).
      */
     static BufferedImage styled(BufferedImage icon,Scheme scheme){
+        return styled(icon,scheme,1);
+    }
+    private static BufferedImage styled(BufferedImage icon,Scheme scheme,int contourWidth){
+        if(scheme.illustrated())return ThemeArtwork.icon(icon,scheme);
         var s=scheme.style;
+        if(icon!=null&&s==Scheme.Style.LCD)return contoured(icon,scheme.text,contourWidth);
         if(icon==null||(s!=Scheme.Style.TERMINAL&&s!=Scheme.Style.MAC&&s!=Scheme.Style.BLUEPRINT&&s!=Scheme.Style.PRINT))return icon;
         int[] bayer={0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5};
         var out=new BufferedImage(icon.getWidth(),icon.getHeight(),BufferedImage.TYPE_INT_ARGB);
@@ -542,7 +560,7 @@ public class StatusImage {
             if(alpha<96)continue;
             int luma=(299*(argb>>16&255)+587*(argb>>8&255)+114*(argb&255))/1000;
             if(s==Scheme.Style.TERMINAL||s==Scheme.Style.BLUEPRINT){
-                int level=Math.max(s==Scheme.Style.BLUEPRINT?150:70,luma),c=scheme.text;
+                int level=Math.max(s==Scheme.Style.BLUEPRINT?25:70,luma),c=scheme.text;
                 out.setRGB(x,y,0xff000000|((c>>16&255)*level/255)<<16|((c>>8&255)*level/255)<<8|(c&255)*level/255);
             }else if(s==Scheme.Style.PRINT){
                 int level=Math.min(210,luma);out.setRGB(x,y,(alpha<<24)|level<<16|level<<8|level);
@@ -550,6 +568,21 @@ public class StatusImage {
                 boolean dark=luma*16/256<=bayer[(y&3)*4+(x&3)];
                 out.setRGB(x,y,dark?0xff000000:0xffffffff);
             }
+        }
+        return s==Scheme.Style.BLUEPRINT?contoured(out,scheme.text,contourWidth):out;
+    }
+    /** A contour inside the alpha silhouette: keeps the icon's size, position and transparent surroundings unchanged. */
+    private static BufferedImage contoured(BufferedImage icon,int rgb,int width){
+        int w=icon.getWidth(),h=icon.getHeight();var out=new BufferedImage(w,h,BufferedImage.TYPE_INT_ARGB);
+        for(int y=0;y<h;y++)for(int x=0;x<w;x++){
+            int argb=icon.getRGB(x,y);
+            if((argb>>>24)>=96){
+                boolean edge=x<width||x+width>=w||y<width||y+width>=h
+                        ||(icon.getRGB(x-width,y)>>>24)<96||(icon.getRGB(x+width,y)>>>24)<96
+                        ||(icon.getRGB(x,y-width)>>>24)<96||(icon.getRGB(x,y+width)>>>24)<96;
+                if(edge)argb=(argb&0xff000000)|rgb;
+            }
+            out.setRGB(x,y,argb);
         }
         return out;
     }

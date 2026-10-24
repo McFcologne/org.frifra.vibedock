@@ -33,12 +33,14 @@ class AccessTest {
     @Autowired MockMvc mvc;
     @Autowired SettingsStore store;
     @Autowired UsageService usage;
+    @Autowired ThemeSettings themes;
     @Autowired ClientRegistry clients;
     @Autowired OtaSigning otaSigning;
     @Autowired DeviceLogs deviceLogs;
     @MockitoBean ProviderClient providers;
     @MockitoBean BrowserLogin login;
     @BeforeEach void resetSettings() throws Exception {
+        for(var scheme:Scheme.values())themes.setEnabled(scheme,true);
         store.save(new SettingsStore.Settings(List.of("127.0.0.1/32"),new SettingsStore.Credential("",""),new SettingsStore.Credential("",""),List.of()));
         usage.forgetPacing();usage.configurationChanged();
     }
@@ -805,6 +807,34 @@ class AccessTest {
         Assertions.assertEquals(new Layout.Usage(List.of("codex","claude")),clients.defaultDesign().layout().bands().get(1));
         Assertions.assertEquals(Scheme.CLASSIC_MAC,clients.defaultDesign().scheme());
         clients.configureDesign(before);
+    }
+    @Test void disabledThemesStayOnExistingDesignsButCannotBeSelectedAndAreSkippedBySwipes() throws Exception {
+        String id="vibedock-themes",key="f3".repeat(32);var previous=clients.defaultDesign();
+        clients.paired(id,"Themes",key,"192.168.1.44",80);
+        try{
+            clients.configureDesign(previous.withScheme(Scheme.OCEAN));
+            mvc.perform(post("/admin/themes/ocean").contentType("application/json").content("{\"enabled\":false}")
+                    .with(user("admin").roles("ADMIN")).with(csrf()).with(r->{r.setLocalPort(10001);return r;}))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$[1].enabled").value(false));
+            Assertions.assertEquals(Scheme.OCEAN,clients.designFor(id).scheme());
+            String body="""
+                    {"scheme":"ocean","mood":"","weatherLocation":"","layout":{"bands":[{"type":"usage","sources":["codex"]},{"type":"usage","sources":["claude"]},{"type":"context","moodLeft":false}]}}
+                    """;
+            mvc.perform(post("/admin/designs/default").contentType("application/json").content(body)
+                    .with(user("admin").roles("ADMIN")).with(csrf()).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isOk());
+            clients.configureDesign(previous.withScheme(Scheme.MIDNIGHT));
+            mvc.perform(post("/admin/designs/default").contentType("application/json").content(body)
+                    .with(user("admin").roles("ADMIN")).with(csrf()).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isBadRequest());
+            mvc.perform(get("/api/v1/clients/"+id+"/image").header("Authorization","Bearer "+key).header("X-VibeDock-Gesture","scheme-next")
+                    .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk());
+            Assertions.assertEquals(Scheme.FOREST,clients.designFor(id).scheme());
+            mvc.perform(post("/admin/themes/ocean").contentType("application/json").content("{\"enabled\":true}")
+                    .with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isForbidden());
+            mvc.perform(get("/admin/themes/porcelain/preview.png").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(8080);return r;}))
+                    .andExpect(status().isNotFound());
+            mvc.perform(get("/admin/themes/porcelain/preview.png").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
+                    .andExpect(status().isOk()).andExpect(content().contentType("image/png"));
+        }finally{themes.setEnabled(Scheme.OCEAN,true);clients.remove(id);clients.configureDesign(previous);}
     }
     @Test void deviceDesignCanBeSavedPreviewedAndResetToDefault() throws Exception {
         String id="vibedock-design-access";clients.paired(id,"Design test","a".repeat(64),"192.168.1.44",80);
