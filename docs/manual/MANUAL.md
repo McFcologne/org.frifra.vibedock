@@ -707,8 +707,8 @@ interval. **Update interval** below the sources sets how it is chosen:
   After an hour without a rate limited answer it tries one minute less, down to the **shortest** interval. If that
   is rate limited again, it goes back up and waits two, then four hours before it tries again. The card marks such
   an interval as *learned*; the server log shows every change (`interval 2 → 3 min`).
-- **Fixed**: every source is asked at the shortest interval. After a rate limited answer it waits twice as long,
-  up to the longest interval, and returns to the shortest one with the next answer.
+- **Fixed**: every source is asked at the shortest interval. After a rate limited answer its interval doubles, up
+  to the longest one; every following answer halves it again, step by step down to the shortest.
 
 Shortest and longest are 1 to 60 minutes (default 1 and 10). While a source is rate limited, the display keeps its
 last values and shows *Rate limited*.

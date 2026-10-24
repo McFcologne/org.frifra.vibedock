@@ -131,7 +131,7 @@
     <small><strong>Dynamic</strong> learns for every source how often its provider answers: each <em>rate limited</em> answer (HTTP 429)
       adds a minute, up to the longest interval; after an hour without one it tries a minute less, down to the shortest. If that
       shorter interval is rate limited again, the source waits two, then four hours before the next try.
-      <strong>Fixed</strong> asks at the shortest interval and only waits longer, up to the longest, after a rate limited answer.</small>
+      <strong>Fixed</strong> asks at the shortest interval; a rate limited answer doubles the interval, up to the longest, and every following answer halves it again.</small>
     <p class="notice" th:if="${pollingMessage}" th:text="${pollingMessage}"></p>
     <p class="notice error" th:if="${pollingError}" th:text="${pollingError}"></p>
     <div class="form-actions" data-dirty-actions><button>Save update interval</button></div>
