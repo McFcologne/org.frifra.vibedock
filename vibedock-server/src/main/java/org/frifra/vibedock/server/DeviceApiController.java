@@ -52,6 +52,7 @@ class DeviceApiController {
         });
         String gesture=request.getHeader("X-VibeDock-Gesture");
         if("photos-toggle".equals(gesture))togglePhotos(registry,designs,events,identifier);
+        else if("turn-clockwise".equals(gesture)||"turn-counterclockwise".equals(gesture))turn(registry,events,identifier,"turn-clockwise".equals(gesture)?1:-1);
         else swipe(registry,designs,events,identifier,"scheme-next".equals(gesture)?1:"scheme-previous".equals(gesture)?-1:0);
         var display=registry.displayType(identifier);
         byte[] pixels=designs.render(DesignService.forDevice(registry.designFor(identifier),serverFooter),peer,display,identifier).rgb565();
@@ -94,6 +95,17 @@ class DeviceApiController {
         if(scheme==current.scheme())return;
         try{registry.setDesign(identifier,current.withScheme(scheme));log.info("Display {} switched to the scheme {} by a swipe",identifier,scheme.id());events.devicesChanged();}
         catch(IOException e){log.warn("Could not store the scheme of {}: {}",identifier,e.toString());}
+    }
+    /**
+     * A circle drawn with one finger on a touch display turns its picture to the next orientation in that direction:
+     * by a quarter on square panels, otherwise between upright and flipped. The answer to this pull carries it.
+     */
+    static void turn(ClientRegistry registry,AdminEvents events,String identifier,int step){
+        var rotations=registry.get(identifier).board().rotations();
+        if(rotations.size()<2){log.info("Display {}: circle gesture, but its board cannot be turned",identifier);return;}
+        int index=rotations.indexOf(registry.rotation(identifier)),next=rotations.get(Math.floorMod(index+step,rotations.size()));
+        try{registry.setRotation(identifier,next);log.info("Display {} turned to {} degrees by a circle gesture",identifier,next);events.devicesChanged();}
+        catch(IOException e){log.warn("Could not store the orientation of {}: {}",identifier,e.toString());}
     }
     /** A double tap on a touch display or a web display page: the slideshow on or off, whatever its schedule says. */
     static void togglePhotos(ClientRegistry registry,DesignService designs,AdminEvents events,String identifier){

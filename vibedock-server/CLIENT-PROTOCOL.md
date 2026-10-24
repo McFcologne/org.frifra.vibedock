@@ -62,7 +62,7 @@ Right after flashing, the administration's browser flasher (*Devices › Firmwar
 | --- | --- |
 | `VIBEDOCK-HELLO` | `VIBEDOCK-READY {"identifier":"vibedock-…","name":"…","version":"0.1.0","paired":false,"board":"vibedock-m1","chip":"ESP8266"}` (also sent once at every start) |
 | `VIBEDOCK-BATTERY` | `VIBEDOCK-BATTERY {"supported":true,"voltageMv":3900,"estimatedPercent":80,"chargeSignal":"inactive","present":null}` (illustrative reading). Supported on `waveshare-s3-touch-lcd-154`; other boards return `supported:false`, null measurements and `chargeSignal:"unknown"`. |
-| `VIBEDOCK-SCAN` | `VIBEDOCK-NETWORKS [{"ssid":"…","rssi":-48,"open":false},…]`, the 12 strongest networks |
+| `VIBEDOCK-SCAN` | `VIBEDOCK-NETWORKS [{"ssid":"…","rssi":-48,"open":false},…]`, the 12 strongest networks. While the display keeps trying a saved network out of reach, it pauses those attempts for the scan and resumes them afterwards. |
 | `VIBEDOCK-LOG` | `VIBEDOCK-LOG ["05-14 09:41:00 Start v0.1.0 vibedock-m1, Power on",…]`, the last 24 events oldest first: starts, Wi-Fi, pairing, server answers and why a connection failed (HTTP and TLS errors). Kept in `/log.txt` across restarts; no keys or passwords. **Devices → Troubleshooting → Read log over USB** shows it. |
 | `VIBEDOCK-SETUP {json}` | `VIBEDOCK-SETUP OK`, then the device restarts; or `VIBEDOCK-SETUP ERROR <reason>` |
 
@@ -195,6 +195,11 @@ older servers. Swipes up and down change the backlight on the display only (10�
 A double tap sends `X-VibeDock-Gesture: photos-toggle`: the server starts the slideshow of the display's design when
 it does not run and stops it when it does, whatever its schedule or the editor's switch say, for that display until
 the next double tap or a restart of the server; a design without photos stays as it is.
+A circle drawn with one finger sends `X-VibeDock-Gesture: turn-clockwise` or `turn-counterclockwise`: the server sets
+the display's orientation (3e) to the next one in that direction, by a quarter turn on square panels and otherwise
+between upright and flipped, and answers this pull with the new `X-VibeDock-Orientation`. The firmware counts a touch
+as a circle when its points go round their centre by at least 300° on an average radius of at least 35 pixels and end
+near their start.
 
 ## 3e. Orientation (server → device)
 

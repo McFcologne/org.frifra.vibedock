@@ -21,7 +21,7 @@
   </details>
 </section>
 
-<section class="card" id="usb-log">
+<section class="card" id="usb-log" th:attr="data-boards=${boardLabels}">
   <div class="card-head"><h3 class="grow">Display log over USB</h3></div>
   <p>Connect the display by USB and close other programs that use its serial port. Works with every board and every display, paired or not;
     opening the port does not restart it. The log is kept on the server with the display's other logs.</p>

@@ -17,7 +17,7 @@ for arch in ${*:-amd64 arm64}; do
     case "$arch" in amd64|arm64) ;; *) echo "Unknown platform: $arch (amd64 or arm64)" >&2; exit 1 ;; esac
     file="target/vibedock-server-$version-$arch.tar"
     # --load and docker save: the docker driver of Docker Desktop cannot write the file itself (type=docker exporter).
-    docker buildx build --platform "linux/$arch" --build-context git=../.git -t "vibedock-server:$arch" --load .
+    docker buildx build --platform "linux/$arch" --build-context git=../.git --build-context twemoji=../third-party/twemoji -t "vibedock-server:$arch" --load .
     docker save -o "$file" "vibedock-server:$arch"
     echo "$file"
 done

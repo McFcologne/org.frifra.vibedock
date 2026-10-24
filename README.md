@@ -48,7 +48,7 @@ server; a display only receives its image.
 - **Encrypted account transfer.** Export data sources with their saved sign-ins and restore selected sources by adding them or replacing the current collection.
 - **Device management.** Pair using the IP and six-digit code on a trusted home network (HTTP pairing is unencrypted), inspect status and previews, rename, reorder by dragging, force a redraw, update, or remove a device.
 - **Boards.** Besides the VibeTV M1 (ESP8266), the firmware builds for ESP32, ESP32-S3 and ESP32-C3 boards with a display (tested on hardware: Waveshare ESP32-S3-Touch-LCD-1.47, ESP32-S3-Touch-LCD-1.54 and ESP32-C6-Touch-LCD-1.69; the others are prepared); each device has a board that decides which firmware it gets.
-- **Touch displays.** On the Waveshare touch boards a swipe left or right changes the theme (or the photo), up and down the brightness, a double tap starts or stops the slideshow. Displays mounted upside down, square ones also turned by 90°, are set with *Orientation* on the device card.
+- **Touch displays.** On the Waveshare touch boards a swipe left or right changes the theme (or the photo), up and down the brightness, a double tap starts or stops the slideshow, a circle drawn with one finger turns the picture. Displays mounted upside down, square ones also turned by 90°, are set with *Orientation* on the device card.
 - **Troubleshooting.** Read a display's log over USB (any board) or over the network, and create an encrypted support file for a problem report.
 - **Web displays.** A browser, tablet or another program shows the image without hardware: a full-screen page that reloads itself, sharp in the size of the window (also as an iPhone home screen app), or a plain PNG link, protected by a secret in the link.
 - **Firmware from the server.** The Docker image carries the matching display firmware for every board: download it, install it from Chrome or Edge over USB and pair the display over the same cable in one go, or update paired displays over Wi-Fi with firmware signed by the server.
@@ -212,7 +212,7 @@ The administration footer shows the build version and links to README, the PDF m
 
 - Quota endpoints and fields follow [CodexBar](https://github.com/steipete/CodexBar) 0.63.0 by Peter Steinberger, pinned to commit [`f3e718c`](https://github.com/steipete/CodexBar/tree/f3e718c897d5ed76af4e07182df899c722118546); additional integrations are documented in [PROVIDERS.md](vibedock-server/PROVIDERS.md).
 - Provider sign-in uses the official Codex, Claude Code, Grok Build and Gemini CLI clients. Cursor uses its team Admin API.
-- Emoji graphics: [Twemoji](https://github.com/jdecked/twemoji) (CC-BY 4.0). Weather: [Open-Meteo](https://open-meteo.com/). Installed component notices are listed in the administration under **Licenses & notices**.
+- Emoji graphics: [Twemoji](https://github.com/jdecked/twemoji) 17.0.3 by Twitter, Inc. and other contributors (CC BY 4.0), unmodified in [`third-party/twemoji`](third-party/twemoji/README.md). Weather: [Open-Meteo](https://open-meteo.com/). Installed component notices are listed in the administration under **Licenses & notices**.
 - Display hardware of the VibeTV M1: Vibe TV (see [Hardware](#hardware)). See also the [feasibility assessment](VibeDock-Feasibility-Codex-Claude.md).
 
 ## Safety notes

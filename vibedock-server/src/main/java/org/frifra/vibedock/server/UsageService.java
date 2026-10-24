@@ -84,7 +84,11 @@ public class UsageService {
         return new Snapshot(1,now,Collections.unmodifiableMap(view),Collections.unmodifiableMap(labels));
     }
     private long staleAfter(String name) {
-        var p=pace.get(name);return p==null?PollPace.MIN_MINUTES*60L+90:p.staleAfterSeconds();
+        var p=pace.get(name);return p==null?settings.polling().minMinutes()*60L+90:p.staleAfterSeconds();
+    }
+    /** The current update interval of a source in minutes; null before its first poll. */
+    public Integer interval(String id) {
+        var p=pace.get(id);return p==null?null:p.minutes();
     }
     /** First values right after start; the full-minute schedule takes over from there. */
     @EventListener(ApplicationReadyEvent.class)
@@ -122,8 +126,9 @@ public class UsageService {
             if (account.suspended()) { pace.remove(name); next.put(name,new Provider("suspended",null,null,null)); continue; }
             if (credential.token().isBlank()&&!demo) { pace.remove(name); next.put(name,new Provider("unconfigured",null,null,null)); continue; }
             var last=readings.get(name);Long previous=last==null?null:last.observedAt();
-            var p=pace.computeIfAbsent(name,k->new PollPace());
-            long now=clock.instant().getEpochSecond();
+            var polling=settings.polling();
+            var p=pace.computeIfAbsent(name,k->new PollPace(polling));p.configure(polling);
+            long now=clock.instant().getEpochSecond();int before=p.minutes();
             if (!p.due(now,manual)) {
                 next.put(name,p.limited()?rateLimited(last,now):last!=null?last:new Provider("waiting",null,null,null));
                 continue;
@@ -133,11 +138,12 @@ public class UsageService {
                 boolean single=period(account.type(),new Provider("ok",null,r.fiveHour(),r.week()))!=null;
                 String status=r.fiveHour()==null && r.week()==null ? "unavailable"
                         : !single && (r.fiveHour()==null || r.week()==null) ? "partial":"ok";
-                p.success(now);report(account,status,"");
+                p.success(now);report(account,status,"");interval(account,before,p,"no HTTP 429 for a while, trying a shorter one");
                 next.put(name,new Provider(status,clock.instant().getEpochSecond(),r.fiveHour(),r.week()));
             } catch (ProviderClient.Failure e) {
-                report(account,e.status,e.detail+(e.status.equals("rate_limited")?", next try in "+Math.min(PollPace.MAX_MINUTES,p.minutes()*2)+" min":""));
                 if (e.status.equals("rate_limited")) { p.rateLimited(now,e.retryAt); next.put(name,rateLimited(last,now)); }
+                report(account,e.status,e.detail+(e.status.equals("rate_limited")?", next try in "+p.waitMinutes(now)+" min":""));
+                if (e.status.equals("rate_limited")) interval(account,before,p,"after HTTP 429");
                 else { p.failed(now); next.put(name,new Provider(e.status,previous,null,null)); }
             }
             catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
@@ -165,5 +171,15 @@ public class UsageService {
         devices.send(configuration.devices(),snapshot());
         pollNow();
     }
-    public synchronized void configurationChanged() { readings=Map.of(); collectedFor=null; pace.clear(); pollNow(); }
+    /** Changed sources are polled again at once; each keeps the interval it learned (unless it waits for a 429). */
+    public synchronized void configurationChanged() { readings=Map.of(); collectedFor=null; pace.values().forEach(PollPace::restart); pollNow(); }
+    /** Tests: every source starts without a learned interval or back-off. */
+    synchronized void forgetPacing() { pace.clear(); }
+    /** New update interval settings: every source keeps its interval within the new bounds. */
+    public synchronized void pollingChanged() { var polling=settings.polling(); pace.values().forEach(p->p.configure(polling)); }
+    /** Dynamic intervals: every change goes to the log, so one can follow how a source settles. */
+    private void interval(SettingsStore.Account account,int before,PollPace p,String why){
+        if(p.dynamic()&&p.minutes()!=before)
+            log.info("{} ({}) usage: interval {} → {} min ({})",account.label(),account.typeLabel(account.type()),before,p.minutes(),why);
+    }
 }

@@ -42,7 +42,7 @@ class AccessTest {
     @BeforeEach void resetSettings() throws Exception {
         for(var scheme:Scheme.values())themes.setEnabled(scheme,true);
         store.save(new SettingsStore.Settings(List.of("127.0.0.1/32"),new SettingsStore.Credential("",""),new SettingsStore.Credential("",""),List.of()));
-        usage.configurationChanged();
+        usage.forgetPacing();usage.configurationChanged();
     }
     @Test void quotaMetadataRequiresAudioOptInAndSurvives304ButNotPreview() throws Exception {
         String key="ab".repeat(32),id="vibedock-audio-test",path="/api/v1/clients/"+id+"/image";
@@ -239,6 +239,25 @@ class AccessTest {
         mvc.perform(post("/admin/sources/import/apply").param("mode","add").param("source",ids.get(0)).session(session)
                 .with(user("admin").roles("ADMIN")).with(csrf()).with(r->{r.setLocalPort(10001);return r;}))
                 .andExpect(flash().attribute("importError","The import expired. Upload the file again."));
+    }
+    @Test void updateIntervalIsSavedAndValidated() throws Exception {
+        try{
+            mvc.perform(post("/admin/sources/polling").param("mode","fixed").param("minMinutes","2").param("maxMinutes","5")
+                    .with(user("admin").roles("ADMIN")).with(csrf()).with(r->{r.setLocalPort(10001);return r;}))
+                    .andExpect(redirectedUrl("/admin/sources#update-interval")).andExpect(flash().attributeExists("pollingMessage"));
+            Assertions.assertEquals(new SettingsStore.UsagePolling(false,2,5),store.polling());
+            mvc.perform(post("/admin/sources/polling").param("mode","dynamic").param("minMinutes","6").param("maxMinutes","5")
+                    .with(user("admin").roles("ADMIN")).with(csrf()).with(r->{r.setLocalPort(10001);return r;}))
+                    .andExpect(flash().attributeExists("pollingError"));
+            Assertions.assertEquals(new SettingsStore.UsagePolling(false,2,5),store.polling());
+            mvc.perform(get("/admin/sources").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
+                    .andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("id=\"update-interval\"")))
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString("<option value=\"fixed\" selected")));
+            // Only the administration sets it; the public port does not know the address.
+            mvc.perform(post("/admin/sources/polling").param("minMinutes","1").param("maxMinutes","2")
+                    .with(user("admin").roles("ADMIN")).with(csrf()).with(r->{r.setLocalPort(8080);return r;}))
+                    .andExpect(status().isNotFound());
+        }finally{store.savePolling(SettingsStore.UsagePolling.DEFAULT);usage.pollingChanged();}
     }
     @Test void onlySourceCreationErrorsOpenTheAddSourcePanel() throws Exception {
         var added=mvc.perform(post("/admin/sources/add").param("type","missing").param("label","Test")
@@ -558,6 +577,28 @@ class AccessTest {
             Assertions.assertEquals(0,clients.rotation(id));
             mvc.perform(get(image).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(8080);return r;})).andExpect(header().string("X-VibeDock-Orientation","upright"));
             mvc.perform(admin.apply("90")).andExpect(status().isBadRequest());
+        }finally{clients.remove(id);}
+    }
+    @Test void aCircleGestureTurnsThePictureAndTheSamePullAnswersWithIt() throws Exception {
+        String key="fa".repeat(32),id="vibedock-circle",image="/api/v1/clients/"+id+"/image";
+        clients.paired(id,"Desk",key,"192.168.1.35",80,"waveshare-s3-touch-lcd-154");
+        try{
+            var circle=(java.util.function.Function<String,org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder>)gesture->get(image)
+                    .header("Authorization","Bearer "+key).header("X-VibeDock-Gesture",gesture).with(r->{r.setLocalPort(8080);return r;});
+            mvc.perform(circle.apply("turn-clockwise")).andExpect(header().string("X-VibeDock-Orientation","rotated-90"));
+            mvc.perform(circle.apply("turn-clockwise")).andExpect(header().string("X-VibeDock-Orientation","flipped"));
+            Assertions.assertTrue(clients.get(id).flipped());
+            mvc.perform(circle.apply("turn-counterclockwise")).andExpect(header().string("X-VibeDock-Orientation","rotated-90"));
+            mvc.perform(circle.apply("turn-counterclockwise")).andExpect(header().string("X-VibeDock-Orientation","upright"));
+            mvc.perform(circle.apply("turn-counterclockwise")).andExpect(header().string("X-VibeDock-Orientation","rotated-270"));
+            // A rectangular panel only flips, in either direction.
+            clients.setBoard(id,"waveshare-s3-touch-lcd-147");
+            mvc.perform(circle.apply("turn-clockwise")).andExpect(header().string("X-VibeDock-Orientation","flipped"));
+            mvc.perform(circle.apply("turn-counterclockwise")).andExpect(header().string("X-VibeDock-Orientation","upright"));
+            // The VibeTV M1 has neither touch nor a turn; the gesture changes nothing.
+            clients.setBoard(id,"vibedock-m1");
+            mvc.perform(circle.apply("turn-clockwise")).andExpect(status().isOk()).andExpect(header().doesNotExist("X-VibeDock-Orientation"));
+            Assertions.assertEquals(0,clients.rotation(id));
         }finally{clients.remove(id);}
     }
     @Test void devicesSavedAsFlippedBeforeQuarterTurnsStayTurned() {

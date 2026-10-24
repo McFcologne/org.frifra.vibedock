@@ -600,6 +600,16 @@ WifiNetwork networks[12]; uint8_t networkCount = 0;
 void scanWifi() {
   networkCount = 0;
   int found = WiFi.scanNetworks(false, false);
+  if (found < 0) {
+    // The ESP32 refuses to scan while the station keeps trying a saved network that is out of reach (e.g. at another
+    // place, for USB pairing there): stop the attempts for the scan, then try that network again.
+    bool reconnect = WiFi.getAutoReconnect();
+    WiFi.setAutoReconnect(false); WiFi.disconnect(); delay(100);
+    found = WiFi.scanNetworks(false, false);
+    logEvent(String(F("Wi-Fi scan while connecting: ")) + (found < 0 ? String(F("failed")) : String(found) + F(" networks")));
+    WiFi.setAutoReconnect(reconnect);
+    if (reconnect && !ssid.isEmpty()) WiFi.begin(ssid.c_str(), password.c_str());
+  }
   for (int i = 0; i < found; i++) {
     String name = WiFi.SSID(i); int32_t rssi = WiFi.RSSI(i);
     if (name.isEmpty() || name.length() > 32) continue;
@@ -1566,16 +1576,28 @@ uint32_t lastTouchPoll = 0;
 void touchPoll() {
   static bool touching = false; static int16_t startX, startY, lastX, lastY; static uint8_t idle = 0;
   static uint32_t touchedAt = 0, lastTap = 0;
+  static client_policy::TouchPath path;  // the points of this touch, for the circle gesture
   if (millis() - lastTouchPoll < 20) return;
   lastTouchPoll = millis();
   int16_t x, y;
   if (touch::read(x, y)) {
-    if (!touching) { touching = true; startX = x; startY = y; touchedAt = millis(); }
-    lastX = x; lastY = y; idle = 0; return;
+    if (!touching) { touching = true; startX = x; startY = y; touchedAt = millis(); path.clear(); }
+    lastX = x; lastY = y; idle = 0; path.add(x, y); return;
   }
   // Released only after 60 ms without a point: the controllers drop single readings during a swipe.
   if (!touching || ++idle < 3) return;
   touching = false; idle = 0;
+  // A circle turns the picture (the server sets the orientation and sends it back with the answer to this gesture);
+  // the direction does not depend on how the panel is turned. Before the swipes: a circle may end some way off.
+  auto circle = path.circle();
+  if (circle != client_policy::Circle::None) {
+    if (mode != Mode::Paired) return;
+    audio::play(audio::Cue::Swipe);
+    pendingGesture = circle == client_policy::Circle::Clockwise ? "turn-clockwise" : "turn-counterclockwise";
+    logEvent(String(F("Touch: ")) + pendingGesture, true);
+    lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u;  // the new orientation right away
+    return;
+  }
   int dx = lastX - startX, dy = lastY - startY;
   client_policy::turnSwipe(dx, dy, turns);  // the panel's coordinates do not turn with the picture
   auto swipe = client_policy::swipeOf(dx, dy);

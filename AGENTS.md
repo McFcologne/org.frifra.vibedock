@@ -15,6 +15,7 @@ This guide is for developers and coding agents working on this monorepo. It desc
 | `VibeDock-Feasibility-Codex-Claude.md` | Provider feasibility findings and sources |
 | `vibedock-client/FLASHING.md` | Manual full backup, flash verification and complete restore procedure |
 | `RELEASING.md` | Releases, Docker registries (ghcr.io, Docker Hub), secrets and the repository settings the workflows rely on |
+| `third-party/twemoji/` | Twemoji 17.0.3 SVGs for the server's emoji (CC BY 4.0, unmodified; origin, checksum and update steps in its README) |
 | `vibedock-client/TLS.md` | https on the displays: TLS 1.3 with Mbed TLS on the M1, memory and stack layout, pitfalls, diagnostics, host test |
 
 Keep project documentation in English. Never commit credentials, `.env`, login caches, runtime data, device backups or generated firmware. Do not print credentials in logs or terminal output. Preserve existing user changes.

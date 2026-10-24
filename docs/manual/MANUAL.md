@@ -85,8 +85,8 @@ board with the browser flasher. Nothing has to be installed next to it.
   Pi 4/5 (arm64) or a Mac/PC with Docker Desktop. The image exists for **amd64** and **arm64**.
 - **Docker Engine with the Compose plugin 2.17 or later** (`docker compose version`), or Docker Desktop.
 - Two free TCP ports: **10001** (administration) and **10002** (displays, web displays, usage API).
-- For building from the sources: Git, access to the repository, and internet access during the build (Maven, npm,
-  Twemoji). The first build takes several minutes.
+- For building from the sources: Git, access to the repository, and internet access during the build (Maven, npm;
+  the emoji graphics are part of the repository). The first build takes several minutes.
 - At run time the server needs internet access to the providers and to the weather service (Open-Meteo).
 
 Choose one of three ways:
@@ -718,6 +718,22 @@ stops polling (the display shows it as paused), **Remove data source** deletes i
 
 <img src="images/41-source-manage.png" width="70%" alt="Manage a data source">
 
+## Update interval
+
+The server asks every source for its usage on its own schedule; **Updates** on the source's card shows the current
+interval. **Update interval** below the sources sets how it is chosen:
+
+- **Dynamic** (default): every source learns how often its provider answers. A *rate limited* answer (HTTP 429)
+  makes its interval one minute longer, up to the **longest** interval; only the next request waits twice as long.
+  After an hour without a rate limited answer it tries one minute less, down to the **shortest** interval. If that
+  is rate limited again, it goes back up and waits two, then four hours before it tries again. The card marks such
+  an interval as *learned*; the server log shows every change (`interval 2 → 3 min`).
+- **Fixed**: every source is asked at the shortest interval. After a rate limited answer its interval doubles, up
+  to the longest one; every following answer halves it again, step by step down to the shortest.
+
+Shortest and longest are 1 to 60 minutes (default 1 and 10). While a source is rate limited, the display keeps its
+last values and shows *Rate limited*.
+
 ## Export and import
 
 **Export** writes all data sources with their stored sign-ins into one file, encrypted with a password of at least
@@ -823,14 +839,20 @@ Needs Chrome or Edge on a computer, and the administration opened over HTTPS or 
 <img src="images/22-firmware-flasher.png" width="100%" alt="Install from the browser">
 
 1. **Connect the display by USB** and close other programs that use its serial port (e.g. a serial monitor).
-   Choose the **Speed** (115200 is the most reliable) and press **Connect**, then choose the serial port in the
-   browser's dialog. The page checks the chip: when it is not the chosen board's and only one board of the
+   Choose the **Speed** (115200 is the most reliable) and press **Connect**, then choose the display. The page checks the chip: when it is not the chosen board's and only one board of the
    installation has it (e.g. the ESP32-C6), the page switches to that board and connects again by itself; boards
    that share a chip (the ESP32-S3 boards) you choose yourself.
 2. **Back up the whole flash** with **Download backup** and keep the file private: it is the only way back to the
    current firmware and contains the display's Wi-Fi and pairing data. Without a download, confirm that you have a
    verified full backup.
 3. **Install** writes the firmware at 0x0. The display restarts and keeps its settings.
+
+**Choosing the display.** The browser names serial ports by their USB chip (*USB JTAG/serial debug unit*, *USB
+Serial*), which no firmware can change. Displays connected in this browser before are therefore listed by the page
+itself, each with its name, identifier, board and firmware as it reports them over USB; *No VibeDock answer* is a
+board with other firmware, one in its bootloader or a port in use elsewhere. **Another display …** opens the
+browser's dialog for a new one; it lists only the USB chips of the boards, not the computer's other serial ports.
+The same choice opens for **Restart display**, **Only pair** and **Read log over USB**.
 
 After the installation the page offers to **pair this device now** over the same cable: enter a **Name**, choose
 the **Wi-Fi** from the networks the display sees (**Refresh networks** scans again, for example after switching on a hotspot) and enter the **Wi-Fi password**, then **Send to the display**.
@@ -933,11 +955,13 @@ Reasons under *Server unreachable*:
 <img src="images/70-screen-unreachable.png" width="30%" alt="Server unreachable">
 <img src="images/70-screen-factory-reset.png" width="30%" alt="Factory reset">
 
-**Wi-Fi setup again and factory reset.** Unplug the display and plug it in again twice, each time within five
+**Wi-Fi setup again and factory reset.** Unplug the display and plug it in again twice, each time within ten
 seconds after power-on. The display then shows *Unplug now for factory reset*:
 
 - wait, and it opens the Wi-Fi setup (the pairing stays);
 - unplug once more, and it forgets Wi-Fi, pairing and server addresses (factory reset).
+
+A display with a battery fitted (Waveshare 1.54) keeps running on it when unplugged; disconnect the battery first.
 
 # Troubleshooting a display
 
@@ -959,8 +983,10 @@ Displays with a touch panel (Waveshare ESP32-S3-Touch-LCD-1.47, ESP32-S3-Touch-L
 | left / right | next / previous colour scheme; the display keeps it as its own design (*Custom design* in the editor) |
 | up / down | brighter / darker (10–100 %), stored on the display |
 | double tap | photos on or off: starts the slideshow of the display's design or stops it, whatever its schedule or the editor's switch say (until the next double tap or a restart of the server) |
+| circle | turns the picture: a circle clockwise turns it clockwise, counter-clockwise the other way; by 90° on the square 1.54, between upright and upside down on the others. The device card shows the new orientation (see [Displays mounted upside down or turned](#displays-mounted-upside-down-or-turned)) |
 
-The scheme changes with the next image, right after the swipe. To follow the default design again, turn off
+Draw the circle with one finger in one go, at least about a third of the screen wide and within three seconds; it does not
+have to be round or end exactly where it started. The scheme changes with the next image, right after the swipe. To follow the default design again, turn off
 *Custom design* for the display in the editor.
 
 ## Sounds and battery on the Waveshare 1.54-inch touch display
@@ -987,7 +1013,7 @@ Battery presence and operation without USB have not been established. No motion-
 
 Every display except the VibeTV M1 (its case decides how it stands) shows its **Orientation** on its card under
 **Devices**. The rotate button beside it turns by 180 degrees, on displays with a square panel (e.g. the Waveshare
-1.54") by 90 degrees clockwise, and saves at once. The card shows the case as the display is mounted, the picture on
+1.54") by 90 degrees clockwise, and saves at once. On touch displays a circle drawn with one finger does the same, in the direction of the circle. The card shows the case as the display is mounted, the picture on
 it upright. The display's own screens and the swipes turn as well; the
 display takes it over within seconds. Quarter turns need firmware that knows them: older firmware keeps its
 orientation until it is updated. The motion sensor of the Waveshare boards is not used: it decided too unreliably.
@@ -1126,8 +1152,8 @@ DOCS_PDF=../docs/manual/vibedock-manual.pdf ./scripts/docs.sh   # screenshots an
 - `DOCS_PDF` also makes the PDF; it needs pandoc, XeLaTeX (TeX Live) and the DejaVu fonts. Title page, page header
   and footer, headings and frames are defined in `docs/manual/style/manual.tex`. `keep-with-figure.lua` next to it moves a
   heading to the next page together with its first picture when both do not fit.
-- `EMOJI_DIR` points to the Twemoji SVGs (`assets/svg`; the 72×72 PNGs work too); without it the script downloads the
-  pinned Twemoji release once.
+- `EMOJI_DIR` points to another Twemoji SVG folder (the 72×72 PNGs work too); without it the script uses the
+  graphics versioned in the repository (`third-party/twemoji/svg`), the same as the server and the Docker image.
 - `PLAYWRIGHT_CHROMIUM` uses an installed Chromium instead of Playwright's own.
 
 **In the Docker image.** Every Docker build (Compose, `scripts/image.sh`, the release workflow) runs the same script
@@ -1159,7 +1185,7 @@ footer also holds every license text. The most important ones:
 | esptool-js (Espressif) | Flashing from the browser | Apache-2.0 |
 | Codex CLI, Gemini CLI | Sign-in to the providers | Apache-2.0 |
 | Claude Code, Grok Build | Sign-in to the providers | Licenses of Anthropic and xAI |
-| Twemoji graphics | Emoji on the displays | CC-BY 4.0 |
+| Twemoji 17.0.3 graphics (Twitter, Inc. and other contributors; unmodified, `third-party/twemoji`) | Emoji on the displays | CC BY 4.0 |
 | Open-Meteo | Weather data | CC-BY 4.0 (attribution) |
 | ArduinoJson, QRCode | Firmware | MIT |
 | TFT_eSPI | Firmware, display driver | FreeBSD and MIT (per file) |
