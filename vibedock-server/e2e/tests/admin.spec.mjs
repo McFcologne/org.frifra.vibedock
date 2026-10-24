@@ -273,8 +273,14 @@ test('editor preview fits the complete case and clears the previous case when sw
 });
 
 test('previews open the whole device enlarged and close again',async ({page,app}) => {
-  for(const path of ['/admin','/admin/devices','/admin/design']){
+  for(const [path,target] of [['/admin'],['/admin/devices'],['/admin/design'],['/admin/design','vibedock-e2e-desk']]){
     await page.goto(app.baseURL+path);
+    if(target){
+      await expect(page.locator('#design-target')).toBeEnabled();
+      await page.locator('#design-target').selectOption(target);
+      await expect(page.locator('.design-preview .case-154')).toBeVisible();
+      await expect.poll(()=>page.locator('.design-preview .device').evaluate(device=>device.style.getPropertyValue('--s'))).not.toBe('');
+    }
     const device=page.locator('main .device[role="button"]').first(), dialog=page.locator('dialog.device-lightbox');
     const small=await device.boundingBox();
     await device.click();await expect(dialog).toBeVisible();

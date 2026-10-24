@@ -161,6 +161,8 @@
   // A copy of the device as it is now; again when the page swaps in a new preview while it is open (device-state.js).
   const enlarged = device => {
     const copy = device.cloneNode(true);
+    // Let the lightbox size the screen independently of the fitted editor thumbnail.
+    copy.style.removeProperty('--s');
     for (const attribute of ['tabindex', 'title', 'role', 'aria-haspopup', 'aria-label']) copy.removeAttribute(attribute);
     copy.querySelectorAll('[id]').forEach(element => element.removeAttribute('id'));
     return copy;
