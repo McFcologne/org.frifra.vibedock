@@ -106,11 +106,12 @@ out-of-range voltages produce `estimatedPercent: null`. A short sample cannot ru
 The pin assignments and voltage divider follow the [manufacturer's power-manager example](https://github.com/waveshareteam/ESP32-S3-Touch-LCD-1.54/blob/5157db7c888e476fd57f8a95020800377447478f/examples/ESP32-S3-Touch-LCD-1.54-demo/ESP-IDF-5.5.1/01_factory/components/esp_bsp/bsp_power_manager.c).
 Battery readings have been displayed on the physical board; battery presence and operation without USB remain unverified.
 
-**Experimental battery power saving.** Switched on on the device card (`X-VibeDock-Power-Saving: battery`, see
-CLIENT-PROTOCOL 3g), the firmware checks every 5 s whether a USB host sends frames (`battery::usbHost`, the
-start-of-frame counter of the USB serial/JTAG unit) and whether the charging signal is inactive. Two such readings in a
-row mean battery operation (`client_policy::PowerSource`): Wi-Fi modem sleep, CPU at 80 MHz, backlight dimmed after
-60 s without touch or button. `VIBEDOCK-BATTERY` and `VIBEDOCK-HELLO` add `powerSource` and `powerSaving`.
+**Experimental battery power saving.** On boards built with `VIBEDOCK_BATTERY` (1.54, 1.47, C6 1.69, S3 1.69,
+T-Display-S3) and switched on on the device card (`X-VibeDock-Power-Saving: battery`, see CLIENT-PROTOCOL 3g), the
+firmware checks every 5 s whether a USB host sends frames (`battery::usbHost`, the start-of-frame counter of the USB
+serial/JTAG unit) and, on the 1.54, whether the charging signal is inactive. Two such readings in a row mean battery
+operation (`client_policy::PowerSource`): Wi-Fi modem sleep, CPU at 80 MHz, backlight dimmed after 60 s without touch
+or button. `VIBEDOCK-BATTERY` and `VIBEDOCK-HELLO` add `powerSource` and `powerSaving`.
 
 ## Before you start
 

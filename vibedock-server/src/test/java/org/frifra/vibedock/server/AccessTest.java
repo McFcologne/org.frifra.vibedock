@@ -552,7 +552,7 @@ class AccessTest {
             clients.setFlipped(id,true);Assertions.assertFalse(clients.get(id).flipped());
         }finally{clients.remove(id);}
     }
-    @Test void batteryPowerSavingIsAnExperimentalSwitchOfTheBoardsThatMeasureTheirBattery() throws Exception {
+    @Test void batteryPowerSavingIsAnExperimentalSwitchOfTheBoardsWithABattery() throws Exception {
         String key="ef".repeat(32),id="vibedock-power",image="/api/v1/clients/"+id+"/image",admin="/admin/clients/"+id+"/power-saving";
         clients.paired(id,"Kitchen",key,"192.168.1.35",80,"waveshare-s3-touch-lcd-154");
         try{
@@ -571,8 +571,12 @@ class AccessTest {
             Assertions.assertTrue(clients.get(id).powerSaving());
             mvc.perform(toggle.apply("false")).andExpect(status().isOk()).andExpect(jsonPath("$.enabled").value(false));
             mvc.perform(pull).andExpect(header().string("X-VibeDock-Power-Saving","off"));
-            // Boards that cannot measure their battery: no switch, no header.
-            clients.setBoard(id,"waveshare-s3-touch-lcd-147");
+            // The other boards with a battery have it too; boards without (or without USB host sensing) neither switch nor header.
+            clients.setBoard(id,"waveshare-c6-touch-lcd-169");
+            mvc.perform(toggle.apply("true")).andExpect(status().isOk());
+            mvc.perform(pull).andExpect(header().string("X-VibeDock-Power-Saving","battery"));
+            mvc.perform(toggle.apply("false")).andExpect(status().isOk());
+            clients.setBoard(id,"lilygo-t-display");
             mvc.perform(toggle.apply("true")).andExpect(status().isBadRequest());
             mvc.perform(pull).andExpect(header().doesNotExist("X-VibeDock-Power-Saving"));
             Assertions.assertFalse(clients.get(id).powerSaving());

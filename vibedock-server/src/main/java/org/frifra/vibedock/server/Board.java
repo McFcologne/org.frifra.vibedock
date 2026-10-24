@@ -33,10 +33,13 @@ public record Board(String id,String label,String chip,String display,String not
     /** Square panels can also stand turned by 90 degrees; on the others the picture would not fit. */
     public boolean rotatable(){return flippable()&&displayType().width()==displayType().height();}
     /**
-     * Experimental battery power saving: the board measures its battery and charging signal, so the firmware can tell
-     * battery operation from USB power (the Waveshare ESP32-S3-Touch-LCD-1.54).
+     * Experimental battery power saving: boards with a battery connection whose chip has its own USB (ESP32-S3, -C6).
+     * The firmware tells battery operation by the missing USB host (VIBEDOCK_BATTERY in platformio.ini), the 1.54 also
+     * by its charging signal. Not the boards with a USB serial chip (LilyGO T-Display) or without battery.
      */
-    public boolean batteryPowerSaving(){return id.equals("waveshare-s3-touch-lcd-154");}
+    static final Set<String> BATTERY_POWER_SAVING=Set.of("waveshare-s3-touch-lcd-154","waveshare-c6-touch-lcd-169",
+            "waveshare-s3-lcd-169","waveshare-s3-touch-lcd-147","lilygo-t-display-s3");
+    public boolean batteryPowerSaving(){return BATTERY_POWER_SAVING.contains(id);}
     /** The turns (clockwise degrees) the administration offers for this board. */
     public List<Integer> rotations(){return rotatable()?List.of(0,90,180,270):flippable()?List.of(0,180):List.of(0);}
     /**

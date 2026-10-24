@@ -51,7 +51,7 @@ uint8_t brightness = 100;  // backlight in percent; touch boards change it with 
 String pendingGesture;  // a swipe for the server (X-VibeDock-Gesture), sent with the next image pull
 uint8_t turns = 0;  // how the display is mounted: the picture turned clockwise in quarter turns (set in the administration)
 void applyOrientation(uint8_t next);
-// Experimental battery power saving (boards with VIBEDOCK_BATTERY_ADC): allowed in the administration, active only on
+// Experimental battery power saving (boards with VIBEDOCK_BATTERY): allowed in the administration, active only on
 // battery. See powerPoll.
 bool powerSavingAllowed = false, powerSaving = false, dimmed = false;
 client_policy::PowerSource powerSource;
@@ -938,7 +938,7 @@ int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
 #ifdef VIBEDOCK_AUDIO_ES8311
       , "X-VibeDock-Quota"
 #endif
-#ifdef VIBEDOCK_BATTERY_ADC
+#ifdef VIBEDOCK_BATTERY
       , "X-VibeDock-Power-Saving"
 #endif
   };
@@ -1133,7 +1133,7 @@ void pull() {
       logEvent(next == 0 ? String(F("Picture upright")) : next == 2 ? String(F("Picture flipped")) : String(F("Picture turned ")) + String(next * 90) + F(" degrees"), true);
     }
   }
-#ifdef VIBEDOCK_BATTERY_ADC
+#ifdef VIBEDOCK_BATTERY
   // Battery power saving, switched in the administration ("battery" or "off"); powerPoll applies it right away.
   if ((code == 200 || code == 304) && http.hasHeader("X-VibeDock-Power-Saving")) {
     bool allowed = http.header("X-VibeDock-Power-Saving") == "battery";
@@ -1213,6 +1213,16 @@ String statusLine(String &css) {
 }
 void colourCard();
 void audioCard();
+// Power source and battery power saving for the status page: closes the open <dd> of the row before, then <dt>/<dd>
+// pairs (the Power card of boards without battery measurement drops the leading "</dd>").
+String powerRows() {
+  String rows = F("</dd><dt>Power source</dt><dd>");
+  rows += powerSource.battery ? F("Battery (no USB host)") : F("USB or charging");
+  rows += F("</dd><dt>Power saving</dt><dd>");
+  rows += !powerSavingAllowed ? F("Off (set in the administration)") : powerSaving ? (dimmed ? F("On, backlight dimmed") : F("On"))
+      : F("Allowed, waits for battery operation");
+  return rows + F("</dd>");
+}
 void statusPage() {
   bool paired = mode == Mode::Paired;
   pageStart(html(deviceName));
@@ -1234,15 +1244,15 @@ void statusPage() {
     card += String(power.millivolts / 1000.0, 2) + F(" V</dd><dt>Estimated level</dt><dd>");
     card += power.estimatedPercent < 0 ? String(F("Unknown")) : String("~") + String(power.estimatedPercent) + " %";
     card += F("</dd><dt>Charging signal</dt><dd>"); card += power.chargeSignal;
-    card += F("</dd><dt>Power source</dt><dd>"); card += powerSource.battery ? F("Battery") : F("USB or charging");
-    card += F("</dd><dt>Power saving</dt><dd>");
-    card += !powerSavingAllowed ? F("Off (set in the administration)") : powerSaving ? (dimmed ? F("On, backlight dimmed") : F("On"))
-        : F("Allowed, waits for battery operation");
-    card += F("</dd><dt>Battery present</dt><dd>Unknown</dd></dl><p class=\"muted\">Voltage-based estimate only. "
+    card += powerRows();
+    card += F("<dt>Battery present</dt><dd>Unknown</dd></dl><p class=\"muted\">Voltage-based estimate only. "
         "USB power and charging affect the reading. A voltage or charging signal does not prove a battery is fitted; "
         "an inactive signal does not mean it is full. Reload this page to measure again.</p></section>");
     web.sendContent(card);
   }
+#ifdef VIBEDOCK_BATTERY
+  else web.sendContent(String(F("<section class=\"card\"><h2>Power</h2><dl>")) + powerRows().substring(5) + F("</dl></section>"));
+#endif
   audioCard();
   if (paired) colourCard();
   pageEnd();
@@ -1398,8 +1408,10 @@ void batteryJson(JsonObject target) {
   target["present"] = nullptr;  // the charging circuit has no reliable battery-presence output
   target["voltageMv"] = nullptr; target["estimatedPercent"] = nullptr;
   target["chargeSignal"] = power.chargeSignal;
-  target["powerSource"] = power.supported ? (powerSource.battery ? "battery" : "usb") : "unknown";
+#ifdef VIBEDOCK_BATTERY
+  target["powerSource"] = powerSource.battery ? "battery" : "usb";
   target["powerSaving"] = !powerSavingAllowed ? "off" : powerSaving ? "active" : "allowed";
+#endif
   if (power.supported) {
     target["voltageMv"] = power.millivolts;
     if (power.estimatedPercent >= 0) target["estimatedPercent"] = power.estimatedPercent;
@@ -1413,7 +1425,7 @@ void serialReady() {
   JsonDocument doc; doc["identifier"] = identifier; doc["name"] = deviceName; doc["version"] = VIBEDOCK_VERSION; doc["paired"] = !key.isEmpty();
   doc["board"] = VIBEDOCK_BOARD; doc["chip"] = VIBEDOCK_CHIP;
   // Leave HELLO lightweight on other boards, including the ESP8266 TLS callback.
-#ifdef VIBEDOCK_BATTERY_ADC
+#ifdef VIBEDOCK_BATTERY
   batteryJson(doc["battery"].to<JsonObject>());
 #endif
   Serial.print(F("VIBEDOCK-READY ")); serializeJson(doc, Serial); Serial.println();
@@ -1620,10 +1632,12 @@ void setPowerSaving(bool on) {
   logEvent(on ? F("Power saving on: Wi-Fi modem sleep, 80 MHz, dims after 60 s") : F("Power saving off"), true);
 }
 void powerPoll() {
-#ifdef VIBEDOCK_BATTERY_ADC
+#ifdef VIBEDOCK_BATTERY
   if (millis() - lastPowerCheck >= client_policy::powerCheckMs) {
     lastPowerCheck = millis();
-    bool charging = strcmp(battery::read().chargeSignal, "inactive") != 0;
+    // Only the 1.54 reports charging; on the others a USB host alone means external power.
+    const char *signal = battery::read().chargeSignal;
+    bool charging = strcmp(signal, "active") == 0 || strcmp(signal, "unstable") == 0;
     if (powerSource.update(client_policy::onBattery(battery::usbHost(), charging)))
       logEvent(powerSource.battery ? F("Power: battery") : F("Power: USB or charging"), true);
     setPowerSaving(powerSavingAllowed && powerSource.battery && mode == Mode::Paired);

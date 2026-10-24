@@ -4,7 +4,9 @@
 #pragma once
 #include <Arduino.h>
 #include "client_policy.h"
-#if defined(ESP32) && defined(VIBEDOCK_BATTERY_ADC) && defined(CONFIG_IDF_TARGET_ESP32S3)
+// Boards with a battery connection (VIBEDOCK_BATTERY) on chips with their own USB serial/JTAG unit.
+#if defined(ESP32) && defined(VIBEDOCK_BATTERY) && (defined(CONFIG_IDF_TARGET_ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6))
+#define VIBEDOCK_USB_HOST_SENSE 1
 #include "soc/usb_serial_jtag_reg.h"
 #endif
 
@@ -21,10 +23,10 @@ inline void begin() {
   analogSetPinAttenuation(VIBEDOCK_BATTERY_ADC, ADC_11db);
 #endif
 }
-// A USB host is attached: it sends a start-of-frame every millisecond, which the ESP32-S3's USB serial/JTAG unit
-// counts. A charger or power bank without data lines sends none. Only on boards with battery sensing.
+// A USB host is attached: it sends a start-of-frame every millisecond, which the chip's USB serial/JTAG unit
+// counts (ESP32-S3, -C3, -C6). A charger or power bank without data lines sends none. Elsewhere always true.
 inline bool usbHost() {
-#if defined(ESP32) && defined(VIBEDOCK_BATTERY_ADC) && defined(CONFIG_IDF_TARGET_ESP32S3)
+#ifdef VIBEDOCK_USB_HOST_SENSE
   uint32_t first = REG_READ(USB_SERIAL_JTAG_FRAM_NUM_REG) & USB_SERIAL_JTAG_SOF_FRAME_INDEX;
   delay(3);
   return (REG_READ(USB_SERIAL_JTAG_FRAM_NUM_REG) & USB_SERIAL_JTAG_SOF_FRAME_INDEX) != first;

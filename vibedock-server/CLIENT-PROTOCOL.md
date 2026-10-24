@@ -242,15 +242,16 @@ handler, kept in RTC memory as well; they are decoded with the ELF of that firmw
 
 ## 3g. Battery power saving (server → device, experimental)
 
-Only the Waveshare ESP32-S3-Touch-LCD-1.54, which measures its battery, gets `X-VibeDock-Power-Saving` with every 200
-and 304 answer: `battery` when *Battery power saving* is switched on on its device card, otherwise `off`. The display
-stores the setting. With `battery` it saves power while it runs on its battery: no USB host sends frames (checked by the
-USB start-of-frame counter of the ESP32-S3) and the charging signal is inactive, two readings 5 s apart. Then it switches
-on Wi-Fi modem sleep, runs its CPU at 80 MHz instead of 240 MHz and dims the backlight to 10 % after a minute without
-touch or volume button; the next touch only wakes it. USB power or charging ends it, as does `off`. A charger without
-data lines next to a full cell also counts as battery operation. The status page, `VIBEDOCK-BATTERY` and the `battery`
-object of `VIBEDOCK-HELLO` show `powerSource` (`battery`, `usb`) and `powerSaving` (`off`, `allowed`, `active`).
-Firmware before this ignores the header.
+Boards with a battery connection whose chip has its own USB (Waveshare 1.54, 1.47, C6 1.69, S3 1.69, LilyGO
+T-Display-S3; `Board.batteryPowerSaving`, `VIBEDOCK_BATTERY` in platformio.ini) get `X-VibeDock-Power-Saving` with
+every 200 and 304 answer: `battery` when *Battery power saving* is switched on on the device card, otherwise `off`.
+The display stores the setting. With `battery` it saves power while it runs on its battery: no USB host sends frames
+(the start-of-frame counter of the chip's USB serial/JTAG unit) and, on the 1.54, the charging signal is inactive; two
+readings 5 s apart. Then it switches on Wi-Fi modem sleep, runs its CPU at 80 MHz and dims the backlight to 10 % after
+a minute without touch or volume button; the next touch only wakes it. A USB host (or charging on the 1.54) ends it,
+as does `off`. A charger without data lines counts as battery operation. The status page, `VIBEDOCK-BATTERY` and the
+`battery` object of `VIBEDOCK-HELLO` show `powerSource` (`battery`, `usb`) and `powerSaving` (`off`, `allowed`,
+`active`). Firmware before this ignores the header.
 
 ## Boards
 
