@@ -23,7 +23,8 @@ inline bool deltaLength(const char *text,uint32_t limit,uint32_t &out) {
     if(*text<'0'||*text>'9'||n>limit/10)return false;
     n=n*10+uint32_t(*text-'0');if(n>=limit)return false;
   }
-  if(n<2)return false;out=n;return true;
+  if(n<2)return false;
+  out=n;return true;
 }
 // Streaming decoder. read fills exactly n bytes or fails; draw receives one uncorrected RGB565 span.
 // The caller owns a 2*maxImageSide scratch buffer and invalidates ALL row state after any failure.

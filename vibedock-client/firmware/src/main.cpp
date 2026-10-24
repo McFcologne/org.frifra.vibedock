@@ -1207,7 +1207,6 @@ void pull() {
       lastImageSize=size;deltaReady=size.width==panel.width()&&size.height==panel.height();
       etag = http.header("ETag"); lastImage = millis(); haveImage = true; staleScreen = false; footer(); imageFailures = 0;
       if (first) logEvent(String(F("Image shown, read in ")) + String(millis() - reading) + " ms", true);
-      if (delta) logEvent(String(F("Image delta: "))+String(length)+F(" bytes, ")+String(millis()-reading)+F(" ms"),true);
     } else {
       etag = "";
       // A rejected/partial patch can have changed pixels without a trustworthy row hash. Redraw the whole basis.

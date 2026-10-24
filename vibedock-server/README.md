@@ -24,7 +24,7 @@ Paired displays with delta-capable firmware receive only changed RGB565 spans wh
 is still in the server's bounded RAM history and a patch is smaller. The server always renders and retains
 complete images; older clients continue to receive full images. No persistent data migration or setting is
 needed. The server log compares each device image response's payload size with its full RGB565 size (HTTP/TLS
-overhead excluded). See [delta transfer, limits and recovery](CLIENT-PROTOCOL.md#optional-delta-images-v1).
+overhead excluded); unchanged images (304) only at debug level. See [delta transfer, limits and recovery](CLIENT-PROTOCOL.md#optional-delta-images-v1).
 
 ## Administration at a glance
 

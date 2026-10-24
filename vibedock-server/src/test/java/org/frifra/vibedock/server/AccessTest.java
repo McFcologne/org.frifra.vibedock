@@ -84,7 +84,7 @@ class AccessTest {
                 .andExpect(status().isOk()).andExpect(header().string("X-VibeDock-Redraw","1"))
                 .andExpect(header().string("X-VibeDock-Image-Format","rgb565-be-240x240")).andExpect(header().doesNotExist("ETag"));
         Assertions.assertTrue(output.getOut().contains("full=115200 bytes, payload=115200 bytes, saved=0 bytes (0.0%)"));
-        Assertions.assertTrue(output.getOut().contains("unchanged (304), full=115200 bytes, payload=0 bytes, saved=115200 bytes (100.0%)"));
+        Assertions.assertFalse(output.getOut().contains("unchanged (304)"),"304 only at debug level");
     }
     @Test void quotaMetadataRequiresAudioOptInAndSurvives304ButNotPreview() throws Exception {
         String key="ab".repeat(32),id="vibedock-audio-test",path="/api/v1/clients/"+id+"/image";

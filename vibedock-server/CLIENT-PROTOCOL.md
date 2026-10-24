@@ -336,14 +336,14 @@ requests a full image on its retry (normally after one second). A partial pictur
 retry succeeds. The row-table check validates bookkeeping, not a physical readback of the panel. TLS continues
 to protect HTTPS traffic; none of its certificate checks change.
 
-**Transfer diagnostics:** every device RGB565 pull logs `Image transfer <device>: <mode>, full=<M> bytes,
-payload=<N> bytes, saved=<M-N> bytes (<P>%)`. Modes distinguish delta, full image, preview and unchanged **304**.
-Savings have one decimal place and always compare with the full RGB565 image: full images save 0%, **304**
-saves 100% with zero body bytes. A **304** was already available before delta support, so that percentage is
-not an additional delta saving. Numbers describe the selected response body, not HTTP/TLS overhead, TCP
-retransmissions or proof of reception. The next device ETag identifies the accepted complete image. The device
-logs successful deltas as `Image delta: <N> bytes, <ms> ms`. Hardware tests are needed to quantify airtime and
-battery savings.
+**Transfer diagnostics:** every device RGB565 pull with an image logs `Image transfer <device>: <mode>,
+full=<M> bytes, payload=<N> bytes, saved=<M-N> bytes (<P>%)`; modes are delta, full image and preview. Savings
+have one decimal place and always compare with the full RGB565 image: full images save 0%. Unchanged images
+(**304**) come with every poll and are logged at debug level only. Numbers describe the selected response body,
+not HTTP/TLS overhead, TCP retransmissions or proof of reception. The next device ETag identifies the accepted
+complete image. The device log keeps its events as before (the first image after a start, aborted images); a
+successful delta adds no line, so the log is not filled and the flash not written with every image. Hardware
+tests are needed to quantify airtime and battery savings.
 
 ## Status in the administration UI
 

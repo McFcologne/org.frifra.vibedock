@@ -110,6 +110,8 @@ class DeviceApiController {
     }
     /** Response payload selected for transmission; excludes transport overhead and is not a receipt acknowledgement. */
     private static void logTransfer(String device,String mode,int full,int payload){
+        // Unchanged images (304) come with every poll: only at debug level, so the log keeps its other events.
+        if(payload==0){log.debug("Image transfer {}: {}",device,mode);return;}
         log.info("Image transfer {}: {}, full={} bytes, payload={} bytes, saved={} bytes ({}%)",device,mode,full,payload,full-payload,
                 String.format(Locale.ROOT,"%.1f",full==0?0:100.0*(full-payload)/full));
     }

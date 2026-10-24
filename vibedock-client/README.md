@@ -156,8 +156,8 @@ use HTTP 304. Old servers and old firmware retain the existing full-image path.
 
 A missing basis, interrupted or invalid delta triggers a full-image retry. Force refresh, slideshow photos,
 scaled images and the status-page preview use full images. The server keeps a bounded, temporary image history;
-there is no configuration or data migration. Its log compares payload bytes with the full image, and the device
-logs successful delta size and read time. These byte savings do not establish battery or airtime savings on
+there is no configuration or data migration. Its log compares payload bytes with the full image; the device log
+notes failed deltas only. These byte savings do not establish battery or airtime savings on
 hardware. See [the wire format and recovery rules](../vibedock-server/CLIENT-PROTOCOL.md#optional-delta-images-v1).
 
 ## Change what a device displays
