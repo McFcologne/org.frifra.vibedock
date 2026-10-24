@@ -231,7 +231,7 @@ button.small{padding:5px 10px;font-size:13px;font-weight:500}
 .design-slot small{font-size:12px;margin-top:7px}.design-slot input{min-width:0;padding:8px;font-size:14px;height:42px}
 .design-side{min-width:0}#design-style-controls:disabled{opacity:.6}
 .design-fixed{padding:0 4px 16px;font-size:13px;color:var(--muted)}.design-fixed strong{font-weight:600}
-.design-preview .screen{margin-top:16px}.design-preview .device{--s:220px;max-width:100%}
+.design-preview .screen{margin-top:16px}.design-preview .device{--s:220px}
 .design-preview figure{text-align:center}.design-preview img{image-rendering:auto}.design-preview #preview-status{margin-top:15px}
 #design-controls:disabled{opacity:.6}
 @media(max-width:860px){.layout-columns{grid-template-columns:minmax(0,1fr)}.design-side{width:100%;max-width:380px;justify-self:center;grid-row:1}.design-preview{width:100%}}
