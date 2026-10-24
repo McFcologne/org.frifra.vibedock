@@ -4,32 +4,31 @@ The release workflow publishes the section of the tagged version (`## 0.1.0` for
 
 ## 0.3.0
 
-More efficient display updates, fifteen new themes and simpler USB pairing. The server can send only the changed
-parts of a picture and tell displays when to fetch the next one. The administration adds a gallery of all
+About 99 % less data for displays, fifteen new themes and simpler USB pairing. The server sends only the changed
+parts of a picture and tells displays when to fetch the next one. The administration adds a gallery of all
 thirty-five themes, instance-wide theme availability and a shared Wi-Fi/USB pairing dialog. Touch rotation and
 optional, experimental battery power saving extend the firmware.
 
 **Updating:** update the server image first, then update the displays over Wi-Fi from the administration. The new
-firmware is needed for delta transfers, scheduled image pulls, the circle gesture, battery power saving and the
-Wi-Fi recovery improvements. The themes, pairing interface, data-source intervals and preview fixes are server-side.
-Older firmware remains supported with complete pictures and its existing polling behaviour; it can be updated
-later. Battery power saving is off by default and remains experimental; energy savings have not been measured.
+firmware is needed for delta transfers, scheduled image pulls, the circle gesture, battery power saving and battery
+icon, and the Wi-Fi scan and power-cycle fixes. The themes, pairing interface, data-source intervals and preview
+fixes are server-side. Older firmware remains supported with complete pictures and its existing polling behaviour;
+it can be updated later. Battery power saving is off by default and remains experimental; energy savings have not
+been measured.
 
-- **Smaller image transfers:** the server still renders the complete picture, but a display with the new firmware
-  can receive only the parts that changed: usually a few hundred bytes to a few KB instead of 115,200 bytes
-  (112.5 KiB) for a complete 240 × 240 picture. In one 20-minute test on a Waveshare 1.54 with readings every
-  minute, image payload fell from 1.84 MB to 20 KB, about 99 % less. This is an example for image payload,
-  not a guarantee for all traffic or battery life; savings depend on how much of the picture changes.
-  A complete picture is sent after a start, for photos, on a forced refresh, when the previous picture is
-  unavailable or uncertain, or when a delta would not be smaller. The server log reports the complete and
-  transferred payload sizes and the percentage saved. Older firmware and older servers keep using complete pictures.
-- **Pull when the picture can change:** the server tells compatible displays when to request their next picture,
-  taking account of the displayed sources' next updates, stale readings and photo changes. Displays use that
-  announced time rather than the configured polling interval while a valid schedule is available. Pending source
-  updates get short retries; failed requests return to the configured fallback interval. Scheduled waits are
-  capped at ten minutes for displays the server can recently reach directly, and two minutes otherwise.
-  The configured interval remains the fallback for older servers and responses without a valid schedule.
-  Both delta transfers and scheduled pulls need the new server and firmware.
+- **About 99 % less data for displays:** the server still renders the complete picture, but a display with the new
+  firmware receives only the parts that changed: usually a few hundred bytes to a few KB instead of 115,200 bytes
+  (112.5 KiB) for a complete 240 × 240 picture. Measured on a Waveshare 1.54 with readings every minute: 20 KB
+  instead of 1.84 MB in 20 minutes; the saving depends on how much of the picture changes. A complete picture is sent
+  after a start, for photos, on a forced refresh, when the previous picture is unavailable or uncertain, or when a
+  delta would not be smaller. The server log reports the complete and transferred sizes and the percentage saved.
+  Older firmware and older servers keep using complete pictures.
+- **Pull when the picture can change:** every answer tells the display when its picture can change next (the
+  next update of the sources it shows, a reading turning stale, the next photo), and the display pulls then instead
+  of every 30 s, so the unchanged answers in between are gone. Pending source updates get short retries. Waits are
+  capped at ten minutes for displays the server has reached directly within the last day, and two minutes otherwise.
+  The poll interval under *Settings* is now called *Fallback poll interval*: it applies to older firmware, failed
+  pulls and answers without a schedule. Both delta transfers and scheduled pulls need the new server and firmware.
 - **Update interval of the data sources:** *Data sources → Update interval* chooses between a fixed and a dynamic
   interval, with a shortest and a longest one (default dynamic, 1 to 10 minutes). Dynamic learns for every source
   how often its provider answers: each HTTP 429 adds a minute, an hour without one tries a minute less, and a 429 at
