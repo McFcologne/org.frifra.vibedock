@@ -23,6 +23,30 @@
   </div>
 </th:block>
 <!-- Pairing forms only offer to leave the pin out; its status and the certificate are under Settings › Network. -->
+<!-- Pairing over USB: one form for two places, the firmware page (after installing, or "Only pair") and Devices → Pair
+     device → USB. Its script is usb-pairing.js; change both places here and there. -->
+<th:block th:fragment="usbPairing(heading,skip)">
+  <h4 th:if="${heading}" th:text="${heading}">Pair this device now?</h4>
+  <p>The display gets your Wi-Fi and this server's address over the cable and shows its image right after its restart: no setup Wi-Fi, no pairing code.
+    The Wi-Fi password goes from this browser to the device only; the server never sees it.</p>
+  <p class="notice error" data-pair-unsupported hidden>This browser cannot reach USB devices: use Chrome or Edge, with the administration opened over https or on localhost.</p>
+  <p class="notice error" th:if="${internalLoopback}">This page is opened on localhost, so the server's LAN address is unknown to it. Set the internal address under
+    <a th:href="@{/admin/server}">Settings</a> first, otherwise the device cannot reach the server.</p>
+  <div class="flash-row" data-pair-ask><button type="button" data-pair-start>Pair now</button><button type="button" class="secondary" data-pair-skip th:text="${skip}">Not now</button></div>
+  <form class="flash-pair-form" data-pair-form hidden autocomplete="off">
+    <label>Name<input name="name" maxlength="40" required></label>
+    <div class="net-pick" data-net-pick><div class="net-pick-head"><span>Wi-Fi</span><button type="button" class="link-button" data-net-refresh>Refresh networks</button></div>
+      <button type="button" class="net-pick-button" aria-haspopup="listbox" aria-expanded="false"><span data-net-value>Choose a network …</span>
+        <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <div class="net-pick-pop" hidden><input type="search" placeholder="Search networks …" aria-label="Search networks" autocomplete="off" maxlength="32">
+        <ul role="listbox"></ul></div>
+      <input type="hidden" name="ssid"></div>
+    <label>Wi-Fi password<input name="password" type="password" maxlength="64" autocomplete="new-password"></label>
+    <th:block th:replace="~{fragments :: tlsPinOption}"></th:block>
+    <div class="flash-row"><button type="submit">Send to the display</button><button type="button" class="secondary" data-pair-skip>Cancel</button></div>
+  </form>
+  <p class="meta" data-pair-state aria-live="polite"></p>
+</th:block>
 <th:block th:fragment="tlsPinOption">
   <label class="check tls-pin-option" title="The root certificate is still sent. The display verifies HTTPS itself and learns its own pin after a successful connection.">
     <input type="checkbox" name="omitTlsPin"> Do not send TLS pin (test full certificate verification)</label>

@@ -288,7 +288,7 @@ test('TLS pin status shows a known fingerprint and pairing can omit it',async ({
   await expect(page.locator('[data-tls-pin-value]')).toBeHidden();await expect(refresh).toBeEnabled();
   await page.goto(app.baseURL+'/admin/devices');
   await page.locator('[data-create-open="invite"]').click();
-  const omit=page.getByLabel('Do not send TLS pin', {exact:false});
+  const omit=page.locator('form.invite').getByLabel('Do not send TLS pin', {exact:false});
   await expect(omit).not.toBeChecked();await omit.check();
   await page.getByLabel('Device IP',{exact:true}).fill('192.168.1.99');
   await page.getByLabel('Pairing code',{exact:true}).fill('123456');
@@ -381,6 +381,100 @@ test('the port choice names the displays allowed before by what they report over
   const output=page.locator('[data-usb-output]');
   await expect(output).toContainText('Log of Shelf (vibedock-e2e-shelf, firmware 0.2.4');
   await expect(output).toContainText('Start v0.2.4 waveshare-s3-touch-lcd-154');
+});
+
+test('pair device offers Wi-Fi or USB, remembers the choice and pairs over USB with the firmware page form',async ({page,app}) => {
+  await page.addInitScript(() => {
+    const port = { buffer: '', getInfo: () => ({ usbVendorId: 0x303a, usbProductId: 0x1001 }), async setSignals() {},
+      async open() {
+        const self = this;
+        this.readable = new ReadableStream({ start(controller) { self.controller = controller; } });
+        this.writable = new WritableStream({ write(chunk) {
+          self.buffer += new TextDecoder().decode(chunk);
+          for (let i; (i = self.buffer.indexOf('\n')) >= 0; self.buffer = self.buffer.slice(i + 1)) {
+            const line = self.buffer.slice(0, i), say = text => self.controller.enqueue(new TextEncoder().encode(text + '\n'));
+            if (line === 'VIBEDOCK-HELLO') say('VIBEDOCK-READY ' + JSON.stringify({ identifier: 'vibedock-e2e-new', name: 'Kitchen', version: '0.2.4', board: 'waveshare-s3-touch-lcd-154', paired: false }));
+            if (line === 'VIBEDOCK-SCAN') say('VIBEDOCK-NETWORKS [{"ssid":"Home","rssi":-50,"open":false}]');
+          }
+        } });
+      },
+      async close() { try { this.controller.close(); } catch { /* closed */ } } };
+    Object.defineProperty(navigator, 'serial', { configurable: true, value: { getPorts: async () => [port], requestPort: async () => port } });
+  });
+  await page.goto(app.baseURL+'/admin/devices');
+  await page.getByRole('button',{name:'Pair device'}).click();
+  const panel=page.locator('#invite'), wifi=panel.getByRole('radio',{name:'Wi-Fi'}), usb=panel.getByRole('radio',{name:'USB'});
+  await expect(wifi).toBeChecked();await expect(panel.getByLabel('Device IP')).toBeVisible();
+  // The warning of the Wi-Fi form leads to USB; the choice stays after a reload.
+  await panel.locator('[data-pair-method-switch="usb"]').click();
+  await expect(usb).toBeChecked();await expect(panel.getByLabel('Device IP')).toBeHidden();
+  await page.reload();await page.getByRole('button',{name:'Pair device'}).click();
+  await expect(usb).toBeChecked();
+  await panel.getByRole('button',{name:'Pair now'}).click();
+  const dialog=page.locator('dialog.port-dialog');await dialog.getByRole('button',{name:/Kitchen/}).click();
+  await expect(panel.locator('[data-pair-form]')).toBeVisible();
+  await expect(panel.locator('[data-pair-form]').getByLabel('Name')).toHaveValue('Kitchen');
+  await expect(panel.locator('[data-net-value]')).toHaveText('Home');
+  // Cancel closes the dialog; back to Wi-Fi is remembered as well.
+  await panel.locator('[data-pair-form]').getByRole('button',{name:'Cancel'}).click();
+  await expect(panel).toBeHidden();
+  await page.getByRole('button',{name:'Pair device'}).click();await panel.locator('.pair-method label',{hasText:'Wi-Fi'}).click();await expect(wifi).toBeChecked();
+  await page.reload();await page.getByRole('button',{name:'Pair device'}).click();await expect(wifi).toBeChecked();
+});
+
+test('leaving USB pairing frees the port and starts the form again, also with Escape',async ({page,app}) => {
+  await page.addInitScript(() => {
+    const port = { buffer: '', getInfo: () => ({ usbVendorId: 0x303a, usbProductId: 0x1001 }), async setSignals() {},
+      async open() {
+        const self = this; window.portOpen = true;
+        this.readable = new ReadableStream({ start(controller) { self.controller = controller; } });
+        this.writable = new WritableStream({ write(chunk) {
+          self.buffer += new TextDecoder().decode(chunk);
+          for (let i; (i = self.buffer.indexOf('\n')) >= 0; self.buffer = self.buffer.slice(i + 1)) {
+            const line = self.buffer.slice(0, i), say = text => self.controller.enqueue(new TextEncoder().encode(text + '\n'));
+            if (line === 'VIBEDOCK-HELLO') say('VIBEDOCK-READY ' + JSON.stringify({ identifier: 'vibedock-e2e-new', name: 'Kitchen', version: '0.2.4', board: 'waveshare-s3-touch-lcd-154', paired: false }));
+            if (line === 'VIBEDOCK-SCAN') say('VIBEDOCK-NETWORKS [{"ssid":"Home","rssi":-50,"open":false}]');
+          }
+        } });
+      },
+      async close() { window.portOpen = false; try { this.controller.close(); } catch { /* closed */ } } };
+    Object.defineProperty(navigator, 'serial', { configurable: true, value: { getPorts: async () => [port], requestPort: async () => port } });
+  });
+  await page.goto(app.baseURL+'/admin/devices');
+  const panel=page.locator('#invite'),form=panel.locator('[data-pair-form]'),start=panel.getByRole('button',{name:'Pair now'});
+  // The first time the port is chosen; afterwards the page keeps it, like the firmware page.
+  const connect=async choose => {
+    await page.getByRole('button',{name:'Pair device'}).click();await panel.locator('.pair-method label',{hasText:'USB'}).click();
+    await start.click();if(choose)await page.locator('dialog.port-dialog').getByRole('button',{name:/Kitchen/}).click();
+    await expect(form).toBeVisible();expect(await page.evaluate(()=>window.portOpen)).toBe(true);
+  };
+  // USB → Wi-Fi → USB: the port is closed and the form is gone, nothing can be sent over the closed connection.
+  let registered=0;await page.route('**/admin/firmware/setup',route=>{registered++;route.fulfill({status:500,body:'{}'});});
+  await connect(true);
+  await panel.locator('.pair-method label',{hasText:'Wi-Fi'}).click();
+  await expect.poll(()=>page.evaluate(()=>window.portOpen)).toBe(false);
+  await panel.locator('.pair-method label',{hasText:'USB'}).click();
+  await expect(form).toBeHidden();await expect(start).toBeVisible();
+  expect(registered).toBe(0);
+  await panel.locator('.pair-method label',{hasText:'Wi-Fi'}).click();await panel.getByRole('button',{name:'Cancel'}).first().click();
+  // Escape closes the dialog like Cancel: port free, form back at its start.
+  await connect(false);
+  await page.keyboard.press('Escape');await expect(panel).toBeHidden();
+  await expect.poll(()=>page.evaluate(()=>window.portOpen)).toBe(false);
+  await page.getByRole('button',{name:'Pair device'}).click();await expect(form).toBeHidden();await expect(start).toBeVisible();
+});
+
+test('the firmware page shows the same USB pairing form under Only pair',async ({page,app}) => {
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.addInitScript(() => Object.defineProperty(navigator, 'serial', { configurable: true, value: { getPorts: async () => [], requestPort: async () => { throw new DOMException('No port selected', 'NotFoundError'); } } }));
+  await page.goto(app.baseURL+'/admin/firmware');
+  const only=page.getByRole('button',{name:'Only pair a display that already runs this firmware'});
+  test.skip(await only.count()===0||await only.isDisabled(),'no browser flasher in this installation');
+  await only.click();
+  const pair=page.locator('#web-flasher [data-pair]');
+  await expect(pair).toBeVisible();await expect(pair.getByRole('heading',{name:'Pair this device now?'})).toBeVisible();
+  await pair.getByRole('button',{name:'Not now'}).click();await expect(pair).toBeHidden();
+  expect(errors).toEqual([]);
 });
 
 test('closing the port choice after a port went away ends there, without the browser dialog',async ({page,app}) => {
