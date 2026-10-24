@@ -125,7 +125,20 @@ class Controllers {
                 a.label(),effective.account(a.id()).map(e->!e.manual().token().isBlank()).orElse(false),a.manual().accountId(),a.suspended())).toList());
         model.addAttribute("types",SettingsStore.Account.TYPES);
         model.addAttribute("sourceStates",usage.snapshot().providers());
+        model.addAttribute("polling",store.polling());
+        var intervals=new java.util.HashMap<String,Integer>();
+        for(var a:store.get().accounts()){var minutes=usage.interval(a.id());if(minutes!=null)intervals.put(a.id(),minutes);}
+        model.addAttribute("intervals",intervals);
         return "sources";
+    }
+    /** Update interval of the sources: fixed or dynamic between the shortest and the longest interval. */
+    @PostMapping("/admin/sources/polling") String polling(@RequestParam(defaultValue="dynamic") String mode,@RequestParam int minMinutes,
+            @RequestParam int maxMinutes,RedirectAttributes flash) throws Exception {
+        try{
+            store.savePolling(new SettingsStore.UsagePolling(!"fixed".equals(mode),minMinutes,maxMinutes));usage.pollingChanged();
+            flash.addFlashAttribute("pollingMessage","Saved. The sources keep their current interval within the new limits.");
+        }catch(IllegalArgumentException e){flash.addFlashAttribute("pollingError",e.getMessage());}
+        return "redirect:/admin/sources#update-interval";
     }
     @PostMapping("/admin/sources/add") String addSource(@RequestParam String type,@RequestParam String label,RedirectAttributes flash) throws Exception {
         try{

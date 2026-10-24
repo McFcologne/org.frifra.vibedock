@@ -40,7 +40,7 @@ class AccessTest {
     @MockitoBean BrowserLogin login;
     @BeforeEach void resetSettings() throws Exception {
         store.save(new SettingsStore.Settings(List.of("127.0.0.1/32"),new SettingsStore.Credential("",""),new SettingsStore.Credential("",""),List.of()));
-        usage.configurationChanged();
+        usage.forgetPacing();usage.configurationChanged();
     }
     @Test void quotaMetadataRequiresAudioOptInAndSurvives304ButNotPreview() throws Exception {
         String key="ab".repeat(32),id="vibedock-audio-test",path="/api/v1/clients/"+id+"/image";
@@ -237,6 +237,25 @@ class AccessTest {
         mvc.perform(post("/admin/sources/import/apply").param("mode","add").param("source",ids.get(0)).session(session)
                 .with(user("admin").roles("ADMIN")).with(csrf()).with(r->{r.setLocalPort(10001);return r;}))
                 .andExpect(flash().attribute("importError","The import expired. Upload the file again."));
+    }
+    @Test void updateIntervalIsSavedAndValidated() throws Exception {
+        try{
+            mvc.perform(post("/admin/sources/polling").param("mode","fixed").param("minMinutes","2").param("maxMinutes","5")
+                    .with(user("admin").roles("ADMIN")).with(csrf()).with(r->{r.setLocalPort(10001);return r;}))
+                    .andExpect(redirectedUrl("/admin/sources#update-interval")).andExpect(flash().attributeExists("pollingMessage"));
+            Assertions.assertEquals(new SettingsStore.UsagePolling(false,2,5),store.polling());
+            mvc.perform(post("/admin/sources/polling").param("mode","dynamic").param("minMinutes","6").param("maxMinutes","5")
+                    .with(user("admin").roles("ADMIN")).with(csrf()).with(r->{r.setLocalPort(10001);return r;}))
+                    .andExpect(flash().attributeExists("pollingError"));
+            Assertions.assertEquals(new SettingsStore.UsagePolling(false,2,5),store.polling());
+            mvc.perform(get("/admin/sources").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
+                    .andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("id=\"update-interval\"")))
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString("<option value=\"fixed\" selected")));
+            // Only the administration sets it; the public port does not know the address.
+            mvc.perform(post("/admin/sources/polling").param("minMinutes","1").param("maxMinutes","2")
+                    .with(user("admin").roles("ADMIN")).with(csrf()).with(r->{r.setLocalPort(8080);return r;}))
+                    .andExpect(status().isNotFound());
+        }finally{store.savePolling(SettingsStore.UsagePolling.DEFAULT);usage.pollingChanged();}
     }
     @Test void onlySourceCreationErrorsOpenTheAddSourcePanel() throws Exception {
         var added=mvc.perform(post("/admin/sources/add").param("type","missing").param("label","Test")
