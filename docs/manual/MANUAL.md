@@ -488,7 +488,14 @@ Every paired display has a card:
 
 **HTTP pairing is unencrypted.** Use it only on a trusted home network. A network attacker can read the
 device key or replace its TLS/OTA trust keys. The form shows a warning and remains available without
-extra activation. Alternatively, use **Devices → Firmware → Only pair** over USB without reinstalling firmware.
+extra activation. Alternatively, pair over USB without reinstalling firmware: **USB** in the same dialog.
+
+**Pair device** has two ways, switched at its top right: **Wi-Fi** with the display's IP address and code, and
+**USB** for a display connected to this computer. The dialog opens with the way chosen last in this browser. **USB** is
+the same pairing as **Only pair** on the firmware page (one form in two places, see [Installing the firmware from the
+browser](#from-the-browser-recommended)): **Pair now**, choose the display, enter a **Name**, choose the
+**Wi-Fi** and its password, **Send to the display**. It needs Chrome or Edge with the administration opened over https
+or on `localhost`; the page reloads once the display shows its image.
 
 A display without pairing shows its IP address and a six-digit code (see [The display's own
 screens](#the-displays-own-screens)). Open **Pair device**, enter both, optionally a name, and choose the
@@ -840,7 +847,7 @@ and shows its image; no setup Wi-Fi and no pairing code are needed.
 
 <img src="images/25-firmware-installed.png" width="100%" alt="After the installation: pairing over USB">
 
-**Only pair a display that already runs this firmware** skips the installation. **Restart display** restarts a
+**Only pair a display that already runs this firmware** skips the installation; the same form is under **Devices → Pair device → USB**. **Restart display** restarts a
 connected display. If writing stops, do not unplug: connect again and repeat **Install** at 115200; the bootloader
 is in the chip's ROM and stays available.
 

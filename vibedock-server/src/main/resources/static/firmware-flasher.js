@@ -1,7 +1,8 @@
 // Flashes the VibeDock firmware over Web Serial with esptool-js: connect, back up the whole flash, write the image of the
 // chosen board at 0x0 (on ESP32 chips bootloader, partition table and app in one; the LittleFS settings stay), then
 // restart the device.
-import { openConsole as openSerialConsole, restart, csrf, sleep, chooseDisplayPort } from './serial-console.js';
+import { restart, chooseDisplayPort } from './serial-console.js';
+import { usbPairing } from './usb-pairing.js';
 const card = document.getElementById('web-flasher');
 const $ = selector => card.querySelector(selector);
 const button = name => $(`[data-flash="${name}"]`);
@@ -106,19 +107,10 @@ function chipFamily(description) {
   return variant ? 'ESP32-' + variant[1] : text.startsWith('ESP32') ? 'ESP32' : text.split(' ')[0];
 }
 
-// ---- pairing over USB right after the installation (the console: serial-console.js) ----
+// ---- pairing over USB right after the installation, or alone (usb-pairing.js, shared with Devices → Pair device) ----
 const pair = card.querySelector('[data-pair]');
-const pairForm = pair.querySelector('[data-pair-form]'), pairAsk = pair.querySelector('[data-pair-ask]');
-const pairState = pair.querySelector('[data-pair-state]');
-let console_, device;
-function say(text, error = false) { pairState.textContent = text; pairState.classList.toggle('error-text', error); }
-function askToPair() { pair.hidden = false; pairAsk.hidden = false; pairForm.hidden = true; say(''); }
-
-const openConsole = () => openSerialConsole(serialPort);
-const hello = () => console_.hello();
-async function closeConsole() { if (console_) { const c = console_; console_ = undefined; await c.close(); } }
-
-pair.querySelectorAll('[data-pair-skip]').forEach(b => b.addEventListener('click', async () => { await closeConsole(); pair.hidden = true; }));
+const pairing = usbPairing(pair, { port: () => serialPort, setPort: p => { serialPort = p; }, board: () => card.dataset.board });
+const askToPair = pairing.ask, say = pairing.say, closeConsole = pairing.close;
 // Restarts the display like its reset button (serial-console.js); esptool restarts it itself while connected.
 card.querySelector('[data-restart]').addEventListener('click', async () => {
   if (busy) return;
@@ -135,124 +127,4 @@ card.querySelector('[data-pair-only]').addEventListener('click', async () => {
   if (busy) return;
   if (loader) await disconnect();  // esptool holds the port
   askToPair();
-});
-pair.querySelector('[data-pair-start]').addEventListener('click', async () => {
-  pairAsk.hidden = true; say('Connecting to the display …');
-  try {
-    serialPort ??= await chooseDisplayPort();
-    if (!serialPort) { pairAsk.hidden = false; say(''); return; }
-    // Boards with the chip's own USB (ESP32-S3, -C3) come back as a new port after their restart.
-    // Choosing none ends it here, without the browser's own dialog on top.
-    try { console_ = await openConsole(); }
-    catch {
-      serialPort = await chooseDisplayPort();
-      if (!serialPort) { pairAsk.hidden = false; say(''); return; }
-      console_ = await openConsole();
-    }
-    device = await hello();
-    const list = await scanNetworks();
-    choose(list[0]?.ssid ?? '');
-    pairForm.elements.name.value = device.name || '';
-    pairForm.hidden = false; pairForm.elements.password.focus();
-    say(`${device.identifier} · firmware ${device.version}${list.length ? ` · ${list.length} networks found` : ''}`);
-  } catch (error) { await closeConsole(); pairAsk.hidden = false; say(error.message, true); }
-});
-// The networks the display sees, strongest first; empty when it does not answer (the name can be typed instead).
-async function scanNetworks() {
-  say('Looking for Wi-Fi networks near the display …');
-  const scanned = console_.wait('VIBEDOCK-NETWORKS ', 20000);
-  await console_.send('VIBEDOCK-SCAN');
-  let list = []; try { list = JSON.parse((await scanned).slice('VIBEDOCK-NETWORKS '.length)); } catch { /* type the name instead */ }
-  networks = list;
-  return list;
-}
-pair.querySelector('[data-net-refresh]').addEventListener('click', async event => {
-  const button = event.currentTarget; if (button.disabled || !console_) return;
-  button.disabled = true; button.textContent = 'Scanning …';
-  try {
-    const kept = pairForm.elements.ssid.value, list = await scanNetworks();
-    if (!kept || !list.some(n => n.ssid === kept)) choose(list[0]?.ssid ?? kept);
-    if (!pop.hidden) renderPicker();  // the open list shows the new scan, not the old one
-    say(list.length ? `${list.length} networks found` : 'No networks found; type the name in the search field.', !list.length);
-  } catch (error) { say(error.message, true); }
-  finally { button.disabled = false; button.textContent = 'Refresh networks'; }
-});
-// Network picker: a dropdown with a search field over the networks the display sees (strongest first). A name that
-// is not in the list (a hidden network) can be typed into the search and used as it is.
-const picker = pairForm.querySelector('[data-net-pick]'), pickButton = picker.querySelector('.net-pick-button');
-const pop = picker.querySelector('.net-pick-pop'), search = pop.querySelector('input'), options = pop.querySelector('ul');
-let networks = [], active = 0;
-const LOCK = '<svg class="net-lock" viewBox="0 0 12 12" aria-label="password"><rect x="2.5" y="5.5" width="7" height="5" rx="1"/><path d="M4 5.5V4a2 2 0 0 1 4 0v1.5" fill="none" stroke-width="1.3"/></svg>';
-function bars(rssi) {
-  const level = rssi >= -55 ? 4 : rssi >= -67 ? 3 : rssi >= -75 ? 2 : 1;
-  return `<svg class="net-bars" viewBox="0 0 16 12" aria-label="${rssi} dBm">${[0, 1, 2, 3].map(i =>
-    `<rect x="${i * 4}" y="${9 - i * 3}" width="3" height="${3 + i * 3}" rx=".8"${i < level ? '' : ' class="off"'}/>`).join('')}</svg>`;
-}
-function choose(ssid) {
-  pairForm.elements.ssid.value = ssid;
-  picker.querySelector('[data-net-value]').textContent = ssid || 'Choose a network …';
-  closePicker(false);
-}
-function renderPicker() {
-  const query = search.value.trim(), lower = query.toLowerCase();
-  const items = networks.filter(n => n.ssid.toLowerCase().includes(lower)).map(n => ({ ssid: n.ssid, html:
-    `<span class="net-name"></span><span class="net-meta">${n.open ? 'open' : LOCK} ${bars(n.rssi)}</span>` }));
-  if (query && !networks.some(n => n.ssid === query)) items.push({ ssid: query, html: '<span class="net-name"></span><span class="net-meta">hidden network</span>', typed: true });
-  options.replaceChildren();
-  active = Math.min(active, Math.max(items.length - 1, 0));
-  items.forEach((item, i) => {
-    const li = document.createElement('li'); li.setAttribute('role', 'option'); li.innerHTML = item.html;
-    li.querySelector('.net-name').textContent = item.typed ? `Use “${item.ssid}”` : item.ssid;
-    li.dataset.ssid = item.ssid; li.classList.toggle('active', i === active);
-    li.setAttribute('aria-selected', String(item.ssid === pairForm.elements.ssid.value));
-    li.addEventListener('mousedown', e => { e.preventDefault(); choose(item.ssid); });
-    options.append(li);
-  });
-  if (!items.length) options.innerHTML = '<li class="net-empty">No network found</li>';
-}
-function openPicker() {
-  pop.hidden = false; pickButton.setAttribute('aria-expanded', 'true'); search.value = '';
-  active = Math.max(0, networks.findIndex(n => n.ssid === pairForm.elements.ssid.value)); renderPicker(); search.focus();
-}
-function closePicker(focus = true) { if (pop.hidden) return; pop.hidden = true; pickButton.setAttribute('aria-expanded', 'false'); if (focus) pickButton.focus(); }
-pickButton.addEventListener('click', () => pop.hidden ? openPicker() : closePicker());
-search.addEventListener('input', () => { active = 0; renderPicker(); });
-search.addEventListener('keydown', e => {
-  const count = options.querySelectorAll('[role=option]').length;
-  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); if (count) { active = (active + (e.key === 'ArrowDown' ? 1 : count - 1)) % count; renderPicker(); options.children[active]?.scrollIntoView({ block: 'nearest' }); } }
-  else if (e.key === 'Enter') { e.preventDefault(); const li = options.querySelectorAll('[role=option]')[active]; if (li) choose(li.dataset.ssid); }
-  else if (e.key === 'Escape') { e.preventDefault(); closePicker(); }
-});
-document.addEventListener('mousedown', e => { if (!picker.contains(e.target)) closePicker(false); });
-pairForm.addEventListener('submit', async event => {
-  event.preventDefault();
-  if (!pairForm.elements.ssid.value) { say('Choose the Wi-Fi network first.', true); openPicker(); return; }
-  const button = pairForm.querySelector('[type=submit]'); button.disabled = true;
-  try {
-    say('Pairing on the server …');
-    const response = await fetch('/admin/firmware/setup', { method: 'POST', credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', ...csrf }, body: JSON.stringify({ identifier: device.identifier, name: pairForm.elements.name.value, board: device.board || card.dataset.board, omitTlsPin: pairForm.elements.omitTlsPin.checked }) });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.error || 'Pairing failed: HTTP ' + response.status);
-    const setup = { ...result.pairing, ssid: pairForm.elements.ssid.value, password: pairForm.elements.password.value };
-    say('Sending Wi-Fi and pairing to the display …');
-    let answer;
-    for (let attempt = 0; attempt < 3 && !answer?.endsWith(' OK'); attempt++) {
-      const reply = console_.wait('VIBEDOCK-SETUP ', 8000);
-      await console_.send('VIBEDOCK-SETUP ' + JSON.stringify(setup));
-      try { answer = await reply; } catch { answer = undefined; }
-      if (answer && !answer.endsWith(' OK') && !answer.includes('invalid request')) throw new Error('The display refused: ' + answer.slice('VIBEDOCK-SETUP ERROR '.length));
-    }
-    if (!answer?.endsWith(' OK')) throw new Error('The display did not confirm the setup. Try again.');
-    await closeConsole(); pairForm.hidden = true;
-    const warnings = result.warnings?.length ? ` Note: ${result.warnings.join('; ')}.` : '';
-    say(`Saved on the display. It restarts and connects to ${setup.ssid} …${warnings}`);
-    for (let i = 0; i < 40; i++) {
-      await sleep(3000);
-      const state = await fetch('/admin/firmware/setup/' + encodeURIComponent(device.identifier), { credentials: 'same-origin' }).then(r => r.json()).catch(() => null);
-      if (state?.status === 'Connected') { say(`${state.name} is paired and shows its image (${state.ip}).${warnings}`); return; }
-    }
-    say('The display has not fetched its image yet. If the Wi-Fi password is wrong, it opens its setup Wi-Fi after the restart; it then appears under Devices once connected.', true);
-  } catch (error) { say(error.message, true); }
-  finally { button.disabled = false; }
 });
