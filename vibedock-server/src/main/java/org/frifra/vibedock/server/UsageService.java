@@ -49,6 +49,11 @@ public class UsageService {
     private volatile Map<String,Provider> readings=Map.of();
     private volatile SettingsStore.Settings collectedFor;
     private final Map<String,PollPace> pace=new ConcurrentHashMap<>();
+    /** Sources asked in the running collection whose readings are not published yet (displays then wait for them). */
+    private final java.util.Set<String> unpublished=ConcurrentHashMap.newKeySet();
+    /** Start of the running collection (epoch seconds, 0 when none) and how long collections take, smoothed. */
+    private volatile long collectingSince;
+    private volatile double collectSeconds=2;
     private static final Logger log=LoggerFactory.getLogger(UsageService.class);
     private final Map<String,String> logged=new ConcurrentHashMap<>();
     /** Logs a provider only when its status changes, so a steady state does not fill the log. */
@@ -86,6 +91,29 @@ public class UsageService {
     private long staleAfter(String name) {
         var p=pace.get(name);return p==null?settings.polling().minMinutes()*60L+90:p.staleAfterSeconds();
     }
+    /**
+     * When the readings of some sources can change next (epoch seconds): the earliest next poll plus the time a
+     * collection takes and two seconds, or the moment a reading turns stale. Pending while one of them is due or asked
+     * but not yet published; the time is then when the running collection should be done. Long.MAX_VALUE when none of
+     * them is polled (not configured, paused, polling off).
+     */
+    public record Schedule(long at,boolean pending) {}
+    public Schedule schedule(java.util.Collection<String> ids) {
+        long now=clock.instant().getEpochSecond();int settle=(int)Math.ceil(collectSeconds)+2;
+        long at=Long.MAX_VALUE;boolean pending=false;
+        for (String id:ids) {
+            var p=pace.get(id);
+            if (unpublished.contains(id)||p!=null&&p.nextAt()<=now) { pending=true; continue; }
+            if (p==null) continue;
+            at=Math.min(at,p.nextAt()+settle);
+            var r=readings.get(id);
+            if (r!=null&&r.observedAt()!=null&&(r.status().equals("ok")||r.status().equals("partial")))
+                at=Math.min(at,r.observedAt()+p.staleAfterSeconds()+1);
+        }
+        if (!pending) return new Schedule(at,false);
+        long since=collectingSince;
+        return new Schedule(Math.max(now+2,(since>0?since:now)+settle),true);
+    }
     /** The current update interval of a source in minutes; null before its first poll. */
     public Integer interval(String id) {
         var p=pace.get(id);return p==null?null:p.minutes();
@@ -117,6 +145,14 @@ public class UsageService {
     /** Manual refresh from the administration; still respects a rate-limit back-off. */
     public void refresh() { collect(true); }
     private synchronized void collect(boolean manual) {
+        long started=System.nanoTime();collectingSince=clock.instant().getEpochSecond();
+        try { collectNow(manual); }
+        finally {
+            if (!unpublished.isEmpty()) collectSeconds=.7*collectSeconds+.3*Math.min(60,(System.nanoTime()-started)/1e9);
+            unpublished.clear();collectingSince=0;
+        }
+    }
+    private void collectNow(boolean manual) {
         // Grok, Gemini and Claude sign-ins are renewed by their CLI shortly before they expire.
         if (renewal!=null&&!demo) for (var a:settings.get().accounts())
             if (a.manual().token().isBlank()&&!a.suspended()) renewal.renewIfDue(a,settings.authDirectory(a));
@@ -133,6 +169,7 @@ public class UsageService {
                 next.put(name,p.limited()?rateLimited(last,now):last!=null?last:new Provider("waiting",null,null,null));
                 continue;
             }
+            unpublished.add(name);
             try {
                 var r=client.fetch(account.type(),credential);
                 boolean single=period(account.type(),new Provider("ok",null,r.fiveHour(),r.week()))!=null;

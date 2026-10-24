@@ -369,6 +369,10 @@ public class ClientRegistry {
         if(network!=null&&d.lastPullIp()!=null&&IpNetworks.parse(network).matches(d.lastPullIp()))target=d.lastPullIp();
         return new Address(target,d.port());
     }
+    /** Pulls announced to displays that follow X-VibeDock-Next-Pull (epoch seconds), in memory only. */
+    private final Map<String,Long> expectedPull=new java.util.concurrent.ConcurrentHashMap<>();
+    /** The display was told to pull again in seconds: it counts as missing only well after that. */
+    public void expectPull(String id,int seconds){expectedPull.put(id,clock.instant().getEpochSecond()+seconds);}
     public synchronized List<View> views(){return state.devices().stream().map(this::view).toList();}
     public synchronized View get(String id){return view(find(id));}
 
@@ -380,7 +384,8 @@ public class ClientRegistry {
         int interval=d.web()!=null?d.web().reloadSeconds():state.server().pollSeconds();
         // Web displays fetch only while their page is open: missing fetches are no fault there.
         String status=d.lastPullAt()==null?(d.web()!=null?"Not connected yet":"Waiting for first pull")
-                :now-d.lastPullAt()>3L*interval?(d.web()!=null?"Not connected":"Updates missing"):"Connected";
+                :now-Math.max(d.lastPullAt()+3L*interval,expectedPull.getOrDefault(d.identifier(),0L)+2L*interval)>0
+                        ?(d.web()!=null?"Not connected":"Updates missing"):"Connected";
         return new View(d.identifier(),d.name(),d.lastPullIp()==null?d.ip():d.lastPullIp(),status,d.lastPullAt(),design(d),d.design()!=null,d.serverFooter(),d.firmware(),
                 otaCapable.contains(d.identifier()),otaWithoutKey.contains(d.identifier()),updateRequested.containsKey(d.identifier()),updateErrors.get(d.identifier()),d.displayType(),d.web(),d.boardType(),effectiveRotation(d)==180,effectiveRotation(d),
                 d.web()==null&&d.boardType().batteryPowerSaving()&&d.powerSaving());

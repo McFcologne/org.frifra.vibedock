@@ -155,6 +155,22 @@ int main(){
   }
   assert(!dimDue(59999,0)); assert(dimDue(60000,0)); assert(!dimDue(5000,beforeWrapPower)); assert(dimDue(59000,beforeWrapPower));
   assert(dimmedBrightness(100)==minBrightness); assert(dimmedBrightness(minBrightness)==minBrightness);
+  // The server's announced next pull: seconds 2-3600 with state current or pending; anything else is ignored.
+  {
+    uint32_t seconds=0;bool pending=true;
+    assert(parseNextPull("58; state=current",seconds,pending)&&seconds==58&&!pending);
+    assert(parseNextPull("3; state=pending",seconds,pending)&&seconds==3&&pending);
+    assert(parseNextPull("3600; state=current",seconds,pending)&&seconds==3600);
+    for(auto text:{"","1; state=current","3601; state=current","58","58;state=current","58; state=later","58; state=current ","x; state=current","123456; state=current"})
+      assert(!parseNextPull(text,seconds,pending));
+    assert(!waited(1999,0,2000)&&waited(2000,0,2000));
+    const uint32_t nearWrap=std::numeric_limits<uint32_t>::max()-500;
+    assert(!waited(1000,nearWrap,2000)&&waited(1500,nearWrap,2000));
+    // Stale after three poll intervals, or two after an announced longer wait.
+    assert(!imageStale(89999,0,30,0)&&imageStale(90000,0,30,0));
+    assert(!imageStale(659999,0,30,600000)&&imageStale(660000,0,30,600000));
+    assert(imageStale(90000,0,30,5000));
+  }
   assert(clampPoll(1)==10);assert(clampPoll(30)==30);assert(clampPoll(99999)==3600);
   assert(!pullDue(29999,0,30));assert(pullDue(30000,0,30));assert(pullDue(10000,0,5));
   assert(!imageStale(89999,0,30));assert(imageStale(90000,0,30));

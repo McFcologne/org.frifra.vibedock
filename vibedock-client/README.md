@@ -147,6 +147,17 @@ The pairing code changes after every restart. Five wrong codes lock pairing unti
 
 </details>
 
+## When the display pulls
+
+The server tells the display with every answer when its picture can change next (`X-VibeDock-Next-Pull`): shortly
+after the next poll of the sources it shows, a stale reading or the next photo. The display pulls then instead of
+every poll interval, so with sources polled every minute it pulls once a minute and no longer gets a **304** in
+between; with longer intervals it pulls less often. While a source is still being asked (`state=pending`) it comes back
+when the poll should be done, at most every 2, 5, 10, then 30 s. Upper limit: 10 minutes for displays the server can
+ask for an immediate pull, 2 minutes for the others. Failed pulls, immediate pull requests and older servers use the
+poll interval as before. The status page shows the next pull. See
+[the protocol](../vibedock-server/CLIENT-PROTOCOL.md#3h-next-pull-server--device).
+
 ## Image transfer
 
 The server always renders a complete image. With matching new server and firmware versions, screen pulls

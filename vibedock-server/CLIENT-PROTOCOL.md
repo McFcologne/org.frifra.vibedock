@@ -125,7 +125,7 @@ X-VibeDock-Board: vibedock-m1
 | **304** | image unchanged since the given `ETag` (no body) |
 | **401** | unknown device or wrong key; the device was removed and returns to pairing mode |
 
-The endpoint exists only on the public port. Unknown identifiers and wrong keys get the same **401**. The IP allowlist of `/api/v1/usage` does not apply; the device key is the authorization. The device uses the poll interval from the latest `X-VibeDock-Poll-Seconds` (10–3600 s, default 30, set in the administration UI). While a display shows a slideshow, it gets the time of one photo when that is shorter (at least 10 s). In a slideshow, a swipe (section 3d) shows the next or previous photo instead of changing the colour scheme.
+The endpoint exists only on the public port. Unknown identifiers and wrong keys get the same **401**. The IP allowlist of `/api/v1/usage` does not apply; the device key is the authorization. The device uses the poll interval from the latest `X-VibeDock-Poll-Seconds` (10–3600 s, default 30, set in the administration UI); current firmware pulls when `X-VibeDock-Next-Pull` says instead (section 3h). While a display shows a slideshow, it gets the time of one photo when that is shorter (at least 10 s). In a slideshow, a swipe (section 3d) shows the next or previous photo instead of changing the colour scheme.
 
 **Immediate pull (server → device):** after a design is saved, the server sends `POST http://<device IP>:<port>/pull` without a body to the affected devices (the default design: every device that follows it). After a restart it sends the same request to every paired device as soon as the first usage readings are collected (at most one minute after start). The device answers **202** and pulls in its next loop; at most one such pull every 5 seconds: a request within that pause (also **202**) is pulled when it is over (firmware before 0.2.0 answers **429** and pulls at its next poll), **409** while it is not paired. The request carries nothing secret and needs no key, because the pull that follows is authenticated as usual. Devices the server cannot reach pull at their next poll.
 
@@ -277,6 +277,29 @@ One firmware source builds for several boards (PlatformIO environments in `vibed
 
 Each build yields `flash.bin`, written at `0x0` over USB (on ESP32 chips bootloader, partition table and app merged), and `firmware.bin`, the app for updates over Wi-Fi. The update format is the same on all chips (step 3a); on ESP32 chips the firmware checks the signature with mbedTLS itself before it activates the new app. https on ESP32 chips always uses the full check against the root from pairing (no SHA-1 fingerprint). The device's own screens are laid out for 240×240 and scaled to fit other panels; server images arrive in the panel's resolution.
 
+## 3h. Next pull (server → device)
+
+Every answer to an image pull, **200** and **304** alike, carries `X-VibeDock-Next-Pull: <seconds>; state=<current|pending>`:
+when the picture of this display can change next, so the display pulls then instead of every poll interval.
+
+- `state=current`: the sources the display shows (its layout fitted to its display type) have been asked; a **304**
+  really means nothing changed. The seconds run to the earliest of: the next poll of one of those sources plus the
+  time a collection takes (smoothed, about 2 s) and 2 s; the moment one of their readings turns stale; the next
+  photo of a running slideshow; the start or end of a scheduled one.
+- `state=pending`: one of those sources is due or being asked and its reading is not published yet. The seconds run
+  to when the collection should be done; repeated `pending` answers wait at least 2, 5, 10, then 30 s, so a slow
+  provider cannot make the display pull every second. A failed poll or HTTP 429 is done as well: the next answer is
+  `current` with the time of the next try.
+- At most 600 s for displays that took an immediate pull (`POST /pull`, section 2) within the last day, so design
+  changes still reach them at once; at most 120 s for the others (behind NAT, only through the external address),
+  which see design changes with their next pull. At least 2 s.
+
+Firmware that follows it sends `X-VibeDock-Schedule: 1` with its screen pulls; the server then expects its next pull at
+the announced time (section *Status*). It still uses `X-VibeDock-Poll-Seconds` until the first answer, after failed
+pulls, for immediate retries and when the header is missing (older servers). Older firmware ignores the header and
+keeps pulling every poll interval. The display's status page shows the next pull. Weather refreshes in the background
+at most every 15 minutes and appears with the next pull after that, so it can show up to one wait later than before.
+
 ## Image format
 
 Pixels are sent row by row from the top left: `width` pixels per row, `height` rows as named in `X-VibeDock-Image-Format`, two bytes per pixel, most significant byte first, 5 red, 6 green and 5 blue bits. No compression. The administration UI shows a PNG of the same pixels.
@@ -350,11 +373,12 @@ tests are needed to quantify airtime and battery savings.
 | Status | Meaning |
 | --- | --- |
 | `Waiting for first pull` | paired, no pull yet |
-| `Connected` | last pull within three poll intervals |
-| `Updates missing` | no pull for more than three poll intervals |
+| `Connected` | last pull within three poll intervals, or within two poll intervals after the pull it announced (section 3h) |
+| `Updates missing` | no pull for longer than that |
 | `Not connected yet` / `Not connected` | web display: no fetch yet / none for three reload intervals (its page is closed) |
 
-`Remove device` deletes the device; its next pull gets **401** and it returns to pairing mode. The device shows `Updates missing` itself after three poll intervals without a successful pull.
+`Remove device` deletes the device; its next pull gets **401** and it returns to pairing mode. The device shows `Updates missing` itself after three poll intervals without a successful pull, or two poll
+intervals after a longer announced wait.
 
 ## Validation
 

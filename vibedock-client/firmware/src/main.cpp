@@ -67,6 +67,12 @@ String pairingCode, shownIp;
 uint8_t wrongCodes = 0;
 bool haveImage = false, staleScreen = true;
 uint32_t lastPull = 0, lastImage = 0, lastFooter = 0, lastReconnect = 0;
+// The wait the server announced after the last pull (X-VibeDock-Next-Pull), 0: every poll interval. pending: it was
+// still asking a source of this display, so the picture may change shortly.
+uint32_t pullWaitMs = 0; bool pullPending = false;
+uint32_t pullIntervalMs() { return pullWaitMs ? pullWaitMs : client_policy::clampPoll(pollSeconds) * 1000u; }
+// Pull in the next loop (or after delayMs); an announced wait no longer applies.
+void pullSoon(uint32_t delayMs = 0) { pullWaitMs = 0; lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u + delayMs; }
 int lastStatus = 0;  // HTTP status of the last pull, negative for connection errors, 0 before the first pull
 
 String currentIp() {
@@ -873,7 +879,7 @@ void handlePair() {
   reply["subnetMask"] = WiFi.subnetMask().toString();  // fixed by the server at pairing; pulls only fill it in once if it is missing
   String out; serializeJson(reply, out);
   web.send(200, "application/json", out);
-  mode = Mode::Paired; lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u; lastImage = millis();
+  mode = Mode::Paired; pullSoon(); lastImage = millis();
   message("Loading image", Step::Image);
 }
 // ---- image pull (device -> server) ----
@@ -970,7 +976,7 @@ File *uploadFile = nullptr; String uploadRequest;
 int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
   if (!r.http.begin(*r.client, url)) return HTTPC_ERROR_CONNECTION_FAILED;
   const char *wanted[] = {"ETag", "X-VibeDock-Image-Format", "X-VibeDock-Poll-Seconds", "X-VibeDock-Tls-Pin", "X-VibeDock-Redraw", "X-VibeDock-Update", "x-MD5", "X-VibeDock-Length", "X-VibeDock-Send-Log", "X-VibeDock-Orientation",
-      "X-VibeDock-Base", "X-VibeDock-Check", "X-VibeDock-Payload"
+      "X-VibeDock-Base", "X-VibeDock-Check", "X-VibeDock-Payload", "X-VibeDock-Next-Pull"
 #ifdef VIBEDOCK_AUDIO_ES8311
       , "X-VibeDock-Quota"
 #endif
@@ -997,6 +1003,7 @@ int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
   if (r.verified) r.http.addHeader("X-VibeDock-Tls-Check", "full");
   if (conditional && !etag.isEmpty() && haveImage && imageOnScreen) r.http.addHeader("If-None-Match", etag);
   if (conditional && !uploadFile) r.http.addHeader("X-VibeDock-Delta", "1");
+  if (conditional && !uploadFile) r.http.addHeader("X-VibeDock-Schedule", "1");  // follows X-VibeDock-Next-Pull
   if (conditional && !pendingGesture.isEmpty()) r.http.addHeader("X-VibeDock-Gesture", pendingGesture);
   if (uploadFile) {  // the log, straight from flash: no copy on the heap the TLS handshake needs
     r.http.addHeader("Content-Type", "text/plain; charset=utf-8");
@@ -1099,7 +1106,7 @@ void installUpdate(const String &version) {
   auto fail = [&](const String &reason) {
     updateError = version + ": " + reason; failedUpdate = version; logEvent(String(F("Update failed: ")) + reason);
     message("Update failed", Step::None, true); showDetail(reason.substring(0, 34), PROBLEM); delay(4000);
-    haveImage = false; staleScreen = true; etag = ""; forgetRows(); lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u;
+    haveImage = false; staleScreen = true; etag = ""; forgetRows(); pullSoon();
   };
   ImageRequest request; HTTPClient &http = request.http;
   int code = requestImage(request, false, "firmware");
@@ -1167,6 +1174,12 @@ void pull() {
     uint32_t poll = client_policy::clampPoll(http.header("X-VibeDock-Poll-Seconds").toInt());
     if (poll != pollSeconds) { pollSeconds = poll; saveConfig(); }
   }
+  // When the picture can change next: pull then, also after a 304, instead of every poll interval. Older servers
+  // send nothing and the poll interval applies.
+  uint32_t nextSeconds = 0; bool nextPending = false;
+  if ((code == 200 || code == 304) && client_policy::parseNextPull(http.header("X-VibeDock-Next-Pull").c_str(), nextSeconds, nextPending)) {
+    pullWaitMs = nextSeconds * 1000u; pullPending = nextPending; lastPull = millis();
+  } else { pullWaitMs = 0; pullPending = false; }
   if ((code == 200 || code == 304) && http.hasHeader("X-VibeDock-Orientation")) {
     uint8_t next = client_policy::turnsOf(http.header("X-VibeDock-Orientation").c_str(), turns, panel.width() == panel.height());
     if (next != turns) {
@@ -1212,7 +1225,7 @@ void pull() {
       // A rejected/partial patch can have changed pixels without a trustworthy row hash. Redraw the whole basis.
       if(delta)forgetRows();
       logEvent(String(F("Image aborted: ")) + imageProblem + (https ? ", " + platform::tlsTraffic() : String()), true);
-      if (++imageFailures == 1 && haveImage) lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u + 1000u;
+      if (++imageFailures == 1 && haveImage) pullSoon(1000);
       else {
         haveImage = false; staleScreen = true; message("Image aborted", Step::Image, true);
         showWrapped(imageProblem, 145, 4, PROBLEM); present();
@@ -1233,7 +1246,7 @@ void pull() {
     String failed = servers[serverIndex];
     serverIndex = next;
     // The next attempt right away (as many as there are addresses), not only after the poll interval.
-    if (++failedInRow <= serverCount) lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u + 1000u;
+    if (++failedInRow <= serverCount) pullSoon(1000);
     else failedInRow = 0;
     if (!haveImage || staleScreen) {
       // Why, without a USB cable (reading the log over USB restarts the M1): the reason, e.g. the TLS error, wrapped
@@ -1284,7 +1297,9 @@ void statusPage() {
   if (paired) {
     body += String(F("<dt>Server</dt><dd>")) + html(servers[serverIndex]) + F("</dd><dt>Last update</dt><dd>")
         + (haveImage ? String((millis() - lastImage) / 1000) + F(" s ago") : String("-")) + F("</dd><dt>Poll interval</dt><dd>")
-        + String(pollSeconds) + F(" s</dd>");
+        + String(pollSeconds) + F(" s</dd>") + (pullWaitMs ? String(F("<dt>Next pull</dt><dd>in "))
+        + String((pullWaitMs - min(pullWaitMs, uint32_t(millis() - lastPull)) + 999) / 1000) + F(" s")
+        + (pullPending ? F(" (new readings expected)") : F(" (as announced by the server)")) + F("</dd>") : String());
   }
   body += String(F("<dt>Device ID</dt><dd>")) + identifier + F("</dd><dt>Last start</dt><dd>") + html(String(startKind) + " (" + platform::resetReason() + ")") + F("</dd><dt>Firmware</dt><dd>" VIBEDOCK_VERSION "</dd></dl>");
   if (!paired) body += F("<p class=\"muted\">Enter this IP address and the pairing code shown on the display in the VibeDock administration.</p>");
@@ -1389,7 +1404,7 @@ void saveColours() {
   }
   panelTone.build(toneSettings); saveLater();
   // Redraw everything with the new correction: unconditional request on the next loop.
-  forgetRows(); etag = ""; lastPull = millis() - clampPoll(pollSeconds) * 1000u;
+  forgetRows(); etag = ""; pullSoon();
   if (web.hasArg("live")) { web.send(204, "text/plain", ""); return; }  // slider moved, the page stays
   web.sendHeader("Location", "/", true); web.send(303, "text/plain", "");
 }
@@ -1423,6 +1438,7 @@ void imagePage() {
 uint32_t lastPullRequest = 0;
 void handlePullRequest() {
   if (mode != Mode::Paired) { web.send(409, "text/plain", ""); return; }
+  pullWaitMs = 0;  // the poll interval applies until the server answers again
   uint32_t poll = client_policy::clampPoll(pollSeconds) * 1000u;
   if (lastPullRequest != 0 && !client_policy::pullRequestAllowed(millis(), lastPullRequest)) {
     // Too soon after the last one (e.g. a setting switched on and off again): pulled when the pause is over, not
@@ -1655,7 +1671,7 @@ void setup() {
   shownIp = currentIp(); startPairingServer(); lastReconnect = millis(); diagPhase(Phase::Idle);
   if (key.isEmpty()) enterPairing();
   else {
-    mode = Mode::Paired; lastImage = millis(); lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u;
+    mode = Mode::Paired; lastImage = millis(); pullSoon();
     if (online) message("Connecting to server", Step::Server); else showWaiting();
   }
 }
@@ -1694,7 +1710,7 @@ void powerPoll() {
     if (powerSource.update(client_policy::onBattery(battery::usbHost(), charging))) {
       logEvent(powerSource.battery ? F("Power: battery") : F("Power: USB or charging"), true);
       // The battery icon in the image appears or goes away with the next image, right away.
-      if (mode == Mode::Paired) lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u;
+      if (mode == Mode::Paired) pullSoon();
     }
     setPowerSaving(powerSavingAllowed && powerSource.battery && mode == Mode::Paired);
   }
@@ -1732,7 +1748,7 @@ void touchPoll() {
     audio::play(audio::Cue::Swipe);
     pendingGesture = circle == client_policy::Circle::Clockwise ? "turn-clockwise" : "turn-counterclockwise";
     logEvent(String(F("Touch: ")) + pendingGesture, true);
-    lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u;  // the new orientation right away
+    pullSoon();  // the new orientation right away
     return;
   }
   int dx = lastX - startX, dy = lastY - startY;
@@ -1745,7 +1761,7 @@ void touchPoll() {
     lastTap = 0;
     if (mode != Mode::Paired) return;
     pendingGesture = "photos-toggle"; logEvent(F("Touch: double tap, photos on or off"), true);
-    lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u;  // the new image right away
+    pullSoon();  // the new image right away
     return;
   }
   if (swipe == client_policy::Swipe::Up || swipe == client_policy::Swipe::Down) {
@@ -1755,7 +1771,7 @@ void touchPoll() {
   } else if (swipe != client_policy::Swipe::None && mode == Mode::Paired) {
     pendingGesture = swipe == client_policy::Swipe::Left ? "scheme-next" : "scheme-previous";
     logEvent(String(F("Touch: ")) + pendingGesture, true);
-    lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u;  // the new image right away
+    pullSoon();  // the new image right away
   }
 }
 #endif
@@ -1766,7 +1782,7 @@ void applyOrientation(uint8_t next) {
   turns = next % 4;
   panel.setRotation((VIBEDOCK_ROTATION + turns) % 4);
   forgetRows();
-  if (imageOnScreen) { etag = ""; lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u; }  // the image again, every row
+  if (imageOnScreen) { etag = ""; pullSoon(); }  // the image again, every row
   else present(true);
 }
 
@@ -1803,7 +1819,7 @@ void loop() {
       haveImage = false; staleScreen = true; etag = "";
       if (WiFi.status() == WL_CONNECTED) {
         // Network back (or new address): fetch the image right away instead of waiting a whole poll interval.
-        message("Connecting to server", Step::Server); lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u;
+        message("Connecting to server", Step::Server); pullSoon();
       } else showWaiting();
     }
   }
@@ -1814,8 +1830,8 @@ void loop() {
   if (!online && millis() - lastReconnect >= 15000) { lastReconnect = millis(); WiFi.reconnect(); }
   if (WiFi.status() == WL_CONNECTED && !networkVerified) { networkVerified = true; saveConfig(); }
   if (mode == Mode::Paired) {
-    if (client_policy::pullDue(millis(), lastPull, pollSeconds)) pull();
-    if (mode == Mode::Paired && haveImage && !staleScreen && client_policy::imageStale(millis(), lastImage, pollSeconds)) {
+    if (client_policy::waited(millis(), lastPull, pullIntervalMs())) pull();
+    if (mode == Mode::Paired && haveImage && !staleScreen && client_policy::imageStale(millis(), lastImage, pollSeconds, pullWaitMs)) {
       staleScreen = true;
       if (WiFi.status() == WL_CONNECTED) message("Updates missing", Step::Server, true); else showWaiting();
     }

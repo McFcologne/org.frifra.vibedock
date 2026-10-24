@@ -19,9 +19,10 @@ class DeviceApiController {
     private final Firmware firmware;private final OtaSigning signing;private final DeviceLogs logs;private final AdminEvents events;private final DeviceDiagnostics diagnostics;
     private final DevicePower power;
     private final ImageDelta delta;
+    private final PullSchedule schedule;
     DeviceApiController(ClientRegistry registry,DesignService designs,ServerAddresses addresses,TlsTrust trust,Firmware firmware,OtaSigning signing,DeviceLogs logs,AdminEvents events,
-                        DeviceDiagnostics diagnostics,DevicePower power,ImageDelta delta){
-        this.delta=delta;
+                        DeviceDiagnostics diagnostics,DevicePower power,ImageDelta delta,PullSchedule schedule){
+        this.delta=delta;this.schedule=schedule;
         this.power=power;this.logs=logs;this.events=events;this.diagnostics=diagnostics;this.registry=registry;this.designs=designs;this.addresses=addresses;this.trust=trust;this.firmware=firmware;this.signing=signing;
     }
     /** The device authenticates with its key; unknown devices and wrong keys get the same 401. */
@@ -65,6 +66,13 @@ class DeviceApiController {
         String tag="\""+HexFormat.of().formatHex(Arrays.copyOf(sha256(pixels),12))+"\"";
         var headers=new HttpHeaders();headers.setETag(tag);headers.set("X-VibeDock-Image-Format",display.imageFormat());
         headers.set("X-VibeDock-Poll-Seconds",String.valueOf(designs.pollSeconds(registry.designFor(identifier),registry.pollSeconds(),identifier)));
+        // When the picture can change next: firmware that follows it (X-VibeDock-Schedule: 1) pulls then instead of
+        // every poll interval, also after a 304, and the server expects it then.
+        boolean previewPull="1".equals(request.getHeader("X-VibeDock-Preview"));
+        var next=schedule.next(identifier,display,previewPull);
+        headers.set("X-VibeDock-Next-Pull",next.header());
+        if(!previewPull&&"1".equals(request.getHeader("X-VibeDock-Schedule")))
+            registry.expectPull(identifier,next.seconds());
         // Only clients that explicitly support sound receive quota metadata. Preview pulls neither need nor consume it.
         if(QuotaHeader.requested(request.getHeader("X-VibeDock-Audio"),request.getHeader("X-VibeDock-Preview")))
             headers.set("X-VibeDock-Quota",designs.quotaHeader(registry.designFor(identifier),display));

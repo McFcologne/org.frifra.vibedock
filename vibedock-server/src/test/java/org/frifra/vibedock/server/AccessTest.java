@@ -86,6 +86,23 @@ class AccessTest {
         Assertions.assertTrue(output.getOut().contains("full=115200 bytes, payload=115200 bytes, saved=0 bytes (0.0%)"));
         Assertions.assertFalse(output.getOut().contains("unchanged (304)"),"304 only at debug level");
     }
+    @Test void everyAnswerAnnouncesTheNextPullAlsoA304() throws Exception {
+        String key="ef".repeat(32),id="vibedock-next-pull",path="/api/v1/clients/"+id+"/image";
+        clients.paired(id,"Next",key,"192.168.1.20",80);
+        try{
+            var first=mvc.perform(get(path).header("Authorization","Bearer "+key).header("X-VibeDock-Schedule","1")
+                    .with(r->{r.setLocalPort(8080);r.setRemoteAddr("192.168.1.20");return r;}))
+                    .andExpect(status().isOk()).andExpect(header().string("X-VibeDock-Next-Pull",org.hamcrest.Matchers.matchesPattern("\\d+; state=(current|pending)")))
+                    .andReturn().getResponse();
+            mvc.perform(get(path).header("Authorization","Bearer "+key).header("If-None-Match",first.getHeader("ETag")).header("X-VibeDock-Schedule","1")
+                    .with(r->{r.setLocalPort(8080);r.setRemoteAddr("192.168.1.20");return r;}))
+                    .andExpect(status().isNotModified()).andExpect(header().exists("X-VibeDock-Next-Pull"));
+            // Never reached by an immediate pull: at most two minutes between pulls.
+            int seconds=Integer.parseInt(first.getHeader("X-VibeDock-Next-Pull").split(";")[0]);
+            Assertions.assertTrue(seconds>=2&&seconds<=PullSchedule.UNREACHABLE_SECONDS,"seconds "+seconds);
+            Assertions.assertEquals("Connected",clients.get(id).status());
+        }finally{clients.remove(id);}
+    }
     @Test void quotaMetadataRequiresAudioOptInAndSurvives304ButNotPreview() throws Exception {
         String key="ab".repeat(32),id="vibedock-audio-test",path="/api/v1/clients/"+id+"/image";
         clients.paired(id,"Audio",key,"192.168.1.20",80);
