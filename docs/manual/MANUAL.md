@@ -1044,7 +1044,7 @@ Battery presence and operation without USB have not been established. No motion-
 
 ### Battery power saving (experimental)
 
-Displays with a battery connection have the switch **Battery power saving** (marked *experimental*) on their device
+Displays with a battery connection have the switch **Battery power saving** on their device
 card: Waveshare 1.54, 1.47 and C6 1.69 (tested boards), Waveshare S3 1.69 and LilyGO T-Display-S3 (prepared). It is
 off by default. Switched on, the display saves power while it runs on its battery, that is without a computer on its
 USB port (and on the 1.54 without charging):

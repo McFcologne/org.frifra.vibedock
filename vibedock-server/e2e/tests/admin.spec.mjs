@@ -122,12 +122,12 @@ test('orientation turns on each click and saves at once; only touch boards offer
   await page.reload();await expect(value).toHaveText('0°');
 });
 
-test('battery power saving is an experimental switch only on boards with a battery',async ({page,app}) => {
+test('battery power saving is a switch only on boards with a battery',async ({page,app}) => {
   await page.goto(app.baseURL+'/admin/devices');
   await expect(page.locator('#device-vibedock-e2e-office [data-power-saving]')).toHaveCount(0);
   await expect(page.locator('#device-vibedock-e2e-shelf [data-power-saving]')).toHaveCount(1);
   const desk=page.locator('#device-vibedock-e2e-desk'), toggle=desk.getByRole('checkbox',{name:/Battery power saving/});
-  await expect(desk.locator('.power-saving .badge')).toHaveText('experimental');
+  await expect(desk.locator('.power-saving .badge')).toHaveCount(0);
   await expect(toggle).not.toBeChecked();
   const saved=page.waitForResponse(r=>r.url().endsWith('/power-saving')&&r.request().method()==='POST');
   await toggle.check();expect((await (await saved).json()).enabled).toBe(true);
