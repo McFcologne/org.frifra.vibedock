@@ -600,6 +600,8 @@ on the right is rendered by the server exactly as the display will show it. Ever
 
 <img src="images/30-display-default.png" width="100%" alt="Default design">
 
+<!-- page break -->
+
 ## Themes
 
 **Appearance → Browse all themes** jumps to the gallery below the editor. It shows all thirty-five themes in five
@@ -639,6 +641,8 @@ emoji; **Swap weather & mood** exchanges the two slots. The update time and the 
 
 Change the order with the grip (drag) or with ↑ and ↓, remove a band with ×, add one with **+ Add usage band**. A
 data source that is paused or unavailable is shown as such on the display.
+
+<!-- page break -->
 
 ## A device's own design
 
