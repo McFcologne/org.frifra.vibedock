@@ -253,6 +253,12 @@ as does `off`. A charger without data lines counts as battery operation. The sta
 `battery` object of `VIBEDOCK-HELLO` show `powerSource` (`battery`, `usb`) and `powerSaving` (`off`, `allowed`,
 `active`). Firmware before this ignores the header.
 
+On its battery such a display also sends `X-VibeDock-Power: battery` with its pulls, on the 1.54 with its level
+(`battery;level=60`, the voltage estimate in steps of 20), whether power saving is on or not; on USB it sends nothing.
+The server then draws a battery icon at the top right of the first usage band (left of a status, in the title bar of
+window themes), filled to the level, red below 20 %. It keeps the report in memory until the next pull, so the
+preview on the device card shows the same. The display pulls right away when its power source changes.
+
 ## Boards
 
 One firmware source builds for several boards (PlatformIO environments in `vibedock-client/firmware/platformio.ini`, the server's inventory in `Board.java`):

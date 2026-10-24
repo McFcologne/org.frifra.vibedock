@@ -1005,7 +1005,14 @@ Plugging into a computer ends it within about ten seconds. A charger or power ba
 battery operation, except on the 1.54 while it charges; that does no harm. The display's status page shows **Power
 source** and **Power saving** (on the 1.54 in the *Battery* card, on the others in a *Power* card). Not yet tested
 on hardware: how long a battery lasts with and without it, and whether every access point keeps up with modem sleep.
-If the display misses updates on battery, switch it off again. The LilyGO T-Display has a battery connection too,
+If the display misses updates on battery, switch it off again.
+
+**Battery icon.** While one of these displays runs on its battery, its picture shows a small battery at the top right
+of the first usage band (beside a status such as *Rate limited*, in window themes in the title bar), whether power
+saving is on or not. The 1.54 fills it to its measured level in steps of 20 %, red below 20 %; the others only know
+that they run on battery and show it empty. The device card's preview shows it as well. On USB it disappears. The
+server draws it into the image, so the display only sends one more header with its pulls; the image changes only when
+the level steps or the power source changes. The LilyGO T-Display has a battery connection too,
 but its USB serial chip cannot tell whether a computer is connected, so it has no power saving.
 
 ## Displays mounted upside down or turned

@@ -566,6 +566,12 @@ class AccessTest {
             var tag=mvc.perform(pull).andExpect(header().string("X-VibeDock-Power-Saving","battery")).andReturn().getResponse().getHeader("ETag");
             mvc.perform(get(image).header("Authorization","Bearer "+key).header("If-None-Match",tag).with(r->{r.setLocalPort(8080);return r;}))
                     .andExpect(status().isNotModified()).andExpect(header().string("X-VibeDock-Power-Saving","battery"));
+            // On its battery the display reports it; its image gets the battery icon (another image), on USB it goes again.
+            String usb=mvc.perform(pull).andReturn().getResponse().getHeader("ETag");
+            String onBattery=mvc.perform(get(image).header("Authorization","Bearer "+key).header("X-VibeDock-Power","battery;level=60")
+                    .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk()).andReturn().getResponse().getHeader("ETag");
+            Assertions.assertNotEquals(usb,onBattery);
+            Assertions.assertEquals(usb,mvc.perform(pull).andReturn().getResponse().getHeader("ETag"));
             // Pairing again keeps it.
             clients.paired(id,"Kitchen",key,"192.168.1.35",80,"waveshare-s3-touch-lcd-154");
             Assertions.assertTrue(clients.get(id).powerSaving());

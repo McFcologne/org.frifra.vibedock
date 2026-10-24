@@ -111,7 +111,8 @@ T-Display-S3) and switched on on the device card (`X-VibeDock-Power-Saving: batt
 firmware checks every 5 s whether a USB host sends frames (`battery::usbHost`, the start-of-frame counter of the USB
 serial/JTAG unit) and, on the 1.54, whether the charging signal is inactive. Two such readings in a row mean battery
 operation (`client_policy::PowerSource`): Wi-Fi modem sleep, CPU at 80 MHz, backlight dimmed after 60 s without touch
-or button. `VIBEDOCK-BATTERY` and `VIBEDOCK-HELLO` add `powerSource` and `powerSaving`.
+or button. `VIBEDOCK-BATTERY` and `VIBEDOCK-HELLO` add `powerSource` and `powerSaving`. On battery every pull also sends
+`X-VibeDock-Power: battery` (1.54: `battery;level=N`); the server then draws a battery icon into the image.
 
 ## Before you start
 

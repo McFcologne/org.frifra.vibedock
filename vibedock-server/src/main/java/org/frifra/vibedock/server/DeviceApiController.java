@@ -17,9 +17,10 @@ class DeviceApiController {
     private static final Logger log=LoggerFactory.getLogger(DeviceApiController.class);
     private final ClientRegistry registry;private final DesignService designs;private final ServerAddresses addresses;private final TlsTrust trust;
     private final Firmware firmware;private final OtaSigning signing;private final DeviceLogs logs;private final AdminEvents events;private final DeviceDiagnostics diagnostics;
+    private final DevicePower power;
     DeviceApiController(ClientRegistry registry,DesignService designs,ServerAddresses addresses,TlsTrust trust,Firmware firmware,OtaSigning signing,DeviceLogs logs,AdminEvents events,
-                        DeviceDiagnostics diagnostics){
-        this.logs=logs;this.events=events;this.diagnostics=diagnostics;this.registry=registry;this.designs=designs;this.addresses=addresses;this.trust=trust;this.firmware=firmware;this.signing=signing;
+                        DeviceDiagnostics diagnostics,DevicePower power){
+        this.power=power;this.logs=logs;this.events=events;this.diagnostics=diagnostics;this.registry=registry;this.designs=designs;this.addresses=addresses;this.trust=trust;this.firmware=firmware;this.signing=signing;
     }
     /** The device authenticates with its key; unknown devices and wrong keys get the same 401. */
     @GetMapping("/api/v1/clients/{identifier}/image")
@@ -50,6 +51,8 @@ class DeviceApiController {
             try{if(registry.get(identifier).display()==DisplayType.M1&&type!=DisplayType.M1)registry.setDisplay(identifier,type.id());}
             catch(IOException e){log.warn("Could not store the display type of {}: {}",identifier,e.toString());}
         });
+        // On its battery the display gets a small battery icon at the top right; on USB it reports nothing.
+        power.report(identifier,request.getHeader("X-VibeDock-Power"));
         String gesture=request.getHeader("X-VibeDock-Gesture");
         if("photos-toggle".equals(gesture))togglePhotos(registry,designs,events,identifier);
         else if("turn-clockwise".equals(gesture)||"turn-counterclockwise".equals(gesture))turn(registry,events,identifier,"turn-clockwise".equals(gesture)?1:-1);

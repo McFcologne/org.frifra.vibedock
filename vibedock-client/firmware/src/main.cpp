@@ -56,6 +56,7 @@ void applyOrientation(uint8_t next);
 bool powerSavingAllowed = false, powerSaving = false, dimmed = false;
 client_policy::PowerSource powerSource;
 uint32_t lastActivity = 0, lastPowerCheck = 0;
+int batteryLevel = -1;  // the estimate of the last power check (1.54 only, steps of 20 %), -1 unknown
 client_policy::ToneSettings toneSettings;  // colour correction of the panel, set on the status page
 client_policy::Tone panelTone;
 
@@ -970,6 +971,10 @@ int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
 #ifdef VIBEDOCK_AUDIO_ES8311
   if (conditional && audio::available()) r.http.addHeader("X-VibeDock-Audio", "1");
 #endif
+#ifdef VIBEDOCK_BATTERY
+  // On its battery: the server draws a small battery icon (with the level when the board measures it).
+  if (powerSource.battery) r.http.addHeader("X-VibeDock-Power", batteryLevel >= 0 ? String(F("battery;level=")) + batteryLevel : String(F("battery")));
+#endif
   if (!conditional) r.http.addHeader("X-VibeDock-Preview", "1");  // the status page's copy; leaves a forced redraw for the screen
   return r.http.GET();
 }
@@ -1636,10 +1641,14 @@ void powerPoll() {
   if (millis() - lastPowerCheck >= client_policy::powerCheckMs) {
     lastPowerCheck = millis();
     // Only the 1.54 reports charging; on the others a USB host alone means external power.
-    const char *signal = battery::read().chargeSignal;
-    bool charging = strcmp(signal, "active") == 0 || strcmp(signal, "unstable") == 0;
-    if (powerSource.update(client_policy::onBattery(battery::usbHost(), charging)))
+    auto reading = battery::read();
+    bool charging = strcmp(reading.chargeSignal, "active") == 0 || strcmp(reading.chargeSignal, "unstable") == 0;
+    batteryLevel = reading.supported ? reading.estimatedPercent : -1;
+    if (powerSource.update(client_policy::onBattery(battery::usbHost(), charging))) {
       logEvent(powerSource.battery ? F("Power: battery") : F("Power: USB or charging"), true);
+      // The battery icon in the image appears or goes away with the next image, right away.
+      if (mode == Mode::Paired) lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u;
+    }
     setPowerSaving(powerSavingAllowed && powerSource.battery && mode == Mode::Paired);
   }
   if (powerSaving && !dimmed && client_policy::dimDue(millis(), lastActivity)) {
