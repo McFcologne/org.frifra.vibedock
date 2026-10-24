@@ -62,7 +62,7 @@ Right after flashing, the administration's browser flasher (*Devices › Firmwar
 | --- | --- |
 | `VIBEDOCK-HELLO` | `VIBEDOCK-READY {"identifier":"vibedock-…","name":"…","version":"0.1.0","paired":false,"board":"vibedock-m1","chip":"ESP8266"}` (also sent once at every start) |
 | `VIBEDOCK-BATTERY` | `VIBEDOCK-BATTERY {"supported":true,"voltageMv":3900,"estimatedPercent":80,"chargeSignal":"inactive","present":null}` (illustrative reading). Supported on `waveshare-s3-touch-lcd-154`; other boards return `supported:false`, null measurements and `chargeSignal:"unknown"`. |
-| `VIBEDOCK-SCAN` | `VIBEDOCK-NETWORKS [{"ssid":"…","rssi":-48,"open":false},…]`, the 12 strongest networks |
+| `VIBEDOCK-SCAN` | `VIBEDOCK-NETWORKS [{"ssid":"…","rssi":-48,"open":false},…]`, the 12 strongest networks. While the display keeps trying a saved network out of reach, it pauses those attempts for the scan and resumes them afterwards. |
 | `VIBEDOCK-LOG` | `VIBEDOCK-LOG ["05-14 09:41:00 Start v0.1.0 vibedock-m1, Power on",…]`, the last 24 events oldest first: starts, Wi-Fi, pairing, server answers and why a connection failed (HTTP and TLS errors). Kept in `/log.txt` across restarts; no keys or passwords. **Devices → Troubleshooting → Read log over USB** shows it. |
 | `VIBEDOCK-SETUP {json}` | `VIBEDOCK-SETUP OK`, then the device restarts; or `VIBEDOCK-SETUP ERROR <reason>` |
 

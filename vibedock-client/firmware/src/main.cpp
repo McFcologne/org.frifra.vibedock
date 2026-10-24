@@ -600,6 +600,16 @@ WifiNetwork networks[12]; uint8_t networkCount = 0;
 void scanWifi() {
   networkCount = 0;
   int found = WiFi.scanNetworks(false, false);
+  if (found < 0) {
+    // The ESP32 refuses to scan while the station keeps trying a saved network that is out of reach (e.g. at another
+    // place, for USB pairing there): stop the attempts for the scan, then try that network again.
+    bool reconnect = WiFi.getAutoReconnect();
+    WiFi.setAutoReconnect(false); WiFi.disconnect(); delay(100);
+    found = WiFi.scanNetworks(false, false);
+    logEvent(String(F("Wi-Fi scan while connecting: ")) + (found < 0 ? String(F("failed")) : String(found) + F(" networks")));
+    WiFi.setAutoReconnect(reconnect);
+    if (reconnect && !ssid.isEmpty()) WiFi.begin(ssid.c_str(), password.c_str());
+  }
   for (int i = 0; i < found; i++) {
     String name = WiFi.SSID(i); int32_t rssi = WiFi.RSSI(i);
     if (name.isEmpty() || name.length() > 32) continue;

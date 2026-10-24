@@ -912,11 +912,13 @@ Reasons under *Server unreachable*:
 <img src="images/70-screen-unreachable.png" width="30%" alt="Server unreachable">
 <img src="images/70-screen-factory-reset.png" width="30%" alt="Factory reset">
 
-**Wi-Fi setup again and factory reset.** Unplug the display and plug it in again twice, each time within five
+**Wi-Fi setup again and factory reset.** Unplug the display and plug it in again twice, each time within ten
 seconds after power-on. The display then shows *Unplug now for factory reset*:
 
 - wait, and it opens the Wi-Fi setup (the pairing stays);
 - unplug once more, and it forgets Wi-Fi, pairing and server addresses (factory reset).
+
+A display with a battery fitted (Waveshare 1.54) keeps running on it when unplugged; disconnect the battery first.
 
 # Troubleshooting a display
 
