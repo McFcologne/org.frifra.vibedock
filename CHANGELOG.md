@@ -2,18 +2,6 @@
 
 The release workflow publishes the section of the tagged version (`## 0.1.0` for the tag `v0.1.0` or `0.1.0`) above the list of commits that GitHub generates.
 
-## 0.2.5
-
-- **Theme gallery and instance availability:** Display shows all thirty themes with previews from the device
-  renderer. Choose a theme for the default or a device override, or disable individual themes for new selections
-  and swipe cycling across the instance. Existing designs keep their saved theme; at least one stays enabled.
-  Availability is stored in `themes.json` in the data directory.
-- **Ten new themes:** Mission Control, Departure Board, Nordic, Hi-Fi, Solarized, Pixel Quest, Bauhaus, E-Ink,
-  Industrial and Porcelain. All use the existing band layouts and display sizes. Update the server image;
-  no firmware update is needed.
-- **Clearer emoji contours:** Handheld LCD outlines icons in dark green; Blueprint adds a light contour and keeps
-  eyes and mouths dark enough to read. Icon sizes and positions stay unchanged, including scaled web displays.
-
 ## 0.2.4
 
 Claude sign-in renewal fixed, the Waveshare ESP32-S3-Touch-LCD-1.54 as a new tested board, quarter turns for square
