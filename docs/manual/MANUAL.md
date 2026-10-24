@@ -652,6 +652,8 @@ With **Custom design** a display gets its own complete design; turn it off to fo
 change is saved right away). Here the display *Home office* shows one full band and two compact rows in the
 *Classic Mac* theme.
 
+<!-- page break -->
+
 ## Photos and slideshows
 
 The switch **Usage monitor | Photos** at the top of the *Content* box chooses what the display shows. **Photos** shows
@@ -729,6 +731,8 @@ stops polling (the display shows it as paused), **Remove data source** deletes i
 
 <img src="images/41-source-manage.png" width="70%" alt="Manage a data source">
 
+<!-- page break -->
+
 ## Update interval
 
 The server asks every source for its usage on its own schedule; **Updates** on the source's card shows the current
@@ -755,6 +759,8 @@ last values and shows *Rate limited*.
 **Import** opens such a file with its password; you review the contained sources before anything changes.
 
 <img src="images/44-import-sources.png" width="80%" alt="Import data sources">
+
+<!-- page break -->
 
 ## How little data a display needs
 
