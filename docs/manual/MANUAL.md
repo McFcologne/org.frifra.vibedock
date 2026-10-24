@@ -1016,6 +1016,33 @@ presence stays **Unknown**. USB serial command `VIBEDOCK-BATTERY` returns the sa
 Tested on hardware: display colours, touch, audio, the short volume and swipe cues and the volume controls work.
 Battery presence and operation without USB have not been established. No motion-based rotation or microphone recording is implemented.
 
+### Battery power saving (experimental)
+
+Displays with a battery connection have the switch **Battery power saving** (marked *experimental*) on their device
+card: Waveshare 1.54, 1.47 and C6 1.69 (tested boards), Waveshare S3 1.69 and LilyGO T-Display-S3 (prepared). It is
+off by default. Switched on, the display saves power while it runs on its battery, that is without a computer on its
+USB port (and on the 1.54 without charging):
+
+- Wi-Fi modem sleep, which VibeDock otherwise switches off because some access points and phone hotspots then delay or
+  drop packets;
+- the processor at 80 MHz instead of 240 (C6: 160) MHz;
+- the backlight dims to 10 % after a minute without touch or volume button. The next touch only wakes it; swipe again
+  for the gesture.
+
+Plugging into a computer ends it within about ten seconds. A charger or power bank without data lines counts as
+battery operation, except on the 1.54 while it charges; that does no harm. The display's status page shows **Power
+source** and **Power saving** (on the 1.54 in the *Battery* card, on the others in a *Power* card). Not yet tested
+on hardware: how long a battery lasts with and without it, and whether every access point keeps up with modem sleep.
+If the display misses updates on battery, switch it off again.
+
+**Battery icon.** While one of these displays runs on its battery, its picture shows a small battery at the top right
+of the first usage band (beside a status such as *Rate limited*, in window themes in the title bar), whether power
+saving is on or not. The 1.54 fills it to its measured level in steps of 20 %, red below 20 %; the others only know
+that they run on battery and show it empty. The device card's preview shows it as well. On USB it disappears. The
+server draws it into the image, so the display only sends one more header with its pulls; the image changes only when
+the level steps or the power source changes. The LilyGO T-Display has a battery connection too,
+but its USB serial chip cannot tell whether a computer is connected, so it has no power saving.
+
 ## Displays mounted upside down or turned
 
 Every display except the VibeTV M1 (its case decides how it stands) shows its **Orientation** on its card under

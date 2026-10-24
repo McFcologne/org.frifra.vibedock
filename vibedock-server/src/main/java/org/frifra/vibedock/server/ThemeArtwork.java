@@ -41,6 +41,8 @@ final class ThemeArtwork {
             }
         }finally{ink.dispose();}
     }
+    /** Room a theme's own decoration takes at the top right of a band, kept free of the battery icon (Bauhaus: its dot). */
+    static int cornerRoom(Scheme s){return s.style==Scheme.Style.BAUHAUS?11:0;}
     /** Syntax headings stay inside their slot, including narrow and compact layouts. */
     static boolean heading(Graphics2D g,Scheme s,String title,int x,int baseline,int width,int size){
         if(!s.developer())return false;

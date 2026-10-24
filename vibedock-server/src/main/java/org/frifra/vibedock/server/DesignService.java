@@ -13,7 +13,7 @@ class DesignService {
         Input(String mood,String scheme,String weatherLocation,Layout layout,boolean inherit,String display){this(mood,scheme,weatherLocation,layout,inherit,display,null);}
     }
     private final UsageService usage;private final StatusImage renderer;private final Twemoji twemoji;private final WeatherService weather;
-    private final PhotoLibrary photos;private final java.time.Clock clock;private final ThemeSettings themes;
+    private final PhotoLibrary photos;private final java.time.Clock clock;private final ThemeSettings themes;private final DevicePower power;
     /** Swipes in a slideshow: photos skipped per display, in memory only. */
     private final java.util.Map<String,Integer> skipped=new java.util.concurrent.ConcurrentHashMap<>();
     /**
@@ -22,8 +22,11 @@ class DesignService {
      */
     private final java.util.Map<String,Boolean> forced=new java.util.concurrent.ConcurrentHashMap<>();
     @org.springframework.beans.factory.annotation.Autowired
+    DesignService(UsageService usage,StatusImage renderer,Twemoji twemoji,WeatherService weather,PhotoLibrary photos,java.time.Clock clock,ThemeSettings themes,DevicePower power){
+        this.usage=usage;this.renderer=renderer;this.twemoji=twemoji;this.weather=weather;this.photos=photos;this.clock=clock;this.themes=themes;this.power=power;
+    }
     DesignService(UsageService usage,StatusImage renderer,Twemoji twemoji,WeatherService weather,PhotoLibrary photos,java.time.Clock clock,ThemeSettings themes){
-        this.usage=usage;this.renderer=renderer;this.twemoji=twemoji;this.weather=weather;this.photos=photos;this.clock=clock;this.themes=themes;
+        this(usage,renderer,twemoji,weather,photos,clock,themes,new DevicePower());
     }
     DesignService(UsageService usage,StatusImage renderer,Twemoji twemoji,WeatherService weather,PhotoLibrary photos,java.time.Clock clock){this(usage,renderer,twemoji,weather,photos,clock,null);}
     Scheme nextScheme(Scheme current,int step){return themes==null?current.shifted(step):themes.shifted(current,step);}
@@ -45,7 +48,7 @@ class DesignService {
     StatusImage.Image render(Design design,String ip,DisplayType type,String display,double scale) throws IOException {
         var photo=currentPhoto(design,display);
         if(photo.isPresent()){var image=photos.render(photo.get(),type,scale);if(image.isPresent())return image.get();}
-        return render(design,ip,type,scale);
+        return render(design,ip,type,scale,power.battery(display));
     }
     /** The photos of the design's slideshow that still exist, if it is active now. */
     java.util.List<String> activePhotos(Design design){return activePhotos(design,null);}
@@ -96,11 +99,13 @@ class DesignService {
     StatusImage.Image render(Design design,String ip) throws IOException {return render(design,ip,DisplayType.M1);}
     /** The image in the resolution of a display type, the design fitted to it. */
     StatusImage.Image render(Design design,String ip,DisplayType type) throws IOException {return render(design,ip,type,1);}
-    StatusImage.Image render(Design design,String ip,DisplayType type,double scale) throws IOException {
+    StatusImage.Image render(Design design,String ip,DisplayType type,double scale) throws IOException {return render(design,ip,type,scale,null);}
+    /** battery: the display runs on its battery (a small icon at the top right), null otherwise. */
+    StatusImage.Image render(Design design,String ip,DisplayType type,double scale,StatusImage.Battery battery) throws IOException {
         var current=weather.current(design.weather());
         var look=new StatusImage.Look(twemoji.image(design.mood(),(int)Math.round(Twemoji.SIZE*scale)).orElse(null),design.scheme(),
                 current.flatMap(c->twemoji.image(WeatherService.emoji(c.code(),c.day()),(int)Math.round(24*scale))).orElse(null),
-                current.map(c->WeatherService.temperature(c.temperature())).orElse(null),design.layout());
+                current.map(c->WeatherService.temperature(c.temperature())).orElse(null),design.layout(),battery);
         return renderer.render(usage.snapshot(),ip,look,type,scale);
     }
     /**

@@ -240,6 +240,25 @@ start per display (the last 20); a header from older firmware is simply absent. 
 handler, kept in RTC memory as well; they are decoded with the ELF of that firmware (`addr2line -pfiaC -e firmware.elf
 <addresses>`, see `vibedock-client/FLASHING.md`, *Decoding a crash*). The full backtrace stays on the serial port.
 
+## 3g. Battery power saving (server → device, experimental)
+
+Boards with a battery connection whose chip has its own USB (Waveshare 1.54, 1.47, C6 1.69, S3 1.69, LilyGO
+T-Display-S3; `Board.batteryPowerSaving`, `VIBEDOCK_BATTERY` in platformio.ini) get `X-VibeDock-Power-Saving` with
+every 200 and 304 answer: `battery` when *Battery power saving* is switched on on the device card, otherwise `off`.
+The display stores the setting. With `battery` it saves power while it runs on its battery: no USB host sends frames
+(the start-of-frame counter of the chip's USB serial/JTAG unit) and, on the 1.54, the charging signal is inactive; two
+readings 5 s apart. Then it switches on Wi-Fi modem sleep, runs its CPU at 80 MHz and dims the backlight to 10 % after
+a minute without touch or volume button; the next touch only wakes it. A USB host (or charging on the 1.54) ends it,
+as does `off`. A charger without data lines counts as battery operation. The status page, `VIBEDOCK-BATTERY` and the
+`battery` object of `VIBEDOCK-HELLO` show `powerSource` (`battery`, `usb`) and `powerSaving` (`off`, `allowed`,
+`active`). Firmware before this ignores the header.
+
+On its battery such a display also sends `X-VibeDock-Power: battery` with its pulls, on the 1.54 with its level
+(`battery;level=60`, the voltage estimate in steps of 20), whether power saving is on or not; on USB it sends nothing.
+The server then draws a battery icon at the top right of the first usage band (left of a status, in the title bar of
+window themes), filled to the level, red below 20 %. It keeps the report in memory until the next pull, so the
+preview on the device card shows the same. The display pulls right away when its power source changes.
+
 ## Boards
 
 One firmware source builds for several boards (PlatformIO environments in `vibedock-client/firmware/platformio.ini`, the server's inventory in `Board.java`):
