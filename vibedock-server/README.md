@@ -166,7 +166,7 @@ docker compose exec vibedock /app/login-provider.sh codex-logout
 docker compose exec vibedock /app/login-provider.sh claude-logout
 ```
 
-The token-removal checkboxes clear only manually stored tokens. For a complete logout, also log out the relevant official client; otherwise its cache becomes the active credential source again.
+The token-removal switches clear only manually stored tokens. For a complete logout, also log out the relevant official client; otherwise its cache becomes the active credential source again.
 
 Sources: [Codex App Server](https://learn.chatgpt.com/docs/app-server), [Codex authentication and headless operation](https://developers.openai.com/codex/auth), [Claude CLI authentication](https://code.claude.com/docs/en/cli-reference), [Claude credential storage](https://code.claude.com/docs/en/authentication). Cache fields are client implementation details and may change with client versions.
 
