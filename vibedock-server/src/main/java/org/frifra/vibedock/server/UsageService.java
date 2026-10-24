@@ -107,8 +107,10 @@ public class UsageService {
             if (p==null) continue;
             at=Math.min(at,p.nextAt()+settle);
             var r=readings.get(id);
-            if (r!=null&&r.observedAt()!=null&&(r.status().equals("ok")||r.status().equals("partial")))
-                at=Math.min(at,r.observedAt()+p.staleAfterSeconds()+1);
+            // A reading that is stale already changes nothing more until the next poll (e.g. after the interval was
+            // shortened while the next poll stays): only a stale moment still to come counts.
+            long stale=r==null||r.observedAt()==null?0:r.observedAt()+p.staleAfterSeconds()+1;
+            if (stale>now&&(r.status().equals("ok")||r.status().equals("partial"))) at=Math.min(at,stale);
         }
         if (!pending) return new Schedule(at,false);
         long since=collectingSince;

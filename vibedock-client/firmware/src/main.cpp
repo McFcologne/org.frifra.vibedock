@@ -1222,6 +1222,7 @@ void pull() {
       if (first) logEvent(String(F("Image shown, read in ")) + String(millis() - reading) + " ms", true);
     } else {
       etag = "";
+      pullWaitMs = client_policy::waitAfterImage(false, pullWaitMs); pullPending = false;
       // A rejected/partial patch can have changed pixels without a trustworthy row hash. Redraw the whole basis.
       if(delta)forgetRows();
       logEvent(String(F("Image aborted: ")) + imageProblem + (https ? ", " + platform::tlsTraffic() : String()), true);

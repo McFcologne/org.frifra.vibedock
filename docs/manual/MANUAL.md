@@ -752,6 +752,27 @@ last values and shows *Rate limited*.
 
 <img src="images/44-import-sources.png" width="80%" alt="Import data sources">
 
+## How little data a display needs
+
+The server renders every picture completely, but a display with current firmware only receives what changed, and
+only when something can have changed:
+
+- **Changed parts only.** The server keeps the last pictures of each display in memory and sends just the changed
+  spans of rows: usually a few hundred bytes to a few KB instead of 112.5 KB for a 240 × 240 picture. Whole pictures
+  still come after a start, a theme change, a forced refresh, for slideshow photos and whenever the display or the
+  server is not sure what the display shows.
+- **Pulls when new readings are due.** Every answer tells the display when its picture can change next: shortly after
+  the next poll of the sources it shows. The display pulls then instead of every 30 s; while a source is still being
+  asked, it comes back a few seconds later. At most every 10 minutes (2 minutes if the server cannot reach the display
+  directly), so design changes and status still arrive.
+
+Measured on a Waveshare 1.54 with readings every minute: 16 picture updates in 20 minutes took 20 KB instead of
+1.84 MB of whole pictures (98.9 % less); the typical update was 0.2 to 3 KB, a design change in the editor 4 to 12 KB.
+The figures count the picture data, not HTTP headers or TLS. The server log shows each transfer with the bytes saved
+and the announced next pull (`Image transfer …: delta, full=115200 bytes, payload=638 bytes, saved=… (99.4%),
+next=58 s (current)`). Older firmware keeps receiving whole pictures every poll interval; a firmware update over
+Wi-Fi is all it takes.
+
 # Settings
 
 **Settings** holds the server's network addresses, who may read its API, the old push connection, the
@@ -1100,6 +1121,7 @@ valid for 10 minutes and for one log.
 | `… after TLS; sent …, got …` | The encrypted connection works; the HTTP request failed afterwards (for example read timeout or connection lost). Check the reverse proxy and the server's access log for the request. |
 | `Image shown, read in … ms` | The first image after a start or a problem arrived completely. |
 | `Image aborted: no data for 8 s at row …` / `connection closed at row …` | The answer started but the image did not arrive completely; over https the traffic figures follow. |
+| `Image aborted: invalid delta, length or checksum` / `delta transfer interrupted` / `unsupported image or delta basis` | A partial update did not fit what the display shows or did not arrive completely; the display fetches the whole picture right away. Now and then is harmless; every time points to a proxy changing the answers. |
 | `Image not accepted: format …, … bytes announced` | The server's answer was not a VibeDock image: no or a wrong image format, typically a wrong address or a reverse proxy that answers itself. A missing `Content-Length` is fine. |
 | `Trying <address> next` | The display switches to its other server address. |
 | `Clock set (NTP)` | The time is known; https needs it. Without this line check that the display can reach `pool.ntp.org`. |

@@ -56,6 +56,9 @@ inline bool parseNextPull(const char *text, uint32_t &seconds, bool &pending) {
   if (is(text, current)) pending = false; else if (is(text, waiting)) pending = true; else return false;
   seconds = value; return true;
 }
+// The announced wait counts only for a pull that ended well: after an aborted or refused image the poll interval
+// applies again (or the immediate retry), never a wait of up to ten minutes.
+constexpr uint32_t waitAfterImage(bool complete, uint32_t announcedMs) { return complete ? announcedMs : 0; }
 // A pull is due once the wait has passed (the announced one, or the poll interval); survives millis() rollover.
 constexpr bool waited(uint32_t now, uint32_t since, uint32_t ms) { return uint32_t(now - since) >= ms; }
 // Stale after three poll intervals without a successful pull, or two poll intervals after an announced longer wait.

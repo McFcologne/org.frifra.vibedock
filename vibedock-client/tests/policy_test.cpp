@@ -170,6 +170,8 @@ int main(){
     assert(!imageStale(89999,0,30,0)&&imageStale(90000,0,30,0));
     assert(!imageStale(659999,0,30,600000)&&imageStale(660000,0,30,600000));
     assert(imageStale(90000,0,30,5000));
+    // An aborted image falls back to the poll interval; only a complete one keeps the announced wait.
+    assert(waitAfterImage(true,600000)==600000&&waitAfterImage(false,600000)==0);
   }
   assert(clampPoll(1)==10);assert(clampPoll(30)==30);assert(clampPoll(99999)==3600);
   assert(!pullDue(29999,0,30));assert(pullDue(30000,0,30));assert(pullDue(10000,0,5));
