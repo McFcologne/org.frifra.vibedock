@@ -54,6 +54,32 @@ test('default design is saved right away',async ({page,app}) => {
   await page.locator('#design-align').selectOption('spread');await expect(message).toContainText('Default design saved');
 });
 
+test('theme gallery selects real themes and persists instance availability without replacing an existing design',async ({page,app}) => {
+  await editor(page,app);
+  const grid=page.locator('#theme-grid'),nordic=grid.locator('[data-theme="nordic"]');
+  await expect(grid.locator('.theme-card')).toHaveCount(30);
+  await expect(page.locator('#theme-count')).toHaveText('30 / 30 enabled');
+  const save=page.waitForResponse(r=>r.url().endsWith('/admin/designs/default')&&r.request().method()==='POST');
+  await nordic.getByRole('button',{name:'Use theme',exact:true}).click();await save;
+  await expect(page.locator('#design-scheme')).toHaveValue('nordic');
+  await nordic.getByRole('checkbox').uncheck();
+  await expect(page.locator('#theme-message')).toContainText('Nordic disabled');
+  await expect(page.locator('#theme-count')).toHaveText('29 / 30 enabled');
+  await expect(page.locator('#design-scheme')).toHaveValue('nordic');
+  await expect(page.locator('#design-scheme option[value=nordic]')).toBeDisabled();
+  await page.reload();await expect(nordic.getByRole('checkbox')).not.toBeChecked();
+  await expect(page.locator('#design-scheme')).toHaveValue('nordic');
+  const changed=page.waitForResponse(r=>r.url().endsWith('/admin/designs/default')&&r.request().method()==='POST');
+  await grid.locator('[data-theme="porcelain"]').getByRole('button',{name:'Use theme',exact:true}).click();await changed;
+  await expect(nordic.getByRole('button',{name:'Use theme',exact:true})).toBeDisabled();
+  await page.locator('#design-target').selectOption('vibedock-e2e-office');
+  await expect(grid.locator('[data-theme="mission_control"] button')).toBeDisabled();
+  await page.locator('#design-override').check();
+  await expect(grid.locator('[data-theme="mission_control"] button')).toBeEnabled();
+  await nordic.getByRole('checkbox').check();await expect(page.locator('#theme-count')).toHaveText('30 / 30 enabled');
+  await expect(nordic.getByRole('button',{name:'Use theme',exact:true})).toBeEnabled();
+});
+
 test('device inherits the default, can override it, and can return to inheritance',async ({page,app}) => {
   await editor(page,app);const message=page.locator('#design-message');
   await page.locator('#design-scheme').selectOption('ocean');await expect(message).toContainText('Default design saved');

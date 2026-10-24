@@ -56,6 +56,7 @@ public class StatusImage {
     }
     /** The scheme's icon look; the Mac's dithering keeps its pixel size on scaled images. */
     BufferedImage look(BufferedImage icon,Scheme scheme){
+        if(scheme.style==Scheme.Style.LCD||scheme.style==Scheme.Style.BLUEPRINT)return styled(icon,scheme,Math.max(1,(int)Math.round(scale)));
         if(icon==null||scale==1||scheme.style!=Scheme.Style.MAC)return styled(icon,scheme);
         var dithered=styled(resize(icon,iw(icon),ih(icon)),scheme);
         var out=new BufferedImage(icon.getWidth(),icon.getHeight(),BufferedImage.TYPE_INT_ARGB);var g=out.createGraphics();
@@ -79,7 +80,7 @@ public class StatusImage {
             g.setColor(new Color(scheme.background));g.fillRect(0,0,w,h);
             backdrop(g,scheme);
             // Classic Mac, Windows and the LCD: no anti-aliasing, crisp pixels like the originals.
-            boolean smooth=scheme.style!=Scheme.Style.MAC&&scheme.style!=Scheme.Style.WINDOWS&&scheme.style!=Scheme.Style.LCD;
+            boolean smooth=scheme.style!=Scheme.Style.MAC&&scheme.style!=Scheme.Style.WINDOWS&&scheme.style!=Scheme.Style.LCD&&scheme.style!=Scheme.Style.QUEST;
             g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,smooth?RenderingHints.VALUE_TEXT_ANTIALIAS_ON:RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,smooth?RenderingHints.VALUE_ANTIALIAS_ON:RenderingHints.VALUE_ANTIALIAS_OFF);
             // Usage bands shrink in proportion (to their minimum, see Layout.fit) when they need more than the screen
@@ -120,6 +121,8 @@ public class StatusImage {
         }
     }
     private void provider(Graphics2D g,Scheme scheme,String title,UsageService.Provider p,int top,int height,boolean bottom){
+        title=ThemeArtwork.title(scheme,title);
+        ThemeArtwork.band(g,scheme,0,top-22,w,height);
         if(p==null)p=new UsageService.Provider("unconfigured",null,null,null);
         // Rate limited with last known values: keep them and show the time they were read.
         boolean held=p.status().equals("rate_limited")&&p.observedAt()!=null&&(p.fiveHour()!=null||p.week()!=null);
@@ -210,7 +213,7 @@ public class StatusImage {
     }
     /** Light colour schemes: a thin grey outline keeps white icons (clouds, snow) visible. */
     private void icon(Graphics2D g,Scheme scheme,BufferedImage icon,int x,int y){
-        if(scheme.light()&&scheme.style==Scheme.Style.MODERN){
+        if(scheme.light()&&(scheme.style==Scheme.Style.MODERN||scheme.illustrated()&&scheme.style!=Scheme.Style.INK)){
             var mask=mask(icon,0x9aa0a6);
             for(int dy=-1;dy<=1;dy++)for(int dx=-1;dx<=1;dx++)if(dx!=0||dy!=0)put(g,mask,x+dx,y+dy);
         }
@@ -247,6 +250,8 @@ public class StatusImage {
     }
     /** Half-width provider: the theme's own window or heading at half width; compact text, nothing scaled. */
     private void compact(Graphics2D g,Scheme scheme,String title,UsageService.Provider p,int height,boolean bottom){
+        title=ThemeArtwork.title(scheme,title);
+        ThemeArtwork.band(g,scheme,0,0,w/2,height);
         if(p==null)p=new UsageService.Provider("unconfigured",null,null,null);
         int top=16;
         switch(scheme.style){
@@ -286,6 +291,8 @@ public class StatusImage {
      * both windows side by side (a single window spans the width). No reset times.
      */
     private void row(Graphics2D g,Scheme scheme,String title,UsageService.Provider p,int y,int height,boolean bottom){
+        title=ThemeArtwork.title(scheme,title);
+        ThemeArtwork.band(g,scheme,0,y,w,height);
         if(p==null)p=new UsageService.Provider("unconfigured",null,null,null);
         boolean held=p.status().equals("rate_limited")&&p.observedAt()!=null&&(p.fiveHour()!=null||p.week()!=null);
         String status=held?"Limited \u00b7 "+DateTimeFormatter.ofPattern("HH:mm").withZone(zone).format(Instant.ofEpochSecond(p.observedAt()))
@@ -355,6 +362,7 @@ public class StatusImage {
      * coloured dot in the newspaper.
      */
     private void bar(Graphics2D g,Scheme scheme,int x,int top,int width,int height,double left){
+        if(scheme.illustrated()){ThemeArtwork.bar(g,scheme,x,top,width,height,left);return;}
         int fill=left<0?0:(int)Math.round(width*left/100);
         switch(scheme.style){
             case LCD -> {
@@ -533,7 +541,12 @@ public class StatusImage {
      * newspaper, 1-bit ordered dithering for the Mac (the LCD reduces the whole image to its shades, see encode).
      */
     static BufferedImage styled(BufferedImage icon,Scheme scheme){
+        return styled(icon,scheme,1);
+    }
+    private static BufferedImage styled(BufferedImage icon,Scheme scheme,int contourWidth){
+        if(scheme.illustrated())return ThemeArtwork.icon(icon,scheme);
         var s=scheme.style;
+        if(icon!=null&&s==Scheme.Style.LCD)return contoured(icon,scheme.text,contourWidth);
         if(icon==null||(s!=Scheme.Style.TERMINAL&&s!=Scheme.Style.MAC&&s!=Scheme.Style.BLUEPRINT&&s!=Scheme.Style.PRINT))return icon;
         int[] bayer={0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5};
         var out=new BufferedImage(icon.getWidth(),icon.getHeight(),BufferedImage.TYPE_INT_ARGB);
@@ -542,7 +555,7 @@ public class StatusImage {
             if(alpha<96)continue;
             int luma=(299*(argb>>16&255)+587*(argb>>8&255)+114*(argb&255))/1000;
             if(s==Scheme.Style.TERMINAL||s==Scheme.Style.BLUEPRINT){
-                int level=Math.max(s==Scheme.Style.BLUEPRINT?150:70,luma),c=scheme.text;
+                int level=Math.max(s==Scheme.Style.BLUEPRINT?25:70,luma),c=scheme.text;
                 out.setRGB(x,y,0xff000000|((c>>16&255)*level/255)<<16|((c>>8&255)*level/255)<<8|(c&255)*level/255);
             }else if(s==Scheme.Style.PRINT){
                 int level=Math.min(210,luma);out.setRGB(x,y,(alpha<<24)|level<<16|level<<8|level);
@@ -550,6 +563,21 @@ public class StatusImage {
                 boolean dark=luma*16/256<=bayer[(y&3)*4+(x&3)];
                 out.setRGB(x,y,dark?0xff000000:0xffffffff);
             }
+        }
+        return s==Scheme.Style.BLUEPRINT?contoured(out,scheme.text,contourWidth):out;
+    }
+    /** A contour inside the alpha silhouette: keeps the icon's size, position and transparent surroundings unchanged. */
+    private static BufferedImage contoured(BufferedImage icon,int rgb,int width){
+        int w=icon.getWidth(),h=icon.getHeight();var out=new BufferedImage(w,h,BufferedImage.TYPE_INT_ARGB);
+        for(int y=0;y<h;y++)for(int x=0;x<w;x++){
+            int argb=icon.getRGB(x,y);
+            if((argb>>>24)>=96){
+                boolean edge=x<width||x+width>=w||y<width||y+width>=h
+                        ||(icon.getRGB(x-width,y)>>>24)<96||(icon.getRGB(x+width,y)>>>24)<96
+                        ||(icon.getRGB(x,y-width)>>>24)<96||(icon.getRGB(x,y+width)>>>24)<96;
+                if(edge)argb=(argb&0xff000000)|rgb;
+            }
+            out.setRGB(x,y,argb);
         }
         return out;
     }

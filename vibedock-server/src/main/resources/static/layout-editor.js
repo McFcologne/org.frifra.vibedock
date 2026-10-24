@@ -25,6 +25,12 @@
     $('#design-controls').disabled = inherit || !catalog;
     $('#design-style-controls').disabled = inherit || !catalog;
     $('#design-target').disabled = !catalog;
+    for(const button of root.querySelectorAll('[data-theme-choose]')){
+      const theme=catalog?.schemes.find(s=>s.id===button.dataset.themeChoose);
+      button.disabled=inherit||!theme?.enabled;
+      button.setAttribute('aria-pressed',String(draft?.scheme===theme?.id));
+      button.textContent=draft?.scheme===theme?.id?'Selected':'Use theme';
+    }
   }
   function changed(delay = 250) {
     dirty = true; edits++; error(''); schedulePreview(delay); controls();
@@ -224,6 +230,39 @@
     $('#design-align').value = draft.layout.alignTop ? 'top' : 'spread';
     renderPhotos(); renderBands(); displayNote(); controls();
   }
+  function themeOptions(){
+    $('#design-scheme').replaceChildren(...catalog.schemes.map(s=>{
+      const option=element('option','',s.label+(s.enabled?'':' · disabled'));option.value=s.id;option.disabled=!s.enabled;return option;
+    }));
+    if(draft)$('#design-scheme').value=draft.scheme;
+  }
+  function themeGallery(){
+    $('#theme-count').textContent=catalog.schemes.filter(s=>s.enabled).length+' / '+catalog.schemes.length+' enabled';
+    const cards=catalog.schemes.map(s=>{
+      const card=element('article','theme-card');card.dataset.theme=s.id;card.classList.toggle('theme-disabled',!s.enabled);
+      const heading=element('h4','',s.label), image=document.createElement('img');
+      image.src='/admin/themes/'+encodeURIComponent(s.id)+'/preview.png';image.alt=s.label+' theme with sample usage';image.width=240;image.height=240;image.loading='lazy';
+      const choose=element('button','secondary','Use theme');choose.type='button';choose.dataset.themeChoose=s.id;
+      choose.addEventListener('click',()=>{draft.scheme=s.id;$('#design-scheme').value=s.id;changed();controls();});
+      const label=element('label','theme-availability'),toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=s.enabled;toggle.setAttribute('aria-label',s.label+' enabled');label.title='Enable or disable '+s.label;
+      label.append(toggle);
+      toggle.addEventListener('change',async()=>{
+        root.querySelectorAll('.theme-card input').forEach(input=>input.disabled=true);
+        try{
+          const response=await fetch('/admin/themes/'+encodeURIComponent(s.id),{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json',[csrfHeader]:csrf},body:JSON.stringify({enabled:toggle.checked})});
+          if(!response.ok){const body=await response.json().catch(()=>({}));throw new Error(body.error||body.message||'Could not update theme availability. Keep at least one theme enabled.');}
+          catalog.schemes=await response.json();themeOptions();
+          // Update in place so keyboard focus stays on the switch just used.
+          for(const item of catalog.schemes){const tile=$('#theme-grid').querySelector('[data-theme="'+item.id+'"]');tile.classList.toggle('theme-disabled',!item.enabled);tile.querySelector('input').checked=item.enabled;}
+          $('#theme-count').textContent=catalog.schemes.filter(t=>t.enabled).length+' / '+catalog.schemes.length+' enabled';
+          $('#theme-message').textContent=s.label+(toggle.checked?' enabled.':' disabled. Existing designs keep this theme.');controls();
+        }catch(e){toggle.checked=!toggle.checked;error(e.message);$('#theme-message').textContent=e.message;}
+        finally{root.querySelectorAll('.theme-card input').forEach(input=>input.disabled=false);}
+      });
+      const title=element('div','theme-card-heading');title.append(heading,label);card.append(title,image,choose);return card;
+    });
+    $('#theme-grid').replaceChildren(...cards);controls();
+  }
   $('#design-align').addEventListener('change', event => { draft.layout.alignTop = event.target.value === 'top'; changed(); });
   // ---- content: usage monitor or photos (a paused selection is kept for switching back) ----
   const photoDefaults = () => ({images: [], seconds: 30, shuffle: false, from: null, to: null, paused: false});
@@ -367,7 +406,7 @@
     try { const photos = await fetch('/admin/photos', {credentials: 'same-origin'}); if (photos.ok) library = await photos.json(); } catch { /* no library */ }
     $('#design-display').replaceChildren(...catalog.displays.map(d => { const o = document.createElement('option'); o.value = d.id; o.textContent = d.label; return o; }));
     catalog.devices.forEach(d => { const option = element('option', '', d.name + (d.overridden ? ' · own design' : ' · default')); option.value = d.identifier; $('#design-target').append(option); });
-    catalog.schemes.forEach(s => { const option = element('option', '', s.label); option.value = s.id; $('#design-scheme').append(option); });
+    themeOptions();themeGallery();
     const requested = new URLSearchParams(location.search).get('device'); if (catalog.devices.some(d => d.identifier === requested)) target = requested;
     $('#design-target').value = target; $('#design-message').textContent = 'Changes are saved right away.'; loadTarget();
   }).catch(failure => error(failure.message));

@@ -15,10 +15,11 @@ class DesignController {
     record DisplayOption(String id,String label,int width,int height,int bandRoom,boolean halfWidth) {}
     /** A data source the usage bands can show: id as stored in layouts, label as shown on the display. */
     record SourceOption(String id,String label) {}
-    record SchemeOption(String id,String label) {}
+    record SchemeOption(String id,String label,boolean enabled) {}
     private final ClientRegistry registry;private final DesignService designs;private final UsageService usage;private final DevicePoke poke;
-    private final ApplicationInfo info;
-    DesignController(ClientRegistry registry,DesignService designs,UsageService usage,DevicePoke poke,ApplicationInfo info){
+    private final ApplicationInfo info;private final ThemeSettings themes;
+    DesignController(ClientRegistry registry,DesignService designs,UsageService usage,DevicePoke poke,ApplicationInfo info,ThemeSettings themes){
+        this.themes=themes;
         this.info=info;
         this.registry=registry;this.designs=designs;this.usage=usage;this.poke=poke;
     }
@@ -28,8 +29,16 @@ class DesignController {
         return new Catalog(registry.defaultDesign(),registry.views().stream()
                 .map(v->new Target(v.identifier(),v.name(),v.ip(),v.overridden(),v.design(),v.serverFooter(),v.display().id(),v.board().previewCase(),v.web()!=null)).toList(),
                 usage.snapshot().providers().keySet().stream().map(id->new SourceOption(id,usage.snapshot().label(id))).toList(),
-                Arrays.stream(Scheme.values()).map(s->new SchemeOption(s.id(),s.label)).toList(),
+                schemeOptions(),
                 DisplayType.WEB.stream().map(t->new DisplayOption(t.id(),t.label(),t.width(),t.height(),t.bandRoom(),t.halfWidth())).toList());
+    }
+    private List<SchemeOption> schemeOptions(){return Arrays.stream(Scheme.values()).map(s->new SchemeOption(s.id(),s.label,themes.enabled(s))).toList();}
+    record Availability(boolean enabled) {}
+    @PostMapping("/admin/themes/{id}") @ResponseBody List<SchemeOption> availability(@PathVariable String id,@RequestBody Availability input) throws IOException {
+        themes.setEnabled(Scheme.parse(id),input.enabled());return schemeOptions();
+    }
+    @GetMapping(value="/admin/themes/{id}/preview.png",produces="image/png") @ResponseBody byte[] themePreview(@PathVariable String id) throws IOException {
+        return designs.themePreview(Scheme.parse(id));
     }
     @PostMapping("/admin/designs/default") @ResponseBody Design saveDefault(@RequestBody DesignService.Input input) throws IOException {
         if(input.inherit())throw new IllegalArgumentException("The default design cannot inherit");
