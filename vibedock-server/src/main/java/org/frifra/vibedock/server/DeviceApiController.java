@@ -17,9 +17,10 @@ class DeviceApiController {
     private static final Logger log=LoggerFactory.getLogger(DeviceApiController.class);
     private final ClientRegistry registry;private final DesignService designs;private final ServerAddresses addresses;private final TlsTrust trust;
     private final Firmware firmware;private final OtaSigning signing;private final DeviceLogs logs;private final AdminEvents events;private final DeviceDiagnostics diagnostics;
+    private final DevicePower power;
     DeviceApiController(ClientRegistry registry,DesignService designs,ServerAddresses addresses,TlsTrust trust,Firmware firmware,OtaSigning signing,DeviceLogs logs,AdminEvents events,
-                        DeviceDiagnostics diagnostics){
-        this.logs=logs;this.events=events;this.diagnostics=diagnostics;this.registry=registry;this.designs=designs;this.addresses=addresses;this.trust=trust;this.firmware=firmware;this.signing=signing;
+                        DeviceDiagnostics diagnostics,DevicePower power){
+        this.power=power;this.logs=logs;this.events=events;this.diagnostics=diagnostics;this.registry=registry;this.designs=designs;this.addresses=addresses;this.trust=trust;this.firmware=firmware;this.signing=signing;
     }
     /** The device authenticates with its key; unknown devices and wrong keys get the same 401. */
     @GetMapping("/api/v1/clients/{identifier}/image")
@@ -50,6 +51,8 @@ class DeviceApiController {
             try{if(registry.get(identifier).display()==DisplayType.M1&&type!=DisplayType.M1)registry.setDisplay(identifier,type.id());}
             catch(IOException e){log.warn("Could not store the display type of {}: {}",identifier,e.toString());}
         });
+        // On its battery the display gets a small battery icon at the top right; on USB it reports nothing.
+        power.report(identifier,request.getHeader("X-VibeDock-Power"));
         String gesture=request.getHeader("X-VibeDock-Gesture");
         if("photos-toggle".equals(gesture))togglePhotos(registry,designs,events,identifier);
         else if("turn-clockwise".equals(gesture)||"turn-counterclockwise".equals(gesture))turn(registry,events,identifier,"turn-clockwise".equals(gesture)?1:-1);
@@ -65,6 +68,8 @@ class DeviceApiController {
         // Mounted turned: the device turns its panel (also its own screens and the swipes). "upright" and "flipped" as
         // before; firmware that does not know "rotated-90"/"rotated-270" keeps its orientation.
         if(registry.get(identifier).board().flippable())headers.set("X-VibeDock-Orientation",orientation(registry.rotation(identifier)));
+        // Experimental battery power saving: "battery" lets the display save power while it runs on its battery.
+        if(registry.get(identifier).board().batteryPowerSaving())headers.set("X-VibeDock-Power-Saving",registry.get(identifier).powerSaving()?"battery":"off");
         // A requested update over Wi-Fi: the device fetches /firmware after this pull and installs it if signed.
         firmware.info(registry.get(identifier).board()).filter(i->registry.updatePending(identifier,i.version())).ifPresent(i->headers.set("X-VibeDock-Update",i.version()));
         // A log requested in the administration: the display uploads it after this pull (POST .../log).

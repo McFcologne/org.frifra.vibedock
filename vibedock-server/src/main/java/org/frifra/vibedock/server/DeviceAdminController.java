@@ -268,6 +268,15 @@ class DeviceAdminController {
             return org.springframework.http.ResponseEntity.ok(java.util.Map.of("flipped",registry.flipped(identifier),"rotation",registry.rotation(identifier)));}
         catch(IllegalArgumentException e){return org.springframework.http.ResponseEntity.badRequest().body(java.util.Map.of("error",e.getMessage()));}
     }
+    /** The experimental battery power saving switch on the card; the device is asked to pull right away. */
+    @PostMapping(value="/admin/clients/{identifier}/power-saving",produces="application/json") @ResponseBody org.springframework.http.ResponseEntity<java.util.Map<String,Object>> powerSaving(
+            @PathVariable String identifier,@RequestParam(defaultValue="false") boolean enabled) throws IOException {
+        try{
+            registry.setPowerSaving(identifier,enabled);
+            try{poke.pullNow(List.of(registry.address(identifier)));}catch(IllegalArgumentException ignored){ /* learns it at its next poll */ }
+            return org.springframework.http.ResponseEntity.ok(java.util.Map.of("enabled",registry.get(identifier).powerSaving()));}
+        catch(IllegalArgumentException e){return org.springframework.http.ResponseEntity.badRequest().body(java.util.Map.of("error",e.getMessage()));}
+    }
     record Order(List<String> ids) {}
     /** Order of the device cards after dragging one by its grip. */
     @PostMapping(value="/admin/clients/order",produces="application/json") @ResponseBody java.util.Map<String,Object> order(@RequestBody Order order) throws IOException {

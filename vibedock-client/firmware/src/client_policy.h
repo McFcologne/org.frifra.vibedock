@@ -11,6 +11,25 @@ constexpr int batteryEstimate(uint32_t millivolts) {
       millivolts < 3520 ? 1 : millivolts < 3640 ? 20 : millivolts < 3760 ? 40 :
       millivolts < 3880 ? 60 : millivolts < 4000 ? 80 : 100;
 }
+// ---- experimental battery power saving (boards that measure their battery) ----
+// Battery operation: no USB host sends frames and the charger does not report charging. A charger without data
+// lines next to a full cell also counts; saving power there does no harm.
+constexpr bool onBattery(bool usbHost, bool charging) { return !usbHost && !charging; }
+// The power source, read every powerCheckMs: it changes only after two readings in a row agree, so a USB host that
+// misses a frame or a flickering charge signal does not switch the Wi-Fi mode back and forth.
+constexpr uint32_t powerCheckMs = 5000;
+struct PowerSource {
+  bool battery = false; uint8_t agreeing = 0;
+  // True when the source changed with this reading.
+  bool update(bool reading) {
+    if (reading == battery) { agreeing = 0; return false; }
+    if (++agreeing < 2) return false;
+    battery = reading; agreeing = 0; return true;
+  }
+};
+// While saving power, the backlight dims after a minute without touch or button; the next touch only wakes it.
+constexpr uint32_t dimAfterMs = 60000;
+constexpr bool dimDue(uint32_t now, uint32_t lastActivity) { return now - lastActivity >= dimAfterMs; }
 
 constexpr uint32_t minPollSeconds = 10, maxPollSeconds = 3600, defaultPollSeconds = 30;
 constexpr uint8_t maxPairingAttempts = 5;
@@ -185,6 +204,8 @@ struct TouchPath {
 constexpr uint8_t minBrightness = 10, brightnessStep = 15;
 constexpr uint8_t clampBrightness(long v) { return v < minBrightness ? minBrightness : v > 100 ? 100 : uint8_t(v); }
 constexpr uint8_t nextBrightness(uint8_t percent, bool up) { return clampBrightness(long(percent) + (up ? brightnessStep : -long(brightnessStep))); }
+// Dimmed while saving power: the lowest step, or lower than that never.
+constexpr uint8_t dimmedBrightness(uint8_t percent) { return percent < minBrightness ? percent : minBrightness; }
 // ---- diagnosis: why the display started, and the last state of the run before (kept across a reset) ----
 // What the firmware meant to do when it restarted itself; a restart without one is unexpected.
 enum class Intent : uint8_t { None = 0, Update = 1, Setup = 2, FactoryReset = 3 };
