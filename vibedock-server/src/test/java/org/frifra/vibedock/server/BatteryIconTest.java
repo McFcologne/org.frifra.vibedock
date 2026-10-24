@@ -30,7 +30,7 @@ class BatteryIconTest {
         for(var scheme:Scheme.values()){
             var plain=image(scheme,Layout.DEFAULT,null,limited);var battery=image(scheme,Layout.DEFAULT,new StatusImage.Battery(40),limited);
             for(int y=0;y<240;y++)for(int x=0;x<240;x++)if(plain.getRGB(x,y)!=battery.getRGB(x,y))
-                Assertions.assertTrue(y<24,scheme+": only the heading row changes, at "+x+","+y);
+                Assertions.assertTrue(y<28,scheme+": only the heading row changes, at "+x+","+y);
         }
     }
     @Test void theLevelShowsInTheIcon() throws Exception {

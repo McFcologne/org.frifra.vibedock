@@ -13,7 +13,7 @@ class DesignService {
         Input(String mood,String scheme,String weatherLocation,Layout layout,boolean inherit,String display){this(mood,scheme,weatherLocation,layout,inherit,display,null);}
     }
     private final UsageService usage;private final StatusImage renderer;private final Twemoji twemoji;private final WeatherService weather;
-    private final PhotoLibrary photos;private final java.time.Clock clock;private final DevicePower power;
+    private final PhotoLibrary photos;private final java.time.Clock clock;private final ThemeSettings themes;private final DevicePower power;
     /** Swipes in a slideshow: photos skipped per display, in memory only. */
     private final java.util.Map<String,Integer> skipped=new java.util.concurrent.ConcurrentHashMap<>();
     /**
@@ -21,12 +21,23 @@ class DesignService {
      * the schedule or the switch in the editor say; until the next double tap or a restart of the server.
      */
     private final java.util.Map<String,Boolean> forced=new java.util.concurrent.ConcurrentHashMap<>();
-    DesignService(UsageService usage,StatusImage renderer,Twemoji twemoji,WeatherService weather,PhotoLibrary photos,java.time.Clock clock){
-        this(usage,renderer,twemoji,weather,photos,clock,new DevicePower());
-    }
     @org.springframework.beans.factory.annotation.Autowired
-    DesignService(UsageService usage,StatusImage renderer,Twemoji twemoji,WeatherService weather,PhotoLibrary photos,java.time.Clock clock,DevicePower power){
-        this.usage=usage;this.renderer=renderer;this.twemoji=twemoji;this.weather=weather;this.photos=photos;this.clock=clock;this.power=power;
+    DesignService(UsageService usage,StatusImage renderer,Twemoji twemoji,WeatherService weather,PhotoLibrary photos,java.time.Clock clock,ThemeSettings themes,DevicePower power){
+        this.usage=usage;this.renderer=renderer;this.twemoji=twemoji;this.weather=weather;this.photos=photos;this.clock=clock;this.themes=themes;this.power=power;
+    }
+    DesignService(UsageService usage,StatusImage renderer,Twemoji twemoji,WeatherService weather,PhotoLibrary photos,java.time.Clock clock,ThemeSettings themes){
+        this(usage,renderer,twemoji,weather,photos,clock,themes,new DevicePower());
+    }
+    DesignService(UsageService usage,StatusImage renderer,Twemoji twemoji,WeatherService weather,PhotoLibrary photos,java.time.Clock clock){this(usage,renderer,twemoji,weather,photos,clock,null);}
+    Scheme nextScheme(Scheme current,int step){return themes==null?current.shifted(step):themes.shifted(current,step);}
+    /** Stable sample readings, rendered by the same code as devices; no provider or weather network calls. */
+    byte[] themePreview(Scheme scheme) throws IOException {
+        long time=java.time.Instant.parse("2026-10-14T05:12:00Z").getEpochSecond();
+        var values=new java.util.LinkedHashMap<String,UsageService.Provider>();
+        values.put("codex",new UsageService.Provider("ok",time,new ProviderClient.Window(0,time+5*3600),new ProviderClient.Window(22,time+6*86400)));
+        values.put("claude",new UsageService.Provider("ok",time,new ProviderClient.Window(5,time+3*3600),new ProviderClient.Window(14,time+5*86400)));
+        return renderer.render(new UsageService.Snapshot(1,time,values),"192.168.1.50",new StatusImage.Look(
+                twemoji.image("😎",Twemoji.SIZE).orElse(null),scheme,twemoji.image("⛅",24).orElse(null),"13°",Layout.DEFAULT)).png();
     }
     /**
      * What a display shows now: the current photo of its slideshow while that is active, otherwise the status.
@@ -109,6 +120,8 @@ class DesignService {
     Design resolve(Input input,Design previous){
         if(input==null||input.layout()==null||input.mood()==null||input.scheme()==null||input.weatherLocation()==null)
             throw new IllegalArgumentException("Complete the design before saving");
+        var scheme=Scheme.parse(input.scheme());
+        if(themes!=null&&!themes.enabled(scheme)&&scheme!=previous.scheme())throw new IllegalArgumentException("This theme is disabled for this instance");
         input.layout().validateSources(usage.snapshot().providers().keySet());
         if(!Objects.equals(input.mood(),previous.mood()))twemoji.validate(input.mood());
         String place=input.weatherLocation().strip();
@@ -116,6 +129,6 @@ class DesignService {
         // Photos removed from the library meanwhile drop out of the selection.
         var chosen=input.photos();
         var selected=chosen==null?null:new Design.Photos(chosen.images().stream().filter(photos::exists).toList(),chosen.seconds(),chosen.shuffle(),chosen.from(),chosen.to(),chosen.paused());
-        return new Design(Scheme.parse(input.scheme()),input.mood(),resolved,input.layout(),selected);
+        return new Design(scheme,input.mood(),resolved,input.layout(),selected);
     }
 }
