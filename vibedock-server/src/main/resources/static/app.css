@@ -366,6 +366,7 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 .firmware-line .badge{margin:6px 0 0}.firmware-line .inline-form button.badge{margin:6px 0 0}.firmware-line{display:grid;justify-items:start}
 .source-manage{display:flex;align-items:center;justify-content:space-between;gap:12px}.source-manage button{margin:0}
 .source-dialog{width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 48px);overflow:auto;padding:20px 22px;border:1px solid var(--line);border-radius:16px;background:var(--card);color:var(--text);box-shadow:0 24px 60px rgba(0,0,0,.3)}
+.port-list{list-style:none;margin:6px 0 4px;padding:0;display:grid;gap:8px}.port-choice{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;margin:0;padding:10px 14px;text-align:left;background:var(--card);color:var(--text);border:1px solid var(--line);font-weight:400}.port-choice:hover:not(:disabled){border-color:var(--accent)}.port-choice strong{font-weight:600}.port-dialog .form-actions{margin-top:14px}.port-dialog .dialog-head h3{flex:1;margin:0;font-size:17px}.port-dialog .dialog-head{align-items:center}
 .source-dialog::backdrop{background:rgba(10,14,22,.45)}.source-dialog .dialog-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
 .source-dialog .dialog-close{margin:0;width:34px;height:34px;padding:0;font-size:20px;line-height:1}.source-dialog .source-actions{align-items:center}.source-dialog .source-actions .grow{flex:1}
 .source-dialog .login-panel{border-style:solid}

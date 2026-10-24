@@ -1,7 +1,7 @@
 // Flashes the VibeDock firmware over Web Serial with esptool-js: connect, back up the whole flash, write the image of the
 // chosen board at 0x0 (on ESP32 chips bootloader, partition table and app in one; the LittleFS settings stay), then
 // restart the device.
-import { openConsole as openSerialConsole, restart, csrf, sleep } from './serial-console.js';
+import { openConsole as openSerialConsole, restart, csrf, sleep, chooseDisplayPort, requestDisplayPort } from './serial-console.js';
 const card = document.getElementById('web-flasher');
 const $ = selector => card.querySelector(selector);
 const button = name => $(`[data-flash="${name}"]`);
@@ -62,7 +62,7 @@ if (!('serial' in navigator) || !window.isSecureContext) {
       deviceInfo.textContent = `${chip} · MAC ${mac} · flash ${flashSize}`;
     } catch (error) { await disconnect(); throw error; }
   });
-  button('connect').addEventListener('click', async () => { try { connect(await navigator.serial.requestPort()); } catch { /* no port chosen */ } });
+  button('connect').addEventListener('click', async () => { try { const port = await chooseDisplayPort(); if (port) connect(port); } catch { /* no port chosen */ } });
   // Opened after switching to the right board: connect to the port allowed before, without asking again.
   if (new URLSearchParams(location.search).get('connect') === '1') {
     history.replaceState(null, '', location.pathname + '?board=' + encodeURIComponent(card.dataset.board) + '#web-flasher');
@@ -125,7 +125,8 @@ card.querySelector('[data-restart]').addEventListener('click', async () => {
   try {
     if (loader) { await loader.after('hard_reset'); await disconnect(); say(''); terminal.writeLine('Display restarted.'); return; }
     await closeConsole();
-    serialPort ??= await navigator.serial.requestPort();
+    serialPort ??= await chooseDisplayPort();
+    if (!serialPort) return;
     await restart(serialPort);
     terminal.writeLine('Display restarted.');
   } catch (error) { terminal.writeLine('Restart failed: ' + (error?.message || error)); }
@@ -138,10 +139,11 @@ card.querySelector('[data-pair-only]').addEventListener('click', async () => {
 pair.querySelector('[data-pair-start]').addEventListener('click', async () => {
   pairAsk.hidden = true; say('Connecting to the display …');
   try {
-    serialPort ??= await navigator.serial.requestPort();
+    serialPort ??= await chooseDisplayPort();
+    if (!serialPort) { pairAsk.hidden = false; say(''); return; }
     // Boards with the chip's own USB (ESP32-S3, -C3) come back as a new port after their restart.
     try { console_ = await openConsole(); }
-    catch { serialPort = await navigator.serial.requestPort(); console_ = await openConsole(); }
+    catch { serialPort = await chooseDisplayPort() ?? await requestDisplayPort(); console_ = await openConsole(); }
     device = await hello();
     const list = await scanNetworks();
     choose(list[0]?.ssid ?? '');
