@@ -11,10 +11,11 @@ import java.util.*;
 import java.util.List;
 
 /**
- * Draws docs/manual/themes.png (README and manual; outside images/, which scripts/docs.sh makes again): every colour
- * scheme with example data, with the server's renderer at twice the size (sharp on high-resolution screens). Runs only
- * with the emoji set at hand:
- * {@code VIBEDOCK_TWEMOJI=<twemoji>/assets/svg mvn test -Dtest=ThemesImageTest} (from vibedock-server).
+ * Draws every colour scheme with example data, with the server's renderer at twice the size (sharp on high-resolution
+ * screens), into target/themes.png. With the Twemoji graphics versioned in the repository; VIBEDOCK_TWEMOJI names
+ * another SVG folder. The picture of the README and the manual (docs/manual/themes.png; outside images/, which
+ * scripts/docs.sh makes again) is made with
+ * {@code VIBEDOCK_THEMES_IMAGE=../docs/manual/themes.png mvn test -Dtest=ThemesImageTest} (from vibedock-server).
  */
 class ThemesImageTest {
     record Example(Scheme scheme,String mood,String weather,String temperature) {}
@@ -28,10 +29,11 @@ class ThemesImageTest {
             new Example(Scheme.NEON,"🌆","🌙","18°"),new Example(Scheme.NEWSPRINT,"📰","🌧","10°"));
 
     @Test void drawsEveryScheme() throws Exception {
-        String emoji=System.getenv("VIBEDOCK_TWEMOJI");
-        Assumptions.assumeTrue(emoji!=null&&Files.isDirectory(Path.of(emoji)),"VIBEDOCK_TWEMOJI not set");
+        var emoji=Twemoji.locate(System.getenv("VIBEDOCK_TWEMOJI"));
+        Assertions.assertTrue(Files.isDirectory(emoji),"No Twemoji graphics in "+emoji.toAbsolutePath().normalize()
+                +": third-party/twemoji/svg of the repository, or the folder VIBEDOCK_TWEMOJI names");
         Assertions.assertEquals(Scheme.values().length,EXAMPLES.size(),"every scheme has an example");
-        var twemoji=new Twemoji(emoji);var renderer=new StatusImage("Europe/Berlin");
+        var twemoji=new Twemoji(emoji.toString());var renderer=new StatusImage("Europe/Berlin");
         long updated=LocalDateTime.of(2026,10,14,7,12).atZone(ZoneId.of("Europe/Berlin")).toEpochSecond();
         var snapshot=new UsageService.Snapshot(1,updated,new LinkedHashMap<>(Map.of(
                 "codex",new UsageService.Provider("ok",updated,new ProviderClient.Window(0,updated+5*3600,5*3600),new ProviderClient.Window(22,updated+6*86400+1560,7*86400)),
@@ -45,12 +47,19 @@ class ThemesImageTest {
         g.setFont(new Font(Font.SANS_SERIF,Font.PLAIN,14*k));
         for(int i=0;i<EXAMPLES.size();i++){
             var e=EXAMPLES.get(i);int x=gap+(i%columns)*cell,y=gap/2+(i/columns)*(label+240*k+gap);
-            var look=new StatusImage.Look(twemoji.image(e.mood(),Twemoji.SIZE*k).orElseThrow(),e.scheme(),twemoji.image(e.weather(),24*k).orElseThrow(),e.temperature(),Layout.DEFAULT);
+            var look=new StatusImage.Look(required(twemoji,e.mood(),Twemoji.SIZE*k),e.scheme(),required(twemoji,e.weather(),24*k),e.temperature(),Layout.DEFAULT);
             var image=ImageIO.read(new ByteArrayInputStream(renderer.render(snapshot,"192.168.1.50",look,DisplayType.M1,k).png()));
             g.setColor(new Color(0x3c4048));g.drawString(e.scheme().label,x,y+15*k);
             g.drawImage(image,x,y+label,null);
         }
         g.dispose();
-        Path out=Path.of("../docs/manual/themes.png");Files.createDirectories(out.getParent());ImageIO.write(sheet,"png",out.toFile());
+        String target=System.getenv("VIBEDOCK_THEMES_IMAGE");
+        Path out=Path.of(target==null||target.isBlank()?"target/themes.png":target);
+        Files.createDirectories(out.toAbsolutePath().getParent());ImageIO.write(sheet,"png",out.toFile());
+    }
+    /** An emoji of the examples; a missing or unreadable SVG fails with its file name and folder. */
+    private static BufferedImage required(Twemoji twemoji,String emoji,int size){
+        return twemoji.image(emoji,size).orElseThrow(()->new AssertionError("Twemoji SVG for "+emoji+" ("+String.join(" or ",Twemoji.fileNames(emoji))
+                +".svg) is missing or unreadable in "+twemoji.directory().toAbsolutePath().normalize()));
     }
 }

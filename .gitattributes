@@ -1,0 +1,2 @@
+# The bundled Twemoji graphics stay byte for byte as published (no line-ending conversion).
+third-party/twemoji/** -text

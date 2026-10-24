@@ -12,9 +12,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * Colour emoji for the status image. Java2D cannot draw colour emoji fonts, so the Twemoji set (CC-BY 4.0, bundled in
- * the Docker image) is used instead: the SVG files, drawn sharp at any size (high-resolution web displays); a
- * directory of the PNG files (72 x 72) works as well. "-" or an empty value means no emoji.
+ * Colour emoji for the status image. Java2D cannot draw colour emoji fonts, so the Twemoji set (graphics CC BY 4.0,
+ * versioned in the repository under third-party/twemoji) is used instead: the SVG files, drawn sharp at any size
+ * (high-resolution web displays); a directory of the PNG files (72 x 72) works as well. "-" or an empty value means
+ * no emoji. Where the set is: {@link #locate}.
  */
 @Component
 public class Twemoji {
@@ -29,7 +30,24 @@ public class Twemoji {
     private static final java.util.regex.Pattern FILE=java.util.regex.Pattern.compile("[0-9a-f]{1,6}(-[0-9a-f]{1,6}){0,10}\\.(svg|png)");
     private volatile List<Entry> catalog;
 
-    public Twemoji(@Value("${vibedock.emoji-dir:/app/twemoji/svg}") String directory){this.directory=Path.of(directory);}
+    /**
+     * Where the bundled set is looked for, in this order, relative to the working directory unless absolute: next to
+     * the server (the Docker image's /app, or a JAR deployment with a copy of third-party/twemoji as twemoji/), the
+     * Docker image's place from anywhere, and the repository when started from its root or from vibedock-server.
+     */
+    static final List<String> BUNDLED=List.of("twemoji/svg","/app/twemoji/svg","third-party/twemoji/svg","../third-party/twemoji/svg");
+    /**
+     * The emoji folder, the same rule for the server and the tests: a configured folder (EMOJI_DIR, or
+     * VIBEDOCK_TWEMOJI in the tests) as given, also when it is missing, so that its error names it; otherwise the
+     * first bundled place that exists, else the repository's place relative to the working directory.
+     */
+    static Path locate(String configured){
+        if(configured!=null&&!configured.isBlank())return Path.of(configured.strip());
+        return BUNDLED.stream().map(Path::of).filter(Files::isDirectory).findFirst().orElse(Path.of(BUNDLED.get(2)));
+    }
+    public Twemoji(@Value("${vibedock.emoji-dir:}") String directory){this.directory=locate(directory);}
+    /** The folder the emoji are read from. */
+    public Path directory(){return directory;}
     /** The file of an emoji name: the SVG, else the PNG. */
     private Optional<Path> file(String name){
         for(String extension:List.of(".svg",".png")){var file=directory.resolve(name+extension);if(Files.isRegularFile(file))return Optional.of(file);}

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.util.List;
@@ -46,6 +47,25 @@ class TwemojiTest {
         assertTrue(twemoji.png("1f680").isPresent());
         assertTrue(twemoji.png("../1f680").isEmpty());assertTrue(twemoji.png("notes").isEmpty());
         assertTrue(new Twemoji(dir.resolve("missing").toString()).catalog().isEmpty());
+    }
+    @Test void aConfiguredFolderWinsOverTheBundledSet(@TempDir Path dir) {
+        // EMOJI_DIR (server) or VIBEDOCK_TWEMOJI (tests): taken as given, even with the bundled set at hand.
+        assertEquals(dir,Twemoji.locate(dir.toString()));
+        assertEquals(dir,new Twemoji(dir.toString()).directory());
+        // A missing configured folder stays the one named, so that the error says which.
+        assertEquals(dir.resolve("missing"),Twemoji.locate(dir.resolve("missing").toString()));
+        // Nothing configured: the set versioned in the repository (the tests run in vibedock-server).
+        assertEquals(Path.of("../third-party/twemoji/svg"),Twemoji.locate(null));
+        assertEquals(Path.of("../third-party/twemoji/svg"),Twemoji.locate("  "));
+    }
+    @Test void theBundledSetHasEveryEmojiTheServerUses() throws Exception {
+        var twemoji=new Twemoji("");
+        assertTrue(Files.isRegularFile(twemoji.directory().resolve("../LICENSE-GRAPHICS")),"the license travels with the graphics");
+        assertEquals(Files.readString(twemoji.directory().resolve("../VERSION")).strip(),"17.0.3");
+        try(var files=Files.list(twemoji.directory())){assertEquals(4009,files.filter(f->f.toString().endsWith(".svg")).count(),"all SVGs of Twemoji 17.0.3");}
+        var used=new java.util.ArrayList<>(EmojiController.QUICK_PICKS);used.add(Design.DEFAULT.mood());
+        for(int code:new int[]{0,1,2,3,45,51,61,71,95,100})for(boolean day:new boolean[]{true,false})used.add(WeatherService.emoji(code,day));
+        for(String emoji:used)assertTrue(twemoji.image(emoji).isPresent(),"no Twemoji SVG for "+emoji+" "+Twemoji.fileNames(emoji));
     }
     @Test void devicesInheritTheDefaultEmojiUnlessOverridden(@TempDir Path dir) throws Exception {
         var registry=new ClientRegistry(dir.toString(),new ObjectMapper(),Clock.systemUTC());
