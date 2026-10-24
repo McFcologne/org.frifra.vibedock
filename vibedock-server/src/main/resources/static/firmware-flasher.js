@@ -1,7 +1,7 @@
 // Flashes the VibeDock firmware over Web Serial with esptool-js: connect, back up the whole flash, write the image of the
 // chosen board at 0x0 (on ESP32 chips bootloader, partition table and app in one; the LittleFS settings stay), then
 // restart the device.
-import { openConsole as openSerialConsole, restart, csrf, sleep, chooseDisplayPort, requestDisplayPort } from './serial-console.js';
+import { openConsole as openSerialConsole, restart, csrf, sleep, chooseDisplayPort } from './serial-console.js';
 const card = document.getElementById('web-flasher');
 const $ = selector => card.querySelector(selector);
 const button = name => $(`[data-flash="${name}"]`);
@@ -142,8 +142,13 @@ pair.querySelector('[data-pair-start]').addEventListener('click', async () => {
     serialPort ??= await chooseDisplayPort();
     if (!serialPort) { pairAsk.hidden = false; say(''); return; }
     // Boards with the chip's own USB (ESP32-S3, -C3) come back as a new port after their restart.
+    // Choosing none ends it here, without the browser's own dialog on top.
     try { console_ = await openConsole(); }
-    catch { serialPort = await chooseDisplayPort() ?? await requestDisplayPort(); console_ = await openConsole(); }
+    catch {
+      serialPort = await chooseDisplayPort();
+      if (!serialPort) { pairAsk.hidden = false; say(''); return; }
+      console_ = await openConsole();
+    }
     device = await hello();
     const list = await scanNetworks();
     choose(list[0]?.ssid ?? '');

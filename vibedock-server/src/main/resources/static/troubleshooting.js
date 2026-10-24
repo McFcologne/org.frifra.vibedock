@@ -1,5 +1,5 @@
 // Troubleshooting: reads a display's log over USB, whatever board and firmware it has (serial-console.js).
-import { openConsole, showAndSaveLog, restart, csrf, chooseDisplayPort, requestDisplayPort } from './serial-console.js';
+import { openConsole, showAndSaveLog, restart, csrf, chooseDisplayPort } from './serial-console.js';
 const card = document.getElementById('usb-log');
 const output = card.querySelector('[data-usb-output]'), buttons = card.querySelectorAll('[data-usb-log],[data-usb-restart]');
 const writeLine = line => { output.hidden = false; output.textContent += line + '\n'; output.scrollTop = output.scrollHeight; };
@@ -27,7 +27,11 @@ async function chosen(open) {
   const port = await chooseDisplayPort();
   if (!port) throw new Error('no display chosen');
   try { return await open(port); }
-  catch { return open(await requestDisplayPort()); }
+  catch {
+    const again = await chooseDisplayPort();
+    if (!again) throw new Error('no display chosen');
+    return open(again);
+  }
 }
 card.querySelector('[data-usb-log]').addEventListener('click', () => run(async () => {
   output.textContent = ''; let console_;

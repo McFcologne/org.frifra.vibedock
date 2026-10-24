@@ -347,3 +347,24 @@ test('the port choice names the displays allowed before by what they report over
   await expect(output).toContainText('Log of Shelf (vibedock-e2e-shelf, firmware 0.2.4');
   await expect(output).toContainText('Start v0.2.4 waveshare-s3-touch-lcd-154');
 });
+
+test('closing the port choice after a port went away ends there, without the browser dialog',async ({page,app}) => {
+  // A port allowed before that is gone (a board with the chip's own USB right after its restart): opening it fails.
+  await page.addInitScript(() => {
+    const gone = { getInfo: () => ({ usbVendorId: 0x303a, usbProductId: 0x1001 }), open: async () => { throw new DOMException('The device has been lost.', 'NetworkError'); } };
+    window.browserDialogs = 0;
+    Object.defineProperty(navigator, 'serial', { configurable: true, value: {
+      getPorts: async () => [gone],
+      requestPort: async () => { window.browserDialogs++; throw new DOMException('No port selected', 'NotFoundError'); }
+    } });
+  });
+  await page.goto(app.baseURL+'/admin/troubleshooting');
+  await page.getByRole('button',{name:'Read log over USB',exact:true}).click();
+  const dialog=page.locator('dialog.port-dialog');
+  await dialog.getByRole('button',{name:/No VibeDock answer/}).click({timeout:10000});
+  // Opening it fails: the choice comes again; closing it ends the action.
+  await expect(dialog.getByRole('button',{name:/No VibeDock answer/})).toBeVisible({timeout:10000});
+  await dialog.getByRole('button',{name:'Close'}).click();
+  await expect(page.locator('[data-usb-output]')).toContainText('no display chosen');
+  expect(await page.evaluate(() => window.browserDialogs)).toBe(0);
+});
