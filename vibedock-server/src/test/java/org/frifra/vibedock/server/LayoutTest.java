@@ -33,6 +33,25 @@ class LayoutTest {
     private static byte[] withoutIpCorner(byte[] rgb565,int top){
         var copy=rgb565.clone();for(int y=top;y<top+20;y++)Arrays.fill(copy,y*480,y*480+300,(byte)0);return copy;
     }
+    @Test void narrowScreensKeepTheLastSegmentsOfTheIp() throws Exception {
+        var renderer=new StatusImage("Europe/Berlin");
+        for(boolean moodLeft:List.of(true,false)){
+            var look=new StatusImage.Look(icon(44),Scheme.MIDNIGHT,icon(24),"13°",new Layout(List.of(
+                    new Layout.Usage(List.of("codex")),new Layout.Context(moodLeft))));
+            for(var type:List.of(DisplayType.of("128x160"),DisplayType.of("135x240"),DisplayType.of("170x320"))){
+                // Shortened from the right, both would end in "192.168.12…".
+                assertFalse(Arrays.equals(renderer.render(snapshot(0),"192.168.123.193",look,type).rgb565(),
+                        renderer.render(snapshot(0),"192.168.123.194",look,type).rgb565()),type.id()+" mood left "+moodLeft);
+            }
+        }
+        var g=new BufferedImage(1,1,BufferedImage.TYPE_INT_RGB).createGraphics();
+        g.setFont(new java.awt.Font(Scheme.MIDNIGHT.font(),java.awt.Font.PLAIN,10));var metrics=g.getFontMetrics();
+        assertEquals("192.168.123.193",StatusImage.fitTail(g,Scheme.MIDNIGHT,"192.168.123.193",10,metrics.stringWidth("192.168.123.193")));
+        assertEquals("…123.193",StatusImage.fitTail(g,Scheme.MIDNIGHT,"192.168.123.193",10,metrics.stringWidth("…123.193")));
+        assertEquals("…193",StatusImage.fitTail(g,Scheme.MIDNIGHT,"192.168.123.193",10,metrics.stringWidth("…193")));
+        assertNull(StatusImage.fitTail(g,Scheme.MIDNIGHT,"192.168.123.193",10,metrics.stringWidth("…19")));
+        g.dispose();
+    }
     @Test void defaultIsPixelIdenticalToTheFrozenRendererInEveryTheme() throws Exception {
         var before=new LegacyStatusImage("Europe/Berlin");var after=new StatusImage("Europe/Berlin");
         // The frozen renderer knows the schemes up to Classic Windows; the later ones have no earlier image.
