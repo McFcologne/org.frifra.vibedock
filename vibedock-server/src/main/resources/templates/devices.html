@@ -16,10 +16,16 @@
 <p class="notice warn" th:if="${clientWarning}" th:text="${clientWarning}" role="alert"></p>
 <p class="notice error" th:if="${deviceRemovalError}" th:text="${deviceRemovalError}" role="alert"></p>
 <section class="card create-panel" id="invite" data-create-panel th:attr="data-create-error=${pairingError != null}">
-  <div class="card-head"><h3>Pair device</h3></div>
+  <!-- Over Wi-Fi with IP and pairing code, or over USB with the same form as Firmware → Only pair (fragment usbPairing,
+       usb-pairing.js). The choice is remembered in this browser (usb-pair-dialog.js). -->
+  <div class="card-head"><h3>Pair device</h3>
+    <div class="pair-method" role="radiogroup" aria-label="Pair over">
+      <label><input type="radio" name="pair-method" value="wifi" checked> Wi-Fi</label>
+      <label><input type="radio" name="pair-method" value="usb"> USB</label></div></div>
   <p class="notice error" th:if="${pairingError}" th:text="${pairingError}" role="alert"></p>
+  <div data-pair-method="wifi">
   <p>Enter the IP address and 6-digit pairing code shown on your display.</p>
-  <p class="notice warn" role="note">HTTP pairing is unencrypted. Use it only on a trusted home network: others on the network could read the device key or replace its trust keys. Alternatively, use <a th:href="@{/admin/firmware}">Firmware → Only pair</a> over USB.</p>
+  <p class="notice warn" role="note">HTTP pairing is unencrypted. Use it only on a trusted home network: others on the network could read the device key or replace its trust keys. Alternatively, pair over <button type="button" class="link-button" data-pair-method-switch="usb">USB</button>.</p>
   <form class="invite" th:action="@{/admin/clients/invite}" method="post" autocomplete="off">
     <div class="grid-3">
       <div><label for="invite-ip">Device IP</label><input id="invite-ip" name="ip" placeholder="192.168.1.50" required></div>
@@ -34,6 +40,11 @@
     <div class="form-actions"><button type="button" class="secondary" data-create-close="invite">Cancel</button><button>Pair device</button></div>
   </form>
   <p class="meta">Announced addresses: <th:block th:each="url,it:${announced}"><code th:text="${url}"></code><span th:if="${!it.last}"> → </span></th:block> · set under <a th:href="@{/admin/server}">Settings</a></p>
+  </div>
+  <div data-pair-method="usb" hidden>
+    <div class="flash-pair usb-pair" data-pair th:insert="~{fragments :: usbPairing(null,'Cancel')}"></div>
+    <p class="meta">For a display that already runs VibeDock firmware; the same pairing is on the <a th:href="@{/admin/firmware}">Firmware</a> page after installing (<em>Only pair</em>).</p>
+  </div>
 </section>
 <section class="card create-panel" id="web" data-create-panel th:attr="data-create-error=${webError != null}">
   <div class="card-head"><h3>Add web display</h3></div>
@@ -128,4 +139,5 @@
 <script src="../static/admin-state.js" th:src="@{/admin-state.js}"></script>
 <script src="../static/device-state.js" th:src="@{/device-state.js}"></script>
 <script src="../static/admin-login.js" th:src="@{/admin-login.js}"></script>
+<script type="module" src="../static/usb-pair-dialog.js" th:src="@{/usb-pair-dialog.js}"></script>
 </body></html>
