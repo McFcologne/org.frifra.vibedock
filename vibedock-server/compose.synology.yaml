@@ -1,5 +1,6 @@
-# Synology Container Manager: runs the prebuilt image (built with scripts/image.sh amd64 and the file
-# target/vibedock-server-<version>-amd64.tar imported under Container Manager > Image > Import), with the data on the volume. Administration listens on 8080, the device API on 8081;
+# Synology Container Manager: runs a prebuilt image, with the data on the volume: mcfcologne/vibedock-server from
+# Container Manager > Registry (set it as image below), or the file target/vibedock-server-<version>-amd64.tar from
+# scripts/image.sh amd64 imported under Container Manager > Image > Import. Administration listens on 8080, the device API on 8081;
 # Web Station can publish them as HTTPS, e.g. administration on 10001 and device API on 10002.
 # Create a project with this file in /volume1/docker/vibedock-server; set ADMIN_PASSWORD (Container Manager does not
 # always read a .env, then write the password into the file on the NAS, never into Git).

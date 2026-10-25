@@ -24,8 +24,8 @@ Both registries carry the same images: `<version>` and `latest` (only for a plai
 ```
 git tag vX.Y.Z  ──push──▶  GitHub Actions: Release VibeDock (.github/workflows/release.yml)
                               ├─ server    → vibedock-server-<version>.jar
-                              ├─ image     → vibedock-server-<version>-<arch>.tar.gz
-                              │              and ghcr.io/…/vibedock-server:<version>-<arch>
+                              ├─ image     → ghcr.io/…/vibedock-server:<version>-<arch> (pushed from the build,
+                              │              no image file)
                               ├─ publish-image → ghcr.io/…:<version>, :latest
                               │                  and Docker Hub …:<version>, :latest and its description
                               │                  from docs/DOCKERHUB.md (with the secrets below)
@@ -40,6 +40,9 @@ push / pull request  ──────▶  GitHub Actions: Verify VibeDock (.gi
   `org.opencontainers.image.source`; it is public because the repository is, and lists the repository's README.
 - **Docker Hub** gets the images only when both repository secrets are set; without them the run publishes to ghcr.io
   and says so in its log.
+- **Release files** are only the server JAR and the firmware BINs; the release job downloads exactly these two
+  artifacts. The Docker image comes from the registries; releases up to 0.3.0 also carried it as
+  `vibedock-server-<version>-<arch>.tar.gz`, and those files stay as they are.
 - **Displays** get their firmware from the server they are paired with, not from GitHub: a new server image brings the
   new firmware, and the administration offers it over Wi-Fi.
 
