@@ -425,3 +425,20 @@ the supplied pin, or learn its own after a full check; ESP32 boards currently al
 The UI shows the external pin status and fingerprint under **Settings → Network**; the pairing forms only offer to leave the pin out.
 Successful status inspections are cached for one minute. **Devices → Troubleshooting → Server log** shows the
 recent application log, including resolver results, TLS errors and successful public-DNS routes.
+
+## Device web-page appearance
+
+A capable device sends `X-VibeDock-UI: 1` with its authenticated image pull. The server then includes
+`X-VibeDock-UI: light` or `dark` on both 200 and 304 responses, reflecting the instance-wide administration
+appearance. No header is added for older clients. The device accepts only these two values, stores changes
+in its existing configuration and uses the setting for setup/status pages.
+After a device advertises support, the server can also POST `/pull?ui=light` or `/pull?ui=dark` to its
+existing, subnet-restricted callback address. This cosmetic LAN callback returns 202 without scheduling an
+image pull; invalid values return 400. A change within 5 s of the last one returns 429 and is not saved (the
+device writes it to flash); the next image response brings it. It shares the existing unauthenticated `/pull` callback and cannot change
+pairing, credentials, calibration or server addresses. Unreachable devices learn the value through their next
+authenticated image response. An open page polls local `/ui-state` every five seconds, skips hidden tabs,
+and requests `/image.bmp` only when the device has completed another image. No persistent connection or
+additional image buffer is kept on the device. Missing or unknown
+values leave its saved preference unchanged (initial default: dark). The setting does not alter the rendered
+image, theme selection, colour calibration or backlight.

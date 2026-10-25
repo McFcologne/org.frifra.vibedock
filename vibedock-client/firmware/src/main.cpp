@@ -44,6 +44,7 @@ String wifiProblem;  // why the last connection to the saved network failed, sho
 bool setupRequested = false;  // two quick power cycles: open the Wi-Fi setup although a network is saved
 // True once the saved network has connected at least once. Only such a proven network is waited for when it is
 // missing (e.g. a phone hotspot); a newly entered network that never worked opens the setup again with the reason.
+bool uiDark = true;  // last appearance received from the server; also used by the setup portal
 bool networkVerified = false;
 String pin;  // SHA-1 fingerprint of the https server certificate, learned over a fully verified connection
 String servers[2]; uint8_t serverCount = 0, serverIndex = 0, storedIndex = 0;
@@ -66,6 +67,7 @@ Mode mode = Mode::Starting;
 String pairingCode, shownIp;
 uint8_t wrongCodes = 0;
 bool haveImage = false, staleScreen = true;
+uint32_t imageRevision = 0;
 uint32_t lastPull = 0, lastImage = 0, lastFooter = 0, lastReconnect = 0;
 // The wait the server announced after the last pull (X-VibeDock-Next-Pull), 0: every poll interval. pending: it was
 // still asking a source of this display, so the picture may change shortly.
@@ -480,13 +482,14 @@ String randomHex(size_t bytes) {
 
 // ---- configuration ----
 bool writeConfig();
+void saveLater();
 bool saveConfig() { PhaseScope saving(Phase::Config); return writeConfig(); }
 bool writeConfig() {
   JsonDocument doc;
   doc["identifier"] = identifier; doc["name"] = deviceName;
   doc["ssid"] = ssid; doc["password"] = password; doc["key"] = key; doc["poll"] = pollSeconds; doc["pin"] = pin;
   doc["verified"] = networkVerified; doc["brightness"] = brightness; doc["flipped"] = turns == 2; doc["turns"] = turns;
-  doc["powerSaving"] = powerSavingAllowed;
+  doc["powerSaving"] = powerSavingAllowed; doc["uiDark"] = uiDark;
 #ifdef VIBEDOCK_AUDIO_ES8311
   doc["volume"] = audio::volume();
 #endif
@@ -506,6 +509,7 @@ bool loadConfig() {
   if (file && file.size() <= 2048) {
     JsonDocument doc;
     if (!deserializeJson(doc, file)) {
+      uiDark = doc["uiDark"] | true;
       identifier = doc["identifier"].as<String>(); deviceName = doc["name"] | "";
       ssid = doc["ssid"].as<String>(); password = doc["password"].as<String>();
       key = doc["key"] | ""; pin = doc["pin"] | "";
@@ -579,11 +583,48 @@ void pageStart(const String &subtitle) {
   web.sendHeader("Cache-Control", "no-store");
   platform::chunkedStart(web, "text/html; charset=utf-8");
   web.sendContent_P(PAGE_HEAD);
+  web.sendContent(uiDark ? F("<style id=\"ui-light\" media=\"not all\">") : F("<style id=\"ui-light\">"));
+  web.sendContent(F(":root{color-scheme:light}body{background:#f3f5fa;color:#162030}"
+      ".card{background:#fff;border-color:#dce2ed}.net{border-color:#dce2ed}"
+      "header p,h2,.f,.muted,dt,.hint{color:#586b87}input[type=text],input[type=password]{background:#fff;border-color:#ccd5e4}"
+      "a{color:#5145d9}.problem{background:#fff3d6;border-color:#eed49c;color:#855000}"
+      ".sig:not(.l1):not(.l2):not(.l3) i{background:#ccd5e4}.ok{color:#167344}.warn{color:#965600}.bad{color:#b52230}</style>"));
   web.sendContent(String(F("<title>VibeDock - ")) + subtitle + F("</title><link rel=\"icon\" href=\"/favicon.ico\" sizes=\"32x32\">"
       "<link rel=\"icon\" href=\"/favicon.svg\" type=\"image/svg+xml\"><link rel=\"apple-touch-icon\" href=\"/apple-touch-icon.png\">"
       "</head><body><main><header>"));
   web.sendContent_P(PAGE_LOGO);
   web.sendContent(String(F("<div><h1>VibeDock</h1><p>")) + subtitle + F("</p></div></header>"));
+}
+// A tiny live status for open browser pages; no image buffer or persistent socket on the device.
+const char PAGE_LIVE[] PROGMEM = R"JS((()=>{
+  const light=document.getElementById('ui-light'), image=document.querySelector('img.screen');
+  let version=image?.dataset.imageVersion, loading=false;
+  async function poll(){
+    try {
+      if(document.hidden||loading)return;
+      const response=await fetch('/ui-state',{cache:'no-store'});
+      if(!response.ok)return;
+      const state=await response.json();
+      light.media=state.dark?'not all':'all';
+      const next=state.boot+':'+state.image;
+      if(image&&state.image&&version!==next){
+        loading=true;
+        image.onload=()=>{version=next;loading=false;};
+        image.onerror=()=>{loading=false;};
+        image.src='/image.bmp?v='+encodeURIComponent(next);
+      }
+    }catch(e){}finally{setTimeout(poll,5000);}
+  }
+  setTimeout(poll,5000);
+})();)JS";
+void uiState() {
+  JsonDocument doc;doc["dark"]=uiDark;doc["boot"]=diag.boot;
+  doc["image"]=haveImage && imageOnScreen && !staleScreen ? imageRevision : 0;
+  String text;serializeJson(doc,text);web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",text);
+}
+void serveUi() {
+  web.on("/ui-state",HTTP_GET,uiState);
+  web.on("/ui.js",HTTP_GET,[]{web.sendHeader("Cache-Control","no-store");web.send_P(200,"text/javascript",PAGE_LIVE);});
 }
 // Browser icons, the same as the administration's; registered in the setup portal and on the status page.
 void serveIcons() {
@@ -596,7 +637,7 @@ void serveIcons() {
 }
 void pageEnd() {
   web.sendContent_P(PAGE_HINT);
-  web.sendContent(F("</main></body></html>"));
+  web.sendContent(F("</main><script src=\"/ui.js\" defer></script></body></html>"));
   platform::chunkedEnd(web);
 }
 
@@ -773,7 +814,7 @@ void startPortal() {
   setupDns.start(53, "*", WiFi.softAPIP());
   showSetupCode(apName, apPassword);
   web.on("/", HTTP_GET, portalPage);
-  serveIcons();
+  serveIcons(); serveUi();
   web.on("/save", HTTP_POST, [] {
     if (web.arg("ssid").isEmpty() || web.arg("ssid").length() > 32 || web.arg("password").length() > 64) {
       web.sendHeader("Location", "/", true); web.send(303, "text/plain", ""); return;
@@ -1005,7 +1046,7 @@ File *uploadFile = nullptr; String uploadRequest;
 int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
   if (!r.http.begin(*r.client, url)) return HTTPC_ERROR_CONNECTION_FAILED;
   const char *wanted[] = {"ETag", "X-VibeDock-Image-Format", "X-VibeDock-Poll-Seconds", "X-VibeDock-Tls-Pin", "X-VibeDock-Redraw", "X-VibeDock-Update", "x-MD5", "X-VibeDock-Length", "X-VibeDock-Send-Log", "X-VibeDock-Orientation",
-      "X-VibeDock-Base", "X-VibeDock-Check", "X-VibeDock-Payload", "X-VibeDock-Next-Pull"
+      "X-VibeDock-Base", "X-VibeDock-Check", "X-VibeDock-Payload", "X-VibeDock-Next-Pull", "X-VibeDock-UI"
 #ifdef VIBEDOCK_AUDIO_ES8311
       , "X-VibeDock-Quota"
 #endif
@@ -1021,6 +1062,7 @@ int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
   r.http.addHeader("Authorization", String(F("Bearer ")) + key);
   r.http.addHeader("X-VibeDock-Device-IP", WiFi.localIP().toString());  // the server may only see a NAT gateway
   r.http.addHeader("X-VibeDock-Subnet-Mask", WiFi.subnetMask().toString());  // USB and legacy registrations learn their mask once
+  r.http.addHeader("X-VibeDock-UI", "1");
   r.http.addHeader("X-VibeDock-Footer", "server");  // this firmware shows the IP the server draws into the image
   r.http.addHeader("X-VibeDock-Firmware", VIBEDOCK_VERSION);  // lets the administration offer updates
   r.http.addHeader("X-VibeDock-Display", String(panel.width()) + "x" + String(panel.height()));  // suggests the display type
@@ -1197,6 +1239,12 @@ void pull() {
     audio::quotas(http.header("X-VibeDock-Quota").c_str());
 #endif
   }
+  if (code == 200 || code == 304) {
+    String appearance = http.header("X-VibeDock-UI");
+    if ((appearance == "dark" || appearance == "light") && uiDark != (appearance == "dark")) {
+      uiDark = appearance == "dark"; saveLater();
+    }
+  }
   String offered = code == 200 || code == 304 ? http.header("X-VibeDock-Update") : "";
   String logRequest = code == 200 || code == 304 ? http.header("X-VibeDock-Send-Log") : "";
   if (code > 0 && http.hasHeader("X-VibeDock-Poll-Seconds")) {
@@ -1246,6 +1294,7 @@ void pull() {
         ?readImageDelta(http.getStreamPtr(),size,length,payload,check,https?15000:8000)
         :readImage(http.getStreamPtr(),size,https?15000:8000));
     if (complete) {
+      ++imageRevision;
       lastImageSize=size;deltaReady=size.width==panel.width()&&size.height==panel.height();
       etag = http.header("ETag"); lastImage = millis(); haveImage = true; staleScreen = false; footer(); imageFailures = 0;
       if (first) logEvent(String(F("Image shown, read in ")) + String(millis() - reading) + " ms", true);
@@ -1394,7 +1443,7 @@ void colourCard() {
   uint16_t w = lastImageSize.width ? lastImageSize.width : 240, h = lastImageSize.height ? lastImageSize.height : 240;
   String card = F("<form action=\"/colours\" method=\"post\"><section class=\"card\"><h2>Display colours</h2>"
       "<div style=\"display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start\"><figure style=\"margin:0;flex:none\"><img class=\"screen\" src=\"/image.bmp?t=");
-  card += millis(); card += F("\" width=\""); card += w; card += F("\" height=\""); card += h; card += F("\" style=\"width:"); card += w;
+  card += millis(); card += F("\" data-image-version=\""); card += String(diag.boot) + ":" + String(imageRevision); card += F("\" width=\""); card += w; card += F("\" height=\""); card += h; card += F("\" style=\"width:"); card += w;
   card += F("px;height:"); card += h;
   card += F("px;max-width:100%;object-fit:contain;image-rendering:pixelated\" alt=\"Current image\">"
       "<figcaption class=\"muted\">Uncorrected, as the server sends it. <a href=\"/\">Reload</a></figcaption></figure><div style=\"flex:1;min-width:200px\">");
@@ -1469,8 +1518,21 @@ void imagePage() {
   http.end();
 }
 // The server asks for an immediate pull, e.g. after a design change. No data: the pull itself is authenticated.
-uint32_t lastPullRequest = 0;
+uint32_t lastPullRequest = 0, lastUiRequest = 0;
 void handlePullRequest() {
+  // Cosmetic state only, on the existing LAN callback. A UI-only push never requests another image. The callback is
+  // unauthenticated and a change is saved to flash: at most one change per pause, like image pulls; one refused
+  // here arrives with the next image response (X-VibeDock-UI).
+  if (web.hasArg("ui")) {
+    String appearance=web.arg("ui");
+    if (appearance!="dark" && appearance!="light") { web.send(400,"text/plain",""); return; }
+    if (uiDark != (appearance=="dark")) {
+      if (lastUiRequest != 0 && !client_policy::pullRequestAllowed(millis(), lastUiRequest)) { web.send(429,"text/plain",""); return; }
+      lastUiRequest = millis(); if (lastUiRequest == 0) lastUiRequest = 1;
+      uiDark=appearance=="dark"; saveLater();
+    }
+    web.send(202,"text/plain",""); return;
+  }
   if (mode != Mode::Paired) { web.send(409, "text/plain", ""); return; }
   pullWaitMs = 0;  // the poll interval applies until the server answers again
   uint32_t poll = client_policy::clampPoll(pollSeconds) * 1000u;
@@ -1487,7 +1549,7 @@ void handlePullRequest() {
 }
 void startPairingServer() {
   web.on("/", HTTP_GET, statusPage);
-  serveIcons();
+  serveIcons(); serveUi();
   web.on("/image.bmp", HTTP_GET, imagePage);
   web.on("/colours", HTTP_POST, saveColours);
 #ifdef VIBEDOCK_AUDIO_ES8311

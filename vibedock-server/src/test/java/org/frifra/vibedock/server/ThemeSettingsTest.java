@@ -8,11 +8,20 @@ import java.util.Arrays;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ThemeSettingsTest {
+    @Test void serverAppearanceSurvivesRestartAndAvailabilityChanges(@TempDir Path dir) throws Exception {
+        java.nio.file.Files.writeString(dir.resolve("themes.json"),"{\"disabled\":[]}");
+        var settings=new ThemeSettings(dir.toString(),JsonCompatibility.mapper());
+        assertFalse(settings.dark());settings.setDark(true);settings.setEnabled(Scheme.OCEAN,false);
+        var loaded=new ThemeSettings(dir.toString(),JsonCompatibility.mapper());
+        assertTrue(loaded.dark());assertFalse(loaded.enabled(Scheme.OCEAN));
+        loaded.setDark(false);assertFalse(new ThemeSettings(dir.toString(),JsonCompatibility.mapper()).dark());
+    }
+
     @Test void availabilityPersistsAndSwipesSkipInEitherDirection(@TempDir Path dir) throws Exception {
-        var settings=new ThemeSettings(dir.toString(),new ObjectMapper());
+        var settings=new ThemeSettings(dir.toString(),JsonCompatibility.mapper());
         for(var theme:Scheme.values())assertTrue(settings.enabled(theme));
         settings.setEnabled(Scheme.OCEAN,false);
-        var loaded=new ThemeSettings(dir.toString(),new ObjectMapper());
+        var loaded=new ThemeSettings(dir.toString(),JsonCompatibility.mapper());
         assertFalse(loaded.enabled(Scheme.OCEAN));
         assertEquals(Scheme.FOREST,loaded.shifted(Scheme.MIDNIGHT,1));
         assertEquals(Scheme.MIDNIGHT,loaded.shifted(Scheme.FOREST,-1));

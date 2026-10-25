@@ -40,9 +40,27 @@ class AccessTest {
     @MockitoBean ProviderClient providers;
     @MockitoBean BrowserLogin login;
     @BeforeEach void resetSettings() throws Exception {
+        themes.setDark(false);
         for(var scheme:Scheme.values())themes.setEnabled(scheme,true);
         store.save(new SettingsStore.Settings(List.of("127.0.0.1/32"),new SettingsStore.Credential("",""),new SettingsStore.Credential("",""),List.of()));
         usage.forgetPacing();usage.configurationChanged();
+    }
+    @Test void deviceWebAppearanceFollowsServerOnFullAndUnchangedImages() throws Exception {
+        String key="ab".repeat(32),id="vibedock-ui-theme",path="/api/v1/clients/"+id+"/image";
+        clients.paired(id,"Appearance",key,"192.168.1.20",80);
+        mvc.perform(post("/admin/ui-theme").with(r->{r.setLocalPort(10001);return r;}).with(user("admin").roles("ADMIN")).param("dark","true")).andExpect(status().isForbidden());
+        var base=mvc.perform(get(path).header("Authorization","Bearer "+key).header("X-VibeDock-UI","1")
+                .with(r->{r.setLocalPort(8080);r.setRemoteAddr("192.168.1.20");return r;}))
+                .andExpect(status().isOk()).andExpect(header().string("X-VibeDock-UI","light")).andReturn().getResponse();
+        mvc.perform(post("/admin/ui-theme").with(r->{r.setLocalPort(10001);return r;}).with(user("admin").roles("ADMIN")).with(csrf()).param("dark","true")).andExpect(status().isOk());
+        mvc.perform(get(path).header("Authorization","Bearer "+key).header("X-VibeDock-UI","1").header("If-None-Match",base.getHeader("ETag"))
+                .with(r->{r.setLocalPort(8080);r.setRemoteAddr("192.168.1.20");return r;}))
+                .andExpect(status().isNotModified()).andExpect(header().string("X-VibeDock-UI","dark"));
+        mvc.perform(get(path).header("Authorization","Bearer "+key)
+                .with(r->{r.setLocalPort(8080);r.setRemoteAddr("192.168.1.20");return r;}))
+                .andExpect(status().isOk()).andExpect(header().doesNotExist("X-VibeDock-UI"));
+        mvc.perform(get("/admin").with(r->{r.setLocalPort(10001);return r;}).with(user("admin").roles("ADMIN"))).andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"vibedock-ui-theme\" content=\"dark\"")));
     }
     @Test @org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)
     void deltaTransfersReconstructTheFullImageAndKeepLegacyPreviewAndRedrawPaths(org.springframework.boot.test.system.CapturedOutput output) throws Exception {

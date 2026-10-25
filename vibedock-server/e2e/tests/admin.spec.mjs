@@ -594,3 +594,20 @@ test('a display log shows the server lines about it on demand, and key figures a
   const download = await page.request.get(app.baseURL+'/admin/clients/vibedock-e2e-desk/logs/'+String(saved).padStart(13,'0')+'-net.txt?server=true');
   expect(await download.text()).toMatch(/10-25 \d{2}:36:04  server   Image transfer vibedock-e2e-desk: delta/);
 });
+
+test('the sign-in page keeps a light/dark choice in this browser; a saved one follows it there',async ({page,app}) => {
+  // Signed in: the choice is saved for the installation and remembered in this browser.
+  await page.goto(app.baseURL+'/admin');
+  const toggle=page.locator('[data-theme-toggle]');
+  await expect(toggle).toHaveAttribute('aria-pressed','false');await toggle.click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+  const signedOut=await page.context().browser().newContext();const login=await signedOut.newPage();
+  await login.goto(app.baseURL+'/login');
+  await expect(login.locator('html')).toHaveAttribute('data-theme','dark');  // from the server
+  // Without a session it cannot be saved on the server: it stays in this browser across a reload.
+  const own=login.locator('[data-theme-toggle]');await expect(own).toHaveAttribute('aria-pressed','true');await own.click();
+  await expect(login.locator('html')).not.toHaveAttribute('data-theme','dark');
+  await login.reload();await expect(login.locator('html')).not.toHaveAttribute('data-theme','dark');
+  await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','dark');  // the installation's choice stays
+  await signedOut.close();
+});
