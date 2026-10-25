@@ -1,7 +1,7 @@
 // Flashes the VibeDock firmware over Web Serial with esptool-js: connect, back up the whole flash, write the image of the
 // chosen board at 0x0 (on ESP32 chips bootloader, partition table and app in one; the LittleFS settings stay), then
 // restart the device.
-import { restart, chooseDisplayPort } from './serial-console.js';
+import { restart, chooseDisplayPort, confirmUsbStart } from './serial-console.js';
 import { usbPairing } from './usb-pairing.js';
 const card = document.getElementById('web-flasher');
 const $ = selector => card.querySelector(selector);
@@ -100,6 +100,11 @@ if (!('serial' in navigator) || !window.isSecureContext) {
     terminal.writeLine('Done. Restarting the device …');
     await loader.after(loader.chip.CHIP_NAME === 'ESP8266' ? 'soft_reset' : 'hard_reset');
     await disconnect();
+    if (card.dataset.chip === 'ESP8266') {
+      terminal.writeLine('Confirming the M1 start over USB …');
+      try { await confirmUsbStart(serialPort); }
+      catch { terminal.writeLine('Firmware written, but the M1 did not confirm its USB start. Check the display before restarting it again.'); return; }
+    }
     terminal.writeLine(`Firmware ${card.dataset.version} installed. The device shows the version while it starts.`);
     askToPair();
   }));
@@ -123,11 +128,12 @@ const askToPair = pairing.ask, say = pairing.say, closeConsole = pairing.close;
 card.querySelector('[data-restart]').addEventListener('click', async () => {
   if (busy) return;
   try {
-    if (loader) { await loader.after(loader.chip.CHIP_NAME === 'ESP8266' ? 'soft_reset' : 'hard_reset'); await disconnect(); say(''); terminal.writeLine('Display restarted.'); return; }
+    if (loader) { await loader.after(loader.chip.CHIP_NAME === 'ESP8266' ? 'soft_reset' : 'hard_reset'); await disconnect(); if (card.dataset.chip === 'ESP8266') await confirmUsbStart(serialPort); say(''); terminal.writeLine('Display restarted.'); return; }
     await closeConsole();
     serialPort ??= await chooseDisplayPort();
     if (!serialPort) return;
     await restart(serialPort);
+    if (card.dataset.chip === 'ESP8266') await confirmUsbStart(serialPort);
     terminal.writeLine('Display restarted.');
   } catch (error) { terminal.writeLine('Restart failed: ' + (error?.message || error)); }
 });

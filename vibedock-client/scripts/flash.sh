@@ -139,6 +139,8 @@ if [ "$chip" != auto ] && [ "$detected" != "$chip" ]; then
     echo "$port has $detected, not the $chip of $board. Nothing written." >&2; exit 1
 fi
 chip="$detected"
+# A probe can restart the M1 too: clear its quick-start counter before the potentially long build.
+if [ "$chip" = esp8266 ]; then reported_board "$port" >/dev/null || true; fi
 # Native USB briefly disconnects after resetting only the selected device.
 sleep 2
 
@@ -199,7 +201,11 @@ if [ "$chip" = esp8266 ]; then
     esptool --port "$port" --after soft_reset \
         write_flash --flash_mode dio --flash_freq 40m --flash_size "${size}MB" 0x000000 "$image"
     echo
-    echo "Done. The M1 starts the new firmware automatically; if not, unplug it and plug it in again."
+    if reported=$(reported_board "$port") && [ "$reported" = "$board" ]; then
+        echo "Done. The M1 answered over USB; this start is excluded from the setup/reset counter."
+    else
+        echo "Firmware written, but the M1 did not confirm its start over USB. Check the display before restarting it again." >&2
+    fi
 else
     esptool --port "$port" --after hard_reset write_flash 0x0 "$image"
     echo

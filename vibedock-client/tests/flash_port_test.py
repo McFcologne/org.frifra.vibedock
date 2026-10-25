@@ -26,6 +26,7 @@ fi
             prefix = '''set -euo pipefail
 found=$'/dev/fixture-a\\n/dev/fixture-b'
 board=fixture
+reported_board() { printf "fixture\\n"; }
 sleep() { :; }
 '''
             prefix += "lsof() { return " + ("0" if busy else "1") + "; }\n"
@@ -38,7 +39,7 @@ sleep() { :; }
     def final_flash(self, chip):
         source = (Path(__file__).parents[1] / "scripts/flash.sh").read_text()
         block = source[source.rindex('if [ "$chip" = esp8266 ]; then'):]
-        prefix = 'set -eu\nchip="$TEST_CHIP"\nport=/dev/fixture\nsize=4\nimage=fixture.bin\nesptool() { printf "%s\\n" "$*"; }\n'
+        prefix = 'set -eu\nchip="$TEST_CHIP"\nport=/dev/fixture\nsize=4\nimage=fixture.bin\nesptool() { printf "%s\\n" "$*"; }\nboard=vibedock-m1\nreported_board() { printf "vibedock-m1\\n"; }\n'
         return subprocess.run(["bash", "-c", prefix + block], capture_output=True, text=True,
                               env={**os.environ, "TEST_CHIP": chip})
 
@@ -46,6 +47,7 @@ sleep() { :; }
         result = self.final_flash("esp8266")
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn("--after soft_reset write_flash", result.stdout)
+        self.assertIn("this start is excluded", result.stdout)
         self.assertNotIn("--after hard_reset", result.stdout)
         self.assertNotIn("--after no_reset", result.stdout)
 
