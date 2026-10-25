@@ -10,8 +10,8 @@ while making TLS 1.3 work on the ESP8266. The trust model (root from pairing, pi
 
 | Board | TLS library | Versions | Notes |
 | --- | --- | --- | --- |
-| VibeTV M1 (ESP8266) | Mbed TLS 3.6.2 (`kochcodes/mbedtls@3.6.2`, Apache-2.0) | TLS 1.3; TLS 1.2 (BearSSL) only when the server refuses 1.3 | A pin supplied at pairing allows the first pull to use the simple check. Without a pin, or after a certificate change, the M1 does the full check against the root from pairing; later pulls use the pinned certificate. Tested against local OpenSSL servers; on the device against a Synology reverse proxy (TLS 1.3 only), at home and over a phone hotspot. |
-| ESP32 boards | mbedTLS 2.28 of arduino-esp32 2.x (`espressif32@6.9.0`) | TLS 1.2 | No TLS 1.3 yet: needs a newer core (arduino-esp32 3.x / ESP-IDF 5 with mbedTLS 3) or the same Mbed TLS 3.6 approach. A server that offers only TLS 1.3 is not reachable from these boards. |
+| VibeTV M1 (ESP8266) | Mbed TLS 3.6.7 (official pinned source archive, Apache-2.0) | TLS 1.3; TLS 1.2 (BearSSL) only when the server refuses 1.3 | A pin supplied at pairing allows the first pull to use the simple check. Without a pin, or after a certificate change, the M1 does the full check against the root from pairing; later pulls use the pinned certificate. 3.6.7 passes the local OpenSSL tests. The previous dependency was used on the device against a Synology reverse proxy (TLS 1.3 only), at home and over a phone hotspot; revalidate 3.6.7 on hardware. |
+| ESP32 boards | Mbed TLS supplied by Arduino-ESP32 3.3.12 (`espressif32@8.0.0`; C6: pioarduino 55.03.312-1) | TLS 1.2 | The core migration alone does not enable TLS 1.3 in its precompiled libraries. A server must still offer TLS 1.2. Revalidate pinning, certificate renewal and memory on hardware. |
 
 ## How the server supplies the initial pin
 
@@ -192,10 +192,8 @@ It does not cover the ESP8266 specifics (IRAM, stack, timing); those show only o
 ## Open points
 
 - TLS 1.3 for the ESP32 boards, waiting for hardware to test on. The M1's approach does not carry over as it is:
-  arduino-esp32 2.x ships Mbed TLS 2.28 without TLS 1.3, and a second Mbed TLS next to it clashes by symbol name
-  with the core's one, which the Wi-Fi stack uses as well. arduino-esp32 3.x has Mbed TLS 3.6, but its precompiled
-  libraries leave `CONFIG_MBEDTLS_SSL_PROTO_TLS1_3` off. The planned way: the pioarduino platform with
-  `custom_sdkconfig = CONFIG_MBEDTLS_SSL_PROTO_TLS1_3=y` (it rebuilds the ESP-IDF libraries), the ESP32 boards moved
-  to Arduino 3.x (network client, Update, LEDC, SHA/PK calls of the signature check), and the M1's pinning on top.
+  the boards now use Arduino-ESP32 3.3.12, but its precompiled libraries do not enable TLS 1.3. A second Mbed TLS
+  next to the core's library clashes by symbol name. Enabling it still needs a compatible custom ESP-IDF build
+  with `CONFIG_MBEDTLS_SSL_PROTO_TLS1_3=y`, followed by validation of certificate checks, pinning and memory.
   Renaming the symbols of a second Mbed TLS (objcopy) would work too, but breaks with every core update.
 - The heap margin of the full check is small; the log's heap and stack figures show how much is left. The pinned check needs less.

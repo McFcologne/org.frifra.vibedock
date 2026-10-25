@@ -35,14 +35,29 @@ def merge(source, target, env):
     if env.subst("$PIOPLATFORM") == "espressif8266":
         shutil.copyfile(app, out)
         return
-    esptool = os.path.join(env.PioPlatform().get_package_dir("tool-esptoolpy"), "esptool.py")
+    # PlatformIO 8 uses the prebuilt esptool 5 executable; pioarduino still supplies the Python package.
+    platform = env.PioPlatform()
+    binary_package = platform.get_package_dir("tool-esptool") if "tool-esptool" in platform.packages else None
+    if binary_package:
+        executable = next((os.path.join(binary_package, name) for name in ("esptool", "esptool.exe")
+                           if os.path.isfile(os.path.join(binary_package, name))), None)
+        if executable is None:
+            raise RuntimeError("The platform's esptool executable is missing")
+        runner = [executable]
+        merge_command, mode_option, size_option = "merge-bin", "--flash-mode", "--flash-size"
+    else:
+        python_package = env.PioPlatform().get_package_dir("tool-esptoolpy")
+        if not python_package:
+            raise RuntimeError("The platform has no esptool package")
+        runner = [env.subst("$PYTHONEXE"), os.path.join(python_package, "esptool.py")]
+        merge_command, mode_option, size_option = "merge_bin", "--flash_mode", "--flash_size"
     parts = []
     for offset, image in env.get("FLASH_EXTRA_IMAGES", []):
         parts += [offset, env.subst(image)]
     parts += [env.subst("$ESP32_APP_OFFSET"), app]
     chip = env.BoardConfig().get("build.mcu")
-    command = [env.subst("$PYTHONEXE"), esptool, "--chip", chip, "merge_bin", "-o", out,
-               "--flash_mode", "dio", "--flash_size", "keep"] + parts
-    env.Execute(" ".join('"%s"' % p for p in command))
+    command = runner + ["--chip", chip, merge_command, "-o", out, mode_option, "dio", size_option, "keep"] + parts
+    if env.Execute(" ".join('"%s"' % p for p in command)):
+        raise RuntimeError("Could not create the merged USB firmware image")
 
 env.AddPostAction("$BUILD_DIR/${PROGNAME}.bin", merge)

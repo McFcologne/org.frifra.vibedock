@@ -15,16 +15,18 @@ void quotas(const char *header);
 void connection(bool healthy, uint32_t now);
 void pairingUsb(uint32_t now);
 #else
-inline bool begin() { return false; }
-inline bool available() { return false; }
-inline void play(Cue) {}
-inline uint8_t volume() { return 0; }
-inline void setVolume(int) {}
-inline bool takeVolumeChange() { return false; }
-inline void showVolume() {}
-inline bool takeVolumeInteraction() { return false; }
-inline void quotas(const char*) {}
-inline void connection(bool,uint32_t) {}
-inline void pairingUsb(uint32_t) {}
+// Keep even the empty stubs out of non-audio firmware with Core 3 / GCC 14.
+
+inline __attribute__((always_inline)) bool begin() { return false; }
+inline __attribute__((always_inline)) bool available() { return false; }
+inline __attribute__((always_inline)) void play(Cue) {}
+inline __attribute__((always_inline)) uint8_t volume() { return 0; }
+inline __attribute__((always_inline)) void setVolume(int) {}
+inline __attribute__((always_inline)) bool takeVolumeChange() { return false; }
+inline __attribute__((always_inline)) void showVolume() {}
+inline __attribute__((always_inline)) bool takeVolumeInteraction() { return false; }
+inline __attribute__((always_inline)) void quotas(const char*) {}
+inline __attribute__((always_inline)) void connection(bool,uint32_t) {}
+inline __attribute__((always_inline)) void pairingUsb(uint32_t) {}
 #endif
 }
