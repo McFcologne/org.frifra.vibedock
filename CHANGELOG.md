@@ -2,6 +2,58 @@
 
 The release workflow publishes the section of the tagged version (`## 0.1.0` for the tag `v0.1.0` or `0.1.0`) above the list of commits that GitHub generates.
 
+## 0.3.1
+
+Pinned certificates on every board, PSRAM on the ESP32-S3 boards and the Wi-Fi of each display on its device card.
+The ESP32 boards now check the server certificate against its pin like the M1 and run the full chain check only
+after a renewal. The S3 boards keep a copy of their picture in PSRAM and turn without loading it again. A display
+goes back to its LAN address after a restart, and a phone with a web display shows the last image blurred while it
+turns.
+
+**Updating:** update the server image first, then update the displays over Wi-Fi from the administration. The new
+firmware is needed for the pin check on the ESP32 boards and the pin after a renewed certificate, PSRAM and the
+picture copy, the return to the LAN and the Wi-Fi name on the device card. The route on the device card, the
+background TLS check of the server and the web display are server-side. Releases no longer carry Docker image files;
+the image comes from ghcr.io or Docker Hub.
+
+- **Pinned certificate on every board:** the ESP32 boards (Waveshare 1.54, 1.47, S3 1.69, C6 1.69, LilyGO, CYD, C3)
+  now use the simple check the M1 already had: they compare the server certificate with its pin and run the full
+  chain check only when that fails, for example after the certificate was renewed. Before, they checked the whole
+  chain with every pull. The device log names the check after the status: *HTTP 200, TLS pinned* or *TLS full check*
+  (M1: *TLS 1.3 pinned …* or *TLS 1.3 full check …*). Needs the new firmware.
+- **Pin after a renewed certificate:** after a full check every board keeps the server's pin only when it matches the
+  certificate it has just verified, otherwise that certificate (log line *Server pin differs from the verified
+  certificate, pinned the verified one*), and the server no longer sends an older pin after a failed refresh. Before,
+  a pin from before the renewal could make every pull fall back to the full check for up to ten minutes. Needs the new
+  firmware and server.
+- **No waiting for the server's own TLS check:** image answers after a display's full certificate check no longer
+  wait for the server to check its external address. Where the server could not reach it (no route from the
+  container to the reverse proxy, no NAT loopback), every pull of the ESP32 boards took the 5-second connect timeout;
+  the check now runs in the background and a failure is retried after ten minutes. Server only.
+- **Back to the LAN after a restart:** a display that last answered on its second (usually external) address tries
+  the first one again once after each start, without an error message when it is not reachable. Before, it stayed on
+  the external address until that failed. Needs the new firmware.
+- **PSRAM on the ESP32-S3 boards:** the Waveshare 1.54, 1.47 and S3 1.69 and the LilyGO T-Display-S3 (all ESP32-S3R8
+  with 8 MB octal PSRAM) now use it. The copy of the picture lives there, so these displays too turn their picture and
+  apply a new colour correction without loading it again (before, the 1.54 logged *No memory for a copy of the
+  picture*). Wi-Fi buffers and larger allocations move there as well, leaving more internal memory for TLS. Needs the
+  new firmware.
+- **Picture copy also without PSRAM:** a board that has no room for the copy while the first picture's TLS connection
+  is open (the C6 1.69) tries again right after that pull and loads the picture once more to fill it.
+- **Turning without a copy:** the patch that came with the turn was made for the old orientation; it is now dropped
+  silently and the whole picture follows at once, instead of the log line *Image aborted: unsupported image or delta
+  basis*.
+- **Wi-Fi and route on the device card:** below the IP the card shows the Wi-Fi the display is in, its signal (in the
+  warning colour below −75 dBm) and whether its last pull used the internal address (**LAN**) or the external one
+  (**external**). The route works with every firmware; the Wi-Fi name needs the new firmware. The support file lists
+  both; the Wi-Fi name is hidden together with the host names.
+- **Turning a phone with a web display:** until the image in the new size has loaded, the page shows the last one
+  stretched over the new area and blurred, instead of a picture in the old shape. Server only.
+- **Releases without Docker image files:** a GitHub release now carries the server JAR and the firmware of every
+  board only. The image is built and pushed straight to ghcr.io and Docker Hub as before (`<version>`, `latest` for a
+  plain `x.y.z`, one tag for amd64 and arm64); for a machine without registry access `scripts/image.sh` or
+  `docker save` makes the file. The files of earlier releases stay as they are.
+
 ## 0.3.0
 
 About 99 % less data for displays, fifteen new themes and simpler USB pairing. The server sends only the changed
