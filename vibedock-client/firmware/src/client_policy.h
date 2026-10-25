@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <math.h>
+#include <string>
 // Pure timing and format rules of the VibeDock client (protocol v2), shared with the native test.
 namespace client_policy {
 // Coarse voltage-only estimate for a single Li-ion cell, following the Waveshare 1.54-inch example.
@@ -64,6 +65,16 @@ constexpr uint32_t waitAfterImage(bool complete, uint32_t announcedMs) { return 
 enum class Below : uint8_t { Top, Bottom, Unknown };
 constexpr Below belowCut(bool known, uint16_t cut, uint16_t split, uint16_t height) {
   return !known ? Below::Unknown : split >= height ? Below::Top : cut >= split ? Below::Bottom : Below::Unknown;
+}
+// Bytes outside A-Z, a-z, 0-9 and "-._~" as %XX (upper case), e.g. a Wi-Fi name in a header field.
+inline std::string percentEncoded(const char *text) {
+  static const char hex[] = "0123456789ABCDEF"; std::string out;
+  for (const unsigned char *p = reinterpret_cast<const unsigned char *>(text); *p; p++) {
+    unsigned char c = *p;
+    if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '.' || c == '_' || c == '~') out += char(c);
+    else { out += '%'; out += hex[c >> 4]; out += hex[c & 15]; }
+  }
+  return out;
 }
 // A pull is due once the wait has passed (the announced one, or the poll interval); survives millis() rollover.
 constexpr bool waited(uint32_t now, uint32_t since, uint32_t ms) { return uint32_t(now - since) >= ms; }

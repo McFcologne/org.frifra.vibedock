@@ -136,8 +136,12 @@ String diagHeader() {
     snprintf_P(text + n, sizeof(text) - n, PSTR(";prev=%08lx;phase=%s;prevup=%lu;prevheap=%lu;prevmin=%lu;prevrssi=%d;prevdrops=%u"), (unsigned long)previousDiag.boot,
              client_policy::phaseName(previousDiag.phase), (unsigned long)previousDiag.uptime, (unsigned long)previousDiag.heapFree,
              (unsigned long)previousDiag.heapMin, int(previousDiag.rssi), unsigned(previousDiag.drops));
+  String header(text);
+  // The Wi-Fi it is in, for its card in the administration: UTF-8, percent-encoded (an SSID may contain ";" and "=").
+  String ssid = WiFi.status() == WL_CONNECTED ? WiFi.SSID() : String();
+  if (!ssid.isEmpty() && ssid.length() <= 32) { header += F(";ssid="); header += client_policy::percentEncoded(ssid.c_str()).c_str(); }
   String crash = platform::crashHeader();
-  return crash.isEmpty() ? String(text) : String(text) + F(";panic=") + crash;
+  return crash.isEmpty() ? header : header + F(";panic=") + crash;
 }
 // ---- device log: the last events, kept in /log.txt across restarts and read over USB (VIBEDOCK-LOG) ----
 // What the display did and why a connection failed; no keys, passwords or tokens.

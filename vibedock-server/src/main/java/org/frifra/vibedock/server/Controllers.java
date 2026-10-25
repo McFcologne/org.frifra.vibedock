@@ -34,6 +34,7 @@ class Controllers {
         this.storage=storage;this.firmware=firmware;this.info=info;this.admin=admin;this.dataDir=dataDir;this.logDir=logDir;
     }
     @org.springframework.beans.factory.annotation.Autowired private DesignService designs;
+    @org.springframework.beans.factory.annotation.Autowired(required=false) private DeviceDiagnostics diagnostics;
     @org.springframework.beans.factory.annotation.Value("${vibedock.admin-auth:password}") private String auth;
     /** Without sign-in (ADMIN_AUTH=none) the login page, e.g. a bookmark or after "Sign out", leads to the administration. */
     @GetMapping("/login") String login() { return "none".equals(auth) ? "redirect:/admin" : "login"; }
@@ -95,6 +96,10 @@ class Controllers {
     private static String left(ProviderClient.Window w){return String.format(Locale.ROOT,"%.0f %%",Math.max(0,Math.min(100,100-w.usedPercent())));}
     @GetMapping("/admin/devices") String devices(Model model,HttpServletRequest request) {
         model.addAttribute("clients",clients.views());
+        // Wi-Fi, signal and the address the last pull used, per display (as far as known since the server started).
+        var networks=new java.util.HashMap<String,DeviceDiagnostics.Network>();
+        if(diagnostics!=null)for(var c:clients.views()){var n=diagnostics.network(c.identifier());if(n!=null)networks.put(c.identifier(),n);}
+        model.addAttribute("networks",networks);
         // The preview's link changes with the design and with the photo a slideshow shows now, so the card follows it.
         var previews=new java.util.HashMap<String,String>();
         for(var c:clients.views())previews.put(c.identifier(),c.design().hashCode()+designs.currentPhoto(c.design(),c.identifier()).map(p->"-"+p).orElse(""));

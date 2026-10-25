@@ -32,7 +32,8 @@ class SupportFile {
                    int days,int pollSeconds,int ipRules,int sources,int displays,String testMode,boolean hostsHidden) {}
     record Source(String type,String label,boolean suspended,String status,Long observedAt) {}
     record Display(String identifier,String name,String board,String display,String firmware,String status,Long lastPullAt,String ip,
-                   boolean web,boolean ota,boolean otaNeedsPairing,boolean updating,String updateError,boolean flipped,int rotation,boolean serverFooter) {}
+                   boolean web,boolean ota,boolean otaNeedsPairing,boolean updating,String updateError,boolean flipped,int rotation,boolean serverFooter,
+                   String wifi,String route) {}
     /** savedAt: when the server received it (its lines can be older); bootId, uptimeSeconds: the start it came from, when known. */
     record DeviceLog(String identifier,long savedAt,String source,String firmware,String board,String bootId,Long uptimeSeconds,List<String> lines) {}
     /** The problem in the user's words (all optional); displays: the identifiers of the displays it concerns. */
@@ -123,7 +124,8 @@ class SupportFile {
         var displays=new ArrayList<Display>();
         for(var v:registry.views())
             displays.add(new Display(v.identifier(),redactor.text(v.name()),v.board().id(),v.display().id(),v.firmware(),v.status(),v.lastPullAt(),
-                    redactor.text(v.ip()),v.web()!=null,v.ota(),v.otaNeedsPairing(),v.updating(),redactor.text(v.updateError()),v.flipped(),v.rotation(),v.serverFooter()));
+                    redactor.text(v.ip()),v.web()!=null,v.ota(),v.otaNeedsPairing(),v.updating(),redactor.text(v.updateError()),v.flipped(),v.rotation(),v.serverFooter(),
+                    network(v.identifier(),redactor,true),network(v.identifier(),redactor,false)));
         var deviceLogs=new ArrayList<DeviceLog>();
         for(String id:logs.identifiers())for(var entry:logs.list(id)){
             if(entry.savedAt()<since.toEpochMilli())continue;
@@ -150,6 +152,11 @@ class SupportFile {
     }
 
     /** The server log or the access logs since the given time, oldest first (see {@link ServerLogFiles#read}). */
+    /** Wi-Fi name (hidden with the host names) or route of a display's last pull; null when not known. */
+    private String network(String identifier,SupportRedactor redactor,boolean wifi){
+        var n=diagnostics.network(identifier);if(n==null)return null;
+        return wifi?redactor.network(n.ssid()):n.route();
+    }
     private List<String> logLines(String prefix,Instant since,SupportRedactor redactor) throws IOException {
         return ServerLogFiles.read(logDir,prefix,since,MAX_LOG_CHARS,line->true,redactor::text);
     }

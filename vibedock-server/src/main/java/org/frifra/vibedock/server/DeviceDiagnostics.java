@@ -37,7 +37,18 @@ class DeviceDiagnostics {
     private static final Pattern IDENTIFIER=Pattern.compile("[A-Za-z0-9_.:-]{8,80}");
 
     /** The current start of a display as of its last pull; receivedAt is server time. */
-    record Live(String bootId,Long uptimeSeconds,Long heapFree,Long heapMin,Integer rssi,Integer wifiDrops,long receivedAt) {}
+    record Live(String bootId,Long uptimeSeconds,Long heapFree,Long heapMin,Integer rssi,Integer wifiDrops,long receivedAt,String ssid) {
+        Live(String bootId,Long uptimeSeconds,Long heapFree,Long heapMin,Integer rssi,Integer wifiDrops,long receivedAt){
+            this(bootId,uptimeSeconds,heapFree,heapMin,rssi,wifiDrops,receivedAt,null);
+        }
+    }
+    /**
+     * The network of a display for its card: Wi-Fi name (firmware 0.3.1 and newer, else null), signal, and how its last
+     * pull reached the server: route "lan" (the internal address), "external" (the external address) or "other",
+     * host the address it used.
+     */
+    record Network(String ssid,Integer rssi,String route,String host) {}
+    private final Map<String,String[]> routes=new ConcurrentHashMap<>();
     /**
      * One start: seenAt is the server time of its first report. previous*: the last state of the start before, null
      * where it did not survive (power cut) or the firmware does not know it. crash*: what the crash of the start before
@@ -75,6 +86,7 @@ class DeviceDiagnostics {
                 case "cause" -> value.matches("\\d{1,10}");
                 case "fault" -> value.matches("[0-9a-f]{1,8}");
                 case "abort" -> value.matches("[A-Za-z0-9 .:_/()-]{1,60}");
+                case "ssid" -> ssid(value)!=null;
                 default -> false;
             };
             if(valid)values.put(key,value);
@@ -85,7 +97,7 @@ class DeviceDiagnostics {
     void report(String identifier,String header,String firmware,String board){
         var v=parse(header);String boot=v.get("boot");
         if(boot==null||!IDENTIFIER.matcher(identifier).matches())return;
-        live.put(identifier,new Live(boot,longOf(v,"up"),longOf(v,"heap"),longOf(v,"min"),intOf(v,"rssi"),intOf(v,"drops"),clock.millis()));
+        live.put(identifier,new Live(boot,longOf(v,"up"),longOf(v,"heap"),longOf(v,"min"),intOf(v,"rssi"),intOf(v,"drops"),clock.millis(),ssid(v.get("ssid"))));
         synchronized(this){
             try{
                 var starts=new ArrayList<>(starts(identifier));
@@ -103,6 +115,28 @@ class DeviceDiagnostics {
         }
     }
     Optional<Live> live(String identifier){return Optional.ofNullable(live.get(identifier));}
+    /**
+     * The Wi-Fi name as the firmware sends it: the SSID's UTF-8 bytes, percent-encoded outside A–Z, a–z, 0–9 and
+     * "-._~" (an SSID may contain ";" and "="). Null when it is not such a text of 1 to 32 bytes.
+     */
+    static String ssid(String encoded){
+        if(encoded==null||!encoded.matches("([A-Za-z0-9._~-]|%[0-9A-Fa-f]{2}){1,32}"))return null;
+        var bytes=new java.io.ByteArrayOutputStream();
+        for(int i=0;i<encoded.length();i++){
+            char c=encoded.charAt(i);
+            if(c=='%'){bytes.write(Integer.parseInt(encoded.substring(i+1,i+3),16));i+=2;}else bytes.write(c);
+        }
+        String text=bytes.toString(java.nio.charset.StandardCharsets.UTF_8);
+        return text.chars().anyMatch(ch->ch<32||ch==127)?null:text;
+    }
+    /** How the display's last pull reached the server (see Network). */
+    void route(String identifier,String route,String host){if(IDENTIFIER.matcher(identifier).matches())routes.put(identifier,new String[]{route,host});}
+    /** The display's network as of its last pull; null before its first pull since the server started. */
+    Network network(String identifier){
+        var l=live.get(identifier);var r=routes.get(identifier);
+        if(l==null&&r==null)return null;
+        return new Network(l==null?null:l.ssid(),l==null?null:l.rssi(),r==null?null:r[0],r==null?null:r[1]);
+    }
     /** The display's starts, newest first; empty for displays that never reported one. */
     synchronized List<Start> starts(String identifier) throws IOException {
         if(!IDENTIFIER.matcher(identifier).matches())return List.of();
@@ -111,7 +145,7 @@ class DeviceDiagnostics {
         try{return json.readValue(file.toFile(),new TypeReference<List<Start>>(){});}
         catch(tools.jackson.core.JacksonException e){log.warn("Unreadable {}: {}",file,e.toString());return List.of();}
     }
-    void forget(String identifier){live.remove(identifier);}
+    void forget(String identifier){live.remove(identifier);routes.remove(identifier);}
     private void save(String identifier,List<Start> starts) throws IOException {
         Path dir=Files.createDirectories(root.resolve(identifier));
         Path temporary=Files.createTempFile(dir,"starts-",".tmp");

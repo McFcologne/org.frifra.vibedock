@@ -10,6 +10,7 @@
 #include <limits>
 int main(){
   using namespace client_policy;
+  assert(percentEncoded("FRIFRA")=="FRIFRA"&&percentEncoded("a;b=c d")=="a%3Bb%3Dc%20d"&&percentEncoded("Caf\xc3\xa9")=="Caf%C3%A9");
   {
     ImageSize size;assert(parseImageFormat("rgb565-delta-be-16x16",size,true));
     assert(!parseImageFormat("rgb565-delta-be-16x16",size));
