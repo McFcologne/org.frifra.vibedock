@@ -96,7 +96,9 @@ VIBEDOCK-BATTERY
 The reply starts with `VIBEDOCK-BATTERY ` followed by JSON containing `supported`, `voltageMv`,
 `estimatedPercent`, `chargeSignal` (`active`, `inactive`, `unstable` or `unknown`), `present`, `powerSource`
 (`battery`, `usb` or `unknown`) and `powerSaving` (`off`, `allowed` or `active`).
-`VIBEDOCK-HELLO` also includes these fields inside `battery` on this board. Other boards answer the explicit
+`VIBEDOCK-HELLO` also includes these fields inside `battery` on this board. The Waveshare ESP32-C6-Touch-LCD-1.69 measures
+the voltage the same way (GPIO 0, battery / 3, BAT_ADC in the vendor schematic) but has no charging signal
+(`chargeSignal: unknown`); its status page shows the same *Battery* card. Other boards answer the explicit
 battery request with `supported: false` and unknown measurements, without reading their pins.
 
 **Battery presence stays unknown (`present: null`).** The charging circuit does not reliably distinguish an

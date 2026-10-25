@@ -1075,7 +1075,7 @@ If the display misses updates on battery, switch it off again.
 
 **Battery icon.** While one of these displays runs on its battery, its picture shows a small battery at the top right
 of the first usage band (beside a status such as *Rate limited*, in window themes in the title bar), whether power
-saving is on or not. The 1.54 fills it to its measured level in steps of 20 %, red below 20 %; the others only know
+saving is on or not. The 1.54 and the C6 1.69 fill it to their measured level in steps of 20 %, red below 20 %; the others only know
 that they run on battery and show it empty. The device card's preview shows it as well. On USB it disappears. The
 server draws it into the image, so the display only sends one more header with its pulls; the image changes only when
 the level steps or the power source changes. The LilyGO T-Display has a battery connection too,

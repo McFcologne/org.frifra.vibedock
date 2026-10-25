@@ -57,7 +57,7 @@ void applyOrientation(uint8_t next);
 bool powerSavingAllowed = false, powerSaving = false, dimmed = false;
 client_policy::PowerSource powerSource;
 uint32_t lastActivity = 0, lastPowerCheck = 0;
-int batteryLevel = -1;  // the estimate of the last power check (1.54 only, steps of 20 %), -1 unknown
+int batteryLevel = -1;  // the estimate of the last power check (1.54 and C6 1.69, steps of 20 %), -1 unknown
 client_policy::ToneSettings toneSettings;  // colour correction of the panel, set on the status page
 client_policy::Tone panelTone;
 
@@ -1311,7 +1311,11 @@ void statusPage() {
     String card = F("<section class=\"card\"><h2>Battery</h2><dl><dt>Measured voltage</dt><dd>");
     card += String(power.millivolts / 1000.0, 2) + F(" V</dd><dt>Estimated level</dt><dd>");
     card += power.estimatedPercent < 0 ? String(F("Unknown")) : String("~") + String(power.estimatedPercent) + " %";
+#ifdef VIBEDOCK_BATTERY_CHARGE
     card += F("</dd><dt>Charging signal</dt><dd>"); card += power.chargeSignal;
+#else
+    card += F("</dd><dt>Charging signal</dt><dd>none on this board");
+#endif
     card += powerRows();
     card += F("<dt>Battery present</dt><dd>Unknown</dd></dl><p class=\"muted\">Voltage-based estimate only. "
         "USB power and charging affect the reading. A voltage or charging signal does not prove a battery is fitted; "
@@ -1704,7 +1708,8 @@ void powerPoll() {
 #ifdef VIBEDOCK_BATTERY
   if (millis() - lastPowerCheck >= client_policy::powerCheckMs) {
     lastPowerCheck = millis();
-    // Only the 1.54 reports charging; on the others a USB host alone means external power.
+    // Only the 1.54 reports charging; on the others a USB host alone means external power. The level comes from
+    // the boards that measure the battery voltage (1.54, C6 1.69).
     auto reading = battery::read();
     bool charging = strcmp(reading.chargeSignal, "active") == 0 || strcmp(reading.chargeSignal, "unstable") == 0;
     batteryLevel = reading.supported ? reading.estimatedPercent : -1;

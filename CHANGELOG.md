@@ -61,7 +61,7 @@ been measured.
   uses Wi-Fi modem sleep, runs at 80 MHz and dims its backlight after a minute without touch. USB ends it. Off by
   default; needs the new firmware.
 - **Battery icon:** on battery these displays show a small battery at the top right of their picture, on the 1.54
-  filled to its level. It goes away on USB.
+  and the C6 1.69 filled to its level. It goes away on USB.
 - **Wi-Fi scan while a saved network is out of reach:** a display that keeps trying a saved network it cannot reach
   (for example when it is paired over USB at another place) found no networks for **Pair now** or its setup portal;
   it now pauses those attempts for the scan. Firmware.
