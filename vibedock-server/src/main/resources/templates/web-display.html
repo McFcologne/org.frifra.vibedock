@@ -30,13 +30,22 @@ html,body{margin:0;height:100%;background:var(--display-background,#000);overflo
 // double tap (or double click, or the space bar) starts or stops the slideshow, whatever its schedule says.
 (() => {
   const body = document.body, screen = document.querySelector('.screen'), stale = document.querySelector('.stale'), every = Number(body.dataset.reload) * 1000;
-  let last = null, resized = null, tag = null;
+  let last = null, resized = null, tag = null, newest = 0;
   const time = date => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   function load() {
-    const ratio = Math.round((window.devicePixelRatio || 1) * 100) / 100;
-    const url = body.dataset.image + '?w=' + screen.clientWidth + '&h=' + screen.clientHeight + '&r=' + ratio + '&t=' + Date.now(), next = new Image();
-    next.onload = () => { screen.style.backgroundImage = 'url("' + url + '")'; screen.classList.remove('reshaping'); last = new Date(); stale.style.display = 'none'; tint(next); };
-    next.onerror = () => { screen.classList.remove('reshaping'); stale.textContent = last ? 'offline · last image ' + time(last) : 'offline'; stale.style.display = 'inline-block'; };
+    const ratio = Math.round((window.devicePixelRatio || 1) * 100) / 100, width = screen.clientWidth, height = screen.clientHeight;
+    const url = body.dataset.image + '?w=' + width + '&h=' + height + '&r=' + ratio + '&t=' + Date.now(), next = new Image(), id = ++newest;
+    // Only the newest request, and only for the current size, counts: an answer to a request started before a turn
+    // (or overtaken by a later one) neither shows its picture nor ends the stretched, blurred one.
+    const current = () => id === newest && width === screen.clientWidth && height === screen.clientHeight;
+    next.onload = () => {
+      if (!current()) return;
+      screen.style.backgroundImage = 'url("' + url + '")'; screen.classList.remove('reshaping'); last = new Date(); stale.style.display = 'none'; tint(next);
+    };
+    next.onerror = () => {
+      if (!current()) return;
+      screen.classList.remove('reshaping'); stale.textContent = last ? 'offline · last image ' + time(last) : 'offline'; stale.style.display = 'inline-block';
+    };
     next.src = url;
   }
   // Inspect EVERY successfully loaded image, including timed reloads and photo/theme changes. The theme's
