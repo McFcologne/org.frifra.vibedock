@@ -37,7 +37,8 @@ class TlsPinControllerTest {
         when(pairing.setUp(anyString(),anyString(),anyString(),anyList(),anyBoolean()))
                 .thenReturn(new ClientPairing.Setup(Map.of("anchor","AQID"),List.of()));
         var mvc=MockMvcBuilders.standaloneSetup(new DeviceAdminController(null,pairing,null,addresses,null,null,null,null,null,null),
-                new FirmwareController(null,null,pairing,addresses,"UTC")).build();
+                new FirmwareController(null,null,pairing,addresses,"UTC"))
+                .setMessageConverters(new org.springframework.http.converter.json.JacksonJsonHttpMessageConverter(JsonCompatibility.mapper())).build();
         mvc.perform(post("/admin/clients/invite").param("ip","192.168.1.20").param("code","123456")).andExpect(status().is3xxRedirection());
         mvc.perform(post("/admin/clients/invite").param("ip","192.168.1.20").param("code","123456").param("omitTlsPin","on")).andExpect(status().is3xxRedirection());
         verify(pairing).invite("192.168.1.20",80,"123456","","",servers,true);

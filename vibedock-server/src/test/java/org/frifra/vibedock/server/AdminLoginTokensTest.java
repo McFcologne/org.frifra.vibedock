@@ -1,6 +1,6 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.*;
@@ -9,7 +9,7 @@ import java.time.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class AdminLoginTokensTest {
-    final ObjectMapper json=new ObjectMapper();
+    final ObjectMapper json=JsonCompatibility.mapper();
     static class Time extends Clock {
         Instant instant=Instant.parse("2026-10-18T12:00:00Z");
         void advance(Duration duration){instant=instant.plus(duration);}

@@ -1,6 +1,6 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
@@ -9,7 +9,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SourceTransferTest {
-    private final ObjectMapper json=new ObjectMapper();
+    private final ObjectMapper json=JsonCompatibility.mapper();
     private static final String PASSWORD="correct horse battery";
 
     private SettingsStore server(Path dir,String label) throws Exception {

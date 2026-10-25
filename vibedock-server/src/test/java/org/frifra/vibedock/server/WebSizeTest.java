@@ -45,7 +45,7 @@ class WebSizeTest {
         var six=new ArrayList<Layout.Band>(five);six.add(0,new Layout.Usage(List.of("claude")));
         Assertions.assertThrows(IllegalArgumentException.class,()->new Layout(six));
         // The JSON keeps alignTop only when set; fitting and moving the weather band keep it.
-        var json=new com.fasterxml.jackson.databind.ObjectMapper();
+        var json=JsonCompatibility.mapper();
         Assertions.assertFalse(json.writeValueAsString(Layout.DEFAULT).contains("alignTop"));
         var top=new Layout(Layout.DEFAULT.bands(),true);
         Assertions.assertEquals(top,json.readValue(json.writeValueAsString(top),Layout.class));

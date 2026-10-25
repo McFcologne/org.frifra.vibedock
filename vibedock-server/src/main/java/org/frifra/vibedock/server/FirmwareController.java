@@ -36,8 +36,8 @@ class FirmwareController {
         // For the browser flasher: which boards of this installation have which chip, to switch to the right one itself.
         var chips=new java.util.ArrayList<java.util.Map<String,Object>>();
         for(var b:Board.INVENTORY)if(firmware.info(b).isPresent())chips.add(java.util.Map.of("id",b.id(),"label",b.label(),"chip",b.chip()));
-        try{model.addAttribute("boardChips",new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(chips));}
-        catch(com.fasterxml.jackson.core.JsonProcessingException e){model.addAttribute("boardChips","[]");}
+        try{model.addAttribute("boardChips",new tools.jackson.databind.json.JsonMapper().writeValueAsString(chips));}
+        catch(tools.jackson.core.JacksonException e){model.addAttribute("boardChips","[]");}
         model.addAttribute("firmware",firmware.info(selected).orElse(null));
         model.addAttribute("uploadIncomplete",firmware.uploadIncomplete(selected));
         model.addAttribute("uploadedAt",firmware.info(selected).filter(Firmware.Info::uploaded)

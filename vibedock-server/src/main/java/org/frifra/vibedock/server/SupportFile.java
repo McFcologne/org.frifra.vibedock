@@ -1,6 +1,6 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import javax.crypto.AEADBadTagException;
@@ -95,7 +95,7 @@ class SupportFile {
         if(content==null||content.isBlank())throw new IllegalArgumentException("Choose a support file");
         if(content.length()>MAX_FILE*2)throw new IllegalArgumentException("The file is too large for a VibeDock support file");
         SourceTransfer.Envelope envelope;
-        try{envelope=json.readValue(content,SourceTransfer.Envelope.class);}catch(IOException e){throw new IllegalArgumentException("This is not a VibeDock support file");}
+        try{envelope=json.readValue(content,SourceTransfer.Envelope.class);}catch(tools.jackson.core.JacksonException e){throw new IllegalArgumentException("This is not a VibeDock support file");}
         if(!FORMAT.equals(envelope.format())||envelope.version()!=SourceTransfer.VERSION||!"AES-256-GCM".equals(envelope.cipher())||!"PBKDF2-HMAC-SHA256".equals(envelope.kdf()))
             throw new IllegalArgumentException("This is not a VibeDock support file of a supported version");
         if(envelope.iterations()<100_000||envelope.iterations()>5_000_000)throw new IllegalArgumentException("The file uses unsupported key settings");
@@ -106,7 +106,7 @@ class SupportFile {
             plain=SourceTransfer.cipher(Cipher.DECRYPT_MODE,FORMAT,key==null?"":key.trim(),salt,envelope.iterations(),nonce).doFinal(b64.decode(envelope.data()));
             return json.readValue(plain,Contents.class);
         }catch(AEADBadTagException e){throw new IllegalArgumentException("Wrong key, or the file was changed");}
-        catch(GeneralSecurityException|IOException|IllegalArgumentException e){
+        catch(GeneralSecurityException|tools.jackson.core.JacksonException|IllegalArgumentException e){
             if(e instanceof IllegalArgumentException i&&i.getMessage()!=null&&i.getMessage().startsWith("The support"))throw i;
             throw new IllegalArgumentException("The support file is damaged");
         }finally{if(plain!=null)Arrays.fill(plain,(byte)0);}

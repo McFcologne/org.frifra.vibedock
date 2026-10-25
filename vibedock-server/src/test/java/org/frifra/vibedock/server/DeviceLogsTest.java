@@ -1,6 +1,6 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.*;
@@ -9,7 +9,7 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class DeviceLogsTest {
-    private final ObjectMapper json=new ObjectMapper();
+    private final ObjectMapper json=JsonCompatibility.mapper();
     private static Clock ticking(){
         var now=new long[]{Instant.parse("2026-10-17T08:00:00Z").toEpochMilli()};
         return new Clock(){
@@ -46,6 +46,14 @@ class DeviceLogsTest {
         // Without a server log the log has none (null: not taken), and stays readable.
         var plain=new DeviceLogs(dir.toString(),json,ticking());
         assertNull(plain.read(id,plain.save(id,"usb","0.2.4","vibedock-m1",List.of("x")).name()).orElseThrow().serverLines());
+    }
+    @Test void aDamagedLogFileIsAnUnreadableFileNotAnUncheckedError(@TempDir Path dir) throws Exception {
+        var logs=new DeviceLogs(dir.toString(),json,ticking());String id="vibedock-0a1b2c000009";
+        var entry=logs.save(id,"usb","0.2.4","vibedock-m1",List.of("line"));
+        java.nio.file.Files.writeString(dir.resolve("device-logs").resolve(id).resolve(entry.name()),"{ not json");
+        // As with Jackson 2: callers that show an unreadable log as such (Troubleshooting) catch IOException.
+        assertThrows(java.io.IOException.class,()->logs.read(id,entry.name()));
+        assertThrows(java.io.IOException.class,()->logs.list(id));
     }
     @Test void savedLogsHoldNoKeysNoWebLinksAndAreBounded(@TempDir Path dir) throws Exception {
         var logs=new DeviceLogs(dir.toString(),json,ticking());

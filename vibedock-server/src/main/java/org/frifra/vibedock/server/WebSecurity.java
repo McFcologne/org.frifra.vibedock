@@ -3,7 +3,7 @@ package org.frifra.vibedock.server;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import org.apache.catalina.connector.Connector;
-import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory;
+import org.springframework.boot.tomcat.servlet.TomcatServletWebServerFactory;
 import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.*;
@@ -27,7 +27,7 @@ class WebSecurity {
         return factory -> {
             Connector connector=new Connector("org.apache.coyote.http11.Http11NioProtocol");
             connector.setPort(port); connector.setProperty("address",address);
-            factory.addAdditionalTomcatConnectors(connector);
+            factory.addAdditionalConnectors(connector);
         };
     }
     @Bean org.springframework.security.core.session.SessionRegistry sessionRegistry(){

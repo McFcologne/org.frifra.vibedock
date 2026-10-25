@@ -3,7 +3,7 @@ package org.frifra.vibedock.server;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -500,7 +500,7 @@ class AccessTest {
                 .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNotFound());
         var saved=mvc.perform(post("/admin/clients/"+id+"/logs").contentType("application/json").content(body).with(admin).with(csrf())
                 .with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isOk()).andExpect(jsonPath("$.count").value(1)).andReturn();
-        String name=new com.fasterxml.jackson.databind.ObjectMapper().readTree(saved.getResponse().getContentAsString()).path("name").asText().replace(".json","");
+        String name=JsonCompatibility.mapper().readTree(saved.getResponse().getContentAsString()).path("name").asText().replace(".json","");
         mvc.perform(post("/admin/clients/../logs").contentType("application/json").content(body).with(admin).with(csrf())
                 .with(r->{r.setLocalPort(10001);return r;})).andExpect(status().is4xxClientError());
         mvc.perform(get("/admin/troubleshooting").with(admin).with(r->{r.setLocalPort(10001);return r;}))
@@ -778,7 +778,7 @@ class AccessTest {
                 .with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isOk())
                 .andExpect(jsonPath("$.pairing.servers[0]").value("http://192.168.1.5:10002"))
                 .andExpect(jsonPath("$.pairing.name").value("Desk")).andExpect(jsonPath("$.pairing.pollSeconds").value(30)).andReturn();
-        String key=new com.fasterxml.jackson.databind.ObjectMapper().readTree(result.getResponse().getContentAsString()).path("pairing").path("key").asText();
+        String key=JsonCompatibility.mapper().readTree(result.getResponse().getContentAsString()).path("pairing").path("key").asText();
         Assertions.assertTrue(key.matches("[0-9a-f]{64}"));
         mvc.perform(get("/admin/firmware/setup/vibedock-a1b2c3d4e5f6").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
                 .andExpect(jsonPath("$.status").value("Waiting for first pull")).andExpect(jsonPath("$.ip").value(""));
@@ -996,7 +996,7 @@ class AccessTest {
         mvc.perform(get("/web/"+"0".repeat(64)+"/icon.png").with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNotFound());
         mvc.perform(get("/web/"+secret).with(r->{r.setLocalPort(8080);return r;})).andExpect(content().string(org.hamcrest.Matchers.containsString("rel=\"apple-touch-icon\" href=\"/web/"+secret+"/icon.png\"")));
         // Changes: the state tag follows the image; a swipe changes the theme (POST only, no session needed).
-        var state=new com.fasterxml.jackson.databind.ObjectMapper().readTree(mvc.perform(get("/web/"+secret+"/state").with(r->{r.setLocalPort(8080);return r;}))
+        var state=JsonCompatibility.mapper().readTree(mvc.perform(get("/web/"+secret+"/state").with(r->{r.setLocalPort(8080);return r;}))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).path("tag").asText();
         var scheme=clients.designFor(view.identifier()).scheme();
         mvc.perform(post("/web/"+secret+"/swipe").param("direction","next").with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNoContent());

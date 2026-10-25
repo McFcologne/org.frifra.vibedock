@@ -1,6 +1,6 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -72,7 +72,7 @@ class TlsTrustTest {
             int port=server.getAddress().getPort();String external="https://external.example.invalid:"+port;
             byte[] leaf=keys.getCertificate("proxy").getEncoded();
             String pin=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-1").digest(leaf));
-            var registry=new ClientRegistry(dir.resolve("data").toString(),new ObjectMapper(),Clock.systemUTC());
+            var registry=new ClientRegistry(dir.resolve("data").toString(),JsonCompatibility.mapper(),Clock.systemUTC());
             var configured=new ServerAddresses(registry,10002,"http://127.0.0.1:8081",external);
             @SuppressWarnings("unchecked") ObjectProvider<ServerAddresses> provider=mock(ObjectProvider.class);
             when(provider.getIfAvailable()).thenReturn(configured);
@@ -111,7 +111,7 @@ class TlsTrustTest {
             assertThrows(IllegalArgumentException.class,()->publicRoute.inspect("https://internal.example.invalid:"+port));
             verifyNoInteractions(resolver);
             // USB setup forwards the live certificate's pin through the existing pairing format.
-            var pairing=new ClientPairing(registry,java.net.http.HttpClient.newHttpClient(),new ObjectMapper(),trust,new OtaSigning(dir.resolve("data").toString()));
+            var pairing=new ClientPairing(registry,java.net.http.HttpClient.newHttpClient(),JsonCompatibility.mapper(),trust,new OtaSigning(dir.resolve("data").toString()));
             var setup=pairing.setUp("vibedock-123456789abc","Test",List.of("http://127.0.0.1:8081",external));
             assertEquals(pin,setup.pairing().get("pin"));assertTrue(setup.warnings().isEmpty());
             assertEquals(List.of("http://127.0.0.1:8081",external),setup.pairing().get("servers"));

@@ -1,6 +1,6 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -73,7 +73,7 @@ class CertificateLogTest {
                 @Override public Instant instant(){return now.get();}
             };
             @SuppressWarnings("unchecked") ObjectProvider<ServerAddresses> none=mock(ObjectProvider.class);
-            var certificateLog=new CertificateLog(HttpClient.newHttpClient(),new ObjectMapper(),clock,none,"http://127.0.0.1:"+port+"/");
+            var certificateLog=new CertificateLog(HttpClient.newHttpClient(),JsonCompatibility.mapper(),clock,none,"http://127.0.0.1:"+port+"/");
             // The test root is not in the Java trust store: accept it, as TlsTrust.root does for trusted ones.
             certificateLog.anchorOf=chain->{
                 try{chain[0].verify(read(dir.resolve("root.der")).getPublicKey());return root;}catch(Exception e){throw new IllegalArgumentException(e);}

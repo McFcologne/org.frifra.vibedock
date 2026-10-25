@@ -1,6 +1,6 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.*;
@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class DataSourceTest {
-    final ObjectMapper json=new ObjectMapper();
+    final ObjectMapper json=JsonCompatibility.mapper();
 
     @Test void earlierSettingsBecomeTheTwoDefaultSources(@TempDir Path dir) throws Exception {
         Files.writeString(dir.resolve("settings.json"),"""

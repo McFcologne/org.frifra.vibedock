@@ -1,11 +1,11 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.TextNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.StringNode;
 
 import javax.crypto.Cipher;
 import javax.crypto.Mac;
@@ -29,7 +29,7 @@ final class SecretStore {
     private static final String MAGIC="VIBEDOCK-SEALED-1\n";
     private static final byte[] PREFIX=MAGIC.getBytes(StandardCharsets.US_ASCII);
     static final String FIELD_PREFIX="vibedock:sealed:v1:";
-    private static final ObjectMapper JSON=new ObjectMapper().enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
+    private static final ObjectMapper JSON=tools.jackson.databind.json.JsonMapper.builder().enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();
     private static final Set<String> SECRET_NAMES=Set.of("token","accesstoken","refreshtoken","idtoken","apikey","openaikey","openaiapikey","anthropicapikey","authtoken","clientsecret","password");
     private static final long MAX_FILE=32L*1024*1024;
     private final Path data,keyFile,runtime;
@@ -133,7 +133,7 @@ final class SecretStore {
         try{write(file,plain);}finally{Arrays.fill(plain,(byte)0);}
     }
     private JsonNode tree(byte[] bytes){
-        try{return JSON.readTree(bytes);}catch(IOException e){return null;}
+        try{return JSON.readTree(bytes);}catch(tools.jackson.core.JacksonException e){return null;}
     }
     private boolean secret(Path file,String name){
         String normalized=name.replace("_","").replace("-","").toLowerCase(Locale.ROOT);
@@ -143,7 +143,7 @@ final class SecretStore {
     private boolean plainSecrets(Path file,JsonNode node){
         if(node==null)return false;
         if(node.isObject()){
-            var fields=node.fields();while(fields.hasNext()){
+            var fields=node.properties().iterator();while(fields.hasNext()){
                 var field=fields.next();var value=field.getValue();
                 if(secret(file,field.getKey())&&value.isTextual()&&!value.textValue().isBlank()&&!value.textValue().startsWith(FIELD_PREFIX))return true;
                 if(plainSecrets(file,value))return true;
@@ -160,7 +160,7 @@ final class SecretStore {
     }
     private JsonNode fields(Path file,JsonNode node,String pointer,boolean encrypt,boolean protectedField) throws IOException {
         if(node.isObject()){
-            var result=(ObjectNode)node.deepCopy();var names=node.fieldNames();
+            var result=(ObjectNode)node.deepCopy();var names=node.propertyNames().iterator();
             while(names.hasNext()){
                 String name=names.next(),part=name.replace("~","~0").replace("/","~1");
                 result.set(name,fields(file,node.get(name),pointer+"/"+part,encrypt,secret(file,name)));
@@ -173,9 +173,9 @@ final class SecretStore {
         if(!node.isTextual())return node;
         String value=node.textValue();
         if(value.startsWith(FIELD_PREFIX)){
-            String decoded=openField(file,pointer,value);return encrypt?node:TextNode.valueOf(decoded);
+            String decoded=openField(file,pointer,value);return encrypt?node:StringNode.valueOf(decoded);
         }
-        return encrypt&&protectedField&&!value.isBlank()?TextNode.valueOf(sealField(file,pointer,value)):node;
+        return encrypt&&protectedField&&!value.isBlank()?StringNode.valueOf(sealField(file,pointer,value)):node;
     }
     private byte[] fieldAad(Path file,String pointer) throws IOException {
         return (new String(aad(file),StandardCharsets.UTF_8)+"\nfield:"+pointer).getBytes(StandardCharsets.UTF_8);

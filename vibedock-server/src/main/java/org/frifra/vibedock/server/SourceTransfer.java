@@ -1,6 +1,6 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import javax.crypto.AEADBadTagException;
 import javax.crypto.Cipher;
@@ -65,7 +65,7 @@ class SourceTransfer {
         if(content==null||content.isBlank())throw new IllegalArgumentException("Choose an export file");
         if(content.length()>MAX_EXPORT)throw new IllegalArgumentException("The file is too large for a VibeDock export");
         Envelope envelope;
-        try{envelope=json.readValue(content,Envelope.class);}catch(IOException e){throw new IllegalArgumentException("This is not a VibeDock data source export");}
+        try{envelope=json.readValue(content,Envelope.class);}catch(tools.jackson.core.JacksonException e){throw new IllegalArgumentException("This is not a VibeDock data source export");}
         if(!(FORMAT.equals(envelope.format())||EARLIER_FORMAT.equals(envelope.format()))||envelope.version()!=VERSION||!"AES-256-GCM".equals(envelope.cipher())||!"PBKDF2-HMAC-SHA256".equals(envelope.kdf()))
             throw new IllegalArgumentException("This is not a VibeDock data source export of a supported version");
         if(envelope.iterations()<100_000||envelope.iterations()>5_000_000)throw new IllegalArgumentException("The export uses unsupported key settings");
@@ -84,7 +84,7 @@ class SourceTransfer {
             }
             return bundle;
         }catch(AEADBadTagException e){throw new IllegalArgumentException("Wrong password or damaged file");}
-        catch(GeneralSecurityException|IOException|NullPointerException e){throw new IllegalArgumentException("The export is damaged");}
+        catch(GeneralSecurityException|tools.jackson.core.JacksonException|NullPointerException e){throw new IllegalArgumentException("The export is damaged");}
         finally{if(plain!=null)Arrays.fill(plain,(byte)0);}
     }
 
@@ -159,7 +159,7 @@ class SourceTransfer {
         if(!Files.isDirectory(auth,LinkOption.NOFOLLOW_LINKS))return;
         List<Path> asides;
         try(var list=Files.list(auth)){asides=list.filter(p->p.getFileName().toString().startsWith(ASIDE)&&Files.isDirectory(p,LinkOption.NOFOLLOW_LINKS)).toList();}
-        var json=new ObjectMapper();
+        var json=new tools.jackson.databind.json.JsonMapper();
         for(Path aside:asides){
             Path manifest=aside.resolve(MANIFEST);
             if(Files.isRegularFile(manifest,LinkOption.NOFOLLOW_LINKS)){

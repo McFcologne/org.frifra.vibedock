@@ -112,7 +112,7 @@ class DeviceApiController {
                 headers.set("X-VibeDock-Payload",p.payload());headers.set("X-VibeDock-Length",String.valueOf(pixels.length));
             }
         }
-        logTransfer(identifier,preview?"preview full":headers.containsKey("X-VibeDock-Base")?"delta":"full",fullBytes,pixels.length,next);
+        logTransfer(identifier,preview?"preview full":headers.containsHeader("X-VibeDock-Base")?"delta":"full",fullBytes,pixels.length,next);
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
         return new ResponseEntity<>(pixels,headers,HttpStatus.OK);
     }

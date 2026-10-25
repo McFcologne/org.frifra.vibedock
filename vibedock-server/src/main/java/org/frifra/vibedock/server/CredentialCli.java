@@ -1,6 +1,6 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import java.nio.file.Path;
 import java.util.*;
 
@@ -12,7 +12,7 @@ public final class CredentialCli {
             throw new IllegalArgumentException("Expected codex, claude, codex-logout or claude-logout");
         boolean logout=args[0].endsWith("-logout");String type=args[0].replace("-logout","");
         String directory=System.getenv().getOrDefault("DATA_DIR","/data"),runtime=System.getenv().getOrDefault("AUTH_RUNTIME_DIR","");
-        var json=new ObjectMapper();var store=new SettingsStore(directory,json,new SecretStore(Path.of(directory),"",runtime));
+        var json=new tools.jackson.databind.json.JsonMapper();var store=new SettingsStore(directory,json,new SecretStore(Path.of(directory),"",runtime));
         var account=store.get().accounts().stream().filter(a->a.type().equals(type)).findFirst().orElseThrow(()->new IllegalArgumentException("Create a "+type+" data source first"));
         List<String> command=type.equals("codex")?logout?List.of("codex","-c","cli_auth_credentials_store=\"file\"","logout")
                 :List.of("codex","-c","cli_auth_credentials_store=\"file\"","login","--device-auth")

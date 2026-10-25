@@ -1,6 +1,6 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import java.io.IOException;
@@ -191,7 +191,10 @@ class DeviceLogs {
         }
     }
     private Log read(Path dir,String name) throws IOException {
-        var stored=json.readValue(dir.resolve(name).toFile(),Stored.class);
+        Stored stored;
+        // Jackson 3 reports a damaged file unchecked; the callers handle it as the unreadable file it is, as before.
+        try{stored=json.readValue(dir.resolve(name).toFile(),Stored.class);}
+        catch(tools.jackson.core.JacksonException e){throw new IOException("Unreadable log "+name+": "+e.getOriginalMessage(),e);}
         if(stored.serverLines()==null&&logDir!=null){
             // Saved before the server kept its lines: taken now from the server log, as far as it still reaches back, and kept.
             stored=stored.withServerLines(serverLines(dir.getFileName().toString(),stored.lines()==null?List.of():stored.lines(),stored.savedAt()));

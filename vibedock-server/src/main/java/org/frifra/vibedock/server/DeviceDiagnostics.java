@@ -1,7 +1,7 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -109,7 +109,7 @@ class DeviceDiagnostics {
         Path file=root.resolve(identifier).resolve(DeviceLogs.STARTS);
         if(!Files.isRegularFile(file))return List.of();
         try{return json.readValue(file.toFile(),new TypeReference<List<Start>>(){});}
-        catch(IOException e){log.warn("Unreadable {}: {}",file,e.toString());return List.of();}
+        catch(tools.jackson.core.JacksonException e){log.warn("Unreadable {}: {}",file,e.toString());return List.of();}
     }
     void forget(String identifier){live.remove(identifier);}
     private void save(String identifier,List<Start> starts) throws IOException {
