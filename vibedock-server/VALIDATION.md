@@ -2,6 +2,52 @@
 
 # Current validation status
 
+## M1 post-flash reset selection (2026-10-25)
+
+The owner authorised a test on the identified M1 (ESP8266). Esptool 4.8.1 entered its stub, read the MAC and
+executed `--after soft_reset`; the owner confirmed that the display returned immediately. No flash or settings
+were written during that test. The script's final ESP8266 write now selects soft reset; the browser flasher and
+its connected-loader restart action use the equivalent esptool-js 0.7.0 mode. ESP32 hardware resets and the
+manual backup/verification `no_reset` commands are unchanged. Six isolated script tests pass, including the
+real final write branch for both chip families. Browser module syntax is checked; an actual post-flash start
+through each UI/script path remains to be confirmed separately from the successful reset-only hardware test.
+
+## Native USB startup backpressure fix (2026-10-25)
+
+The owner's battery-powered S3 resumed without a reboot as soon as USB was unplugged. Source-level reproduction
+with the selected HWCDC write routine showed two seconds of waiting for one byte when a connected host stops
+reading; repeated JSON writes can therefore delay Wi-Fi startup by minutes. This demonstrates the mechanism,
+not a hardware trace of the reported stall.
+
+Native USB now uses nonblocking driver writes and bounded solicited response streaming (250 ms without progress,
+five seconds total, no additional buffer). READY is sent only for HELLO. UART boards retain their serial output
+implementation. The short firmware marker remains; setup acknowledgements are drained before restarting.
+The browser already actively sends HELLO; it now retries an incomplete JSON reply as well.
+
+The native regression test passes under AddressSanitizer/UndefinedBehaviorSanitizer: stalled reader, complete
+10 KB stream, delayed first write after a scan, mid-response stall, total deadline, timer rollover and failed writes.
+Two Node tests exercise a silent device and truncated HELLO; three browser tests cover USB identification, pairing
+and port release. Builds passed for M1, S3 Touch 1.47/1.54, C6 Touch 1.69, CYD, T-Display and T-Display-S3. The
+remaining two board rebuilds were handed back to the owner to avoid concurrent PlatformIO access. The owner confirmed on 2026-10-25 that the USB startup problem is resolved on all devices they tested.
+The exact tested board inventory was not supplied; this confirmation does not imply that every prepared board
+has been physically validated or that a longer Core 3 soak test has completed. Nothing was flashed by the agent.
+
+## Server dependency migration and shared appearance (2026-10-25)
+
+Java 21 Maven `verify` passed with Spring Boot 4.1.2 / Jackson 3.1.4: **232 tests, zero failures, zero errors,
+zero skipped**. This includes previous JSON layouts/registries, restart and credential handling, encrypted
+export/support files, login/CSRF, and new persistence, opt-in header and appearance-only callback tests.
+See [dependency upgrades](DEPENDENCIES.md) for compatibility and rollback. No production data was used.
+
+The client live-page test checks theme changes without image downloads, image revision changes, failed downloads,
+pausing hidden tabs and avoiding overlapping transfers. Four flash-script tests prove that only the selected
+USB port is queried. The M1 build passes audio exclusion; actual live-page hardware checks are pending.
+The packaged Boot 4 JAR passed **35 browser tests** (one existing skipped test), including desktop/mobile
+light/dark navigation and persistent-login recovery. All nine final firmware environments compiled; all eight
+non-audio boards passed the strict audio-exclusion check. Two license-inventory tests and the native policy
+test with AddressSanitizer/UndefinedBehaviorSanitizer passed. A complete Docker/manual build and
+provider sign-ins with real accounts are not covered by Maven verification.
+
 ## Waveshare ESP32-S3-Touch-LCD-1.54 (2026-10-19)
 
 The owner confirmed testing on the physical board: display colours (BGR), touch, image delivery, audio and volume

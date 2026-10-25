@@ -53,7 +53,7 @@ server; a display only receives its image.
 - **Troubleshooting.** Read a display's log over USB (any board) or over the network, and create an encrypted support file for a problem report.
 - **Web displays.** A browser, tablet or another program shows the image without hardware: a full-screen page that reloads itself, sharp in the size of the window (also as an iPhone home screen app), or a plain PNG link, protected by a secret in the link.
 - **Firmware from the server.** The Docker image carries the matching display firmware for every board: download it, install it from Chrome or Edge over USB and pair the display over the same cable in one go, or update paired displays over Wi-Fi with firmware signed by the server.
-- **Responsive administration.** Five navigation areas, remembered light/dark appearance, forms that open on demand, a design editor that saves every change right away, and a footer with build version, README and generated license information.
+- **Responsive administration.** Five navigation areas, shared light/dark appearance for administration and device web pages, forms that open on demand, a design editor that saves every change right away, and a footer with build version, README and generated license information.
 
 The Java 21 / Spring Boot server collects usage, renders an image in each device's resolution (240×240 for the VibeTV M1) and handles provider credentials. The firmware (ESP8266 or ESP32 with an SPI display) manages Wi-Fi and pairing, pulls the image and draws it, scaled to its screen. Provider credentials never go to a device.
 

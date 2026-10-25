@@ -438,7 +438,11 @@ delete it yourself.
 <img src="images/01-login.png" width="70%" alt="Sign-in page">
 
 Open `http://<host>:10001/admin` and sign in with the administration user. The session ends with **Sign out**
-at the top right. **Stay signed in** is enabled by default: this browser stays signed in for 30 days, renewed during use, including across browser and server restarts. Turn it off for a session that expires after 15 minutes of inactivity. Signing out revokes this browser's saved login; changing or resetting the administration password signs out all browsers. Clearing browser cookies also requires a new sign-in. **Dark** switches between the light and the dark theme; the choice is kept in this browser.
+at the top right. **Stay signed in** is enabled by default: this browser stays signed in for 30 days, renewed during use, including across browser and server restarts. Turn it off for a session that expires after 15 minutes of inactivity. Signing out revokes this browser's saved login; changing or resetting the administration password signs out all browsers. Clearing browser cookies also requires a new sign-in. **Dark** switches between light and dark appearance. Once signed in, the choice is saved for the whole
+server instance and sent to capable devices: directly over their existing LAN callback, with the next authenticated
+image response as a fallback. Their setup/status web pages follow it live (up to five seconds while open). The
+preview reloads only after a new complete device image; hidden tabs pause polling. This appearance is separate
+from the theme of the display image. The switch on the sign-in page changes only that open page.
 The footer of every page links the README, this manual as PDF (**Manual (PDF)**) and the licenses.
 
 # Overview

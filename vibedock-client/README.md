@@ -278,6 +278,10 @@ Power-on and external resets count toward this sequence; software restarts and c
 
 ## Build and test
 
+The dependency migration uses Mbed TLS 3.6.7 on the M1 and Arduino-ESP32 3.3.12 on the ESP32 boards.
+See [Dependency upgrades and device checks](DEPENDENCIES.md) for the versions, build evidence, rollback and the
+hardware tests still needed. The earlier Core 2 workaround is no longer the selected build.
+
 The firmware uses PlatformIO, independently of the server's Maven build. Use PlatformIO 6.2.0, `espressif8266@4.2.1`, ArduinoJson 7.4.3, TFT_eSPI 2.5.43, and QRCode 0.0.1. The pinned versions and display wiring are defined in [`firmware/platformio.ini`](firmware/platformio.ini). Python 3 is required for PlatformIO; a C++ compiler is required for the native policy test.
 
 ### Install PlatformIO once
@@ -369,7 +373,8 @@ References: [PlatformIO installation](https://docs.platformio.org/en/latest/core
 
 Follow [FLASHING.md](FLASHING.md) for device identification, a complete backup, verification, installation and recovery. Keep the backup private, record its SHA256 and device identity, and restore only a matching backup from that same device. Original firmware and device backups are not distributed with this project.
 
-After preparing and verifying the backup, `scripts/flash.sh [board]` detects the connected chip (and on the M1 its flash size), takes the board with that chip, or the board the VibeDock firmware on the device names, or offers the boards that share the chip, each marked tested on hardware or prepared (`--list` shows them), builds the candidate, shows the firmware details and asks for confirmation before writing. It writes firmware only, preserving LittleFS Wi-Fi and pairing settings. A full backup restore is a separate operation that replaces the entire flash. Neither the build configuration nor the native test installs anything on a device.
+After preparing and verifying the backup, `scripts/flash.sh [board]` first lets you choose a USB port when
+several are connected. Enumeration is passive; only the selected port is queried and may restart. It detects the connected chip (and on the M1 its flash size), takes the board with that chip, or the board the VibeDock firmware on the device names, or offers the boards that share the chip, each marked tested on hardware or prepared (`--list` shows them), builds the candidate, shows the firmware details and asks for confirmation before writing. It writes firmware only, preserving LittleFS Wi-Fi and pairing settings. The M1 starts automatically through a soft reset in both the script and browser flasher; ESP32 boards retain their hardware reset. A full backup restore is a separate operation that replaces the entire flash. Neither the build configuration nor the native test installs anything on a device.
 
 ## Technical reference
 
@@ -392,3 +397,9 @@ The complete HTTP contract is in [CLIENT-PROTOCOL.md](../vibedock-server/CLIENT-
 Native tests cover polling and retry timing, stale detection, clock rollover, address fallback, pairing lock, RGB565 decoding, row hashes and colour correction. Server tests also exercise the protocol with a simulated device. These checks do not replace hardware validation.
 
 Wi-Fi setup, pairing, image pulls, display output and colour calibration have been used on real devices. The redesigned startup/progress screens have been compiled but still need visual verification on the physical panel. See [server validation notes](../vibedock-server/VALIDATION.md) for further evidence and limits.
+
+The device's setup and status web pages inherit the server administration's Light/Dark choice through the next
+authenticated image response (including HTTP 304). Reachable devices also receive an appearance-only push
+over the existing `/pull` callback, independently of image updates. Open pages apply changes within five seconds and reload their preview only after a new
+complete image; hidden tabs pause polling. Preview updates stream a full image only while the page is open.
+The last choice persists across restarts; an unpaired device defaults to dark. The image colour scheme is separate.

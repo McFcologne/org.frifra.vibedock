@@ -334,7 +334,7 @@ mvn verify
 ADMIN_PASSWORD='YOUR-OWN-PASSWORD' java -jar target/vibedock-server.jar
 ```
 
-Direct Java execution binds administration to `127.0.0.1` by default and the public port to all interfaces. Settings are stored under `./data`. Docker also uses Java 21. Spring Boot 3.5.16 is pinned.
+Direct Java execution binds administration to `127.0.0.1` by default and the public port to all interfaces. Settings are stored under `./data`. Docker also uses Java 21. Spring Boot 4.1.2 is pinned (Jackson 3.1.4); the JSON compatibility settings retain omitted primitive defaults in older settings and device requests. See [dependency upgrades](DEPENDENCIES.md).
 
 **Emoji graphics.** The JAR does not contain the Twemoji graphics. Started from the repository (its root or `vibedock-server`), the server finds `third-party/twemoji/svg` by itself. To run the JAR elsewhere, copy the folder `third-party/twemoji` next to it as `twemoji` (the server looks for `twemoji/svg` in its working directory), or set `EMOJI_DIR` to the `svg` folder; an explicitly set `EMOJI_DIR` always wins. The start log names the folder in use (`emoji set …`), or says that it is missing. Keep `LICENSE-GRAPHICS` and `README.md` with the graphics.
 
@@ -389,3 +389,15 @@ Browser tests start a fresh, loopback-only server for every test with temporary 
 The browser suite covers create-panel triggers and cancellation, adding and renaming sources, conditional save actions, saving designs right away, device overrides/inheritance, saving before switching targets, orientation, photo upload and slideshows, support files, footer/license navigation, and eight pages at desktop/mobile widths in light/dark modes. Layout checks cover overflow, footer placement, overview alignment and Appearance below Preview. These are structural layout checks, not pixel-by-pixel screenshot baselines. Existing Java renderer tests cover the display output and its themes. Playwright retains screenshots, browser traces and isolated-server logs on failures; open `e2e/playwright-report/index.html` for diagnostics.
 
 The GitHub Actions workflow runs the same checks on pushes and pull requests. It does not deploy, pair devices, flash firmware or use provider credentials.
+
+### Shared light and dark appearance
+
+The administration's Light/Dark switch stores the instance-wide choice in `themes.json`. Firmware advertising
+`X-VibeDock-UI: 1` receives `X-VibeDock-UI: light` or `dark` on authenticated image responses (200 and 304).
+Reachable devices also receive a small appearance-only push through the existing `/pull?ui=dark|light` callback,
+without downloading an image. The header is the fallback for devices behind NAT or temporarily offline.
+Setup and status pages retain the choice across restarts and update while open. A new unpaired
+device stays dark until it first receives a server preference. Older firmware continues unchanged. An open page polls a small local status every five seconds, pauses while hidden and refreshes its
+preview only after a complete new image. Preview refreshes stream a full image from the server only while the
+page is open; the device keeps no extra image buffer. This changes web-page appearance only, not the display
+image's colour scheme.

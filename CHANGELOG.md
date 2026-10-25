@@ -16,6 +16,15 @@ fixes are server-side. Older firmware remains supported with complete pictures a
 it can be updated later. Battery power saving is off by default and remains experimental; energy savings have not
 been measured.
 
+- **Shared web appearance:** the administration's Light/Dark choice applies to the device setup and status pages.
+  Reachable devices receive a small push through the existing callback; the next authenticated image response is
+  the fallback. Open pages update appearance and refresh changed previews automatically, pausing in hidden tabs.
+- **USB startup:** native USB output no longer waits indefinitely for a computer to read it. Device information
+  is sent on an active HELLO request, keeping USB pairing and log reading available without blocking Wi-Fi startup.
+  The M1 starts automatically after flashing through a soft reset in both the script and browser flasher.
+- **Dependency refresh:** Spring Boot 4.1.2 / Jackson 3.1.4 retain existing settings, layouts and credential formats;
+  ESP32 boards move to Arduino 3.3.12 and the M1 uses upstream Mbed TLS 3.6.7 LTS. Firmware requires fresh device
+  validation. USB flashing selects one port before probing, avoiding resets of other connected displays.
 - **About 99 % less data for displays:** the server still renders the complete picture, but a display with the new
   firmware receives only the parts that changed: usually a few hundred bytes to a few KB instead of 115,200 bytes
   (112.5 KiB) for a complete 240 × 240 picture. Measured on a Waveshare 1.54 with readings every minute: 20 KB
