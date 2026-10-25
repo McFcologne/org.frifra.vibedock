@@ -44,3 +44,32 @@ test('web display samples every image reload and keeps its background when offli
   await expect(theme).toHaveAttribute('content', 'rgb(243,232,210)');
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(243, 232, 210)');
 });
+
+test('a turned or resized screen shows the last image stretched and blurred until the new one has loaded', async ({page}) => {
+  const template = await readFile(new URL('../../src/main/resources/templates/web-display.html', import.meta.url), 'utf8');
+  const html = template.replace(/<body[^>]*>/, '<body data-image="/image.png" data-state="/state" data-swipe="/swipe" data-reload="600">');
+  let hold = null;
+  await page.route('http://display.test/**', async route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === '/') return route.fulfill({contentType: 'text/html', body: html});
+    if (path === '/state') return route.fulfill({json: {tag: 'same-tag'}});
+    if (path === '/image.png') {
+      if (hold) await hold;
+      return route.fulfill({contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"><rect width="4" height="4" fill="#203040"/></svg>'});
+    }
+    return route.abort();
+  });
+  await page.setViewportSize({width: 390, height: 844});
+  await page.goto('http://display.test/');
+  const screen = page.locator('.screen');
+  await expect(screen).toHaveCSS('background-image', /image\.png/);
+  await expect(screen).not.toHaveClass(/reshaping/);
+  let release; hold = new Promise(resolve => { release = resolve; });
+  await page.setViewportSize({width: 844, height: 390});  // the phone turned
+  await expect(screen).toHaveClass(/reshaping/);
+  await expect(screen).toHaveCSS('background-size', '100% 100%');
+  await expect(screen).toHaveCSS('filter', /blur/);
+  release();
+  await expect(screen).not.toHaveClass(/reshaping/);
+  await expect(screen).toHaveCSS('background-size', 'contain');
+});

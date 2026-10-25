@@ -608,6 +608,9 @@ instead of an IP address:
 
 <img src="images/16-web-display-page.png" width="70%" alt="Web display page">
 
+The page loads the image in the size of the screen. When a phone or tablet turns or the window changes its size, the
+last image fills the new area stretched and blurred for the moment until the image in the new size has loaded.
+
 A web display is *Not connected* until the page or PNG was loaded for the first time. Web displays have no firmware
 and do not appear on the firmware page.
 
