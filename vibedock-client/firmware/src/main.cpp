@@ -22,6 +22,9 @@
 #include "esp32-hal-periman.h"  // the pin owners in the start diagnosis
 #endif
 #include <qrcode.h>
+#if defined(ESP32)
+#include <esp_heap_caps.h>
+#endif
 
 #ifndef VIBEDOCK_VERSION
 #define VIBEDOCK_VERSION "dev"  // set by version.py from the Git tag
@@ -276,7 +279,23 @@ constexpr uint16_t MUTED = 0x8CB5, TRACK = 0x29A8, DONE = 0x362B, ACTIVE = 0x7EB
 uint32_t drawnRows[TFT_WIDTH > TFT_HEIGHT ? TFT_WIDTH : TFT_HEIGHT];  // hash of each drawn image row; only changed rows are pushed to the display
 bool imageOnScreen = false;  // a server image fills the screen, IP included; the device draws no footer over it
 bool deltaReady = false;  // only a complete, unscaled image is a basis for partial pixel updates
-void forgetRows() { deltaReady = false; for (auto &h : drawnRows) h = 0; }
+// After an image was cut off on the way (weak Wi-Fi): rows 0 to resumeRows-1 show resumeTop, the others resumeBottom
+// ("" unknown). The next pull names both (X-VibeDock-Resume) and gets only what is still missing, as a delta.
+bool resuming = false; uint16_t resumeRows = 0; String resumeTop, resumeBottom;
+String resumeToken() { return resumeTop + F(";rows=") + String(resumeRows) + F(";base=") + resumeBottom; }
+#if defined(ESP32)
+// The image's pixels as the server sent them (before the colour correction), on boards with the memory for it: a turn
+// or a new colour correction redraws from it instead of loading the whole image again. Every row with a known hash
+// matches it; a scaled image clears shadowOk until the rows are forgotten.
+uint16_t *shadow = nullptr; uint16_t shadowWidth = 0, shadowHeight = 0; bool shadowOk = true;
+#endif
+void forgetRows() {
+  deltaReady = false; resuming = false; for (auto &h : drawnRows) h = 0;
+#if defined(ESP32)
+  shadowOk = true;
+#endif
+}
+bool redrawFromShadow();
 // Only the main task touches the panel; the audio task reports button activity through an atomic flag.
 #ifdef VIBEDOCK_AUDIO_ES8311
 sound_policy::VolumeOverlay volumeOverlay;
@@ -959,6 +978,8 @@ void unpair() {
 }
 // Reads the rows of an image and hands each one to onRow; onRow returns false to abort.
 String imageProblem;  // why the last image was not read completely, for the device log
+bool transferCut = false;  // the last image broke off on the way (timeout, connection closed), not on bad data
+uint16_t rowsRead = 0;     // rows of the last image drawn in order before it ended
 static uint8_t imageBytes[2 * client_policy::maxImageSide];  // shared by full and delta transfers
 static uint16_t imagePixels[TFT_WIDTH > TFT_HEIGHT ? TFT_WIDTH : TFT_HEIGHT];
 // Reads the image row by row. Fails after `timeout` ms without new bytes (not in all: over TLS 1.3 on the M1 the
@@ -966,7 +987,7 @@ static uint16_t imagePixels[TFT_WIDTH > TFT_HEIGHT ? TFT_WIDTH : TFT_HEIGHT];
 template <typename Row> bool readRows(WiFiClient *stream, const client_policy::ImageSize &size, Row onRow, uint32_t timeout = 8000) {
   uint8_t *bytes=imageBytes; const size_t length = 2u * size.width;
   uint32_t began = millis(), progress = began;
-  imageProblem = "";
+  imageProblem = ""; transferCut = false; rowsRead = 0;
   for (int y = 0; y < size.height; y++) {
     size_t received = 0;
     while (received < length) {
@@ -974,7 +995,7 @@ template <typename Row> bool readRows(WiFiClient *stream, const client_policy::I
       if (idle || closed) {
         imageProblem = String(idle ? String(F("no data for ")) + String(timeout / 1000) + " s" : "connection closed") + F(" at row ") + String(y) + "/"
             + String(size.height) + F(" after ") + String(millis() - began) + " ms";
-        return false;
+        transferCut = true; return false;
       }
       volumeFeedback();
       int count = stream->read(bytes + received, length - received);
@@ -983,17 +1004,58 @@ template <typename Row> bool readRows(WiFiClient *stream, const client_policy::I
       yield();
     }
     if (!onRow(y, bytes)) return false;
+    rowsRead = y + 1;
   }
   return true;
+}
+#if defined(ESP32)
+void shadowSpan(int row, int x, int width, const uint8_t *bytes) {
+  if (!shadow) return;
+  uint16_t *to = shadow + size_t(row) * shadowWidth + x;
+  for (int i = 0; i < width; i++) to[i] = client_policy::pixel(bytes[2 * i], bytes[2 * i + 1]);
+}
+// Once, before the first image in the panel's size, when enough memory stays free for the next TLS handshake.
+constexpr size_t SHADOW_RESERVE = 64 * 1024;
+void keepShadow() {
+  static bool tried = false;
+  if (shadow || tried) return;
+  tried = true;
+  size_t bytes = size_t(panel.width()) * panel.height() * 2;
+  void *memory = psramFound() ? ps_malloc(bytes) : nullptr;
+  if (!memory && heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) >= bytes && ESP.getFreeHeap() >= bytes + SHADOW_RESERVE)
+    memory = malloc(bytes);
+  if (!memory) { logEvent(F("No memory for a copy of the picture: a turn loads it again"), true); return; }
+  shadow = static_cast<uint16_t *>(memory); shadowWidth = panel.width(); shadowHeight = panel.height();
+  forgetRows();  // every row of this image goes into the copy
+  logEvent(String(F("Copy of the picture kept (")) + String(bytes / 1024) + F(" kB): turns redraw it locally"), true);
+}
+#endif
+// The picture again from the copy, e.g. after a turn of the panel: no transfer, the ETag stays valid. False when
+// there is no complete copy.
+bool redrawFromShadow() {
+#if defined(ESP32)
+  const int width = panel.width(), height = panel.height();
+  if (!shadow || !shadowOk || !imageOnScreen || width != shadowWidth || height != shadowHeight) return false;
+  for (int y = 0; y < height; y++) if (!drawnRows[y]) return false;
+  PhaseScope drawing(Phase::Draw);
+  for (int y = 0; y < height; y++) {
+    const uint16_t *from = shadow + size_t(y) * width;
+    for (int x = 0; x < width; x++) imagePixels[x] = panelTone.apply(from[x]);
+    imageRow(y, width, imagePixels);
+  }
+  return true;
+#else
+  return false;
+#endif
 }
 bool readImageDelta(WiFiClient *stream,const client_policy::ImageSize &size,uint32_t length,uint32_t payload,uint32_t check,uint32_t timeout) {
   PhaseScope receiving(Phase::Image);
   uint16_t *pixels=imagePixels;
-  uint32_t progress=millis();imageProblem=F("invalid delta, length or checksum");
+  uint32_t progress=millis();imageProblem=F("invalid delta, length or checksum");transferCut=false;rowsRead=0;
   return client_policy::readDelta(size,length,payload,check,drawnRows,imageBytes,[&](uint8_t *data,size_t n){
     size_t received=0;
     while(received<n){
-      if(millis()-progress>timeout||(!stream->connected()&&!stream->available())){imageProblem=F("delta transfer interrupted");return false;}
+      if(millis()-progress>timeout||(!stream->connected()&&!stream->available())){imageProblem=F("delta transfer interrupted");transferCut=true;return false;}
       volumeFeedback();
       int count=stream->read(data+received,n-received);
       if(count>0){received+=count;progress=millis();}
@@ -1002,7 +1064,11 @@ bool readImageDelta(WiFiClient *stream,const client_policy::ImageSize &size,uint
     return true;
   },[&](uint16_t row,uint16_t x,uint16_t width,const uint8_t *data){
     for(uint16_t i=0;i<width;i++)pixels[i]=panelTone.apply(client_policy::pixel(data[2*i],data[2*i+1]));
-    imageSpan(row,x,width,pixels);return true;
+    imageSpan(row,x,width,pixels);
+#if defined(ESP32)
+    shadowSpan(row,x,width,data);
+#endif
+    rowsRead=row+1;return true;
   });
 }
 // Draws the image straight to the display, scaled to the whole screen (1:1 when the server renders for this
@@ -1011,7 +1077,11 @@ bool readImage(WiFiClient *stream, const client_policy::ImageSize &size, uint32_
   PhaseScope receiving(Phase::Image);  // rows are read and drawn in turn
   uint16_t *pixels=imagePixels;
   const uint16_t width = panel.width(), height = panel.height();
-  imageOnScreen = true;
+  imageOnScreen = true; reasonOnScreen = false; spinningStep = -1;  // the image takes the whole screen
+#if defined(ESP32)
+  bool copy = shadow && size.width == width && size.height == height && width == shadowWidth && height == shadowHeight;
+  if (!copy) shadowOk = false;
+#endif
   return readRows(stream, size, [&](int y, uint8_t *bytes) {
     // Unchanged rows are not redrawn, so a new image only touches the lines that differ.
     uint32_t hash = client_policy::rowHash(bytes, 2u * size.width);
@@ -1022,6 +1092,9 @@ bool readImage(WiFiClient *stream, const client_policy::ImageSize &size, uint32_
       pixels[x] = panelTone.apply(client_policy::pixel(bytes[2 * s], bytes[2 * s + 1]));
     }
     for (int row = from; row < to && row < height; row++) { imageRow(row, width, pixels); drawnRows[row] = hash; }
+#if defined(ESP32)
+    if (copy) shadowSpan(y, 0, width, bytes);
+#endif
     return true;
   }, timeout);
 }
@@ -1073,6 +1146,7 @@ int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
   if (!updateError.isEmpty()) r.http.addHeader("X-VibeDock-Update-Error", updateError);
   if (r.verified) r.http.addHeader("X-VibeDock-Tls-Check", "full");
   if (conditional && !etag.isEmpty() && haveImage && imageOnScreen) r.http.addHeader("If-None-Match", etag);
+  if (conditional && !uploadFile && resuming && imageOnScreen) r.http.addHeader("X-VibeDock-Resume", resumeToken());
   if (conditional && !uploadFile) r.http.addHeader("X-VibeDock-Delta", "1");
   if (conditional && !uploadFile) r.http.addHeader("X-VibeDock-Schedule", "1");  // follows X-VibeDock-Next-Pull
   if (conditional && !pendingGesture.isEmpty()) r.http.addHeader("X-VibeDock-Gesture", pendingGesture);
@@ -1210,9 +1284,25 @@ String answerStart(HTTPClient &http) {
   for (size_t i = 0; i < length; i++) if (text[i] < 32 || text[i] > 126) text[i] = ' ';
   text[length] = 0; String answer(text); answer.trim(); return answer;
 }
+// Modem sleep stretches a transfer over many beacon intervals, which weak connections do not survive: off for the
+// whole pull on battery (with an update or log that follows it), on again afterwards.
+struct ModemAwake {
+  bool sleeping = powerSaving;
+  ModemAwake() {
+#if defined(ESP32)
+    if (sleeping) WiFi.setSleep(false);
+#endif
+  }
+  ~ModemAwake() {
+#if defined(ESP32)
+    if (sleeping && powerSaving) WiFi.setSleep(true);
+#endif
+  }
+};
 void pull() {
   lastPull = millis();
   if (WiFi.status() != WL_CONNECTED) return;
+  ModemAwake awake;
   diagSample();
   if (reasonOnScreen && (!haveImage || staleScreen)) {  // the reason stays, the address line says what runs now
     display.fillRect(0, 210, 240, 10, TFT_BLACK);
@@ -1279,8 +1369,13 @@ void pull() {
     bool delta=client_policy::parseImageFormat(http.header("X-VibeDock-Image-Format").c_str(),size,true);
     bool full=!delta&&validImage(http,size);
     uint32_t length=0,payload=0,check=0;
-    bool accepted=full || (delta&&deltaReady&&haveImage&&imageOnScreen&&!etag.isEmpty()
-        &&http.header("X-VibeDock-Base")==etag&&http.header("X-VibeDock-Redraw")!="1"
+#if defined(ESP32)
+    if (full&&size.width==panel.width()&&size.height==panel.height()) keepShadow();
+#endif
+    // The basis of a delta: the complete image on screen (its ETag) or, after a cut-off transfer, what it shows.
+    String base=http.header("X-VibeDock-Base");
+    bool basis=(deltaReady&&haveImage&&imageOnScreen&&!etag.isEmpty()&&base==etag)||(resuming&&imageOnScreen&&base==resumeToken());
+    bool accepted=full || (delta&&basis&&http.header("X-VibeDock-Redraw")!="1"
         &&size.width==panel.width()&&size.height==panel.height()
         &&size.width==lastImageSize.width&&size.height==lastImageSize.height
         &&client_policy::deltaLength(http.header("X-VibeDock-Length").c_str(),size.bytes(),length)
@@ -1288,6 +1383,10 @@ void pull() {
         &&client_policy::parseHash(http.header("X-VibeDock-Payload").c_str(),payload)
         &&client_policy::parseHash(http.header("X-VibeDock-Check").c_str(),check));
     if (full&&(http.header("X-VibeDock-Redraw")=="1"||size.width!=lastImageSize.width||size.height!=lastImageSize.height)) forgetRows();
+    // What the screen shows before this transfer, for a resume when it is cut off.
+    bool priorComplete=deltaReady&&haveImage&&imageOnScreen&&!etag.isEmpty(),priorOnScreen=imageOnScreen,priorResuming=resuming;
+    uint16_t priorSplit=priorComplete?size.height:resumeRows,priorRows=resumeRows;
+    String priorTop=priorComplete?etag:resumeTop,priorBottom=resumeBottom,priorResumeTop=resumeTop;
     uint32_t reading=millis();bool first=!haveImage;bool https=servers[serverIndex].startsWith("https");
     imageProblem=F("unsupported image or delta basis");
     bool complete=accepted&&(delta
@@ -1296,15 +1395,31 @@ void pull() {
     if (complete) {
       ++imageRevision;
       lastImageSize=size;deltaReady=size.width==panel.width()&&size.height==panel.height();
-      etag = http.header("ETag"); lastImage = millis(); haveImage = true; staleScreen = false; footer(); imageFailures = 0;
+      etag = http.header("ETag"); lastImage = millis(); haveImage = true; staleScreen = false; footer(); imageFailures = 0; resuming = false;
       if (first) logEvent(String(F("Image shown, read in ")) + String(millis() - reading) + " ms", true);
     } else {
-      etag = "";
       pullWaitMs = client_policy::waitAfterImage(false, pullWaitMs); pullPending = false;
-      // A rejected/partial patch can have changed pixels without a trustworthy row hash. Redraw the whole basis.
-      if(delta)forgetRows();
-      logEvent(String(F("Image aborted: ")) + imageProblem + (https ? ", " + platform::tlsTraffic() : String()), true);
-      if (++imageFailures == 1 && haveImage) pullSoon(1000);
+      // Cut off on the way: the rows drawn so far stay, the next pull asks only for the rest (X-VibeDock-Resume).
+      String shown=http.header("ETag");
+      bool cut=transferCut&&accepted&&!shown.isEmpty()&&size.width==panel.width()&&size.height==panel.height();
+      bool progressed=false;
+      if (cut&&full&&rowsRead==0) {
+        imageOnScreen=priorOnScreen;  // nothing drawn: the screen and what is known about it stay
+      } else if (cut) {
+        auto below=client_policy::belowCut(priorComplete||priorResuming,rowsRead,priorSplit,size.height);
+        progressed=!priorResuming||shown!=priorResumeTop||rowsRead>priorRows;
+        resumeBottom=below==client_policy::Below::Top?priorTop:below==client_policy::Below::Bottom?priorBottom:String();
+        resumeTop=shown;resumeRows=rowsRead;resuming=true;
+        lastImageSize=size;deltaReady=false;etag="";
+      } else {
+        etag=""; resuming=false;
+        // A rejected/partial patch can have changed pixels without a trustworthy row hash. Redraw the whole basis.
+        if(delta)forgetRows();
+      }
+      logEvent(String(F("Image aborted: ")) + imageProblem + (resuming ? String(F(", rest from row ")) + String(resumeRows) : String())
+          + (https ? ", " + platform::tlsTraffic() : String()), true);
+      if (progressed) imageFailures = 0;  // weak but moving: on with the rest instead of the error screen
+      if (++imageFailures == 1 && (haveImage || resuming)) pullSoon(1000);
       else {
         haveImage = false; staleScreen = true; message("Image aborted", Step::Image, true);
         showWrapped(imageProblem, 145, 4, PROBLEM); present();
@@ -1327,7 +1442,8 @@ void pull() {
     // The next attempt right away (as many as there are addresses), not only after the poll interval.
     if (++failedInRow <= serverCount) pullSoon(1000);
     else failedInRow = 0;
-    if (!haveImage || staleScreen) {
+    // A half-loaded picture stays during the immediate retries, so its rest can follow.
+    if ((!haveImage || staleScreen) && !(resuming && failedInRow)) {
       // Why, without a USB cable (reading the log over USB restarts the M1): the reason, e.g. the TLS error, wrapped
       // in place of the progress row, and the address that failed at the bottom.
       if (lastConnectionProblem.isEmpty()) message("Server unreachable", Step::Server, true);
@@ -1486,8 +1602,8 @@ void saveColours() {
     toneSettings.green = clampGain(web.arg("green").toInt()); toneSettings.blue = clampGain(web.arg("blue").toInt());
   }
   panelTone.build(toneSettings); saveLater();
-  // Redraw everything with the new correction: unconditional request on the next loop.
-  forgetRows(); etag = ""; pullSoon();
+  // Redraw everything with the new correction: from the copy of the picture, else unconditional request next loop.
+  if (!redrawFromShadow()) { forgetRows(); etag = ""; pullSoon(); }
   if (web.hasArg("live")) { web.send(204, "text/plain", ""); return; }  // slider moved, the page stays
   web.sendHeader("Location", "/", true); web.send(303, "text/plain", "");
 }
@@ -1881,11 +1997,13 @@ void touchPoll() {
 }
 #endif
 
-// Turns the picture clockwise in quarter turns (Flip image or Rotate image in the administration); the next pull draws
-// every row.
+// Turns the picture clockwise in quarter turns (Flip image or Rotate image in the administration). The server's
+// picture does not depend on the turn: with a copy of it the display draws it again itself and keeps its ETag, so
+// only the normal changes follow; without one the next pull draws every row.
 void applyOrientation(uint8_t next) {
   turns = next % 4;
   panel.setRotation((VIBEDOCK_ROTATION + turns) % 4);
+  if (redrawFromShadow()) return;
   forgetRows();
   if (imageOnScreen) { etag = ""; pullSoon(); }  // the image again, every row
   else present(true);

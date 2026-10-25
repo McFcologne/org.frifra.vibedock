@@ -46,7 +46,7 @@ class ImageDeltaTest {
     }
     @Test void historySupportsRetryButNotOtherDevicesSizesOrExpiredBases(){
         var cache=new ImageDelta();byte[] image=new byte[512];
-        assertTrue(cache.exchange("a",null,"a0",16,16,image,0).isEmpty());
+        assertTrue(cache.exchange("a",(String)null,"a0",16,16,image,0).isEmpty());
         image[0]=1;assertTrue(cache.exchange("a","a0","a1",16,16,image,1).isPresent());
         image[0]=2;assertTrue(cache.exchange("a","a0","a2",16,16,image,2).isPresent()); // retry after lost answer
         assertTrue(cache.exchange("b","a0","b0",16,16,image,3).isEmpty());
@@ -58,12 +58,56 @@ class ImageDeltaTest {
     }
     @Test void bothGlobalLimitsEvictOldBases(){
         var cache=new ImageDelta();byte[] small=new byte[512];
-        cache.exchange("old",null,"first",16,16,small,0);
-        for(int i=0;i<ImageDelta.MAX_DEVICES;i++)cache.exchange("d"+i,null,"tag",16,16,small,1);
+        cache.exchange("old",(String)null,"first",16,16,small,0);
+        for(int i=0;i<ImageDelta.MAX_DEVICES;i++)cache.exchange("d"+i,(String)null,"tag",16,16,small,1);
         assertTrue(cache.exchange("old","first","new",16,16,small,2).isEmpty());
         var bytes=new ImageDelta();byte[] large=new byte[2*480*480];
-        bytes.exchange("old",null,"first",480,480,large,0);
-        for(int i=0;i<30;i++)bytes.exchange("large"+i,null,"tag",480,480,large,1);
+        bytes.exchange("old",(String)null,"first",480,480,large,0);
+        for(int i=0;i<30;i++)bytes.exchange("large"+i,(String)null,"tag",480,480,large,1);
         assertTrue(bytes.exchange("old","first","new",480,480,large,2).isEmpty());
+    }
+    /** The display after a transfer cut off at row cut: the new rows above, the old below; hashes of a cut section unknown. */
+    @Test void aResumedTransferStartsFromWhatTheDisplayShows(){
+        var random=new Random(11);
+        for(var display:DisplayType.INVENTORY)for(int attempt=0;attempt<10;attempt++){
+            int w=display.width(),h=display.height(),cut=1+random.nextInt(h-1);
+            byte[] old=new byte[2*w*h];random.nextBytes(old);
+            byte[] aborted=old.clone();for(int i=0;i<200;i++)aborted[random.nextInt(aborted.length)]^=1;
+            byte[] shown=old.clone();System.arraycopy(aborted,0,shown,0,2*w*cut);
+            byte[] next=attempt%2==0?aborted:aborted.clone();if(attempt%2==1)for(int i=0;i<40;i++)next[random.nextInt(next.length)]^=2;
+            var patch=ImageDelta.encode(aborted,cut,old,next,w,h).orElseThrow();
+            var result=apply(shown,patch.bytes(),w);
+            assertArrayEquals(next,result);
+            // Every row below the cut that differed between the two images is sent again: its hash may be unknown.
+            var sent=sentRows(patch.bytes());
+            for(int y=cut;y<h;y++)if(!Arrays.equals(old,2*y*w,2*(y+1)*w,aborted,2*y*w,2*(y+1)*w))assertTrue(sent.contains(y),"row "+y);
+            // Without the old image every row below the cut is sent whole.
+            var blind=ImageDelta.encode(aborted,cut,null,next,w,h);
+            blind.ifPresent(p->assertArrayEquals(next,apply(shown,p.bytes(),w)));
+        }
+    }
+    @Test void theCacheResumesFromBothImagesOrSendsTheWholeImage(){
+        var cache=new ImageDelta();byte[] old=new byte[512],aborted=old.clone();aborted[0]=1;aborted[300]=1;
+        cache.exchange("a",(String)null,"o",16,16,old,0);cache.exchange("a","o","t",16,16,aborted,1);
+        assertTrue(cache.exchange("a",new ImageDelta.Basis("t",4,"o"),"t",16,16,aborted,2).isPresent());
+        assertTrue(cache.exchange("a",new ImageDelta.Basis("t",4,null),"t",16,16,aborted,3).isPresent());
+        assertTrue(cache.exchange("a",new ImageDelta.Basis("gone",4,"o"),"t",16,16,aborted,4).isEmpty());
+        // Cut off before the first row was drawn: the old image with the rows of the patch unknown.
+        var none=cache.exchange("a",new ImageDelta.Basis("t",0,"o"),"t",16,16,aborted,5).orElseThrow();
+        assertArrayEquals(aborted,apply(old,none.bytes(),16));
+        assertNull(DeviceApiController.resumeBasis("\"t\";rows=4;base=\"o\"",16));
+        assertEquals(new ImageDelta.Basis("\"ab\"",4,"\"cd\""),DeviceApiController.resumeBasis("\"ab\";rows=4;base=\"cd\"",16));
+        assertEquals(new ImageDelta.Basis("\"ab\"",4,null),DeviceApiController.resumeBasis("\"ab\";rows=4;base=",16));
+        for(var bad:new String[]{null,"","\"ab\";rows=x;base=","\"ab\";rows=16;base=","\"ab\";rows=4","ab;rows=4;base="})
+            assertNull(DeviceApiController.resumeBasis(bad,16),bad);
+    }
+    private static Set<Integer> sentRows(byte[] patch){
+        var in=ByteBuffer.wrap(patch);var rows=new HashSet<Integer>();
+        while(true){
+            int y=Short.toUnsignedInt(in.getShort());if(y==65535)return rows;
+            int n=Short.toUnsignedInt(in.getShort());in.getShort();int w=Short.toUnsignedInt(in.getShort());
+            for(int i=0;i<n;i++)rows.add(y+i);
+            in.position(in.position()+4*n+2*n*w);
+        }
     }
 }

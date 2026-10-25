@@ -42,6 +42,19 @@ int main(){
       auto truncated=std::vector<uint8_t>(patch.begin(),patch.begin()+n);
       assert(!decode(truncated,payloadHash(truncated),rowsHash(expected,16)));
     }
+    // Cut off inside a section: drawn rows keep their new hash, the others of the section become unknown (0).
+    uint32_t before[16];uint8_t blank[32]={};for(int y=0;y<16;y++)before[y]=rowHash(blank,32);
+    auto cut=[&](size_t n){
+      memcpy(rows,before,sizeof rows);size_t at=0;
+      assert(!readDelta(size,uint32_t(patch.size()),payloadHash(patch),rowsHash(expected,16),rows,scratch,[&](uint8_t *out,size_t k){
+        if(at+k>n)return false;
+        memcpy(out,patch.data()+at,k);at+=k;return true;
+      },[&](uint16_t,uint16_t,uint16_t,const uint8_t*){return true;}));
+    };
+    cut(12);assert(rows[0]==0&&rows[1]==before[1]);
+    cut(16);assert(rows[0]==0&&rows[1]==0&&rows[2]==before[2]);
+    cut(18);assert(rows[0]==expected[0]&&rows[1]==0);
+    cut(20);assert(rows[0]==expected[0]&&rows[1]==expected[1]);
     for(auto index:{0,2,4,6}){auto bad=patch;bad[index]=0xff;assert(!decode(bad,payloadHash(bad),rowsHash(expected,16)));}
     auto trailing=patch;trailing.push_back(0);assert(!decode(trailing,payloadHash(trailing),rowsHash(expected,16)));
     auto duplicate=patch;duplicate.insert(duplicate.end()-2,patch.begin(),patch.end()-2);

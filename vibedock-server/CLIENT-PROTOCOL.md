@@ -211,8 +211,11 @@ near their start.
 Every board except the VibeTV M1 (its case decides how it stands) gets `X-VibeDock-Orientation` with every 200 and
 304 answer, set with *Orientation* on the device card: `upright`, `flipped` (180 degrees), and on square panels also
 `rotated-90` and `rotated-270` (clockwise). The display turns its panel accordingly, so the image, its
-own screens and the swipes are turned as well; it stores the setting and draws the next image completely. The image
-itself is the same in every case. Firmware that does not know a value keeps its orientation: firmware before 0.2.0
+own screens and the swipes are turned as well; it stores the setting. The image itself is the same in every case,
+so an ESP32 display that keeps a copy of the picture (allocated once at the first image when PSRAM or enough free
+heap is there, log line *Copy of the picture kept*) draws it again turned from that copy and keeps its ETag: no
+transfer, the next pull gets a 304 or the normal delta. Without a copy (the M1 has no turn anyway) it draws the next
+image completely. The same copy serves a new colour correction. Firmware that does not know a value keeps its orientation: firmware before 0.2.0
 ignores the header, firmware before the quarter turns keeps its last `upright`/`flipped` state for `rotated-90` and
 `rotated-270`. The server stores the turn as `rotation` and keeps `flipped` set for 180 degrees, so an older server
 reads such a device as flipped.
@@ -252,7 +255,8 @@ T-Display-S3; `Board.batteryPowerSaving`, `VIBEDOCK_BATTERY` in platformio.ini) 
 every 200 and 304 answer: `battery` when *Battery power saving* is switched on on the device card, otherwise `off`.
 The display stores the setting. With `battery` it saves power while it runs on its battery: no USB host sends frames
 (the start-of-frame counter of the chip's USB serial/JTAG unit) and, on the 1.54, the charging signal is inactive; two
-readings 5 s apart. Then it switches on Wi-Fi modem sleep, runs its CPU at 80 MHz and dims the backlight to 10 % after
+readings 5 s apart. Then it switches on Wi-Fi modem sleep (off again for the duration of each pull, with an
+update or log that follows it, so a picture is not stretched over beacon intervals), runs its CPU at 80 MHz and dims the backlight to 10 % after
 a minute without touch or volume button; the next touch only wakes it. A USB host (or charging on the 1.54) ends it,
 as does `off`. A charger without data lines counts as battery operation. The status page, `VIBEDOCK-BATTERY` and the
 `battery` object of `VIBEDOCK-HELLO` show `powerSource` (`battery`, `usb`) and `powerSaving` (`off`, `allowed`,
@@ -261,7 +265,7 @@ as does `off`. A charger without data lines counts as battery operation. The sta
 On its battery such a display also sends `X-VibeDock-Power: battery` with its pulls, on the 1.54 with its level
 (`battery;level=60`, the voltage estimate in steps of 20), whether power saving is on or not; on USB it sends nothing.
 The server then draws a battery icon at the top right of the first usage band (left of a status, in the title bar of
-window themes), filled to the level, red below 20 %. It keeps the report in memory until the next pull, so the
+window themes), filled to the level, red below 20 %; without a level it shows three dots (unknown) instead of an empty battery. It keeps the report in memory until the next pull, so the
 preview on the device card shows the same. The display pulls right away when its power source changes.
 
 ## Boards
@@ -336,7 +340,7 @@ A delta **200** response has:
 | Header | Value |
 | --- | --- |
 | `X-VibeDock-Image-Format` | `rgb565-delta-be-<width>x<height>`; exact panel size, never scaled |
-| `X-VibeDock-Base` | Exact ETag from the device's conditional request |
+| `X-VibeDock-Base` | Exact ETag from the device's conditional request, or its exact `X-VibeDock-Resume` value |
 | `ETag` | ETag of the complete resulting image |
 | `X-VibeDock-Length` | Exact delta body length, including terminator; also used when a proxy removes Content-Length |
 | `X-VibeDock-Payload` | Eight lowercase hex digits: FNV-1a-32 of all body bytes |
@@ -363,13 +367,29 @@ at a time into the existing row buffer, applies colour correction and updates th
 local to the device; changes also update their saved background pixels. No full framebuffer is allocated.
 
 The new ETag is committed only after the exact length, terminator, payload checksum and row-table checksum
-have passed. After any rejected, interrupted or invalid delta, the firmware clears its ETag and row hashes and
-requests a full image on its retry (normally after one second). A partial picture may be visible until that
-retry succeeds. The row-table check validates bookkeeping, not a physical readback of the panel. TLS continues
+have passed. After a rejected or invalid delta, the firmware clears its ETag and row hashes and requests a full
+image on its retry (normally after one second).
+
+**Resume after a cut-off transfer.** When a full image or a delta breaks off on the way (no data for the timeout,
+connection closed) after `n` rows were drawn in order, the display keeps them. Rows of the broken delta section that
+were not drawn get hash 0 (unknown). With its retry it sends, instead of `If-None-Match`:
+
+```
+X-VibeDock-Resume: "<ETag of the cut-off image>";rows=<n>;base="<ETag of the image in the rows from n on>"
+```
+
+`base` is empty when those rows are not one known image (nothing complete on screen before, or a second cut above
+the first). The server builds the basis from both retained images and answers with a delta whose `X-VibeDock-Base`
+is the exact header value. It sends rows from `n` on whole when `base` is unknown, and always where the two images
+differ, because their row hash on the display may be unknown. If the cut-off image is no longer retained, a full
+image follows. A full image cut off before its first row changes nothing: the display keeps its ETag and pulls
+conditionally again. While each retry gets further, the half-loaded picture stays without the error screen; the
+server log shows `delta resumed`. The rest of a 112.5 KB picture that broke off at row 180 is about 28 KB. The row-table check validates bookkeeping, not a physical readback of the panel. TLS continues
 to protect HTTPS traffic; none of its certificate checks change.
 
 **Transfer diagnostics:** every device RGB565 pull with an image logs `Image transfer <device>: <mode>,
-full=<M> bytes, payload=<N> bytes, saved=<M-N> bytes (<P>%)`; modes are delta, full image and preview. Savings
+full=<M> bytes, payload=<N> bytes, saved=<M-N> bytes (<P>%)`; modes are delta, delta resumed, full image and
+preview. Savings
 have one decimal place and always compare with the full RGB565 image: full images save 0%. Unchanged images
 (**304**) come with every poll and are logged at debug level only. Numbers describe the selected response body,
 not HTTP/TLS overhead, TCP retransmissions or proof of reception. The next device ETag identifies the accepted

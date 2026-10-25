@@ -59,6 +59,12 @@ inline bool parseNextPull(const char *text, uint32_t &seconds, bool &pending) {
 // The announced wait counts only for a pull that ended well: after an aborted or refused image the poll interval
 // applies again (or the immediate retry), never a wait of up to ten minutes.
 constexpr uint32_t waitAfterImage(bool complete, uint32_t announcedMs) { return complete ? announcedMs : 0; }
+// An image cut off at row `cut` on the way: which image the rows from there on show. `split` rows of the top were on
+// screen before (all of them for a complete image), the rest of the bottom; unknown when nothing was known.
+enum class Below : uint8_t { Top, Bottom, Unknown };
+constexpr Below belowCut(bool known, uint16_t cut, uint16_t split, uint16_t height) {
+  return !known ? Below::Unknown : split >= height ? Below::Top : cut >= split ? Below::Bottom : Below::Unknown;
+}
 // A pull is due once the wait has passed (the announced one, or the poll interval); survives millis() rollover.
 constexpr bool waited(uint32_t now, uint32_t since, uint32_t ms) { return uint32_t(now - since) >= ms; }
 // Stale after three poll intervals without a successful pull, or two poll intervals after an announced longer wait.

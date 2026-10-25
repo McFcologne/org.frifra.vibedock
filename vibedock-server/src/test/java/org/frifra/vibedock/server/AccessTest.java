@@ -83,6 +83,16 @@ class AccessTest {
         Assertions.assertArrayEquals(full.getContentAsByteArray(),ImageDeltaTest.apply(base.getContentAsByteArray(),patch.getContentAsByteArray(),240));
         Assertions.assertEquals(full.getHeader("ETag"),patch.getHeader("ETag"));
         Assertions.assertTrue(output.getOut().contains("delta, full=115200 bytes, payload="+patch.getContentAsByteArray().length+" bytes, saved="));
+        // The new image was cut off after row 100: the display names both images and gets only what is still missing.
+        byte[] shown=base.getContentAsByteArray().clone();System.arraycopy(full.getContentAsByteArray(),0,shown,0,2*240*100);
+        String resume=patch.getHeader("ETag")+";rows=100;base="+tag;
+        var rest=mvc.perform(get(path).header("Authorization","Bearer "+key).header("X-VibeDock-Resume",resume)
+                .header("X-VibeDock-Delta","1").header("X-VibeDock-Display","240x240").header("X-VibeDock-Footer","server")
+                .with(r->{r.setLocalPort(8080);r.setRemoteAddr("192.168.1.21");return r;}))
+                .andExpect(status().isOk()).andExpect(header().string("X-VibeDock-Image-Format","rgb565-delta-be-240x240"))
+                .andExpect(header().string("X-VibeDock-Base",resume)).andReturn().getResponse();
+        Assertions.assertArrayEquals(full.getContentAsByteArray(),ImageDeltaTest.apply(shown,rest.getContentAsByteArray(),240));
+        Assertions.assertTrue(output.getOut().contains("delta resumed, full=115200 bytes"));
         for(String mode:List.of("preview","wrong-size","unknown-base","unsupported")){
             var req=get(path).header("Authorization","Bearer "+key).header("If-None-Match",mode.equals("unknown-base")?"\"missing\"":tag)
                     .header("X-VibeDock-Footer","server").header("X-VibeDock-Display",mode.equals("wrong-size")?"239x240":"240x240")

@@ -110,17 +110,35 @@ class DeviceApiController {
         // Capability and exact panel size are required: deltas cannot be scaled without a framebuffer.
         if(!preview&&designs.currentPhoto(registry.designFor(identifier),identifier).isEmpty()&&"1".equals(request.getHeader("X-VibeDock-Delta"))
                 &&(display.width()+"x"+display.height()).equals(request.getHeader("X-VibeDock-Display"))){
-            var patch=delta.exchange(identifier,forced?null:etag,tag,display.width(),display.height(),pixels,System.currentTimeMillis());
+            // After an aborted transfer the display names what it shows instead of an ETag (X-VibeDock-Resume).
+            String resume=request.getHeader("X-VibeDock-Resume");
+            var resumed=forced?null:resumeBasis(resume,display.height());
+            var basis=forced?null:resumed!=null?resumed:ImageDelta.Basis.complete(etag,display.height());
+            var patch=delta.exchange(identifier,basis,tag,display.width(),display.height(),pixels,System.currentTimeMillis());
             if(!forced&&patch.isPresent()){
                 var p=patch.get();pixels=p.bytes();
                 headers.set("X-VibeDock-Image-Format","rgb565-delta-be-"+display.width()+"x"+display.height());
-                headers.set("X-VibeDock-Base",etag);headers.set("X-VibeDock-Check",p.check());
+                headers.set("X-VibeDock-Base",resumed!=null?resume:etag);headers.set("X-VibeDock-Check",p.check());
                 headers.set("X-VibeDock-Payload",p.payload());headers.set("X-VibeDock-Length",String.valueOf(pixels.length));
             }
         }
-        logTransfer(identifier,preview?"preview full":headers.containsHeader("X-VibeDock-Base")?"delta":"full",fullBytes,pixels.length,next);
+        String mode=preview?"preview full":!headers.containsHeader("X-VibeDock-Base")?"full"
+                :headers.getFirst("X-VibeDock-Base").equals(etag)?"delta":"delta resumed";
+        logTransfer(identifier,mode,fullBytes,pixels.length,next);
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
         return new ResponseEntity<>(pixels,headers,HttpStatus.OK);
+    }
+    private static final java.util.regex.Pattern RESUME=java.util.regex.Pattern.compile("(\"[0-9a-f]{1,64}\");rows=([0-9]{1,4});base=(\"[0-9a-f]{1,64}\")?");
+    /**
+     * X-VibeDock-Resume: "&lt;ETag&gt;";rows=&lt;n&gt;;base="&lt;ETag&gt;" after an aborted image: the first n rows (0 too) of the first image
+     * are on the display, the others of the base (empty: unknown). Null when missing or malformed.
+     */
+    static ImageDelta.Basis resumeBasis(String header,int height){
+        if(header==null)return null;
+        var m=RESUME.matcher(header);
+        if(!m.matches())return null;
+        int rows=Integer.parseInt(m.group(2));
+        return rows>=height?null:new ImageDelta.Basis(m.group(1),rows,m.group(3));
     }
     /** Response payload selected for transmission; excludes transport overhead and is not a receipt acknowledgement. */
     private static void logTransfer(String device,String mode,int full,int payload,PullSchedule.Next next){
