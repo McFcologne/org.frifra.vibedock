@@ -58,7 +58,14 @@ if (!('serial' in navigator) || !window.isSecureContext) {
           ? `This display has an ${name}; several boards have it: ${matching.map(b => b.label).join(', ')}. Choose yours under Board above.`
           : `This display has an ${name}; no board of this installation has that chip.`);
       }
+      // esptool-js marks the ESP8266's missing SPI length registers with 0 instead of null, so its flash ID query takes
+      // the ESP32 path and reads 0 (the warning above). With null it uses the ESP8266 layout, like the Python esptool.
+      if (name === 'ESP8266' && loader.chip.SPI_MOSI_DLEN_OFFS === 0) {
+        loader.chip.SPI_MOSI_DLEN_OFFS = null; loader.chip.SPI_MISO_DLEN_OFFS = null;
+        terminal.writeLine('Reading the flash ID again with the ESP8266 SPI layout …');
+      }
       flashSize = await loader.detectFlashSize();
+      if (!flashSize) throw new Error('The flash chip of the display does not answer (Flash ID 0): connect again, with a lower speed or another cable; nothing was written');
       if (expected === 'ESP8266' && flashSize !== '4MB') throw new Error(`The display has ${flashSize} flash; this firmware is built for 4MB`);
       try { mac = await loader.chip.readMac(loader); } catch { mac = 'unknown'; }
       deviceInfo.textContent = `${chip} · MAC ${mac} · flash ${flashSize}`;
