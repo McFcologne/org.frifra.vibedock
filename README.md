@@ -207,6 +207,7 @@ The administration footer shows the build version and links to README, the PDF m
 | [`VibeDock-Feasibility-Codex-Claude.md`](VibeDock-Feasibility-Codex-Claude.md) | Original feasibility assessment |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release notes per version, used for the GitHub releases |
 | [`RELEASING.md`](RELEASING.md) | Releases, Docker registries, secrets and repository settings |
+| [`SECURITY.md`](SECURITY.md) | Supported versions and how to report a vulnerability privately |
 | [`AGENTS.md`](AGENTS.md) | IntelliJ setup and development rules |
 
 ## Background and credits
@@ -221,6 +222,7 @@ The administration footer shows the build version and links to README, the PDF m
 - Create and verify a private full backup of your own device before flashing. Build and test commands never flash hardware.
 - Original-firmware redistribution rights have not been established. No manufacturer firmware or device backups are distributed with this project.
 - Provider quota endpoints are internal interfaces, not guaranteed public APIs.
+- Report security problems privately as described in [SECURITY.md](SECURITY.md), not in a public issue.
 - Keep credentials, `.env`, `docker.data/`, source exports and generated build files out of Git. `docker.data/` also holds the firmware signing key (`ota-signing.key`): keep it with your backups; with a new key, displays must be paired again before they accept updates over Wi-Fi.
 
 ## License
