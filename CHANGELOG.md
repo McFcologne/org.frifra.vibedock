@@ -22,6 +22,7 @@ been measured.
 - **USB startup:** native USB output no longer waits indefinitely for a computer to read it. Device information
   is sent on an active HELLO request, keeping USB pairing and log reading available without blocking Wi-Fi startup.
   The M1 starts automatically after flashing through a soft reset in both the script and browser flasher.
+  Both confirm its USB start to prevent unintended quick-boot setup/reset, including same-version reinstalls.
 - **Dependency refresh:** Spring Boot 4.1.2 / Jackson 3.1.4 retain existing settings, layouts and credential formats;
   ESP32 boards move to Arduino 3.3.12 and the M1 uses upstream Mbed TLS 3.6.7 LTS. Firmware requires fresh device
   validation. USB flashing selects one port before probing, avoiding resets of other connected displays.

@@ -8,9 +8,21 @@ The owner authorised a test on the identified M1 (ESP8266). Esptool 4.8.1 entere
 executed `--after soft_reset`; the owner confirmed that the display returned immediately. No flash or settings
 were written during that test. The script's final ESP8266 write now selects soft reset; the browser flasher and
 its connected-loader restart action use the equivalent esptool-js 0.7.0 mode. ESP32 hardware resets and the
-manual backup/verification `no_reset` commands are unchanged. Six isolated script tests pass, including the
-real final write branch for both chip families. Browser module syntax is checked; an actual post-flash start
-through each UI/script path remains to be confirmed separately from the successful reset-only hardware test.
+manual backup/verification `no_reset` commands are unchanged. The owner subsequently reported that the reset
+could open Wi-Fi setup. The quick-boot wait previously did not service HELLO, and identical firmware version
+strings did not activate the new-firmware exemption.
+
+Both M1 flash paths now confirm startup with HELLO and close the console afterwards. The firmware processes
+serial commands before counting, during the second-start setup wait, and during a two-second grace before
+third-start configuration erasure. USB confirmation cancels these actions. Failed confirmation warns without
+an automatic reset retry. The script also confirms the M1 after chip detection, before the potentially long build.
+
+Six isolated script tests pass. A native C++ fixture runs the actual quick-boot functions with address/undefined
+behaviour sanitizers: queued and delayed USB confirmations preserve settings, while deliberate power-cycle setup
+and factory reset still work. Four serial-console tests cover HELLO, incomplete replies and post-start port release;
+three flasher tests cover M1 and ESP32 reset/confirmation order and failure without an extra reset or pairing.
+M1 and S3-Touch-1.47 firmware builds pass. These checks do not establish the final hardware behaviour: a new
+post-flash test through each UI/script path remains pending after this counter fix.
 
 ## Native USB startup backpressure fix (2026-10-25)
 
