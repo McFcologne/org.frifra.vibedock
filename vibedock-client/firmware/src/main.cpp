@@ -55,7 +55,7 @@ uint32_t pollSeconds = client_policy::defaultPollSeconds;
 uint8_t brightness = 100;  // backlight in percent; touch boards change it with swipes up and down
 String pendingGesture;  // a swipe for the server (X-VibeDock-Gesture), sent with the next image pull
 uint8_t turns = 0;  // how the display is mounted: the picture turned clockwise in quarter turns (set in the administration)
-void applyOrientation(uint8_t next);
+bool applyOrientation(uint8_t next);
 // Experimental battery power saving (boards with VIBEDOCK_BATTERY): allowed in the administration, active only on
 // battery. See powerPoll.
 bool powerSavingAllowed = false, powerSaving = false, dimmed = false;
@@ -1027,18 +1027,26 @@ void shadowSpan(int row, int x, int width, const uint8_t *bytes) {
 }
 // Once, before the first image in the panel's size, when enough memory stays free for the next TLS handshake.
 constexpr size_t SHADOW_RESERVE = 64 * 1024;
-void keepShadow() {
+// First at the first picture; when the heap is short then because its TLS connection is still open, once more right
+// after that pull (afterPull), which then loads the picture again to fill the copy.
+bool shadowLater = false;
+bool keepShadow(bool afterPull) {
   static bool tried = false;
-  if (shadow || tried) return;
+  if (shadow || (tried && !afterPull)) return false;
   tried = true;
   size_t bytes = size_t(panel.width()) * panel.height() * 2;
-  void *memory = psramFound() ? ps_malloc(bytes) : nullptr;
-  if (!memory && heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) >= bytes && ESP.getFreeHeap() >= bytes + SHADOW_RESERVE)
-    memory = malloc(bytes);
-  if (!memory) { logEvent(F("No memory for a copy of the picture: a turn loads it again"), true); return; }
+  void *memory = psramFound() ? ps_malloc(bytes) : nullptr; bool psram = memory != nullptr;
+  if (!memory && heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) >= bytes
+      && heap_caps_get_free_size(MALLOC_CAP_INTERNAL) >= bytes + SHADOW_RESERVE)
+    memory = heap_caps_malloc(bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  if (!memory) {
+    if (!afterPull && !psramFound()) { shadowLater = true; return false; }
+    logEvent(F("No memory for a copy of the picture: a turn loads it again"), true); return false;
+  }
   shadow = static_cast<uint16_t *>(memory); shadowWidth = panel.width(); shadowHeight = panel.height();
   forgetRows();  // every row of this image goes into the copy
-  logEvent(String(F("Copy of the picture kept (")) + String(bytes / 1024) + F(" kB): turns redraw it locally"), true);
+  logEvent(String(F("Copy of the picture kept (")) + String(bytes / 1024) + (psram ? F(" kB in PSRAM") : F(" kB")) + F("): turns redraw it locally"), true);
+  return true;
 }
 #endif
 // The picture again from the copy, e.g. after a turn of the panel: no transfer, the ETag stays valid. False when
@@ -1373,14 +1381,17 @@ void pull() {
   }
   // When the picture can change next: pull then, also after a 304, instead of every poll interval. Older servers
   // send nothing and the poll interval applies.
-  uint32_t nextSeconds = 0; bool nextPending = false;
+  uint32_t nextSeconds = 0; bool nextPending = false, turnedWithoutCopy = false;
   if ((code == 200 || code == 304) && client_policy::parseNextPull(http.header("X-VibeDock-Next-Pull").c_str(), nextSeconds, nextPending)) {
     pullWaitMs = nextSeconds * 1000u; pullPending = nextPending; lastPull = millis();
   } else { pullWaitMs = 0; pullPending = false; }
   if ((code == 200 || code == 304) && http.hasHeader("X-VibeDock-Orientation")) {
     uint8_t next = client_policy::turnsOf(http.header("X-VibeDock-Orientation").c_str(), turns, panel.width() == panel.height());
     if (next != turns) {
-      applyOrientation(next); saveConfig();
+      // Without a copy the picture comes again, whole; a patch in this answer was made for the old rows.
+      bool onScreen = imageOnScreen;
+      if (!applyOrientation(next) && onScreen) turnedWithoutCopy = true;
+      saveConfig();
       logEvent(next == 0 ? String(F("Picture upright")) : next == 2 ? String(F("Picture flipped")) : String(F("Picture turned ")) + String(next * 90) + F(" degrees"), true);
     }
   }
@@ -1400,7 +1411,7 @@ void pull() {
     bool full=!delta&&validImage(http,size);
     uint32_t length=0,payload=0,check=0;
 #if defined(ESP32)
-    if (full&&size.width==panel.width()&&size.height==panel.height()) keepShadow();
+    if (full&&size.width==panel.width()&&size.height==panel.height()) keepShadow(false);
 #endif
     // The basis of a delta: the complete image on screen (its ETag) or, after a cut-off transfer, what it shows.
     String base=http.header("X-VibeDock-Base");
@@ -1422,7 +1433,9 @@ void pull() {
     bool complete=accepted&&(delta
         ?readImageDelta(http.getStreamPtr(),size,length,payload,check,https?15000:8000)
         :readImage(http.getStreamPtr(),size,https?15000:8000));
-    if (complete) {
+    if (!complete && delta && turnedWithoutCopy) {
+      pullSoon();  // not an error: the whole picture in the new orientation follows right away
+    } else if (complete) {
       ++imageRevision;
       lastImageSize=size;deltaReady=size.width==panel.width()&&size.height==panel.height();
       etag = http.header("ETag"); lastImage = millis(); haveImage = true; staleScreen = false; footer(); imageFailures = 0; resuming = false;
@@ -1487,6 +1500,12 @@ void pull() {
   }
   http.end();
   holder.reset();  // the image connection's memory back before the next one
+#if defined(ESP32)
+  if (shadowLater && haveImage && imageOnScreen) {
+    shadowLater = false;
+    if (keepShadow(true)) { etag = ""; pullSoon(1000); }  // the copy is filled with the next, whole picture
+  }
+#endif
   if (client_policy::validLogRequest(logRequest.c_str())) uploadLog(logRequest);
   if (!offered.isEmpty() && offered != VIBEDOCK_VERSION && offered != failedUpdate && platform::hasOtaKey()) installUpdate(offered);
   diagPhase(Phase::Idle);
@@ -2031,13 +2050,14 @@ void touchPoll() {
 // Turns the picture clockwise in quarter turns (Flip image or Rotate image in the administration). The server's
 // picture does not depend on the turn: with a copy of it the display draws it again itself and keeps its ETag, so
 // only the normal changes follow; without one the next pull draws every row.
-void applyOrientation(uint8_t next) {
+bool applyOrientation(uint8_t next) {
   turns = next % 4;
   panel.setRotation((VIBEDOCK_ROTATION + turns) % 4);
-  if (redrawFromShadow()) return;
+  if (redrawFromShadow()) return true;
   forgetRows();
   if (imageOnScreen) { etag = ""; pullSoon(); }  // the image again, every row
   else present(true);
+  return false;
 }
 
 void loop() {
