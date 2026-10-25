@@ -39,7 +39,7 @@ public class TlsTrust {
     /** Like {@link #inspect} but reuses a result younger than a minute, for devices doing their full check. */
     public Inspection recentInspection(String url){
         if(isRecent(url))return recent.get(url);
-        var result=inspect(url);recent.put(url,result);checkedAt.put(url,System.currentTimeMillis());return result;
+        var result=inspect(url);recent.put(url,result);checkedAt.put(url,System.currentTimeMillis());failedAt.remove(url);return result;
     }
     boolean isRecent(String url){
         Long at=checkedAt.get(url);return at!=null&&System.currentTimeMillis()-at<60_000&&recent.containsKey(url);
@@ -50,7 +50,8 @@ public class TlsTrust {
     java.util.concurrent.Executor background=command->Thread.ofVirtual().name("tls-pin-refresh").start(command);
     /**
      * The pin for an image answer after a device's full check, without waiting: the last successful inspection of
-     * the last ten minutes, else none (the display then pins the certificate it verified itself). A missing or older
+     * the last ten minutes unless a refresh failed after it, else none (the display then pins the certificate it
+     * verified itself; current firmware prefers that anyway). A missing or older
      * one is refreshed in the background; after a failure the next try waits ten minutes, so an address the server
      * cannot reach no longer delays every answer by the connect timeout.
      */
@@ -63,8 +64,10 @@ public class TlsTrust {
             catch(RuntimeException e){failedAt.put(url,System.currentTimeMillis());}
             finally{refreshing.remove(url);}
         });
-        var known=recent.get(url);at=checkedAt.get(url);
-        return known==null||at==null||System.currentTimeMillis()-at>=ANSWER_PIN_MS?Optional.empty():Optional.ofNullable(known.fingerprint());
+        var known=recent.get(url);at=checkedAt.get(url);failed=failedAt.get(url);
+        // Not after a failed refresh: the certificate may have been renewed since that pin was taken.
+        if(known==null||at==null||(failed!=null&&failed>=at)||System.currentTimeMillis()-at>=ANSWER_PIN_MS)return Optional.empty();
+        return Optional.ofNullable(known.fingerprint());
     }
     /**
      * The root for pairing a device: from the address itself, or from the public certificate log when the server
