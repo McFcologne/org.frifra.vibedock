@@ -36,6 +36,8 @@ class BatteryIconTest {
     @Test void theLevelShowsInTheIcon() throws Exception {
         Assertions.assertNotEquals(fingerprint(image(Scheme.MIDNIGHT,Layout.DEFAULT,new StatusImage.Battery(20),snapshot)),
                 fingerprint(image(Scheme.MIDNIGHT,Layout.DEFAULT,new StatusImage.Battery(80),snapshot)));
+        Assertions.assertNotEquals(fingerprint(image(Scheme.MIDNIGHT,Layout.DEFAULT,new StatusImage.Battery(null),snapshot)),
+                fingerprint(image(Scheme.MIDNIGHT,Layout.DEFAULT,new StatusImage.Battery(0),snapshot)),"unknown is not empty");
         Assertions.assertThrows(IllegalArgumentException.class,()->new StatusImage.Battery(101));
     }
     @Test void theDeviceReportsBatteryOperationWithOrWithoutItsLevel(){

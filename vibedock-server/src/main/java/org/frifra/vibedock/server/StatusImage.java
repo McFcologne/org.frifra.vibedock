@@ -24,7 +24,7 @@ public class StatusImage {
     }
     /**
      * A display on its battery (X-VibeDock-Power): level in percent when the board measures it (in steps, so the image
-     * changes rarely), otherwise null and the icon stays empty.
+     * changes rarely), otherwise null and the icon shows three dots (level unknown).
      */
     public record Battery(Integer level) {
         public Battery { if(level!=null&&(level<0||level>100))throw new IllegalArgumentException("Battery level 0–100"); }
@@ -589,12 +589,13 @@ public class StatusImage {
     static final int BATTERY_WIDTH=16,BATTERY_ROOM=BATTERY_WIDTH+5;
     /**
      * A battery ending at right, centred on cy: outline and nub in the colour, filled to its level (the warning colour
-     * below 20 %); without a level it stays empty.
+     * below 20 %); without a level three dots, so a board without measurement does not look like an empty battery.
      */
     private static void batteryIcon(Graphics2D g,Battery battery,int right,int cy,int colour,int warning){
         int x=right-BATTERY_WIDTH,y=cy-4;
         g.setColor(new Color(colour));g.drawRect(x,y,13,7);g.fillRect(x+14,y+2,2,4);
-        if(battery.level()==null||battery.level()==0)return;
+        if(battery.level()==null){for(int dx=3;dx<=9;dx+=3)g.fillRect(x+dx,y+3,2,2);return;}
+        if(battery.level()==0)return;
         g.setColor(new Color(battery.level()<20?warning:colour));
         g.fillRect(x+2,y+2,Math.max(1,(int)Math.round(10*battery.level()/100.0)),4);
     }
