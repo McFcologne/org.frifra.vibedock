@@ -98,7 +98,7 @@ if (!('serial' in navigator) || !window.isSecureContext) {
     await loader.writeFlash({ fileArray: [{ data, address: 0 }], flashMode: 'dio', flashFreq: card.dataset.chip === 'ESP8266' ? '40m' : 'keep', flashSize: card.dataset.chip === 'ESP8266' ? flashSize : 'keep',
       eraseAll: false, compress: true, reportProgress: (index, written, total) => show(written, total) });
     terminal.writeLine('Done. Restarting the device …');
-    await loader.after('hard_reset');
+    await loader.after(loader.chip.CHIP_NAME === 'ESP8266' ? 'soft_reset' : 'hard_reset');
     await disconnect();
     terminal.writeLine(`Firmware ${card.dataset.version} installed. The device shows the version while it starts.`);
     askToPair();
@@ -123,7 +123,7 @@ const askToPair = pairing.ask, say = pairing.say, closeConsole = pairing.close;
 card.querySelector('[data-restart]').addEventListener('click', async () => {
   if (busy) return;
   try {
-    if (loader) { await loader.after('hard_reset'); await disconnect(); say(''); terminal.writeLine('Display restarted.'); return; }
+    if (loader) { await loader.after(loader.chip.CHIP_NAME === 'ESP8266' ? 'soft_reset' : 'hard_reset'); await disconnect(); say(''); terminal.writeLine('Display restarted.'); return; }
     await closeConsole();
     serialPort ??= await chooseDisplayPort();
     if (!serialPort) return;

@@ -60,11 +60,16 @@ Right after flashing, the administration's browser flasher (*Devices › Firmwar
 
 | Command | Answer |
 | --- | --- |
-| `VIBEDOCK-HELLO` | `VIBEDOCK-READY {"identifier":"vibedock-…","name":"…","version":"0.1.0","paired":false,"board":"vibedock-m1","chip":"ESP8266"}` (also sent once at every start) |
+| `VIBEDOCK-HELLO` | `VIBEDOCK-READY {"identifier":"vibedock-…","name":"…","version":"0.1.0","paired":false,"board":"vibedock-m1","chip":"ESP8266"}` (sent only after HELLO; do not wait for an unsolicited startup reply) |
 | `VIBEDOCK-BATTERY` | `VIBEDOCK-BATTERY {"supported":true,"voltageMv":3900,"estimatedPercent":80,"chargeSignal":"inactive","present":null}` (illustrative reading). Supported on `waveshare-s3-touch-lcd-154` and, without a charging signal (`chargeSignal:"unknown"`), on `waveshare-c6-touch-lcd-169`; other boards return `supported:false`, null measurements and `chargeSignal:"unknown"`. |
 | `VIBEDOCK-SCAN` | `VIBEDOCK-NETWORKS [{"ssid":"…","rssi":-48,"open":false},…]`, the 12 strongest networks. While the display keeps trying a saved network out of reach, it pauses those attempts for the scan and resumes them afterwards. |
 | `VIBEDOCK-LOG` | `VIBEDOCK-LOG ["05-14 09:41:00 Start v0.1.0 vibedock-m1, Power on",…]`, the last 24 events oldest first: starts, Wi-Fi, pairing, server answers and why a connection failed (HTTP and TLS errors). Kept in `/log.txt` across restarts; no keys or passwords. **Devices → Troubleshooting → Read log over USB** shows it. |
 | `VIBEDOCK-SETUP {json}` | `VIBEDOCK-SETUP OK`, then the device restarts; or `VIBEDOCK-SETUP ERROR <reason>` |
+
+On native USB builds, idle output is nonblocking. Solicited responses are streamed without an additional buffer,
+with a 250 ms no-progress limit and a five-second total limit. A host that stops reading cannot prevent Wi-Fi
+startup. Abandoned replies may be incomplete; a new reply starts on a new line, and HELLO can be retried.
+The brief `VIBEDOCK-FIRMWARE` startup marker remains. Browser flows and `flash.sh` actively send HELLO.
 
 On `waveshare-s3-touch-lcd-154`, `VIBEDOCK-READY` additionally contains a `battery` object with the same fields. Battery readings are optional diagnostics; they do not change pairing or device authentication. `present` stays null: the charging circuit cannot reliably identify a missing cell while USB is connected. The level is a coarse voltage-only estimate (null outside the expected range), not a fuel gauge; a voltage or active charging signal does not prove a battery is fitted. An inactive signal does not mean full. `chargeSignal` is `unstable` when the short sample contains both levels; slower cycling may not be detected. During a TLS handshake only HELLO and LOG are handled; send BATTERY again afterwards.
 

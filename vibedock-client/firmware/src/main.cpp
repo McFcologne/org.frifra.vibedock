@@ -211,21 +211,50 @@ void loadLog() {
   for (auto &line : current) add(line);
   logStored = true; saveLog();
 }
+// Only native USB needs protection against an attached host that does not consume its TX buffer.
+#if defined(ESP32) && ARDUINO_USB_CDC_ON_BOOT
+#include "serial_reply.h"
+struct SerialReplyClock { uint32_t now(){return millis();} void pause(){delay(1);} };
+class SerialResponse:public Print {
+  BoundedSerialReply<decltype(Serial),SerialReplyClock> output;
+  bool first=true;
+public:
+  explicit SerialResponse(decltype(Serial) &port):output(port){}
+  using Print::write;
+  size_t write(const uint8_t *bytes,size_t length) override{
+    if(first){first=false;const uint8_t newline='\n';output.write(&newline,1);} // resync after an abandoned reply
+    return output.write(bytes,length);
+  }
+  size_t write(uint8_t byte) override{return write(&byte,1);}
+};
+#else
+using SerialResponse=decltype(Serial)&; // UART boards keep their existing output and memory footprint.
+#endif
+void flushSerialReply(){
+#if defined(ESP32) && ARDUINO_USB_CDC_ON_BOOT
+  Serial.setTxTimeoutMs(100); // bound the final drain before a setup restart
+#endif
+  Serial.flush();
+#if defined(ESP32) && ARDUINO_USB_CDC_ON_BOOT
+  Serial.setTxTimeoutMs(0);
+#endif
+}
 void serialLog() {
+  SerialResponse reply(Serial);
   if (logDirty) saveLog();
   // Written as JSON line by line, without a JsonDocument: the log is also read during a TLS handshake, when the
   // heap is nearly used up.
-  Serial.print(F("VIBEDOCK-LOG ["));
+  reply.print(F("VIBEDOCK-LOG ["));
   bool first = true;
-  auto line = [&first](const String &text) {
-    if (!first) Serial.print(',');
-    first = false; Serial.print('"');
+  auto line = [&first,&reply](const String &text) {
+    if (!first) reply.print(',');
+    first = false; reply.print('"');
     for (char c : text) {
-      if (c == '"' || c == '\\') { Serial.print('\\'); Serial.print(c); }
-      else if (uint8_t(c) < 32) Serial.print(' ');
-      else Serial.print(c);
+      if (c == '"' || c == '\\') { reply.print('\\'); reply.print(c); }
+      else if (uint8_t(c) < 32) reply.print(' ');
+      else reply.print(c);
     }
-    Serial.print('"');
+    reply.print('"');
   };
   if (logParked) {
     auto in = LittleFS.open("/log.txt", "r");
@@ -234,7 +263,7 @@ void serialLog() {
   } else {
     for (uint8_t i = 0; i < logCount; i++) line(logLines[(logNext + LOG_LINES - logCount + i) % LOG_LINES]);
   }
-  Serial.println(']');
+  reply.println(']');
 }
 String footerText;
 uint16_t footerBackground = TFT_BLACK, footerDrawn = TFT_BLACK;
@@ -1491,36 +1520,40 @@ void batteryJson(JsonObject target) {
   }
 }
 void serialBattery() {
+  SerialResponse reply(Serial);
   JsonDocument doc; batteryJson(doc.to<JsonObject>());
-  Serial.print(F("VIBEDOCK-BATTERY ")); serializeJson(doc, Serial); Serial.println();
+  reply.print(F("VIBEDOCK-BATTERY ")); serializeJson(doc, reply); reply.println();
 }
 void serialReady() {
+  SerialResponse reply(Serial);
   JsonDocument doc; doc["identifier"] = identifier; doc["name"] = deviceName; doc["version"] = VIBEDOCK_VERSION; doc["paired"] = !key.isEmpty();
   doc["board"] = VIBEDOCK_BOARD; doc["chip"] = VIBEDOCK_CHIP;
   // Leave HELLO lightweight on other boards, including the ESP8266 TLS callback.
 #ifdef VIBEDOCK_BATTERY
   batteryJson(doc["battery"].to<JsonObject>());
 #endif
-  Serial.print(F("VIBEDOCK-READY ")); serializeJson(doc, Serial); Serial.println();
+  reply.print(F("VIBEDOCK-READY ")); serializeJson(doc, reply); reply.println();
 }
 void serialNetworks() {
+  SerialResponse reply(Serial);
   scanWifi();
   JsonDocument doc; JsonArray list = doc.to<JsonArray>();
   for (uint8_t i = 0; i < networkCount; i++) {
     JsonObject n = list.add<JsonObject>(); n["ssid"] = networks[i].ssid; n["rssi"] = networks[i].rssi; n["open"] = networks[i].open;
   }
-  Serial.print(F("VIBEDOCK-NETWORKS ")); serializeJson(doc, Serial); Serial.println();
+  reply.print(F("VIBEDOCK-NETWORKS ")); serializeJson(doc, reply); reply.println();
 }
 void serialSetup(const String &body) {
+  SerialResponse reply(Serial);
   JsonDocument doc;
-  if (deserializeJson(doc, body)) { Serial.println(F("VIBEDOCK-SETUP ERROR invalid request")); return; }
+  if (deserializeJson(doc, body)) { reply.println(F("VIBEDOCK-SETUP ERROR invalid request")); return; }
   String newSsid = doc["ssid"] | "", newPassword = doc["password"] | "";
-  if (newSsid.isEmpty() || newSsid.length() > 32 || newPassword.length() > 64) { Serial.println(F("VIBEDOCK-SETUP ERROR invalid Wi-Fi")); return; }
+  if (newSsid.isEmpty() || newSsid.length() > 32 || newPassword.length() > 64) { reply.println(F("VIBEDOCK-SETUP ERROR invalid Wi-Fi")); return; }
   int status = applyPairing(doc);
-  if (status == 400) { Serial.println(F("VIBEDOCK-SETUP ERROR no usable server address or invalid key")); return; }
+  if (status == 400) { reply.println(F("VIBEDOCK-SETUP ERROR no usable server address or invalid key")); return; }
   ssid = newSsid; password = newPassword; networkVerified = false;
-  if (status != 200 || !saveConfig()) { Serial.println(F("VIBEDOCK-SETUP ERROR storage")); return; }
-  Serial.println(F("VIBEDOCK-SETUP OK")); Serial.flush();
+  if (status != 200 || !saveConfig()) { reply.println(F("VIBEDOCK-SETUP ERROR storage")); return; }
+  reply.println(F("VIBEDOCK-SETUP OK")); flushSerialReply();
   message("Set up, restarting", Step::None);
   diagIntent(Intent::Setup); delay(500); ESP.restart();
 }
@@ -1597,11 +1630,14 @@ void setup() {
   platform::crashBegin();  // the crash of the run before, and from now on the panic handler
   diagBegin();  // first: anything before would overwrite the state of the run before
   Serial.setRxBufferSize(1024); Serial.begin(115200);  // the flasher sends in paced chunks
+#if defined(ESP32) && ARDUINO_USB_CDC_ON_BOOT
+  Serial.setTxTimeoutMs(0); // an attached Mac must never hold the network startup waiting for USB reads
+#endif
 #ifdef VIBEDOCK_BOOT_TRACE
   pinMode(TFT_BL, OUTPUT); digitalWrite(TFT_BL, TFT_BACKLIGHT_ON); delay(3000);
 #endif
   BOOT_TRACE("serial");
-  Serial.println(); Serial.println(reinterpret_cast<const __FlashStringHelper *>(IDENTITY));
+  { SerialResponse reply(Serial); reply.println(); reply.println(reinterpret_cast<const __FlashStringHelper *>(IDENTITY)); }
   platform::onTlsWait([] { serialPoll(true); });  // the log stays readable during a long TLS handshake
 #ifdef VIBEDOCK_POWER_PIN
   pinMode(VIBEDOCK_POWER_PIN, OUTPUT); digitalWrite(VIBEDOCK_POWER_PIN, HIGH);  // boards that switch the panel's supply
@@ -1661,7 +1697,8 @@ void setup() {
   if (turns) applyOrientation(turns);
   loadLog();
   loadAnchor(); loadOtaKey();
-  serialReady();
+  // READY is sent only in response to HELLO; the UI and flash.sh actively query it.
+
   handleQuickBoots();
   if (ssid.isEmpty() || setupRequested) { startPortal(); return; }
   diagPhase(Phase::WiFi);

@@ -42,12 +42,13 @@ export async function openConsole(serialPort) {
       try { for (let i = 0; i < bytes.length; i += 128) { await writer.write(bytes.slice(i, i + 128)); await sleep(40); } }
       finally { writer.releaseLock(); }
     },
-    // Asks until the device answers; it may still be starting or trying its old Wi-Fi.
+    // Actively asks: new firmware deliberately sends no unsolicited READY during startup.
+    // It may still be starting or trying its old Wi-Fi; retry incomplete replies after USB backpressure.
     async hello(attempts = 20) {
       for (let attempt = 0; attempt < attempts; attempt++) {
         const answer = console_.wait('VIBEDOCK-READY ', 1500);
         await console_.send('VIBEDOCK-HELLO');
-        try { return JSON.parse((await answer).slice('VIBEDOCK-READY '.length)); } catch (e) { if (e.message !== 'timeout') throw e; }
+        try { return JSON.parse((await answer).slice('VIBEDOCK-READY '.length)); } catch (e) { if (e.message !== 'timeout' && !(e instanceof SyntaxError)) throw e; }
       }
       throw new Error('The display does not answer over USB. Its firmware may be older than this page; install it first.');
     },
