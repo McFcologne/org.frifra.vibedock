@@ -30,7 +30,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
@@ -43,8 +43,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
@@ -54,7 +54,7 @@ jobs:
         run: |
           mvn -B verify -Drevision="${{ needs.version.outputs.version }}"
           cp target/vibedock-server.jar "vibedock-server-${{ needs.version.outputs.version }}.jar"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: server-jar
           retention-days: 1
@@ -68,12 +68,12 @@ jobs:
       matrix:
         arch: [amd64, arm64]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
       - name: Build the ${{ matrix.arch }} image
         working-directory: vibedock-server
         run: |
@@ -95,7 +95,7 @@ jobs:
           echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           docker tag "vibedock-server:${{ matrix.arch }}" "$image:${{ needs.version.outputs.version }}-${{ matrix.arch }}"
           docker push "$image:${{ needs.version.outputs.version }}-${{ matrix.arch }}"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: image-${{ matrix.arch }}
           retention-days: 1
@@ -107,8 +107,8 @@ jobs:
     needs: [version, image]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
       - name: Tag the multi-architecture image
         env:
           GH_TOKEN: ${{ github.token }}
@@ -159,10 +159,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Build the firmware
@@ -172,7 +172,7 @@ jobs:
           sh scripts/images.sh build
           for dir in build/*/; do board=$(basename "$dir"); case $board in vibedock-*) name=$board;; *) name=vibedock-$board;; esac
             cp "$dir/flash.bin" "$name-${{ needs.version.outputs.version }}.bin"; done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: firmware
           retention-days: 1
@@ -183,8 +183,8 @@ jobs:
     if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           path: assets
           merge-multiple: true

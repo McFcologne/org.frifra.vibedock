@@ -174,9 +174,9 @@ class AccessTest {
         String body=mvc.perform(get("/api/v1/usage").with(r->{r.setLocalPort(8080);return r;}))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.providers.claude.status").value("suspended"))
                 .andExpect(jsonPath("$.providers.codex.status").value("ok")).andReturn().getResponse().getContentAsString();
-        var schema=com.networknt.schema.JsonSchemaFactory.getInstance(com.networknt.schema.SpecVersion.VersionFlag.V202012)
+        var schema=com.networknt.schema.SchemaRegistry.withDefaultDialect(com.networknt.schema.SpecificationVersion.DRAFT_2020_12)
                 .getSchema(Files.readString(java.nio.file.Path.of("usage.schema.json")));
-        Assertions.assertEquals(java.util.Set.of(),schema.validate(new com.fasterxml.jackson.databind.ObjectMapper().readTree(body)));
+        Assertions.assertEquals(List.of(),schema.validate(body,com.networknt.schema.InputFormat.JSON));
     }
     @Test void spoofedForwardedHeaderDoesNotBypassIpAllowlist() throws Exception {
         mvc.perform(get("/api/v1/usage").header("X-Forwarded-For","127.0.0.1")

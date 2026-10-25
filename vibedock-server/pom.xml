@@ -13,17 +13,17 @@
     <dependency><groupId>com.github.weisj</groupId><artifactId>jsvg</artifactId><version>2.2.0</version></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
     <dependency><groupId>org.springframework.security</groupId><artifactId>spring-security-test</artifactId><scope>test</scope></dependency>
-    <dependency><groupId>com.networknt</groupId><artifactId>json-schema-validator</artifactId><version>1.5.6</version><scope>test</scope></dependency>
+    <dependency><groupId>com.networknt</groupId><artifactId>json-schema-validator</artifactId><version>3.0.8</version><scope>test</scope></dependency>
   </dependencies>
   <build><finalName>vibedock-server</finalName><plugins><plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId><executions><execution><goals><goal>build-info</goal></goals>
       <configuration><additionalProperties><git.describe>${git.commit.id.describe}</git.describe></additionalProperties></configuration></execution></executions></plugin>
     <!-- Builds from a Git checkout (IDE, mvn) also know their tag; the Docker build gets it as VIBEDOCK_VERSION instead.
          The execution comes from spring-boot-starter-parent; JGit's match knows no [...] classes, hence "*". -->
-    <plugin><groupId>io.github.git-commit-id</groupId><artifactId>git-commit-id-maven-plugin</artifactId><version>9.0.1</version>
+    <plugin><groupId>io.github.git-commit-id</groupId><artifactId>git-commit-id-maven-plugin</artifactId><version>10.0.1</version>
       <configuration><failOnNoGitDirectory>false</failOnNoGitDirectory><failOnUnableToExtractRepoInfo>false</failOnUnableToExtractRepoInfo>
         <generateGitPropertiesFile>false</generateGitPropertiesFile><includeOnlyProperties><includeOnlyProperty>git.commit.id.describe</includeOnlyProperty></includeOnlyProperties>
         <gitDescribe><tags>true</tags><match>*</match><dirty>-dirty</dirty><always>true</always></gitDescribe></configuration></plugin>
-    <plugin><groupId>org.codehaus.mojo</groupId><artifactId>license-maven-plugin</artifactId><version>2.6.0</version>
+    <plugin><groupId>org.codehaus.mojo</groupId><artifactId>license-maven-plugin</artifactId><version>2.7.1</version>
       <executions><execution><id>runtime-license-report</id><phase>generate-resources</phase><goals><goal>add-third-party</goal></goals></execution></executions>
       <configuration><excludedScopes>test,provided</excludedScopes><includeTransitiveDependencies>true</includeTransitiveDependencies>
         <thirdPartyFilename>MAVEN-THIRD-PARTY.txt</thirdPartyFilename><force>true</force><sortArtifactByName>true</sortArtifactByName>
