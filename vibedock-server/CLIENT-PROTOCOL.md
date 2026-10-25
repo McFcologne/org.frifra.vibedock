@@ -250,7 +250,8 @@ X-VibeDock-Diag: boot=1a2b3c4d;up=754;heap=21344;min=18012;rssi=-61;drops=0;star
 
 The device card in the administration shows the Wi-Fi name, the signal and the address the last pull used: `LAN`
 when its host (`X-Forwarded-Host` behind a reverse proxy, else `Host`) is that of the internal address, `external`
-for the external address, otherwise the host itself. The support file lists both per display (`wifi`, `route`); the
+for the external address, otherwise the host itself (without a configured internal address every address but the
+external one counts as `LAN`, since pairing then announced the administration's own host). The support file lists both per display (`wifi`, `route`); the
 Wi-Fi name is hidden together with the host names.
 
 The firmware writes the record to RTC memory, not to flash: when the phase changes and once per pull. The log's start
