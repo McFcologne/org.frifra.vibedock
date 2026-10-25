@@ -2,6 +2,18 @@
 
 The release workflow publishes the section of the tagged version (`## 0.1.0` for the tag `v0.1.0` or `0.1.0`) above the list of commits that GitHub generates.
 
+## 0.3.2
+
+Wi-Fi updates of the M1 over the external address no longer stop with *Out of memory*. Update the server image; a
+VibeTV M1 that pulls over HTTPS then needs this firmware once over USB, since its current firmware carries out the
+update itself. In the LAN over HTTP, without TLS, the update over Wi-Fi should work with the old firmware too. The
+other boards are not affected.
+
+- **Wi-Fi update of the M1:** the update failed with *no space: Out of memory* when the heap had no 4 KB in one piece
+  left after the TLS handshake. The display now keeps that block from before the download's connection and hands it to
+  the updater. A failed download names its reason (for example the TLS error) instead of *download failed*. Needs the
+  new firmware, installed once over USB.
+
 ## 0.3.1
 
 Pinned certificates on every board, PSRAM on the ESP32-S3 boards and the Wi-Fi of each display on its device card.
