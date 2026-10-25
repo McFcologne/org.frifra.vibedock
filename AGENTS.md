@@ -67,7 +67,7 @@ In the server window:
 4. Set the Maven importer and runner JDK to Java 21 where those options are available.
 5. Reload the Maven project. Wait for dependency resolution before running builds.
 
-Menu names vary slightly by IntelliJ version. The server uses Spring Boot 3.5.16. Its executable JAR is `target/vibedock-server.jar`.
+Menu names vary slightly by IntelliJ version. The server uses Spring Boot 4.1.2. Its executable JAR is `target/vibedock-server.jar`.
 
 ### Run configuration: Verify VibeDock Server
 
