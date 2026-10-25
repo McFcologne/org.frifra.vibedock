@@ -1,10 +1,10 @@
 name: Release VibeDock
 # A version tag (0.2.0 or v0.2.0), pushed or created with a release on GitHub, becomes a GitHub release with:
-#   vibedock-server-<version>.jar, vibedock-server-<version>-amd64.tar.gz, vibedock-server-<version>-arm64.tar.gz
-#   (Docker images: docker load -i, Synology Container Manager > Image > Import) and the firmware of every board
-#   (vibedock-m1-<version>.bin, vibedock-<board>-<version>.bin). The job artifacts only carry the files to the release
-#   job and are deleted after a day.
-# The Docker image also goes to the GitHub Container Registry: ghcr.io/<owner>/vibedock-server:<version> for amd64 and
+#   vibedock-server-<version>.jar and the firmware of every board (vibedock-m1-<version>.bin,
+#   vibedock-<board>-<version>.bin). The job artifacts only carry these files to the release job and are deleted after
+#   a day. The Docker image is not a release file (releases up to 0.3.0 carried it as .tar.gz): it is pulled from a
+#   registry, or built locally with vibedock-server/scripts/image.sh for a machine without registry access.
+# The Docker image goes to the GitHub Container Registry: ghcr.io/<owner>/vibedock-server:<version> for amd64 and
 # arm64, and :latest for a plain x.y.z version; with the repository secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN also
 # to Docker Hub as <username>/vibedock-server (searchable, and Synology's Container Manager shows its updates). Started by hand with a tag (Actions > Release VibeDock > Run workflow),
 # the run only publishes that tag's image and leaves its release alone, e.g. for a release that is already published.
@@ -74,33 +74,23 @@ jobs:
           fetch-depth: 0
       - uses: docker/setup-qemu-action@v4
       - uses: docker/setup-buildx-action@v4
-      - name: Build the ${{ matrix.arch }} image
+      - name: Build the ${{ matrix.arch }} image and push it to ghcr.io
         working-directory: vibedock-server
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           v="${{ needs.version.outputs.version }}"
+          image="ghcr.io/$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')/vibedock-server"
+          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          # Straight from the build to the registry: no image file. Without provenance and SBOM the stage is a plain
+          # image manifest, as the pushed images were before, which publish-image joins into one tag.
           # The labels link the image to this repository on ghcr.io (also for tags built before they were added).
           docker buildx build --platform "linux/${{ matrix.arch }}" --build-context git=../.git --build-context twemoji=../third-party/twemoji \
             --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
             --label "org.opencontainers.image.description=VibeDock server: AI usage on small desk displays" \
             --label "org.opencontainers.image.licenses=Apache-2.0" --label "org.opencontainers.image.version=$v" \
-            -t "vibedock-server:${{ matrix.arch }}" \
-            --output "type=docker,dest=vibedock-server-$v-${{ matrix.arch }}.tar" .
-          docker load -i "vibedock-server-$v-${{ matrix.arch }}.tar"
-          gzip -9 "vibedock-server-$v-${{ matrix.arch }}.tar"
-      - name: Push the ${{ matrix.arch }} image to ghcr.io
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          image="ghcr.io/$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')/vibedock-server"
-          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          docker tag "vibedock-server:${{ matrix.arch }}" "$image:${{ needs.version.outputs.version }}-${{ matrix.arch }}"
-          docker push "$image:${{ needs.version.outputs.version }}-${{ matrix.arch }}"
-      - uses: actions/upload-artifact@v7
-        with:
-          name: image-${{ matrix.arch }}
-          retention-days: 1
-          path: vibedock-server/vibedock-server-*.tar.gz
-          compression-level: 0
+            --provenance=false --sbom=false \
+            -t "$image:$v-${{ matrix.arch }}" --push .
 
   publish-image:
     # One tag for both architectures; docker pull picks the one of the host.
@@ -185,10 +175,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      # Only the release files by name: an artifact added to the run later is not published by accident.
       - uses: actions/download-artifact@v8
         with:
+          name: server-jar
           path: assets
-          merge-multiple: true
+      - uses: actions/download-artifact@v8
+        with:
+          name: firmware
+          path: assets
       - name: Create or complete the release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -197,13 +192,14 @@ jobs:
           # The version's section of CHANGELOG.md goes above the commit list GitHub generates.
           v="${{ needs.version.outputs.version }}"
           awk -v v="$v" '$0 ~ "^## v?" v "$" {on=1; next} /^## / {on=0} on' CHANGELOG.md > notes.md
-          # Created as a draft, completed file by file (with retries for the large images), then published, also
+          # Created as a draft, completed file by file (with retries), then published, also
           # when a later run completes a release that is still a draft.
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             if [ -s notes.md ]; then set -- --notes-file notes.md; else set --; fi
             gh release create "$TAG" --draft --title "VibeDock $v" --generate-notes --verify-tag "$@"
           fi
-          for file in assets/*; do
+          for file in assets/vibedock-server-"$v".jar assets/vibedock-*-"$v".bin; do
+            [ -f "$file" ] || { echo "Missing release file $file"; exit 1; }
             ok=
             for attempt in 1 2 3; do
               if gh release upload "$TAG" "$file" --clobber; then ok=1; break; fi
