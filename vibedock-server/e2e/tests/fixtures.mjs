@@ -39,7 +39,7 @@ export const test = base.extend({
         if (processHandle.exitCode !== null) throw new Error(`Test server exited: ${output}`);
         try {return (await fetch(baseURL+'/login')).status;} catch {return 0;}
       },{timeout:25_000,message:'Isolated server starts from the packaged JAR'}).toBe(200);
-      await use({baseURL,password});
+      await use({baseURL,password,dir});
     } finally {
       const exited = once(processHandle,'exit').catch(()=>{});
       if (processHandle.exitCode===null) processHandle.kill('SIGTERM');

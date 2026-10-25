@@ -34,8 +34,18 @@ class DeviceLogs {
      * both null for firmware that does not report them.
      */
     record Entry(String name,long savedAt,String source,String firmware,String board,int lines,String bootId,Long uptimeSeconds) {}
-    record Log(Entry entry,List<String> lines) {}
-    private record Stored(long savedAt,String source,String firmware,String board,List<String> lines,String bootId,Long uptimeSeconds) {}
+    /**
+     * serverLines: the server's own log lines about the display in the time of the log, taken when it was saved
+     * (null for logs saved before the server kept them).
+     */
+    record Log(Entry entry,List<String> lines,List<String> serverLines) {}
+    private record Stored(long savedAt,String source,String firmware,String board,List<String> lines,String bootId,Long uptimeSeconds,List<String> serverLines) {
+        Stored withServerLines(List<String> next){return new Stored(savedAt,source,firmware,board,lines,bootId,uptimeSeconds,next);}
+    }
+    /** Server lines kept per log at most, newest kept. */
+    static final int MAX_SERVER_LINES=300;
+    /** The server log, for the server's lines about a display beside its logs; unset (null) in tests without one. */
+    @Value("${vibedock.log-dir:#{null}}") private String logDir;
     /** Boot ids as the firmware writes them: 8 hex digits. */
     static final Pattern BOOT_ID=Pattern.compile("[0-9a-f]{8}");
     private static final Pattern BOOT_IN_LINE=Pattern.compile("\\bboot=([0-9a-f]{8})\\b");
@@ -78,13 +88,8 @@ class DeviceLogs {
         for(int i=1;Files.exists(dir.resolve(name));i++)name=base+"-"+i+".json";
         String boot=bootId!=null&&BOOT_ID.matcher(bootId).matches()?bootId:newestBoot(clean);
         Long uptime=uptimeSeconds!=null&&uptimeSeconds>=0&&uptimeSeconds<10L*365*86400?uptimeSeconds:null;
-        var stored=new Stored(now,source,short40(firmware),short40(board),clean,boot,uptime);
-        Path temporary=Files.createTempFile(dir,"log-",".tmp");
-        try{
-            try{Files.setPosixFilePermissions(temporary,PosixFilePermissions.fromString("rw-------"));}catch(UnsupportedOperationException ignored){}
-            json.writeValue(temporary.toFile(),stored);
-            Files.move(temporary,dir.resolve(name),StandardCopyOption.ATOMIC_MOVE);
-        }finally{Files.deleteIfExists(temporary);}
+        var stored=new Stored(now,source,short40(firmware),short40(board),clean,boot,uptime,serverLines(identifier,clean,now));
+        write(dir,name,stored);
         var names=names(dir);
         for(String old:names.subList(Math.min(KEEP,names.size()),names.size()))Files.deleteIfExists(dir.resolve(old));
         return entry(name,stored);
@@ -187,7 +192,30 @@ class DeviceLogs {
     }
     private Log read(Path dir,String name) throws IOException {
         var stored=json.readValue(dir.resolve(name).toFile(),Stored.class);
-        return new Log(entry(name,stored),stored.lines()==null?List.of():stored.lines());
+        if(stored.serverLines()==null&&logDir!=null){
+            // Saved before the server kept its lines: taken now from the server log, as far as it still reaches back, and kept.
+            stored=stored.withServerLines(serverLines(dir.getFileName().toString(),stored.lines()==null?List.of():stored.lines(),stored.savedAt()));
+            write(dir,name,stored);
+        }
+        return new Log(entry(name,stored),stored.lines()==null?List.of():stored.lines(),stored.serverLines());
+    }
+    /** The server log's lines that name the display in the time span of a log (see {@link DeviceLogTimeline#span}). */
+    private List<String> serverLines(String identifier,List<String> lines,long savedAt){
+        if(logDir==null)return null;
+        var span=DeviceLogTimeline.span(lines,savedAt);
+        try{
+            var found=ServerLogFiles.read(Path.of(logDir),"vibedock.log",span[0],MAX_BYTES,line->line.contains(identifier),line->line).stream()
+                    .filter(line->{var at=DeviceLogTimeline.serverTime(line);return at!=null&&!at.isAfter(span[1]);}).toList();
+            return List.copyOf(found.subList(Math.max(0,found.size()-MAX_SERVER_LINES),found.size()));
+        }catch(IOException e){return List.of();}
+    }
+    private void write(Path dir,String name,Stored stored) throws IOException {
+        Path temporary=Files.createTempFile(dir,"log-",".tmp");
+        try{
+            try{Files.setPosixFilePermissions(temporary,PosixFilePermissions.fromString("rw-------"));}catch(UnsupportedOperationException ignored){}
+            json.writeValue(temporary.toFile(),stored);
+            Files.move(temporary,dir.resolve(name),StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);
+        }finally{Files.deleteIfExists(temporary);}
     }
     private static Entry entry(String name,Stored s){return new Entry(name,s.savedAt(),s.source(),s.firmware(),s.board(),s.lines()==null?0:s.lines().size(),s.bootId(),s.uptimeSeconds());}
     /** The boot id of the newest start line ("Start v… boot=…") of a log, if the firmware writes them. */

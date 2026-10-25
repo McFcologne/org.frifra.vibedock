@@ -316,6 +316,8 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 .app-footer-inner{max-width:1040px;margin:auto;padding:16px 26px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .app-footer nav{display:flex;gap:20px;flex-wrap:wrap}.app-footer a{color:var(--muted);text-decoration:none}.app-footer a:hover{text-decoration:underline;color:var(--accent)}
 .license-report,.log-lines{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.6 ui-monospace,SFMono-Regular,monospace;color:var(--text);margin:18px 0 0}
+/* Device log page: one line per span; the server's lines about the display between its own, in the accent colour, on demand. */
+.log-lines>span{display:block}.log-lines .log-server{color:var(--accent);display:none}.device-log.show-server .log-server{display:block}.log-figures td{white-space:nowrap}.log-figures{display:block;overflow-x:auto}
 .license-components{list-style:none;padding:0;margin:16px 0 0}.license-components li{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border-top:1px solid var(--line);flex-wrap:wrap}
 .license-components li>div{min-width:0;overflow-wrap:anywhere}.license-components a{flex-shrink:0}
 @media(max-width:460px){.app-footer-inner{padding:16px 14px}.app-footer nav{gap:16px}}

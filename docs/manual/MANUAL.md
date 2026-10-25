@@ -1101,6 +1101,13 @@ Every log read this way is also saved on the server. On the same page, each pair
 with the time they were read and how (USB or network), to show, download as text or delete. Removing
 the display removes its logs.
 
+On a display's log page, **Key figures** compares the logs: per log the lowest free memory, the free memory after a
+TLS handshake and its stack, the slowest complete picture, pictures shown and aborted, and the Wi-Fi signal, with the
+change against the log before in brackets. When a log is saved, the server also keeps its own log entries about that
+display from the same time: image transfers (delta or full, bytes, next pull), starts, saved logs and updates. The
+switch **Server lines** on a log shows them between the display's lines, in the accent colour, with all times in
+server time; while it is on, **Download** includes them too. Logs without such entries have no switch.
+
 The table also shows how fresh the **newest log** is: how long ago the server received it (server time; its lines can
 be much older), over USB or the network, the firmware it came from and, with firmware 0.2.0, the start it was sent in
 (boot id and run time). *Older firmware than now* marks a log from another firmware than the display runs today: read
@@ -1110,7 +1117,9 @@ minimum, Wi-Fi signal) and how the last start came about (*power-on*, *update*, 
 **Read over the network** there asks the display to send its log without a cable: it sends it right
 after its next image pull, over the same address and encryption as its images, within seconds when the server can
 ask it to pull now. This needs firmware newer than 0.1.1; older firmware sends its log only over USB. The request is
-valid for 10 minutes and for one log.
+valid for 10 minutes and for one log. While it is open, the log page says whether the display was asked to pull at
+once, when its next pull is due (the one the server announced, otherwise the last pull plus the fallback poll
+interval) and how late it is, and counts down to the end of the request.
 
 > Opening the USB port restarts the VibeTV M1. Read the log only after the display has finished what you want to
 > see: it shows an image or *Server unreachable*. An https connection takes the M1 a few seconds, and the first

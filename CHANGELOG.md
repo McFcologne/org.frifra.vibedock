@@ -67,6 +67,11 @@ been measured.
   it now pauses those attempts for the scan. Firmware.
 - **Quick power cycles:** the Wi-Fi setup and the factory reset count power cycles within ten seconds after power-on
   instead of five; the Waveshare 1.54, with its start sound, left too little time. Firmware.
+- **Display logs with the server's view:** a display's log page compares its logs (free memory, memory after TLS,
+  slowest picture, aborted pictures, Wi-Fi signal, each with the change against the log before). Every saved log
+  keeps the server's own entries about the display from the same time (image transfers with delta or full and the
+  next pull, starts, updates); the switch **Server lines** shows them between the display's lines and adds them to the
+  download. An open log request shows when the display's next pull is due and how long the request stays valid.
 - **Display editor preview:** the device preview in the editor fits wide cases again instead of clipping the picture,
   shows the right case after switching between devices, and opens enlarged at full size.
 - **IP without a box:** the server draws the display's IP in the theme's font and colour straight over the background;

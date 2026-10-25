@@ -531,7 +531,11 @@ class AccessTest {
             var pull=mvc.perform(get(image).header("Authorization","Bearer "+key).header("X-VibeDock-Firmware","0.2.0")
                     .with(r->{r.setLocalPort(8080);return r;})).andReturn();
             mvc.perform(post("/admin/clients/"+id+"/logs/request").with(admin).with(csrf()).with(r->{r.setLocalPort(10001);return r;}))
-                    .andExpect(flash().attribute("logMessage",org.hamcrest.Matchers.startsWith("Requested")));
+                    .andExpect(flash().attributeCount(0));
+            // The log page names the open request with its times and the next pull it waits for.
+            mvc.perform(get("/admin/clients/"+id+"/logs").with(admin).with(r->{r.setLocalPort(10001);return r;}))
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString("data-log-request")))
+                    .andExpect(content().string(org.hamcrest.Matchers.matchesPattern("(?s).*data-next-pull=\"[1-9]\\d{12}\".*")));
             String request=mvc.perform(get(image).header("Authorization","Bearer "+key).header("X-VibeDock-Firmware","0.2.0")
                     .header("If-None-Match",pull.getResponse().getHeader("ETag")).with(r->{r.setLocalPort(8080);return r;}))
                     .andExpect(status().isNotModified()).andReturn().getResponse().getHeader("X-VibeDock-Send-Log");

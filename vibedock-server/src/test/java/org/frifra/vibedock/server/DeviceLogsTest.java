@@ -29,6 +29,24 @@ class DeviceLogsTest {
         assertEquals("0.1.1",entries.getFirst().firmware());assertEquals("usb",entries.getFirst().source());
         assertEquals(1,logs.count("vibedock-0a1b2c000002"));
     }
+    @Test void aLogKeepsTheServerLinesAboutItsDisplayFromTheTimeItWasSaved(@TempDir Path dir) throws Exception {
+        var logs=new DeviceLogs(dir.toString(),json,ticking());
+        Path logDir=java.nio.file.Files.createDirectories(dir.resolve("logs"));
+        org.springframework.test.util.ReflectionTestUtils.setField(logs,"logDir",logDir.toString());
+        String id="vibedock-0a1b2c000007";
+        // The ticking clock starts at 2026-10-17T08:00:00Z and moves a second per reading.
+        java.nio.file.Files.writeString(logDir.resolve("vibedock.log"),
+                "2026-10-17T07:59:00.000Z  INFO 1 --- [x] o.f.v.s.DeviceApiController  : Image transfer "+id+": before the log\n"+
+                "2026-10-17T08:00:00.000Z  INFO 1 --- [x] o.f.v.s.DeviceApiController  : Image transfer "+id+": delta, payload=198 bytes\n"+
+                "2026-10-17T08:00:00.100Z  INFO 1 --- [x] o.f.v.s.DeviceApiController  : Image transfer vibedock-0a1b2c000008: another display\n");
+        var entry=logs.save(id,"net","0.2.4","vibedock-m1",List.of("10-17 08:00:00 http://192.168.1.10:10002: HTTP 200"));
+        java.nio.file.Files.delete(logDir.resolve("vibedock.log"));  // rotated away: the log keeps its lines
+        var server=logs.read(id,entry.name()).orElseThrow().serverLines();
+        assertEquals(1,server.size());assertTrue(server.getFirst().endsWith(": delta, payload=198 bytes"));
+        // Without a server log the log has none (null: not taken), and stays readable.
+        var plain=new DeviceLogs(dir.toString(),json,ticking());
+        assertNull(plain.read(id,plain.save(id,"usb","0.2.4","vibedock-m1",List.of("x")).name()).orElseThrow().serverLines());
+    }
     @Test void savedLogsHoldNoKeysNoWebLinksAndAreBounded(@TempDir Path dir) throws Exception {
         var logs=new DeviceLogs(dir.toString(),json,ticking());
         String key="ab".repeat(32);
