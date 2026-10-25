@@ -70,6 +70,12 @@ On native USB builds, idle output is nonblocking. Solicited responses are stream
 with a 250 ms no-progress limit and a five-second total limit. A host that stops reading cannot prevent Wi-Fi
 startup. Abandoned replies may be incomplete; a new reply starts on a new line, and HELLO can be retried.
 The brief `VIBEDOCK-FIRMWARE` startup marker remains. Browser flows and `flash.sh` actively send HELLO.
+After restarting an M1, both flashers send HELLO again and close the console after its identity reply. This
+confirms USB activity even when reinstalling the same firmware version. The firmware services serial commands
+while waiting for quick-boot setup and allows two seconds for USB confirmation before a third quick start
+erases configuration. Confirmation cancels the quick-boot action; deliberate power cycles without a USB
+command still enter setup or factory reset. A failed post-flash confirmation produces a warning, without
+another automatic reset.
 
 On `waveshare-s3-touch-lcd-154`, `VIBEDOCK-READY` additionally contains a `battery` object with the same fields. Battery readings are optional diagnostics; they do not change pairing or device authentication. `present` stays null: the charging circuit cannot reliably identify a missing cell while USB is connected. The level is a coarse voltage-only estimate (null outside the expected range), not a fuel gauge; a voltage or active charging signal does not prove a battery is fitted. An inactive signal does not mean full. `chargeSignal` is `unstable` when the short sample contains both levels; slower cycling may not be detected. During a TLS handshake only HELLO and LOG are handled; send BATTERY again afterwards.
 

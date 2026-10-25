@@ -65,6 +65,18 @@ export async function openConsole(serialPort) {
   return console_;
 }
 
+// Confirm a flash/restart actively, also when installing another build with the same version string.
+// Firmware excludes a boot that receives HELLO from its quick power-cycle counter.
+export async function confirmUsbStart(serialPort) {
+  const console_ = await openConsole(serialPort);
+  try {
+    const info = await console_.hello();
+    if (!info?.identifier || !info?.board) throw new Error('The display did not confirm its identity after restarting.');
+    return info;
+  }
+  finally { await console_.close(); }
+}
+
 // Writes a log read over USB to the terminal (writeLine) and keeps it on the server (the last ones per display).
 export async function showAndSaveLog(info, lines, writeLine) {
   writeLine(`Log of ${info.name || info.identifier} (${info.identifier}, firmware ${info.version}${info.board ? ', ' + info.board : ''}), oldest first:`);

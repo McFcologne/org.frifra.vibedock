@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 globalThis.document={querySelector:()=>({content:'synthetic-csrf'})};
-const {openConsole}=await import('../src/main/resources/static/serial-console.js');
+const {openConsole,confirmUsbStart}=await import('../src/main/resources/static/serial-console.js');
 function silentDevice(malformedFirst=false){
   let output,commands=[],attempts=0;
   const info={identifier:'vibedock-silent-test',board:'waveshare-s3-touch-lcd-147',version:'test'};
-  return {commands,info,open:async()=>{},setSignals:async()=>{},close:async()=>{},
+  return {commands,info,closed:false,open:async()=>{},setSignals:async()=>{},async close(){this.closed=true;},
     readable:new ReadableStream({start(controller){output=controller;}}),
     writable:new WritableStream({write(bytes){
       const line=new TextDecoder().decode(bytes).trim();commands.push(line);
@@ -23,4 +23,14 @@ test('HELLO retries an incomplete reply instead of relying on a startup announce
   const port=silentDevice(true),console_=await openConsole(port);
   try{assert.deepEqual(await console_.hello(2),port.info);assert.deepEqual(port.commands,['VIBEDOCK-HELLO','VIBEDOCK-HELLO']);}
   finally{await console_.close();}
+});
+
+test('post-flash confirmation actively sends HELLO and releases the port',async()=>{
+  const port=silentDevice();
+  assert.deepEqual(await confirmUsbStart(port),port.info);
+  assert.deepEqual(port.commands,['VIBEDOCK-HELLO']);assert.equal(port.closed,true);
+});
+test('post-flash confirmation rejects a missing identity and still releases the port',async()=>{
+  const port=silentDevice();delete port.info.identifier;
+  await assert.rejects(confirmUsbStart(port),/confirm its identity/);assert.equal(port.closed,true);
 });

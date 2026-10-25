@@ -249,6 +249,8 @@ The footer shows `IP: -- (no Wi-Fi)` without a connection and `Browser: 192.168.
 
 Use this when you want to clear the device configuration. It removes Wi-Fi settings, pairing, server addresses and local colour settings.
 
+A USB console command cancels quick-boot setup/reset. The third quick start waits two seconds for this confirmation before erasing settings.
+
 1. Perform three quick power cycles, each within about ten seconds of startup. At the second start, the display prompts **Unplug now for factory reset**.
 2. On the third start, the device deletes its configuration and the ESP8266's saved Wi-Fi credentials, restarts and opens setup.
 3. Configure Wi-Fi and pair again. The server replaces the old registration with the same device identifier.
@@ -374,7 +376,7 @@ References: [PlatformIO installation](https://docs.platformio.org/en/latest/core
 Follow [FLASHING.md](FLASHING.md) for device identification, a complete backup, verification, installation and recovery. Keep the backup private, record its SHA256 and device identity, and restore only a matching backup from that same device. Original firmware and device backups are not distributed with this project.
 
 After preparing and verifying the backup, `scripts/flash.sh [board]` first lets you choose a USB port when
-several are connected. Enumeration is passive; only the selected port is queried and may restart. It detects the connected chip (and on the M1 its flash size), takes the board with that chip, or the board the VibeDock firmware on the device names, or offers the boards that share the chip, each marked tested on hardware or prepared (`--list` shows them), builds the candidate, shows the firmware details and asks for confirmation before writing. It writes firmware only, preserving LittleFS Wi-Fi and pairing settings. The M1 starts automatically through a soft reset in both the script and browser flasher; ESP32 boards retain their hardware reset. A full backup restore is a separate operation that replaces the entire flash. Neither the build configuration nor the native test installs anything on a device.
+several are connected. Enumeration is passive; only the selected port is queried and may restart. It detects the connected chip (and on the M1 its flash size), takes the board with that chip, or the board the VibeDock firmware on the device names, or offers the boards that share the chip, each marked tested on hardware or prepared (`--list` shows them), builds the candidate, shows the firmware details and asks for confirmation before writing. It writes firmware only, preserving LittleFS Wi-Fi and pairing settings. The M1 starts automatically through a soft reset in both the script and browser flasher; ESP32 boards retain their hardware reset. Both flashers confirm the M1 start with an active USB HELLO and close the console afterwards, preventing this start from triggering quick-boot setup even when reinstalling the same version. If confirmation fails, they warn without repeating the reset. A full backup restore is a separate operation that replaces the entire flash. Neither the build configuration nor the native test installs anything on a device.
 
 ## Technical reference
 

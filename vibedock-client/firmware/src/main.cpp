@@ -662,7 +662,8 @@ void pageEnd() {
 
 // ---- factory reset by power-cycling ----
 // Power-on and external resets count; software restarts and crashes clear the counter.
-bool quickBootPending = false;
+bool quickBootPending = false, usbBootConfirmed = false;
+void serialPoll(bool duringTls = false);
 // The first start of a new firmware is no power cycle either: flashing over USB resets the device several times
 // (scripts/flash.sh asks the chip, writes, then the device is plugged in again), which used to open the Wi-Fi setup.
 bool newFirmware() {
@@ -677,7 +678,7 @@ bool newFirmware() {
 uint8_t countQuickBoot() {
   bool updated = newFirmware();
   if (updated) logEvent(F("New firmware: this start is not counted as a power cycle"));
-  if (updated || !platform::powerCycleStart()) { LittleFS.remove("/boots"); return 0; }
+  if (updated || usbBootConfirmed || !platform::powerCycleStart()) { LittleFS.remove("/boots"); return 0; }
   int count = 0;
   auto in = LittleFS.open("/boots", "r");
   if (in) { count = max(in.read(), 0); in.close(); }
@@ -692,8 +693,14 @@ void settleQuickBoot() {
   if (quickBootPending && millis() >= client_policy::quickBootMs) { quickBootPending = false; LittleFS.remove("/boots"); }
 }
 void handleQuickBoots() {
+  serialPoll(); // accept a HELLO already queued during startup before counting this boot
   uint8_t boots = countQuickBoot();
   if (client_policy::factoryResetDue(boots)) {
+    // Give the flasher time to identify the new application before any destructive reset. Real unplugging
+    // still works: without an active USB confirmation the third quick start resets after this short grace.
+    uint32_t began = millis();
+    while (!usbBootConfirmed && uint32_t(millis() - began) < client_policy::usbBootGraceMs) { serialPoll(); delay(10); }
+    if (usbBootConfirmed) return;
     // Factory reset: our whole configuration (Wi-Fi, pairing key, servers) and the Wi-Fi credentials the ESP8266
     // SDK keeps in its own flash sectors. The identifier is derived from the MAC again; the setup password stays.
     message("Factory reset", Step::None, true); logEvent(String(F("Factory reset after ")) + String(boots) + F(" quick power cycles"));
@@ -704,8 +711,8 @@ void handleQuickBoots() {
     // Second quick start: unplugging once more resets everything, waiting opens the Wi-Fi setup (pairing stays).
     message("Unplug now for factory reset", Step::None, true); logEvent(F("Second quick power cycle: Wi-Fi setup unless unplugged"));
     showDetail("or wait: Wi-Fi setup");
-    while (quickBootPending) { settleQuickBoot(); delay(50); }
-    setupRequested = true;
+    while (quickBootPending) { serialPoll(); settleQuickBoot(); delay(50); }
+    setupRequested = !usbBootConfirmed;
   }
 }
 
@@ -1738,7 +1745,7 @@ void serialSetup(const String &body) {
 // duringTls: called from inside a TLS handshake, which takes seconds on the ESP8266; only reading the log and the
 // hello answer then, nothing that scans, restarts or changes the configuration.
 bool usbDuringTls = false;
-void serialPoll(bool duringTls = false) {
+void serialPoll(bool duringTls) {
   if (!duringTls && usbDuringTls) {
     usbDuringTls = false; quickBootPending = false; LittleFS.remove("/boots"); logEvent(F("USB console: this start is not counted as a power cycle"));
   }
@@ -1749,6 +1756,7 @@ void serialPoll(bool duringTls = false) {
       // Opening the USB port can reset the chip like a power cycle (reset reason "External System"). A start that
       // talks to the administration over USB is not counted, so reading the log or pairing over the cable never
       // adds up to the Wi-Fi setup or a factory reset.
+      if (line.startsWith("VIBEDOCK-")) usbBootConfirmed = true;
       if (line.startsWith("VIBEDOCK-") && quickBootPending && duringTls) usbDuringTls = true;  // logged afterwards: little stack here
       else if (line.startsWith("VIBEDOCK-") && quickBootPending) {
         quickBootPending = false; LittleFS.remove("/boots"); logEvent(F("USB console: this start is not counted as a power cycle"));

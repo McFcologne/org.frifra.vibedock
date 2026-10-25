@@ -82,6 +82,7 @@ constexpr bool pairingLocked(uint8_t wrongAttempts) { return wrongAttempts >= ma
 // Ten seconds: boards with a start sound and a slower start (Waveshare 1.54) left too little time with five.
 constexpr uint8_t resetPowerCycles = 3;
 constexpr uint32_t quickBootMs = 10000;
+constexpr uint32_t usbBootGraceMs = 2000; // allow a flasher HELLO before a third-start factory reset
 constexpr bool factoryResetDue(uint8_t quickBoots) { return quickBoots >= resetPowerCycles; }
 // Reset reasons of the ESP8266 SDK: 0 power on, 6 external reset. Many boards report 6 when plugged in, because
 // their reset line rises after the supply; both count as a power cycle. Watchdog, exception and software
