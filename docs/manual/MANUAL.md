@@ -479,6 +479,10 @@ Every paired display has a card:
 - The **reload** button makes the display redraw immediately with its next pull.
 - **Preview**: the current image of this display. A click enlarges it.
 - **IP**, **identifier** and **board** (e.g. *vibedock-0a1b2c000002 · VibeTV M1*).
+- **Network** below the IP: the Wi-Fi the display is in (current firmware) and its signal, in the warning colour
+  below −75 dBm, and how its last pull reached the server: **LAN** over the internal address, **external** over the
+  external one (the tooltip names the address). A display at home that shows *external* takes the detour over the
+  public address; a restart brings it back to the LAN.
 - **Firmware**: *Latest version installed*, or **Update to …** to install the server's firmware over Wi-Fi. While
   the update runs the card shows *Updating*; the state disappears on every page when the display reports the new
   version.

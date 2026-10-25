@@ -44,6 +44,9 @@ class DeviceApiController {
                 request.getHeader("X-VibeDock-Subnet-Mask"));
         // The display's own state (newer firmware): its start and run time, memory and Wi-Fi; nothing for older firmware.
         diagnostics.report(identifier,request.getHeader("X-VibeDock-Diag"),registry.get(identifier).firmware(),request.getHeader("X-VibeDock-Board"));
+        // Which address it used: behind a reverse proxy the host it asked for is in X-Forwarded-Host.
+        String used=usedHost(request.getHeader("X-Forwarded-Host"),request.getHeader("Host"));
+        diagnostics.route(identifier,route(used,addresses.configuredInternal(),addresses.external()),used);
         String updateError=request.getHeader("X-VibeDock-Update-Error");
         registry.otaReport(identifier,request.getHeader("X-VibeDock-Ota"),
                 updateError!=null&&updateError.matches("[ -~]{1,120}")?updateError:null);
@@ -128,6 +131,29 @@ class DeviceApiController {
         logTransfer(identifier,mode,fullBytes,pixels.length,next);
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
         return new ResponseEntity<>(pixels,headers,HttpStatus.OK);
+    }
+    /** The host and port a request was sent to: the first X-Forwarded-Host, else Host; null when neither is usable. */
+    static String usedHost(String forwarded,String host){
+        String value=forwarded!=null&&!forwarded.isBlank()?forwarded.split(",")[0].trim():host;
+        return value!=null&&value.matches("[A-Za-z0-9.:\\[\\]-]{1,255}")?value.toLowerCase(Locale.ROOT):null;
+    }
+    /** "lan" or "external" when the host (with port, if the address names one) is that of an announced address, else "other". */
+    static String route(String used,String internal,String external){
+        if(used==null)return "other";
+        if(matches(used,external))return "external";
+        if(matches(used,internal))return "lan";
+        return "other";
+    }
+    private static boolean matches(String used,String url){
+        if(url==null||url.isBlank())return false;
+        try{
+            var uri=java.net.URI.create(url);if(uri.getHost()==null)return false;
+            String host=uri.getHost().toLowerCase(Locale.ROOT);int port=uri.getPort();
+            String usedHost=used.replaceFirst(":\\d+$","");
+            if(!usedHost.equals(host))return false;
+            int usedPort=used.matches(".*:\\d+$")?Integer.parseInt(used.replaceFirst(".*:","")):-1;
+            return port<0||usedPort<0||port==usedPort;
+        }catch(IllegalArgumentException e){return false;}
     }
     private static final java.util.regex.Pattern RESUME=java.util.regex.Pattern.compile("(\"[0-9a-f]{1,64}\");rows=([0-9]{1,4});base=(\"[0-9a-f]{1,64}\")?");
     /**

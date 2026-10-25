@@ -28,6 +28,8 @@ final class SupportRedactor {
         this.secrets=secrets.stream().filter(s->s!=null&&s.length()>=6).distinct().sorted(Comparator.comparingInt(String::length).reversed()).toList();
         this.hideHosts=hideHosts;
     }
+    /** A Wi-Fi name: hidden together with the host names, otherwise redacted like any text. */
+    String network(String ssid){return ssid==null?null:hideHosts?"[network]":text(ssid);}
     String text(String text){
         if(text==null)return null;
         for(String secret:secrets)text=text.replace(secret,"[secret]");

@@ -282,6 +282,22 @@ class AccessTest {
                 .with(r->{r.setLocalPort(10001);return r;})).andExpect(redirectedUrl("/admin/server?saved"));
         Assertions.assertEquals(List.of("192.168.0.0/16"),store.get().allowedIps());Assertions.assertEquals("codex-secret",store.get().codex().token());
     }
+    @Test void theDeviceCardShowsWifiSignalAndTheAddressOfTheLastPull() throws Exception {
+        String key="fa".repeat(32),id="vibedock-wifi-card",path="/api/v1/clients/"+id+"/image";
+        clients.paired(id,"Wi-Fi card",key,"192.168.1.20",80);
+        String internal=clients.internalUrl(),external=clients.externalUrl();int poll=clients.pollSeconds();
+        clients.configure("http://192.168.1.10:10002","https://home.example.org:10002",poll);
+        try{
+            mvc.perform(get(path).header("Authorization","Bearer "+key).header("X-VibeDock-Diag","boot=0000abcd;up=5;rssi=-80;ssid=Home%20Wi-Fi")
+                    .header("X-Forwarded-Host","home.example.org:10002").with(r->{r.setLocalPort(8080);r.setRemoteAddr("192.168.1.20");return r;}))
+                    .andExpect(status().isOk());
+            var html=mvc.perform(get("/admin/devices").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+            var card=html.substring(html.indexOf("data-device=\""+id+"\""));card=card.substring(0,card.indexOf("</section>"));
+            Assertions.assertTrue(card.contains("Home Wi-Fi")&&card.contains("−80 dBm")&&card.contains("weak-signal"),card);
+            Assertions.assertTrue(card.contains("route-chip external")&&card.contains("Last pull over home.example.org:10002"),card);
+        }finally{clients.configure(internal,external,poll);}
+    }
     @Test void removalErrorsDoNotOpenPairingButPairingErrorsDo() throws Exception {
         var removed=mvc.perform(post("/admin/clients/vibedock-missing/remove").with(user("admin").roles("ADMIN")).with(csrf())
                 .with(r->{r.setLocalPort(10001);return r;})).andExpect(redirectedUrl("/admin/devices"))

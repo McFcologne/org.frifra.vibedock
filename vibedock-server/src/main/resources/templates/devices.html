@@ -95,6 +95,12 @@
       <p class="meta" data-live="ip">IP <strong th:if="${client.ip == '0.0.0.0'}">known after its first pull</strong>
         <a th:unless="${client.ip == '0.0.0.0'}" th:href="${'http://' + (client.ip.contains(':') ? '[' + client.ip + ']' : client.ip) + '/'}" target="_blank" rel="noopener noreferrer"
            title="The display's own status page (colour calibration, image) in this network"><strong th:text="${client.ip}"></strong></a></p>
+      <p class="meta network-line" data-live="network" th:with="net=${networks.get(client.identifier)}">
+        <th:block th:if="${net != null and (net.ssid != null or net.rssi != null)}"><svg class="wifi-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 8.5a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1.2"/></svg>
+          <span th:if="${net.ssid != null}" th:text="${net.ssid}" title="Wi-Fi"></span><th:block th:if="${net.ssid != null and net.rssi != null}">·</th:block>
+          <span th:if="${net.rssi != null}" th:classappend="${net.rssi < -75} ? 'weak-signal'" th:title="${net.rssi < -75 ? 'Weak signal' : 'Signal'}" th:text="${'−' + (-net.rssi) + ' dBm'}"></span></th:block>
+        <span th:if="${net != null and net.route != null}" class="route-chip" th:classappend="${net.route == 'external'} ? 'external'"
+              th:title="${'Last pull over ' + (net.host ?: 'an unknown address')}" th:text="${net.route == 'external' ? 'external' : net.route == 'lan' ? 'LAN' : (net.host ?: 'other')}"></span></p>
       <p class="meta device-identifier"><th:block th:text="${client.identifier + ' · ' + client.board.label}"></th:block>
         <span th:unless="${client.board.tested}" class="badge update" title="The firmware for this board builds, but it has never run on the real board">untested board</span></p>
       <div class="meta firmware-line" data-live="firmware" th:with="firmwareVersion=${firmwareVersions.get(client.board.id)}"><span>Firmware <strong th:text="${client.firmware != null ? client.firmware : 'unknown'}"></strong></span>

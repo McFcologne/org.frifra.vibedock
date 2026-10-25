@@ -143,4 +143,26 @@ class DiagnosticsTest {
         assertEquals(Map.of("rssi","-61","phase","image","prev","0000abcd"),v);
         assertTrue(DeviceDiagnostics.parse("x".repeat(500)).isEmpty());assertTrue(DeviceDiagnostics.parse(null).isEmpty());
     }
+    @Test void theCardKnowsTheWifiAndTheAddressOfTheLastPull(@TempDir Path dir){
+        var diagnostics=new DeviceDiagnostics(dir.toString(),json,new TestClock());String id="vibedock-0a1b2c000099";
+        assertNull(diagnostics.network(id));
+        diagnostics.report(id,"boot=0000abcd;up=5;rssi=-47;ssid=Caf%C3%A9%3B%3D%20WLAN","0.3.1","vibedock-m1");
+        diagnostics.route(id,"external","home.example.org:10002");
+        assertEquals(new DeviceDiagnostics.Network("Café;= WLAN",-47,"external","home.example.org:10002"),diagnostics.network(id));
+        // Older firmware: signal only; invalid names are left out.
+        for(String bad:new String[]{"","%G1","%0A","x".repeat(33),"a;b"})assertNull(DeviceDiagnostics.ssid(bad),bad);
+        diagnostics.report(id,"boot=0000abcd;up=6;rssi=-80","0.3.0","vibedock-m1");
+        assertEquals(new DeviceDiagnostics.Network(null,-80,"external","home.example.org:10002"),diagnostics.network(id));
+        diagnostics.forget(id);assertNull(diagnostics.network(id));
+    }
+    @Test void theRouteFollowsTheHostTheDisplayAskedFor(){
+        String internal="http://192.168.123.100:10002",external="https://home.example.org:10002";
+        assertEquals("lan",DeviceApiController.route(DeviceApiController.usedHost(null,"192.168.123.100:10002"),internal,external));
+        // Behind the reverse proxy: the forwarded host counts, not the proxy's upstream address.
+        assertEquals("external",DeviceApiController.route(DeviceApiController.usedHost("home.example.org:10002, proxy","192.168.123.100:10002"),internal,external));
+        assertEquals("external",DeviceApiController.route(DeviceApiController.usedHost(null,"HOME.example.org"),internal,"https://home.example.org"));
+        assertEquals("other",DeviceApiController.route("192.168.123.100:9999",internal,external));
+        assertEquals("other",DeviceApiController.route(null,internal,external));
+        assertNull(DeviceApiController.usedHost(null,"bad host/"));
+    }
 }

@@ -452,3 +452,9 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 .tls-cert-info{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 12px}.tls-cert-info dt{color:var(--muted)}.tls-cert-info dd{margin:0;overflow-wrap:anywhere}.tls-cert-info code{word-break:break-all}
 .pair-method{display:inline-flex;gap:2px;padding:2px;margin:0 0 0 auto;border:1px solid var(--line);border-radius:9px}.pair-method label{position:relative;display:flex;align-items:center;margin:0;padding:4px 14px;border-radius:7px;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer}.pair-method input{position:absolute;opacity:0;pointer-events:none}.pair-method label:has(input:checked){background:var(--accent);color:#fff}.pair-method label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
 .usb-pair{margin-top:0;padding:0;border:0}
+
+.network-line{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.network-line:not(:has(*)){display:none}
+.wifi-icon{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}.wifi-icon circle{fill:currentColor;stroke:none}
+.weak-signal{color:var(--warn)}
+.route-chip{font-size:12px;line-height:1.4;padding:0 6px;border:1px solid var(--line);border-radius:6px;color:var(--muted)}
+.route-chip.external{border-color:color-mix(in srgb,var(--warn) 35%,transparent);background:var(--warn-soft);color:var(--warn)}

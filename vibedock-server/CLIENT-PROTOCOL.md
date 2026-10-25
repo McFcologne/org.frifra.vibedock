@@ -246,6 +246,12 @@ X-VibeDock-Diag: boot=1a2b3c4d;up=754;heap=21344;min=18012;rssi=-61;drops=0;star
 | `panic` | after a crash of the run before: its code addresses in hex, the instruction first, comma-separated (at most 6; ESP32 with Arduino core 3: the backtrace, core 2: the return address; ESP8266: `epc1`) |
 | `cause`, `fault` | with `panic`, where the chip gives them: the exception cause (RISC-V `mcause`, Xtensa and ESP8266 `EXCCAUSE`) and the faulting address in hex |
 | `abort` | with `panic` after `abort()` or a failed assert (ESP-IDF 5): its text, at most 60 characters of `A-Za-z0-9 .:_/()-` |
+| `ssid` | the Wi-Fi it is connected to (firmware 0.3.1 and newer): the SSID's UTF-8 bytes, percent-encoded outside `A-Za-z0-9-._~` (`Home%20Wi-Fi`), 1 to 32 bytes; missing without a connection |
+
+The device card in the administration shows the Wi-Fi name, the signal and the address the last pull used: `LAN`
+when its host (`X-Forwarded-Host` behind a reverse proxy, else `Host`) is that of the internal address, `external`
+for the external address, otherwise the host itself. The support file lists both per display (`wifi`, `route`); the
+Wi-Fi name is hidden together with the host names.
 
 The firmware writes the record to RTC memory, not to flash: when the phase changes and once per pull. The log's start
 line carries the same (`Start v… <board>: boot=… reset=… start=… prev=… phase=… up=… heap=…/…; <reset text>`), so a log
