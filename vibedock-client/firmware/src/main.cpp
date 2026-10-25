@@ -1236,7 +1236,7 @@ int requestImage(ImageRequest &r, bool conditional, const char *resource = "imag
 void learnPin(ImageRequest &r) {
   if (!r.verified) return;
   // The server's pin for its current certificate, otherwise the certificate this full check verified itself.
-  String next = r.http.hasHeader("X-VibeDock-Tls-Pin") ? r.http.header("X-VibeDock-Tls-Pin") : platform::verifiedFingerprint();
+  String next = r.http.hasHeader("X-VibeDock-Tls-Pin") ? r.http.header("X-VibeDock-Tls-Pin") : platform::verifiedFingerprint(r.client.get());
   next.toLowerCase(); uint8_t fingerprint[20];
   if (next != pin && client_policy::parseFingerprint(next.c_str(), fingerprint)) { pin = next; saveConfig(); }
 }
@@ -1317,7 +1317,18 @@ void pull() {
   }
   // On the heap: the TLS handshake below needs most of the ESP8266's 4 kB stack.
   std::unique_ptr<ImageRequest> holder(new ImageRequest()); ImageRequest &request = *holder; HTTPClient &http = request.http;
+  // After a start, a display that last answered on its second address (e.g. the external one after a time on another
+  // network) tries the first one (the LAN address) once more. Not reachable: no log line, no error screen, the usual
+  // address right after.
+  static bool preferredTried = false;
+  uint8_t usual = serverIndex; bool probing = false;
+  if (!preferredTried && serverIndex != 0 && serverCount > 1) { serverIndex = 0; probing = true; }
+  preferredTried = true;
   int code = requestImage(request, true);
+  if (probing && code < 0) {
+    serverIndex = usual; holder.reset(); pullSoon(); return;
+  }
+  if (probing) logEvent(String(F("Back on ")) + servers[serverIndex], true);
   if (code != lastStatus || code < 0) {
     String server = servers[serverIndex];
     String answer = code >= 400 && code != 401 ? answerStart(http) : String();

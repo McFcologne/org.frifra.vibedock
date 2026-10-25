@@ -137,4 +137,26 @@ class TlsTrustTest {
             assertTrue(assertThrows(IllegalArgumentException.class,()->trust.inspect("https://wrong.example.invalid")).getMessage().contains("must use https"));
         }finally{server.stop(0);}
     }
+    @Test void imageAnswersNeverWaitAndAFailedCheckIsNotRepeatedForEveryPull(){
+        var calls=new java.util.concurrent.atomic.AtomicInteger();var reachable=new java.util.concurrent.atomic.AtomicBoolean(false);
+        var trust=new TlsTrust(){
+            @Override public Inspection inspect(String url){
+                calls.incrementAndGet();
+                if(!reachable.get())throw new IllegalArgumentException(url+" is not reachable from the server");
+                return new Inspection(new byte[]{1},"ab".repeat(20));
+            }
+        };
+        var queued=new java.util.ArrayList<Runnable>();trust.background=queued::add;
+        String url="https://external.example.invalid:10002";
+        // The first answer goes out at once without a pin; the check runs afterwards.
+        assertTrue(trust.pinForAnswer(url).isEmpty());assertEquals(1,queued.size());assertEquals(0,calls.get());
+        assertTrue(trust.pinForAnswer(url).isEmpty());assertEquals(1,queued.size(),"one check at a time");
+        queued.removeFirst().run();assertEquals(1,calls.get());
+        // Unreachable: further answers do not try again within ten minutes.
+        for(int i=0;i<5;i++)assertTrue(trust.pinForAnswer(url).isEmpty());
+        assertTrue(queued.isEmpty());assertEquals(1,calls.get());
+        // Once reachable (e.g. Check pin again in the administration), answers carry the pin.
+        reachable.set(true);trust.recentInspection(url);
+        assertEquals(Optional.of("ab".repeat(20)),trust.pinForAnswer(url));assertTrue(queued.isEmpty());
+    }
 }

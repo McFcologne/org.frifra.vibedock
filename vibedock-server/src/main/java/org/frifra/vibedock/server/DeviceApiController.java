@@ -94,7 +94,8 @@ class DeviceApiController {
         // After a full certificate check the device learns the current fingerprint for its simple check. The device
         // accepts it only over such a verified connection, so it cannot be injected over plain http.
         if("full".equals(request.getHeader("X-VibeDock-Tls-Check"))&&addresses.external().startsWith("https://")){
-            try{headers.set("X-VibeDock-Tls-Pin",trust.recentInspection(addresses.external()).fingerprint());}catch(IllegalArgumentException ignored){}
+            // Never waits for the check: ESP32 boards verify fully with every pull (see TlsTrust.pinForAnswer).
+            trust.pinForAnswer(addresses.external()).ifPresent(pin->headers.set("X-VibeDock-Tls-Pin",pin));
         }
         // A forced refresh sends the image without ETag: Spring would otherwise answer the matching If-None-Match with
         // 304 itself. The device then pulls the next image once without condition and learns the ETag again.

@@ -44,6 +44,28 @@ public class TlsTrust {
     boolean isRecent(String url){
         Long at=checkedAt.get(url);return at!=null&&System.currentTimeMillis()-at<60_000&&recent.containsKey(url);
     }
+    static final long ANSWER_PIN_MS=10*60_000,FAILED_RETRY_MS=10*60_000;
+    private final Map<String,Long> failedAt=new java.util.concurrent.ConcurrentHashMap<>();
+    private final Set<String> refreshing=java.util.concurrent.ConcurrentHashMap.newKeySet();
+    java.util.concurrent.Executor background=command->Thread.ofVirtual().name("tls-pin-refresh").start(command);
+    /**
+     * The pin for an image answer after a device's full check, without waiting: the last successful inspection of
+     * the last ten minutes, else none (the display then pins the certificate it verified itself). A missing or older
+     * one is refreshed in the background; after a failure the next try waits ten minutes, so an address the server
+     * cannot reach no longer delays every answer by the connect timeout.
+     */
+    public Optional<String> pinForAnswer(String url){
+        long now=System.currentTimeMillis();
+        Long at=checkedAt.get(url),failed=failedAt.get(url);
+        boolean fresh=at!=null&&now-at<60_000,waiting=failed!=null&&now-failed<FAILED_RETRY_MS;
+        if(!fresh&&!waiting&&refreshing.add(url))background.execute(()->{
+            try{recentInspection(url);failedAt.remove(url);}
+            catch(RuntimeException e){failedAt.put(url,System.currentTimeMillis());}
+            finally{refreshing.remove(url);}
+        });
+        var known=recent.get(url);at=checkedAt.get(url);
+        return known==null||at==null||System.currentTimeMillis()-at>=ANSWER_PIN_MS?Optional.empty():Optional.ofNullable(known.fingerprint());
+    }
     /**
      * The root for pairing a device: from the address itself, or from the public certificate log when the server
      * cannot reach it (e.g. its own public host name without NAT loopback).
