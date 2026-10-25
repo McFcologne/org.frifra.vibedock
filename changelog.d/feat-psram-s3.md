@@ -3,3 +3,8 @@
   apply a new colour correction without loading it again (before, the 1.54 logged *No memory for a copy of the
   picture*). Wi-Fi buffers and larger allocations move there as well, leaving more internal memory for TLS. Needs the
   new firmware.
+- **Picture copy also without PSRAM:** a board that has no room for the copy while the first picture's TLS connection
+  is open (the C6 1.69) tries again right after that pull and loads the picture once more to fill it.
+- **Turning without a copy:** the patch that came with the turn was made for the old orientation; it is now dropped
+  silently and the whole picture follows at once, instead of the log line *Image aborted: unsupported image or delta
+  basis*.
