@@ -164,10 +164,13 @@ poll interval as before. The status page shows the next pull. See
 
 The server always renders a complete image. With matching new server and firmware versions, screen pulls
 advertise delta support: after the first full image, the server can send only changed RGB565 spans. The device
-uses its row buffer, not a full framebuffer, and applies the same colour correction. Unchanged images still
-use HTTP 304. Old servers and old firmware retain the existing full-image path.
+uses its row buffer and applies the same colour correction. Unchanged images still use HTTP 304. Old servers and
+old firmware retain the existing full-image path.
 
-A missing basis, interrupted or invalid delta triggers a full-image retry. Force refresh, slideshow photos,
+A transfer cut off on the way keeps the rows already drawn; the retry names what the screen shows
+(`X-VibeDock-Resume`) and gets only the rest as a delta. A missing basis or an invalid delta triggers a full-image
+retry. ESP32 boards with the memory for it keep a copy of the picture, so a turn or a new colour correction redraws
+it locally instead of loading it again. Force refresh, slideshow photos,
 scaled images and the status-page preview use full images. The server keeps a bounded, temporary image history;
 there is no configuration or data migration. Its log compares payload bytes with the full image; the device log
 notes failed deltas only. These byte savings do not establish battery or airtime savings on
@@ -383,8 +386,8 @@ several are connected. Enumeration is passive; only the selected port is queried
 | Area | Implementation |
 | --- | --- |
 | Protocol | [Version 2](../vibedock-server/CLIENT-PROTOCOL.md): the server invites once; the device then pulls images. The server can request a pull with `POST /pull`, rate-limited to once every five seconds. |
-| Image | RGB565, most significant byte first, 16–480 px per side as named in the format header (240 × 240: 115,200 bytes), scaled to the screen. Delta images (`rgb565-delta-be-WxH`) carry only changed row spans and are checked by length, payload hash and a hash over all rows. Incomplete or failed transfers are rejected; the next pull gets the complete image. |
-| Memory and redraw | One input row (at most 960 bytes) plus one row of 16-bit pixels; no full framebuffer for server images. Row hashes avoid redrawing unchanged rows and are the basis for delta images. |
+| Image | RGB565, most significant byte first, 16–480 px per side as named in the format header (240 × 240: 115,200 bytes), scaled to the screen. Delta images (`rgb565-delta-be-WxH`) carry only changed row spans and are checked by length, payload hash and a hash over all rows. Invalid transfers are rejected and the next pull gets the complete image; a transfer cut off on the way resumes with the rest. |
+| Memory and redraw | One input row (at most 960 bytes) plus one row of 16-bit pixels. ESP32 boards keep a copy of the picture when PSRAM or enough heap is free (for turns and colour correction); the M1 does not. Row hashes avoid redrawing unchanged rows and are the basis for delta images. |
 | IP footer | Current server images carry the IP reported by the device (`X-VibeDock-Footer: server`). On its own status screens, the device draws the footer itself. |
 | Polling | Every answer announces the next pull (`X-VibeDock-Next-Pull`: 2 s to 10 minutes, 2 minutes for displays the server cannot reach directly). The fallback poll interval (default 30 seconds, clamped to 10–3,600 seconds) applies to older servers and after failed pulls. Image reads use an eight-second abort limit (15 seconds over https); the browser BMP proxy has a separate transfer limit. |
 | Version | Compiled in from the Git tag by `firmware/version.py`, like the server: `0.1.0` on the tag `0.1.0` (or `v0.1.0`), `0.1.0-3-g<commit>` after it, `-dirty` with uncommitted changes. |

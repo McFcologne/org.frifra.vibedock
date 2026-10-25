@@ -779,6 +779,10 @@ only when something can have changed:
   spans of rows: usually a few hundred bytes to a few KB instead of 112.5 KB for a 240 × 240 picture. Whole pictures
   still come after a start, a theme change, a forced refresh, for slideshow photos and whenever the display or the
   server is not sure what the display shows.
+- **Rest only after an abort.** If a picture breaks off on the way (weak Wi-Fi), the display keeps the rows it has
+  and asks only for the rest; the server log shows `delta resumed`.
+- **Turns without a new picture.** Displays with an ESP32 that have the memory for a copy of their picture turn it
+  themselves when you change *Orientation* (or the colour correction) and then get only the normal changes.
 - **Pulls when new readings are due.** Every answer tells the display when its picture can change next: shortly after
   the next poll of the sources it shows. The display pulls then instead of every 30 s; while a source is still being
   asked, it comes back a few seconds later. At most every 10 minutes (2 minutes if the server cannot reach the display
@@ -1010,6 +1014,9 @@ seconds after power-on. The display then shows *Unplug now for factory reset*:
 - wait, and it opens the Wi-Fi setup (the pairing stays);
 - unplug once more, and it forgets Wi-Fi, pairing and server addresses (factory reset).
 
+Starts over USB do not count: reading the log, pairing over the cable or flashing new firmware (both flashers
+confirm the start of the M1 over USB) never add up to the Wi-Fi setup or a factory reset.
+
 A display with a battery fitted (Waveshare 1.54) keeps running on it when unplugged; disconnect the battery first.
 
 # Troubleshooting a display
@@ -1066,7 +1073,7 @@ off by default. Switched on, the display saves power while it runs on its batter
 USB port (and on the 1.54 without charging):
 
 - Wi-Fi modem sleep, which VibeDock otherwise switches off because some access points and phone hotspots then delay or
-  drop packets;
+  drop packets; it stays off while the display pulls its picture (or loads an update), so transfers are not slowed;
 - the processor at 80 MHz instead of 240 (C6: 160) MHz;
 - the backlight dims to 10 % after a minute without touch or volume button. The next touch only wakes it; swipe again
   for the gesture.
@@ -1080,7 +1087,7 @@ If the display misses updates on battery, switch it off again.
 **Battery icon.** While one of these displays runs on its battery, its picture shows a small battery at the top right
 of the first usage band (beside a status such as *Rate limited*, in window themes in the title bar), whether power
 saving is on or not. The 1.54 and the C6 1.69 fill it to their measured level in steps of 20 %, red below 20 %; the others only know
-that they run on battery and show it empty. The device card's preview shows it as well. On USB it disappears. The
+that they run on battery and show three dots in it (level unknown), an empty frame means 0 %. The device card's preview shows it as well. On USB it disappears. The
 server draws it into the image, so the display only sends one more header with its pulls; the image changes only when
 the level steps or the power source changes. The LilyGO T-Display has a battery connection too,
 but its USB serial chip cannot tell whether a computer is connected, so it has no power saving.
@@ -1091,7 +1098,8 @@ Every display except the VibeTV M1 (its case decides how it stands) shows its **
 **Devices**. The rotate button beside it turns by 180 degrees, on displays with a square panel (e.g. the Waveshare
 1.54") by 90 degrees clockwise, and saves at once. On touch displays a circle drawn with one finger does the same, in the direction of the circle. The card shows the case as the display is mounted, the picture on
 it upright. The display's own screens and the swipes turn as well; the
-display takes it over within seconds. Quarter turns need firmware that knows them: older firmware keeps its
+display takes it over within seconds. Displays with an ESP32 that keep a copy of their picture (the device log says
+*Copy of the picture kept* after the first picture) turn it themselves without loading it again. Quarter turns need firmware that knows them: older firmware keeps its
 orientation until it is updated. The motion sensor of the Waveshare boards is not used: it decided too unreliably.
 
 ## Read the display log

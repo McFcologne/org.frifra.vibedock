@@ -27,7 +27,8 @@ inline bool deltaLength(const char *text,uint32_t limit,uint32_t &out) {
   out=n;return true;
 }
 // Streaming decoder. read fills exactly n bytes or fails; draw receives one uncorrected RGB565 span.
-// The caller owns a 2*maxImageSide scratch buffer and invalidates ALL row state after any failure.
+// The caller owns a 2*maxImageSide scratch buffer. After a failure the rows of the broken section that were not
+// drawn have hash 0; the caller trusts that only when the transfer was cut off, otherwise it forgets all rows.
 // Sections are disjoint, ascending groups of rows, at most height groups. No framebuffer or allocation.
 template<typename Read,typename Draw>
 bool readDelta(ImageSize size,uint32_t length,uint32_t expectedPayload,uint32_t expectedRows,
@@ -50,14 +51,17 @@ bool readDelta(ImageSize size,uint32_t length,uint32_t expectedPayload,uint32_t 
     if(y<next||y>=size.height||!n||n>size.height-y||x>=size.width||!w||w>size.width-x)return false;
     if(uint32_t(n)*(4u+2u*w)+2u>remaining)return false;
     next=y+n;
+    // A section's hashes come before its pixels: rows not drawn when it breaks off get hash 0 (unknown), so the
+    // row state stays true to the screen for a resumed transfer.
+    auto unknown=[&](uint16_t from,uint16_t to){for(uint16_t row=from;row<to;row++)rows[row]=0;return false;};
     for(uint16_t row=y;row<next;row++) {
-      uint8_t value[4];if(!take(value,4))return false;
+      uint8_t value[4];if(!take(value,4))return unknown(y,row);
       uint32_t h=(uint32_t(value[0])<<24)|(uint32_t(value[1])<<16)|(uint32_t(value[2])<<8)|value[3];
-      if(!h)return false;
+      if(!h)return unknown(y,row);
       rows[row]=h;
     }
     for(uint16_t row=y;row<next;row++) {
-      if(!take(scratch,2u*w)||!draw(row,x,w,scratch))return false;
+      if(!take(scratch,2u*w)||!draw(row,x,w,scratch))return unknown(row,next);
     }
   }
   return false;
