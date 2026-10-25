@@ -13,26 +13,39 @@ html,body{margin:0;height:100%;background:var(--display-background,#000);overflo
 /* The image area leaves out the notch and the home indicator; opened from the home screen also the blurred edge
    below the status bar. */
 .screen{position:fixed;top:env(safe-area-inset-top);right:env(safe-area-inset-right);bottom:env(safe-area-inset-bottom);left:env(safe-area-inset-left);
-  background-position:center;background-size:contain;background-repeat:no-repeat}
+  background-position:center;background-size:contain;background-repeat:no-repeat;transition:filter .3s}
+/* Turned or resized: until the image in the new size has loaded, the last one fills the new area, stretched and
+   blurred, instead of a picture in the wrong shape. */
+.screen.reshaping{background-size:100% 100%;filter:blur(16px);transition:none}
+@media (prefers-reduced-motion: reduce){.screen{transition:none}}
 @media (display-mode: standalone){.screen{top:calc(env(safe-area-inset-top) + 14px)}}
 .stale{position:fixed;right:calc(12px + env(safe-area-inset-right));bottom:calc(10px + env(safe-area-inset-bottom));font:12px system-ui,sans-serif;color:#fff;background:rgba(180,35,53,.85);padding:4px 9px;border-radius:99px;display:none}
 </style></head>
 <body th:attr="data-image=${image},data-state=${state},data-swipe=${swipe},data-reload=${reload}"><div class="screen"></div><span class="stale" role="status"></span>
 <script>
 // Asks for the image in the size of the screen area and the screen's pixel ratio, so it is drawn sharp; a new size
-// (rotation, window resized) loads a new image. Swaps the image only once the next one has loaded, so the screen never
-// goes blank; keeps the last image offline. Every few seconds it asks whether the image changed and loads it then.
+// (rotation, window resized) loads a new image; meanwhile the last one is shown stretched and blurred. Swaps the image
+// only once the next one has loaded, so the screen never goes blank; keeps the last image offline. Every few seconds it asks whether the image changed and loads it then.
 // A swipe left or right (or the arrow keys) changes the theme, in a slideshow the photo, like on touch displays; a
 // double tap (or double click, or the space bar) starts or stops the slideshow, whatever its schedule says.
 (() => {
   const body = document.body, screen = document.querySelector('.screen'), stale = document.querySelector('.stale'), every = Number(body.dataset.reload) * 1000;
-  let last = null, resized = null, tag = null;
+  let last = null, resized = null, tag = null, newest = 0;
   const time = date => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   function load() {
-    const ratio = Math.round((window.devicePixelRatio || 1) * 100) / 100;
-    const url = body.dataset.image + '?w=' + screen.clientWidth + '&h=' + screen.clientHeight + '&r=' + ratio + '&t=' + Date.now(), next = new Image();
-    next.onload = () => { screen.style.backgroundImage = 'url("' + url + '")'; last = new Date(); stale.style.display = 'none'; tint(next); };
-    next.onerror = () => { stale.textContent = last ? 'offline · last image ' + time(last) : 'offline'; stale.style.display = 'inline-block'; };
+    const ratio = Math.round((window.devicePixelRatio || 1) * 100) / 100, width = screen.clientWidth, height = screen.clientHeight;
+    const url = body.dataset.image + '?w=' + width + '&h=' + height + '&r=' + ratio + '&t=' + Date.now(), next = new Image(), id = ++newest;
+    // Only the newest request, and only for the current size, counts: an answer to a request started before a turn
+    // (or overtaken by a later one) neither shows its picture nor ends the stretched, blurred one.
+    const current = () => id === newest && width === screen.clientWidth && height === screen.clientHeight;
+    next.onload = () => {
+      if (!current()) return;
+      screen.style.backgroundImage = 'url("' + url + '")'; screen.classList.remove('reshaping'); last = new Date(); stale.style.display = 'none'; tint(next);
+    };
+    next.onerror = () => {
+      if (!current()) return;
+      screen.classList.remove('reshaping'); stale.textContent = last ? 'offline · last image ' + time(last) : 'offline'; stale.style.display = 'inline-block';
+    };
     next.src = url;
   }
   // Inspect EVERY successfully loaded image, including timed reloads and photo/theme changes. The theme's
@@ -71,7 +84,10 @@ html,body{margin:0;height:100%;background:var(--display-background,#000);overflo
   window.addEventListener('keydown', event => {
     if (event.key === 'ArrowLeft') swipe('next'); else if (event.key === 'ArrowRight') swipe('previous'); else if (event.key === ' ') swipe('toggle');
   });
-  window.addEventListener('resize', () => { clearTimeout(resized); resized = setTimeout(load, 300); });
+  window.addEventListener('resize', () => {
+    if (last) screen.classList.add('reshaping');  // nothing to stretch before the first image
+    clearTimeout(resized); resized = setTimeout(load, 300);
+  });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
   load(); check(); setInterval(load, every); setInterval(check, 3000);
 })();
