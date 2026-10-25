@@ -36,6 +36,7 @@ using VibeWebServer = ESP8266WebServer;
 #include <esp_random.h>
 #include <mbedtls/pk.h>
 #include <mbedtls/sha256.h>
+#include <mbedtls/sha1.h>
 #include <mbedtls/x509_crt.h>
 #include <mbedtls/base64.h>
 using VibeWebServer = WebServer;
@@ -221,7 +222,8 @@ inline WiFiClient *pinnedClient(const uint8_t fingerprint[20]) {
   return new Tls13Client(anchorDer().data(), anchorDer().size(), pinned);
 }
 // SHA-1 of the server certificate the last full check verified, as hex: the display pins it itself.
-inline String verifiedFingerprint() {
+inline String verifiedFingerprint(WiFiClient *client) {
+  (void)client;
   uint8_t fingerprint[20]; if (!tls13::leafFingerprint(fingerprint)) return String();
   char hex[41]; for (int i = 0; i < 20; i++) snprintf(hex + 2 * i, 3, "%02x", fingerprint[i]);
   return String(hex);
@@ -262,15 +264,53 @@ inline bool setAnchor(const uint8_t *der, size_t length) {
 }
 inline bool hasAnchor() { return anchorPem().length() > 0; }
 inline void clearAnchor() { anchorPem() = ""; }
-// mbedTLS has no SHA-1 pinning; every https connection takes the full check against the anchor.
-inline WiFiClient *pinnedClient(const uint8_t fingerprint[20]) { (void)fingerprint; return nullptr; }
-inline String verifiedFingerprint() { return String(); }
-inline WiFiClient *verifiedClient() {
-  auto *tls = new WiFiClientSecure(); tls->setCACert(anchorPem().c_str()); return tls;
+inline bool leafSha1(const mbedtls_x509_crt *leaf, uint8_t out[20]) {
+  return leaf && leaf->raw.p && mbedtls_sha1(leaf->raw.p, leaf->raw.len, out) == 0;
 }
+// The simple check, as on the M1: only the pinned server certificate (SHA-1 of the leaf) is accepted, and the handshake
+// still proves the server holds its key. Chain, host name and validity are not checked; when the pin no longer
+// matches (renewed certificate) the full check against the anchor follows.
+// How the last connection was checked, for the log ("TLS pinned", "TLS full check"); empty until a handshake succeeded.
+inline String &tlsMode() { static String mode; return mode; }
+class PinnedClient : public WiFiClientSecure {
+ public:
+  explicit PinnedClient(const uint8_t fingerprint[20]) { memcpy(pin, fingerprint, 20); setInsecure(); tlsMode() = ""; }
+  int connect(IPAddress ip, uint16_t port) override { return accept(WiFiClientSecure::connect(ip, port)); }
+  int connect(IPAddress ip, uint16_t port, int32_t timeout) override { return accept(WiFiClientSecure::connect(ip, port, timeout)); }
+  int connect(const char *host, uint16_t port) override { return accept(WiFiClientSecure::connect(host, port)); }
+  int connect(const char *host, uint16_t port, int32_t timeout) override { return accept(WiFiClientSecure::connect(host, port, timeout)); }
+ private:
+  uint8_t pin[20];
+  int accept(int connected) {
+    uint8_t seen[20];
+    if (connected && leafSha1(getPeerCertificate(), seen) && memcmp(seen, pin, 20) == 0) { tlsMode() = F("TLS pinned"); return connected; }
+    if (connected) stop();
+    return 0;
+  }
+};
+// The full check against the anchor: chain, host name and validity.
+class VerifiedClient : public WiFiClientSecure {
+ public:
+  VerifiedClient() { setCACert(anchorPem().c_str()); tlsMode() = ""; }
+  int connect(IPAddress ip, uint16_t port) override { return done(WiFiClientSecure::connect(ip, port)); }
+  int connect(IPAddress ip, uint16_t port, int32_t timeout) override { return done(WiFiClientSecure::connect(ip, port, timeout)); }
+  int connect(const char *host, uint16_t port) override { return done(WiFiClientSecure::connect(host, port)); }
+  int connect(const char *host, uint16_t port, int32_t timeout) override { return done(WiFiClientSecure::connect(host, port, timeout)); }
+ private:
+  int done(int connected) { if (connected) tlsMode() = F("TLS full check"); return connected; }
+};
+inline WiFiClient *pinnedClient(const uint8_t fingerprint[20]) { return new PinnedClient(fingerprint); }
+// SHA-1 of the server certificate the full check on this connection verified, as hex: the display pins it itself.
+inline String verifiedFingerprint(WiFiClient *client) {
+  uint8_t fingerprint[20];
+  if (!client || !leafSha1(static_cast<WiFiClientSecure *>(client)->getPeerCertificate(), fingerprint)) return String();
+  char hex[41]; for (int i = 0; i < 20; i++) snprintf(hex + 2 * i, 3, "%02x", fingerprint[i]);
+  return String(hex);
+}
+inline WiFiClient *verifiedClient() { return new VerifiedClient(); }
 inline WiFiClient *legacyClient() { return nullptr; }
 inline bool versionRefused() { return false; }
-inline String tlsSummary() { return String(); }
+inline String tlsSummary() { return tlsMode(); }
 inline String tlsTraffic() { return String(); }
 inline String tlsError(WiFiClient *client, bool legacy = false) {
   (void)legacy; char text[96] = ""; int code = static_cast<WiFiClientSecure *>(client)->lastError(text, sizeof(text));

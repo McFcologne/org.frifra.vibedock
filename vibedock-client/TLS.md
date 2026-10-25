@@ -16,9 +16,10 @@ while making TLS 1.3 work on the ESP8266. The trust model (root from pairing, pi
 ## How the server supplies the initial pin
 
 At network or USB pairing, the server can supply both the trusted root (`anchor`) and the live leaf certificate's
-SHA-1 fingerprint (`pin`). The M1 can use that pin immediately, avoiding the first full chain check on the display.
-Without a pin it performs the full check and learns the verified certificate itself. ESP32 boards currently always
-perform the full check. A certificate change triggers another full check; a root change requires re-pairing.
+SHA-1 fingerprint (`pin`). Every board can use that pin immediately, avoiding the first full chain check on the display.
+Without a pin it performs the full check and learns the verified certificate itself. The M1 pins in its own TLS 1.3
+client; the ESP32 boards accept a connection of `WiFiClientSecure` without chain check only when the SHA-1 of the
+server certificate matches the pin (the handshake still proves the server's key). A certificate change triggers another full check; a root change requires re-pairing.
 
 For an external HTTPS address, the server tries system DNS, the configured internal host on the external HTTPS
 port, then public DNS at **8.8.8.8** and **1.1.1.1**. It connects directly to the public answer IPs but keeps the

@@ -818,7 +818,8 @@ legacy connection.
 The **internal address** (LAN) and an optional **external address** (e.g. a public host name) of the server's
 public port 10002. Without an internal address the server takes the one this page was opened with. The addresses
 are sent to a display when it is paired: it tries the address that answered last, then the other one, so a display
-moves between home and away by itself. The **fallback poll interval** (10–3600 s, default 30) reaches paired
+moves between home and away by itself. After a restart it tries the first one (the internal address) once more,
+without an error message when that fails, so a restart is enough to bring it back to the LAN. The **fallback poll interval** (10–3600 s, default 30) reaches paired
 displays with their next pull. Current firmware does not pull in this rhythm: every answer tells it when its picture
 can change next, after the next poll of the sources it shows (all sources are polled together on the full minute, so
 several providers do not make it pull more often). The interval applies to older firmware, after a failed pull and

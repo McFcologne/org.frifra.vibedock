@@ -298,7 +298,7 @@ int Tls13Client::open(const String &host, IPAddress ip, uint16_t port, bool byNa
   ready_ = true; tls13::sent = tls13::received = tls13::records = 0; tls13::lastRead = 0; tls13::lastByte = millis();
   tls13::recordHave = tls13::recordWant = 0; tls13::tcpWaiting = 0;
   String after = ", " + tls13::heapText() + F(" free after");
-  tls13::lastSuccess() = String("TLS 1.3 ") + (pin_ ? "pinned " : "") + mbedtls_ssl_get_ciphersuite(&ssl_) + timing + F("; heap ")
+  tls13::lastSuccess() = String("TLS 1.3 ") + (pin_ ? "pinned " : "full check ") + mbedtls_ssl_get_ciphersuite(&ssl_) + timing + F("; heap ")
       + heapBefore + F(", TLS ") + String(tls13::peak) + stack + after;
   return 1;
 }
