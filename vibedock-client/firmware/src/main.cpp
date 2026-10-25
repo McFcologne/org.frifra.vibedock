@@ -1032,13 +1032,14 @@ void keepShadow() {
   if (shadow || tried) return;
   tried = true;
   size_t bytes = size_t(panel.width()) * panel.height() * 2;
-  void *memory = psramFound() ? ps_malloc(bytes) : nullptr;
-  if (!memory && heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) >= bytes && ESP.getFreeHeap() >= bytes + SHADOW_RESERVE)
-    memory = malloc(bytes);
+  void *memory = psramFound() ? ps_malloc(bytes) : nullptr; bool psram = memory != nullptr;
+  if (!memory && heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) >= bytes
+      && heap_caps_get_free_size(MALLOC_CAP_INTERNAL) >= bytes + SHADOW_RESERVE)
+    memory = heap_caps_malloc(bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
   if (!memory) { logEvent(F("No memory for a copy of the picture: a turn loads it again"), true); return; }
   shadow = static_cast<uint16_t *>(memory); shadowWidth = panel.width(); shadowHeight = panel.height();
   forgetRows();  // every row of this image goes into the copy
-  logEvent(String(F("Copy of the picture kept (")) + String(bytes / 1024) + F(" kB): turns redraw it locally"), true);
+  logEvent(String(F("Copy of the picture kept (")) + String(bytes / 1024) + (psram ? F(" kB in PSRAM") : F(" kB")) + F("): turns redraw it locally"), true);
 }
 #endif
 // The picture again from the copy, e.g. after a turn of the panel: no transfer, the ETag stays valid. False when
