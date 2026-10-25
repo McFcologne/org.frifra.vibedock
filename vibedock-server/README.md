@@ -28,7 +28,7 @@ overhead excluded); unchanged images (304) only at debug level. See [delta trans
 
 ## Administration at a glance
 
-The top navigation uses **Overview**, **Devices**, **Display**, **Data sources** and **Settings**. Light/dark administration appearance is saved in the browser and is independent of each device's display theme. The footer shows the build version, README link and a dedicated **Licenses & notices** page.
+The top navigation uses **Overview**, **Devices**, **Display**, **Data sources** and **Settings**. Light/dark appearance is saved for the whole instance by the signed-in administration and also applies to the devices' setup and status pages; it is independent of each device's display theme. The sign-in page follows the last choice of this browser. The footer shows the build version, README link and a dedicated **Licenses & notices** page.
 
 ![Current Overview with demo accounts and devices](../docs/manual/images/02-overview.png)
 

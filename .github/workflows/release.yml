@@ -179,7 +179,8 @@ jobs:
           path: vibedock-client/vibedock-*.bin
 
   release:
-    needs: [version, server, image, firmware]
+    # publish-image too: no release without its Docker tags.
+    needs: [version, server, image, publish-image, firmware]
     if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
