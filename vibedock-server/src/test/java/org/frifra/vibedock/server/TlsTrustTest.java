@@ -159,4 +159,20 @@ class TlsTrustTest {
         reachable.set(true);trust.recentInspection(url);
         assertEquals(Optional.of("ab".repeat(20)),trust.pinForAnswer(url));assertTrue(queued.isEmpty());
     }
+    @Test void aPinIsNotSentAgainAfterItsRefreshFailed() throws Exception {
+        var reachable=new java.util.concurrent.atomic.AtomicBoolean(true);
+        var trust=new TlsTrust(){
+            @Override public Inspection inspect(String url){
+                if(!reachable.get())throw new IllegalArgumentException(url+" is not reachable from the server");
+                return new Inspection(new byte[]{1},"ab".repeat(20));
+            }
+        };
+        trust.background=Runnable::run;String url="https://external.example.invalid:10002";
+        trust.recentInspection(url);assertEquals(Optional.of("ab".repeat(20)),trust.pinForAnswer(url));
+        // A minute later the refresh fails (e.g. during a certificate renewal): the older pin is not sent any more.
+        var checkedAt=(Map<String,Long>)org.springframework.test.util.ReflectionTestUtils.getField(trust,"checkedAt");
+        checkedAt.put(url,System.currentTimeMillis()-61_000);reachable.set(false);
+        assertTrue(trust.pinForAnswer(url).isEmpty());
+        assertTrue(trust.pinForAnswer(url).isEmpty());
+    }
 }
