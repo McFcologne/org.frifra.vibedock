@@ -1247,11 +1247,17 @@ int requestImage(ImageRequest &r, bool conditional, const char *resource = "imag
 // After a full check the server names the current certificate fingerprint; later requests use the simple check.
 void learnPin(ImageRequest &r) {
   if (!r.verified) return;
-  // The certificate this full check has just verified; the server's pin only where the board cannot name it. A pin
-  // the server checked earlier can be the one before a renewal.
-  String next = platform::verifiedFingerprint(r.client.get());
-  if (next.isEmpty() && r.http.hasHeader("X-VibeDock-Tls-Pin")) next = r.http.header("X-VibeDock-Tls-Pin");
-  next.toLowerCase(); uint8_t fingerprint[20];
+  // The server's pin when it matches the certificate this full check has just verified; otherwise (the server's is
+  // from before a renewal) the verified one. Where the board cannot name it, the server's pin.
+  String offered = r.http.hasHeader("X-VibeDock-Tls-Pin") ? r.http.header("X-VibeDock-Tls-Pin") : String();
+  String verified = platform::verifiedFingerprint(r.client.get());
+  offered.toLowerCase(); verified.toLowerCase();
+  String next = offered;
+  if (!verified.isEmpty() && offered != verified) {
+    if (!offered.isEmpty()) logEvent(F("Server pin differs from the verified certificate, pinned the verified one"), true);
+    next = verified;
+  }
+  uint8_t fingerprint[20];
   if (next != pin && client_policy::parseFingerprint(next.c_str(), fingerprint)) { pin = next; saveConfig(); }
 }
 client_policy::ImageSize lastImageSize;  // a different size invalidates the row cache
