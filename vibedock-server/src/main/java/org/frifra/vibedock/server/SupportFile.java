@@ -1,6 +1,6 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import javax.crypto.AEADBadTagException;
@@ -15,7 +15,6 @@ import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Pattern;
-import java.util.zip.GZIPInputStream;
 
 /**
  * The support file (Troubleshooting): everything needed to analyse a problem, server and displays alike, in one file
@@ -96,7 +95,7 @@ class SupportFile {
         if(content==null||content.isBlank())throw new IllegalArgumentException("Choose a support file");
         if(content.length()>MAX_FILE*2)throw new IllegalArgumentException("The file is too large for a VibeDock support file");
         SourceTransfer.Envelope envelope;
-        try{envelope=json.readValue(content,SourceTransfer.Envelope.class);}catch(IOException e){throw new IllegalArgumentException("This is not a VibeDock support file");}
+        try{envelope=json.readValue(content,SourceTransfer.Envelope.class);}catch(tools.jackson.core.JacksonException e){throw new IllegalArgumentException("This is not a VibeDock support file");}
         if(!FORMAT.equals(envelope.format())||envelope.version()!=SourceTransfer.VERSION||!"AES-256-GCM".equals(envelope.cipher())||!"PBKDF2-HMAC-SHA256".equals(envelope.kdf()))
             throw new IllegalArgumentException("This is not a VibeDock support file of a supported version");
         if(envelope.iterations()<100_000||envelope.iterations()>5_000_000)throw new IllegalArgumentException("The file uses unsupported key settings");
@@ -107,7 +106,7 @@ class SupportFile {
             plain=SourceTransfer.cipher(Cipher.DECRYPT_MODE,FORMAT,key==null?"":key.trim(),salt,envelope.iterations(),nonce).doFinal(b64.decode(envelope.data()));
             return json.readValue(plain,Contents.class);
         }catch(AEADBadTagException e){throw new IllegalArgumentException("Wrong key, or the file was changed");}
-        catch(GeneralSecurityException|IOException|IllegalArgumentException e){
+        catch(GeneralSecurityException|tools.jackson.core.JacksonException|IllegalArgumentException e){
             if(e instanceof IllegalArgumentException i&&i.getMessage()!=null&&i.getMessage().startsWith("The support"))throw i;
             throw new IllegalArgumentException("The support file is damaged");
         }finally{if(plain!=null)Arrays.fill(plain,(byte)0);}
@@ -150,38 +149,9 @@ class SupportFile {
         return new Contents(report,diagnosis,summary,sources,displays,serverLog,logLines("access.",since,redactor),deviceLogs);
     }
 
-    private static final Pattern STAMP=Pattern.compile("^(\\d{4}-\\d{2}-\\d{2})[T ](\\d{2}:\\d{2}:\\d{2})");
-    /**
-     * The lines of the server log (vibedock.log and its rotated .gz files) or of the access logs (access.*.log) since
-     * the given time, oldest first, the newest {@value #MAX_LOG_CHARS} characters at most. Lines without a time (stack
-     * traces) go with the line before them.
-     */
+    /** The server log or the access logs since the given time, oldest first (see {@link ServerLogFiles#read}). */
     private List<String> logLines(String prefix,Instant since,SupportRedactor redactor) throws IOException {
-        if(!Files.isDirectory(logDir))return List.of();
-        List<Path> files;
-        try(var list=Files.list(logDir)){
-            files=list.filter(p->p.getFileName().toString().startsWith(prefix)&&Files.isRegularFile(p,LinkOption.NOFOLLOW_LINKS))
-                    .filter(p->{try{return Files.getLastModifiedTime(p).toInstant().isAfter(since);}catch(IOException e){return false;}})
-                    .sorted(Comparator.comparing(p->{try{return Files.getLastModifiedTime(p);}catch(IOException e){return java.nio.file.attribute.FileTime.fromMillis(0);}}))
-                    .toList();
-        }
-        var lines=new ArrayDeque<String>();long chars=0;boolean keep=false;
-        String sinceText=LocalDateTime.ofInstant(since,ZoneId.systemDefault()).toString().replace('T',' ');
-        for(Path file:files){
-            InputStream in=Files.newInputStream(file,LinkOption.NOFOLLOW_LINKS);
-            if(file.getFileName().toString().endsWith(".gz"))in=new GZIPInputStream(in);
-            try(var reader=new BufferedReader(new InputStreamReader(in,StandardCharsets.UTF_8))){
-                for(String line;(line=reader.readLine())!=null;){
-                    var m=STAMP.matcher(line);
-                    if(m.find())keep=(m.group(1)+" "+m.group(2)).compareTo(sinceText)>=0;
-                    if(!keep)continue;
-                    String text=redactor.text(line.length()>2000?line.substring(0,2000)+" …":line);
-                    lines.addLast(text);chars+=text.length()+1;
-                    while(chars>MAX_LOG_CHARS&&!lines.isEmpty())chars-=lines.removeFirst().length()+1;
-                }
-            }
-        }
-        return List.copyOf(lines);
+        return ServerLogFiles.read(logDir,prefix,since,MAX_LOG_CHARS,line->true,redactor::text);
     }
     /** Values that must never leave the server, removed literally: hand-entered keys and web display secrets. */
     private List<String> secrets(){

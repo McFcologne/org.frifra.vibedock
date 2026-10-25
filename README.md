@@ -53,7 +53,7 @@ server; a display only receives its image.
 - **Troubleshooting.** Read a display's log over USB (any board) or over the network, and create an encrypted support file for a problem report.
 - **Web displays.** A browser, tablet or another program shows the image without hardware: a full-screen page that reloads itself, sharp in the size of the window (also as an iPhone home screen app), or a plain PNG link, protected by a secret in the link.
 - **Firmware from the server.** The Docker image carries the matching display firmware for every board: download it, install it from Chrome or Edge over USB and pair the display over the same cable in one go, or update paired displays over Wi-Fi with firmware signed by the server.
-- **Responsive administration.** Five navigation areas, remembered light/dark appearance, forms that open on demand, a design editor that saves every change right away, and a footer with build version, README and generated license information.
+- **Responsive administration.** Five navigation areas, shared light/dark appearance for administration and device web pages, forms that open on demand, a design editor that saves every change right away, and a footer with build version, README and generated license information.
 
 The Java 21 / Spring Boot server collects usage, renders an image in each device's resolution (240×240 for the VibeTV M1) and handles provider credentials. The firmware (ESP8266 or ESP32 with an SPI display) manages Wi-Fi and pairing, pulls the image and draws it, scaled to its screen. Provider credentials never go to a device.
 
@@ -141,7 +141,7 @@ Docker Hub (`mcfcologne/vibedock-server`) and on GitHub (`ghcr.io/mcfcologne/vib
 | --- | --- |
 | Administration | `http://<host>:10001/admin` (network-wide by default, plain HTTP) |
 | Public usage API and device image pull | `http://<host>:10002` |
-| Persistent data | `vibedock-server/docker.data/` (plaintext credentials; excluded from Git) |
+| Persistent data | `vibedock-server/docker.data/` (credential fields encrypted, readable with the private `.installation-id` in the same directory: keep it private; excluded from Git) |
 
 1. Open **Data sources**, add accounts as needed and use **Manage** to sign in or configure the Cursor team key.
 2. Connect the display by USB and open **Devices → Firmware** in Chrome or Edge (administration over HTTPS or on `localhost`): download a full backup, install the firmware and pair it right there with name and Wi-Fi.
@@ -207,6 +207,7 @@ The administration footer shows the build version and links to README, the PDF m
 | [`VibeDock-Feasibility-Codex-Claude.md`](VibeDock-Feasibility-Codex-Claude.md) | Original feasibility assessment |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release notes per version, used for the GitHub releases |
 | [`RELEASING.md`](RELEASING.md) | Releases, Docker registries, secrets and repository settings |
+| [`SECURITY.md`](SECURITY.md) | Supported versions and how to report a vulnerability privately |
 | [`AGENTS.md`](AGENTS.md) | IntelliJ setup and development rules |
 
 ## Background and credits
@@ -221,6 +222,7 @@ The administration footer shows the build version and links to README, the PDF m
 - Create and verify a private full backup of your own device before flashing. Build and test commands never flash hardware.
 - Original-firmware redistribution rights have not been established. No manufacturer firmware or device backups are distributed with this project.
 - Provider quota endpoints are internal interfaces, not guaranteed public APIs.
+- Report security problems privately as described in [SECURITY.md](SECURITY.md), not in a public issue.
 - Keep credentials, `.env`, `docker.data/`, source exports and generated build files out of Git. `docker.data/` also holds the firmware signing key (`ota-signing.key`): keep it with your backups; with a new key, displays must be paired again before they accept updates over Wi-Fi.
 
 ## License

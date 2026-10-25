@@ -196,11 +196,16 @@ try {
     await shot('25-firmware-installed', page.locator('#web-flasher'));
 
     // Display editor
-    await go('/admin/design'); await page.waitForTimeout(800); await shot('30-display-default', page, {fullPage: true});
-    await go('/admin/design?device=vibedock-0a1b2c000002'); await page.waitForTimeout(800); await shot('31-display-device', page, {fullPage: true});
+    // The theme gallery below the editor gets a picture of its own (its first two rows); the editor pictures leave it out.
+    const withoutThemes = () => page.addStyleTag({content: '.theme-catalog{display:none!important}'});
+    await go('/admin/design'); await page.waitForTimeout(800);
+    const catalog = await page.locator('#design-themes').boundingBox(), secondRow = await page.locator('#design-themes .theme-card').nth(5).boundingBox();
+    await shot('35-theme-catalog', page, {fullPage: true, clip: {x: catalog.x, y: catalog.y, width: catalog.width, height: secondRow.y + secondRow.height - catalog.y + 16}});
+    await withoutThemes(); await shot('30-display-default', page, {fullPage: true});
+    await go('/admin/design?device=vibedock-0a1b2c000002'); await page.waitForTimeout(800); await withoutThemes(); await shot('31-display-device', page, {fullPage: true});
     await page.locator('.design-band-add').click(); await page.waitForTimeout(800); await shot('32-display-hidden-band', page.locator('#design-bands'));
     await go('/admin/design?device=web-0123456789ab'); await page.waitForTimeout(800);
-    await shot('33-display-type', page, {fullPage: true});
+    await withoutThemes(); await shot('33-display-type', page, {fullPage: true});
     await page.locator('#design-mood-button').click(); await page.waitForTimeout(400); await shot('34-emoji-picker');
     await page.keyboard.press('Escape');
 

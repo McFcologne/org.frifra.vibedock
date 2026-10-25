@@ -13,6 +13,10 @@ import java.time.Duration;
 @SpringBootApplication
 public class Application {
     public static void main(String[] args) { SpringApplication.run(Application.class, args); }
+    // Existing JSON omits false/zero fields; keep those files and older device requests readable on Jackson 3.
+    @Bean org.springframework.boot.jackson.autoconfigure.JsonMapperBuilderCustomizer jsonCompatibility() {
+        return JsonCompatibility::configure;
+    }
     @Bean Clock clock() { return Clock.systemUTC(); }
     @Bean HttpClient httpClient() {
         return HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(6))

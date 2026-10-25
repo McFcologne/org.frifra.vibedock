@@ -1,6 +1,6 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import javax.imageio.ImageIO;
@@ -68,7 +68,7 @@ class TwemojiTest {
         for(String emoji:used)assertTrue(twemoji.image(emoji).isPresent(),"no Twemoji SVG for "+emoji+" "+Twemoji.fileNames(emoji));
     }
     @Test void devicesInheritTheDefaultEmojiUnlessOverridden(@TempDir Path dir) throws Exception {
-        var registry=new ClientRegistry(dir.toString(),new ObjectMapper(),Clock.systemUTC());
+        var registry=new ClientRegistry(dir.toString(),JsonCompatibility.mapper(),Clock.systemUTC());
         registry.paired("vibedock-a1b2c3d4","Desk","a".repeat(64),"192.168.1.20",80);
         assertEquals("🤖",registry.designFor("vibedock-a1b2c3d4").mood());
         registry.configureDesign(new Design(Scheme.MIDNIGHT,"🚀",null));
@@ -76,7 +76,7 @@ class TwemojiTest {
         registry.setDesign("vibedock-a1b2c3d4",new Design(Scheme.MIDNIGHT,"❤️",null));
         assertEquals("❤️",registry.designFor("vibedock-a1b2c3d4").mood());
         registry.paired("vibedock-a1b2c3d4","Desk","b".repeat(64),"192.168.1.20",80);
-        var reloaded=new ClientRegistry(dir.toString(),new ObjectMapper(),Clock.systemUTC());
+        var reloaded=new ClientRegistry(dir.toString(),JsonCompatibility.mapper(),Clock.systemUTC());
         assertEquals("❤️",reloaded.designFor("vibedock-a1b2c3d4").mood());
         registry.configure("","",45);
         assertEquals("🚀",registry.defaultDesign().mood());

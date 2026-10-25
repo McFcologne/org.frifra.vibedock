@@ -2,6 +2,99 @@
 
 The release workflow publishes the section of the tagged version (`## 0.1.0` for the tag `v0.1.0` or `0.1.0`) above the list of commits that GitHub generates.
 
+## 0.3.0
+
+About 99 % less data for displays, fifteen new themes and simpler USB pairing. The server sends only the changed
+parts of a picture and tells displays when to fetch the next one. The administration adds a gallery of all
+thirty-five themes, instance-wide theme availability and a shared Wi-Fi/USB pairing dialog. Touch rotation and
+optional, experimental battery power saving extend the firmware.
+
+**Updating:** update the server image first, then update the displays over Wi-Fi from the administration. The new
+firmware is needed for delta transfers, scheduled image pulls, the circle gesture, battery power saving and battery
+icon, and the Wi-Fi scan and power-cycle fixes. The themes, pairing interface, data-source intervals and preview
+fixes are server-side. Older firmware remains supported with complete pictures and its existing polling behaviour;
+it can be updated later. Battery power saving is off by default and remains experimental; energy savings have not
+been measured.
+
+- **Shared web appearance:** the administration's Light/Dark choice applies to the device setup and status pages.
+  Reachable devices receive a small push through the existing callback; the next authenticated image response is
+  the fallback. Open pages update appearance and refresh changed previews automatically, pausing in hidden tabs.
+- **USB startup:** native USB output no longer waits indefinitely for a computer to read it. Device information
+  is sent on an active HELLO request, keeping USB pairing and log reading available without blocking Wi-Fi startup.
+  The M1 starts automatically after flashing through a soft reset in both the script and browser flasher.
+  Both confirm its USB start to prevent unintended quick-boot setup/reset, including same-version reinstalls.
+- **Dependency refresh:** Spring Boot 4.1.2 / Jackson 3.1.4 retain existing settings, layouts and credential formats;
+  ESP32 boards move to Arduino 3.3.12 and the M1 uses upstream Mbed TLS 3.6.7 LTS. Firmware requires fresh device
+  validation. USB flashing selects one port before probing, avoiding resets of other connected displays.
+- **About 99 % less data for displays:** the server still renders the complete picture, but a display with the new
+  firmware receives only the parts that changed: usually a few hundred bytes to a few KB instead of 115,200 bytes
+  (112.5 KiB) for a complete 240 × 240 picture. Measured on a Waveshare 1.54 with readings every minute: 20 KB
+  instead of 1.84 MB in 20 minutes; the saving depends on how much of the picture changes. A complete picture is sent
+  after a start, for photos, on a forced refresh, when the previous picture is unavailable or uncertain, or when a
+  delta would not be smaller. The server log reports the complete and transferred sizes and the percentage saved.
+  Older firmware and older servers keep using complete pictures.
+- **Pull when the picture can change:** every answer tells the display when its picture can change next (the
+  next update of the sources it shows, a reading turning stale, the next photo), and the display pulls then instead
+  of every 30 s, so the unchanged answers in between are gone. Pending source updates get short retries. Waits are
+  capped at ten minutes for displays the server has reached directly within the last day, and two minutes otherwise.
+  The poll interval under *Settings* is now called *Fallback poll interval*: it applies to older firmware, failed
+  pulls and answers without a schedule. Both delta transfers and scheduled pulls need the new server and firmware.
+- **Update interval of the data sources:** *Data sources → Update interval* chooses between a fixed and a dynamic
+  interval, with a shortest and a longest one (default dynamic, 1 to 10 minutes). Dynamic learns for every source
+  how often its provider answers: each HTTP 429 adds a minute, an hour without one tries a minute less, and a 429 at
+  that shorter interval waits two, then four hours before the next try. Before, a source halved its interval with
+  every successful answer, so after a single 429 the next answer brought it back to one minute and it soon ran into
+  the limit again. The card of each source shows its current interval, and the server log every change. Server only.
+- **Theme gallery and instance availability:** Display shows all thirty-five themes with previews from the device
+  renderer. Choose a theme for the default or a device override, or disable individual themes for new selections
+  and swipe cycling across the instance. Existing designs keep their saved theme; at least one stays enabled.
+  Availability is stored in `themes.json` in the data directory.
+- **Ten new themes:** Mission Control, Departure Board, Nordic, Hi-Fi, Solarized, Pixel Quest, Bauhaus, E-Ink,
+  Industrial and Porcelain. All use the existing band layouts and display sizes. Update the server image;
+  no firmware update is needed.
+- **Five developer themes:** GitHub Dark, VS Code, Terminal, Git Diff and Debugger, with code-style headings,
+  reset lines and bars. Their mood emoji sits slightly higher. Server-rendered; no firmware update is needed.
+- **Clearer emoji contours:** Handheld LCD outlines icons in dark green; Blueprint adds a light contour and keeps
+  eyes and mouths dark enough to read. Icon sizes and positions stay unchanged, including scaled web displays.
+- **Pair over USB from the device list:** *Devices → Pair device* switches between **Wi-Fi** (IP and code) and
+  **USB**, remembered per browser. USB is the same form as *Firmware → Only pair*, without the detour to the firmware
+  page.
+- **Choosing a display over USB:** the firmware page and Troubleshooting list the displays allowed in this browser
+  before by their name, identifier, board and firmware, as each reports them over USB, instead of the browser's port
+  names (*USB JTAG/serial debug unit*). The browser's dialog for a new display lists only the USB chips of the boards.
+  Server only.
+- **Circle gesture on touch displays:** a circle drawn with one finger turns the picture in that direction, by a
+  quarter on the square Waveshare 1.54 and between upright and upside down on the other touch boards. The device
+  card turns with it, live. Needs the new server and firmware.
+- **Battery power saving (experimental):** displays with a battery connection (Waveshare 1.54, 1.47, C6 1.69,
+  S3 1.69, LilyGO T-Display-S3) get a switch on their device card. On battery, without a computer on USB, the display
+  uses Wi-Fi modem sleep, runs at 80 MHz and dims its backlight after a minute without touch. USB ends it. Off by
+  default; needs the new firmware.
+- **Battery icon:** on battery these displays show a small battery at the top right of their picture, on the 1.54
+  and the C6 1.69 filled to its level. It goes away on USB.
+- **Wi-Fi scan while a saved network is out of reach:** a display that keeps trying a saved network it cannot reach
+  (for example when it is paired over USB at another place) found no networks for **Pair now** or its setup portal;
+  it now pauses those attempts for the scan. Firmware.
+- **Quick power cycles:** the Wi-Fi setup and the factory reset count power cycles within ten seconds after power-on
+  instead of five; the Waveshare 1.54, with its start sound, left too little time. Firmware.
+- **Display logs with the server's view:** a display's log page compares its logs (free memory, memory after TLS,
+  slowest picture, aborted pictures, Wi-Fi signal, each with the change against the log before). Every saved log
+  keeps the server's own entries about the display from the same time (image transfers with delta or full and the
+  next pull, starts, updates); the switch **Server lines** shows them between the display's lines and adds them to the
+  download. An open log request shows when the display's next pull is due and how long the request stays valid.
+- **Display editor preview:** the device preview in the editor fits wide cases again instead of clipping the picture,
+  shows the right case after switching between devices, and opens enlarged at full size.
+- **IP without a box:** the server draws the display's IP in the theme's font and colour straight over the background;
+  the dark box behind it was left over from the time the display drew the IP itself.
+  Where it does not fit (narrow displays), `IP:` goes first, then the leading parts of the address (`…123.193`), so
+  the last parts stay visible.
+- **Emoji graphics in the repository:** the Twemoji 17.0.3 SVGs (unmodified, CC BY 4.0) and their license are
+  versioned under `third-party/twemoji`, with their origin, the archive's checksum and the update steps. The server,
+  the tests, the manual and the Docker image use these same files; the build no longer downloads Twemoji. Started from
+  the repository, the server finds them by itself; a JAR elsewhere uses a copy named `twemoji` next to it, and
+  `EMOJI_DIR` still names another folder. `ThemesImageTest` now always runs and draws into `target/themes.png`.
+  Rendering, the available emoji and the firmware stay the same.
+
 ## 0.2.4
 
 Claude sign-in renewal fixed, the Waveshare ESP32-S3-Touch-LCD-1.54 as a new tested board, quarter turns for square

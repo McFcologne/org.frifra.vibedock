@@ -1,6 +1,6 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class ContractTest {
-    final ObjectMapper json=new ObjectMapper();
+    final ObjectMapper json=JsonCompatibility.mapper();
     @Test void ipsAndCidrsUseSocketAddressesOnly() {
         assertTrue(IpNetworks.allows(List.of("192.168.2.0/24"),"192.168.2.170"));
         assertFalse(IpNetworks.allows(List.of("192.168.2.0/24"),"192.168.3.170"));

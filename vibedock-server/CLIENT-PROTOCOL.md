@@ -60,11 +60,22 @@ Right after flashing, the administration's browser flasher (*Devices › Firmwar
 
 | Command | Answer |
 | --- | --- |
-| `VIBEDOCK-HELLO` | `VIBEDOCK-READY {"identifier":"vibedock-…","name":"…","version":"0.1.0","paired":false,"board":"vibedock-m1","chip":"ESP8266"}` (also sent once at every start) |
-| `VIBEDOCK-BATTERY` | `VIBEDOCK-BATTERY {"supported":true,"voltageMv":3900,"estimatedPercent":80,"chargeSignal":"inactive","present":null}` (illustrative reading). Supported on `waveshare-s3-touch-lcd-154`; other boards return `supported:false`, null measurements and `chargeSignal:"unknown"`. |
+| `VIBEDOCK-HELLO` | `VIBEDOCK-READY {"identifier":"vibedock-…","name":"…","version":"0.1.0","paired":false,"board":"vibedock-m1","chip":"ESP8266"}` (sent only after HELLO; do not wait for an unsolicited startup reply) |
+| `VIBEDOCK-BATTERY` | `VIBEDOCK-BATTERY {"supported":true,"voltageMv":3900,"estimatedPercent":80,"chargeSignal":"inactive","present":null}` (illustrative reading). Supported on `waveshare-s3-touch-lcd-154` and, without a charging signal (`chargeSignal:"unknown"`), on `waveshare-c6-touch-lcd-169`; other boards return `supported:false`, null measurements and `chargeSignal:"unknown"`. |
 | `VIBEDOCK-SCAN` | `VIBEDOCK-NETWORKS [{"ssid":"…","rssi":-48,"open":false},…]`, the 12 strongest networks. While the display keeps trying a saved network out of reach, it pauses those attempts for the scan and resumes them afterwards. |
 | `VIBEDOCK-LOG` | `VIBEDOCK-LOG ["05-14 09:41:00 Start v0.1.0 vibedock-m1, Power on",…]`, the last 24 events oldest first: starts, Wi-Fi, pairing, server answers and why a connection failed (HTTP and TLS errors). Kept in `/log.txt` across restarts; no keys or passwords. **Devices → Troubleshooting → Read log over USB** shows it. |
 | `VIBEDOCK-SETUP {json}` | `VIBEDOCK-SETUP OK`, then the device restarts; or `VIBEDOCK-SETUP ERROR <reason>` |
+
+On native USB builds, idle output is nonblocking. Solicited responses are streamed without an additional buffer,
+with a 250 ms no-progress limit and a five-second total limit. A host that stops reading cannot prevent Wi-Fi
+startup. Abandoned replies may be incomplete; a new reply starts on a new line, and HELLO can be retried.
+The brief `VIBEDOCK-FIRMWARE` startup marker remains. Browser flows and `flash.sh` actively send HELLO.
+After restarting an M1, both flashers send HELLO again and close the console after its identity reply. This
+confirms USB activity even when reinstalling the same firmware version. The firmware services serial commands
+while waiting for quick-boot setup and allows two seconds for USB confirmation before a third quick start
+erases configuration. Confirmation cancels the quick-boot action; deliberate power cycles without a USB
+command still enter setup or factory reset. A failed post-flash confirmation produces a warning, without
+another automatic reset.
 
 On `waveshare-s3-touch-lcd-154`, `VIBEDOCK-READY` additionally contains a `battery` object with the same fields. Battery readings are optional diagnostics; they do not change pairing or device authentication. `present` stays null: the charging circuit cannot reliably identify a missing cell while USB is connected. The level is a coarse voltage-only estimate (null outside the expected range), not a fuel gauge; a voltage or active charging signal does not prove a battery is fitted. An inactive signal does not mean full. `chargeSignal` is `unstable` when the short sample contains both levels; slower cycling may not be detected. During a TLS handshake only HELLO and LOG are handled; send BATTERY again afterwards.
 
@@ -420,3 +431,20 @@ the supplied pin, or learn its own after a full check; ESP32 boards currently al
 The UI shows the external pin status and fingerprint under **Settings → Network**; the pairing forms only offer to leave the pin out.
 Successful status inspections are cached for one minute. **Devices → Troubleshooting → Server log** shows the
 recent application log, including resolver results, TLS errors and successful public-DNS routes.
+
+## Device web-page appearance
+
+A capable device sends `X-VibeDock-UI: 1` with its authenticated image pull. The server then includes
+`X-VibeDock-UI: light` or `dark` on both 200 and 304 responses, reflecting the instance-wide administration
+appearance. No header is added for older clients. The device accepts only these two values, stores changes
+in its existing configuration and uses the setting for setup/status pages.
+After a device advertises support, the server can also POST `/pull?ui=light` or `/pull?ui=dark` to its
+existing, subnet-restricted callback address. This cosmetic LAN callback returns 202 without scheduling an
+image pull; invalid values return 400. A change within 5 s of the last one returns 429 and is not saved (the
+device writes it to flash); the next image response brings it. It shares the existing unauthenticated `/pull` callback and cannot change
+pairing, credentials, calibration or server addresses. Unreachable devices learn the value through their next
+authenticated image response. An open page polls local `/ui-state` every five seconds, skips hidden tabs,
+and requests `/image.bmp` only when the device has completed another image. No persistent connection or
+additional image buffer is kept on the device. Missing or unknown
+values leave its saved preference unchanged (initial default: dark). The setting does not alter the rendered
+image, theme selection, colour calibration or backlight.

@@ -3,7 +3,7 @@ package org.frifra.vibedock.server;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -40,9 +40,27 @@ class AccessTest {
     @MockitoBean ProviderClient providers;
     @MockitoBean BrowserLogin login;
     @BeforeEach void resetSettings() throws Exception {
+        themes.setDark(false);
         for(var scheme:Scheme.values())themes.setEnabled(scheme,true);
         store.save(new SettingsStore.Settings(List.of("127.0.0.1/32"),new SettingsStore.Credential("",""),new SettingsStore.Credential("",""),List.of()));
         usage.forgetPacing();usage.configurationChanged();
+    }
+    @Test void deviceWebAppearanceFollowsServerOnFullAndUnchangedImages() throws Exception {
+        String key="ab".repeat(32),id="vibedock-ui-theme",path="/api/v1/clients/"+id+"/image";
+        clients.paired(id,"Appearance",key,"192.168.1.20",80);
+        mvc.perform(post("/admin/ui-theme").with(r->{r.setLocalPort(10001);return r;}).with(user("admin").roles("ADMIN")).param("dark","true")).andExpect(status().isForbidden());
+        var base=mvc.perform(get(path).header("Authorization","Bearer "+key).header("X-VibeDock-UI","1")
+                .with(r->{r.setLocalPort(8080);r.setRemoteAddr("192.168.1.20");return r;}))
+                .andExpect(status().isOk()).andExpect(header().string("X-VibeDock-UI","light")).andReturn().getResponse();
+        mvc.perform(post("/admin/ui-theme").with(r->{r.setLocalPort(10001);return r;}).with(user("admin").roles("ADMIN")).with(csrf()).param("dark","true")).andExpect(status().isOk());
+        mvc.perform(get(path).header("Authorization","Bearer "+key).header("X-VibeDock-UI","1").header("If-None-Match",base.getHeader("ETag"))
+                .with(r->{r.setLocalPort(8080);r.setRemoteAddr("192.168.1.20");return r;}))
+                .andExpect(status().isNotModified()).andExpect(header().string("X-VibeDock-UI","dark"));
+        mvc.perform(get(path).header("Authorization","Bearer "+key)
+                .with(r->{r.setLocalPort(8080);r.setRemoteAddr("192.168.1.20");return r;}))
+                .andExpect(status().isOk()).andExpect(header().doesNotExist("X-VibeDock-UI"));
+        mvc.perform(get("/admin").with(r->{r.setLocalPort(10001);return r;}).with(user("admin").roles("ADMIN"))).andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"vibedock-ui-theme\" content=\"dark\"")));
     }
     @Test @org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)
     void deltaTransfersReconstructTheFullImageAndKeepLegacyPreviewAndRedrawPaths(org.springframework.boot.test.system.CapturedOutput output) throws Exception {
@@ -174,9 +192,9 @@ class AccessTest {
         String body=mvc.perform(get("/api/v1/usage").with(r->{r.setLocalPort(8080);return r;}))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.providers.claude.status").value("suspended"))
                 .andExpect(jsonPath("$.providers.codex.status").value("ok")).andReturn().getResponse().getContentAsString();
-        var schema=com.networknt.schema.JsonSchemaFactory.getInstance(com.networknt.schema.SpecVersion.VersionFlag.V202012)
+        var schema=com.networknt.schema.SchemaRegistry.withDefaultDialect(com.networknt.schema.SpecificationVersion.DRAFT_2020_12)
                 .getSchema(Files.readString(java.nio.file.Path.of("usage.schema.json")));
-        Assertions.assertEquals(java.util.Set.of(),schema.validate(new com.fasterxml.jackson.databind.ObjectMapper().readTree(body)));
+        Assertions.assertEquals(List.of(),schema.validate(body,com.networknt.schema.InputFormat.JSON));
     }
     @Test void spoofedForwardedHeaderDoesNotBypassIpAllowlist() throws Exception {
         mvc.perform(get("/api/v1/usage").header("X-Forwarded-For","127.0.0.1")
@@ -500,7 +518,7 @@ class AccessTest {
                 .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNotFound());
         var saved=mvc.perform(post("/admin/clients/"+id+"/logs").contentType("application/json").content(body).with(admin).with(csrf())
                 .with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isOk()).andExpect(jsonPath("$.count").value(1)).andReturn();
-        String name=new com.fasterxml.jackson.databind.ObjectMapper().readTree(saved.getResponse().getContentAsString()).path("name").asText().replace(".json","");
+        String name=JsonCompatibility.mapper().readTree(saved.getResponse().getContentAsString()).path("name").asText().replace(".json","");
         mvc.perform(post("/admin/clients/../logs").contentType("application/json").content(body).with(admin).with(csrf())
                 .with(r->{r.setLocalPort(10001);return r;})).andExpect(status().is4xxClientError());
         mvc.perform(get("/admin/troubleshooting").with(admin).with(r->{r.setLocalPort(10001);return r;}))
@@ -531,7 +549,11 @@ class AccessTest {
             var pull=mvc.perform(get(image).header("Authorization","Bearer "+key).header("X-VibeDock-Firmware","0.2.0")
                     .with(r->{r.setLocalPort(8080);return r;})).andReturn();
             mvc.perform(post("/admin/clients/"+id+"/logs/request").with(admin).with(csrf()).with(r->{r.setLocalPort(10001);return r;}))
-                    .andExpect(flash().attribute("logMessage",org.hamcrest.Matchers.startsWith("Requested")));
+                    .andExpect(flash().attributeCount(0));
+            // The log page names the open request with its times and the next pull it waits for.
+            mvc.perform(get("/admin/clients/"+id+"/logs").with(admin).with(r->{r.setLocalPort(10001);return r;}))
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString("data-log-request")))
+                    .andExpect(content().string(org.hamcrest.Matchers.matchesPattern("(?s).*data-next-pull=\"[1-9]\\d{12}\".*")));
             String request=mvc.perform(get(image).header("Authorization","Bearer "+key).header("X-VibeDock-Firmware","0.2.0")
                     .header("If-None-Match",pull.getResponse().getHeader("ETag")).with(r->{r.setLocalPort(8080);return r;}))
                     .andExpect(status().isNotModified()).andReturn().getResponse().getHeader("X-VibeDock-Send-Log");
@@ -774,7 +796,7 @@ class AccessTest {
                 .with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isOk())
                 .andExpect(jsonPath("$.pairing.servers[0]").value("http://192.168.1.5:10002"))
                 .andExpect(jsonPath("$.pairing.name").value("Desk")).andExpect(jsonPath("$.pairing.pollSeconds").value(30)).andReturn();
-        String key=new com.fasterxml.jackson.databind.ObjectMapper().readTree(result.getResponse().getContentAsString()).path("pairing").path("key").asText();
+        String key=JsonCompatibility.mapper().readTree(result.getResponse().getContentAsString()).path("pairing").path("key").asText();
         Assertions.assertTrue(key.matches("[0-9a-f]{64}"));
         mvc.perform(get("/admin/firmware/setup/vibedock-a1b2c3d4e5f6").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
                 .andExpect(jsonPath("$.status").value("Waiting for first pull")).andExpect(jsonPath("$.ip").value(""));
@@ -992,7 +1014,7 @@ class AccessTest {
         mvc.perform(get("/web/"+"0".repeat(64)+"/icon.png").with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNotFound());
         mvc.perform(get("/web/"+secret).with(r->{r.setLocalPort(8080);return r;})).andExpect(content().string(org.hamcrest.Matchers.containsString("rel=\"apple-touch-icon\" href=\"/web/"+secret+"/icon.png\"")));
         // Changes: the state tag follows the image; a swipe changes the theme (POST only, no session needed).
-        var state=new com.fasterxml.jackson.databind.ObjectMapper().readTree(mvc.perform(get("/web/"+secret+"/state").with(r->{r.setLocalPort(8080);return r;}))
+        var state=JsonCompatibility.mapper().readTree(mvc.perform(get("/web/"+secret+"/state").with(r->{r.setLocalPort(8080);return r;}))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).path("tag").asText();
         var scheme=clients.designFor(view.identifier()).scheme();
         mvc.perform(post("/web/"+secret+"/swipe").param("direction","next").with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNoContent());

@@ -20,8 +20,11 @@ class DeviceApiController {
     private final DevicePower power;
     private final ImageDelta delta;
     private final PullSchedule schedule;
+    private final ThemeSettings themes;private final DevicePoke poke;
     DeviceApiController(ClientRegistry registry,DesignService designs,ServerAddresses addresses,TlsTrust trust,Firmware firmware,OtaSigning signing,DeviceLogs logs,AdminEvents events,
-                        DeviceDiagnostics diagnostics,DevicePower power,ImageDelta delta,PullSchedule schedule){
+                        DeviceDiagnostics diagnostics,DevicePower power,ImageDelta delta,PullSchedule schedule,ThemeSettings themes,DevicePoke poke){
+        this.poke=poke;
+        this.themes=themes;
         this.delta=delta;this.schedule=schedule;
         this.power=power;this.logs=logs;this.events=events;this.diagnostics=diagnostics;this.registry=registry;this.designs=designs;this.addresses=addresses;this.trust=trust;this.firmware=firmware;this.signing=signing;
     }
@@ -64,7 +67,10 @@ class DeviceApiController {
         byte[] pixels=designs.render(DesignService.forDevice(registry.designFor(identifier),serverFooter),peer,display,identifier).rgb565();
         int fullBytes=pixels.length;
         String tag="\""+HexFormat.of().formatHex(Arrays.copyOf(sha256(pixels),12))+"\"";
-        var headers=new HttpHeaders();headers.setETag(tag);headers.set("X-VibeDock-Image-Format",display.imageFormat());
+        var headers=new HttpHeaders();
+        if("1".equals(request.getHeader("X-VibeDock-UI"))){
+            headers.set("X-VibeDock-UI",themes.dark()?"dark":"light");poke.uiCapable(registry.address(identifier));
+        }headers.setETag(tag);headers.set("X-VibeDock-Image-Format",display.imageFormat());
         headers.set("X-VibeDock-Poll-Seconds",String.valueOf(designs.pollSeconds(registry.designFor(identifier),registry.pollSeconds(),identifier)));
         // When the picture can change next: firmware that follows it (X-VibeDock-Schedule: 1) pulls then instead of
         // every poll interval, also after a 304, and the server expects it then.
@@ -112,7 +118,7 @@ class DeviceApiController {
                 headers.set("X-VibeDock-Payload",p.payload());headers.set("X-VibeDock-Length",String.valueOf(pixels.length));
             }
         }
-        logTransfer(identifier,preview?"preview full":headers.containsKey("X-VibeDock-Base")?"delta":"full",fullBytes,pixels.length,next);
+        logTransfer(identifier,preview?"preview full":headers.containsHeader("X-VibeDock-Base")?"delta":"full",fullBytes,pixels.length,next);
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
         return new ResponseEntity<>(pixels,headers,HttpStatus.OK);
     }

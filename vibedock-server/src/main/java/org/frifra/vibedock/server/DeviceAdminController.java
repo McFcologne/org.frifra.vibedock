@@ -92,8 +92,8 @@ class DeviceAdminController {
         // The board names for the port choice (serial-console.js), which shows each display by what it reports over USB.
         var boards=new java.util.ArrayList<java.util.Map<String,Object>>();
         for(var b:Board.INVENTORY)boards.add(java.util.Map.of("id",b.id(),"label",b.label(),"chip",b.chip()));
-        try{model.addAttribute("boardLabels",new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(boards));}
-        catch(com.fasterxml.jackson.core.JsonProcessingException e){model.addAttribute("boardLabels","[]");}
+        try{model.addAttribute("boardLabels",new tools.jackson.databind.json.JsonMapper().writeValueAsString(boards));}
+        catch(tools.jackson.core.JacksonException e){model.addAttribute("boardLabels","[]");}
         return "troubleshooting";
     }
     record LogUpload(String firmware,String board,List<String> lines) {}
@@ -148,16 +148,33 @@ class DeviceAdminController {
             var view=registry.get(identifier);
             if(view.web()!=null||!sendsLog(view.firmware())){flash.addFlashAttribute("logMessage","This display can send its log only over USB. Update its firmware to read it over the network.");return page;}
             logs.request(identifier);long at=logs.lastRequest(identifier).map(DeviceLogs.RequestStatus::requestedAt).orElse(0L);
-            poke.pullNow(registry.address(identifier)).thenAccept(reach->logs.reached(identifier,at,reach));
-            flash.addFlashAttribute("logMessage","Requested. The log appears here by itself: within seconds, or with the display's next pull.");
+            var asked=poke.pullNow(registry.address(identifier)).thenAccept(reach->logs.reached(identifier,at,reach));
+            // The page names right away whether the display pulls now or with its next pull (the poke gives up after 3 s).
+            try{asked.get(4,java.util.concurrent.TimeUnit.SECONDS);}
+            catch(java.util.concurrent.TimeoutException|java.util.concurrent.ExecutionException ignored){ /* shown as not reached */ }
+            catch(InterruptedException e){Thread.currentThread().interrupt();}
         }catch(IllegalArgumentException e){flash.addFlashAttribute("logMessage","The device was already removed.");}
         return page;
     }
     @GetMapping("/admin/clients/{identifier}/logs") String logs(@PathVariable String identifier,org.springframework.ui.Model model) throws IOException {
         java.util.List<java.util.Map<String,Object>> entries=new java.util.ArrayList<>();
         try{
-            for(var entry:logs.list(identifier))
-                entries.add(java.util.Map.of("entry",entry,"text",String.join("\n",logs.read(identifier,entry.name()).map(DeviceLogs.Log::lines).orElse(List.of()))));
+            var saved=new java.util.ArrayList<DeviceLogs.Log>();
+            for(var entry:logs.list(identifier))logs.read(identifier,entry.name()).ifPresent(saved::add);
+            for(int i=0;i<saved.size();i++){
+                var log=saved.get(i);
+                // Logs are newest first: the one after this is the one before it.
+                var before=i+1<saved.size()?DeviceLogTimeline.figures(saved.get(i+1).lines()):null;
+                var figures=DeviceLogTimeline.figures(log.lines());
+                var item=new java.util.HashMap<String,Object>();
+                item.put("entry",log.entry());item.put("text",String.join("\n",log.lines()));
+                var merged=DeviceLogTimeline.merge(log.lines(),log.entry().savedAt(),log.serverLines()==null?List.of():log.serverLines());
+                item.put("lines",merged);
+                // The switch for the server lines only where there are some.
+                item.put("serverLines",merged.stream().anyMatch(l->"server".equals(l.source())));
+                item.put("cells",DeviceLogTimeline.cells(figures,before));
+                entries.add(item);
+            }
         }catch(IllegalArgumentException e){throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND);}
         String name=identifier;
         boolean paired=false,network=false;
@@ -166,19 +183,43 @@ class DeviceAdminController {
         model.addAttribute("identifier",identifier);model.addAttribute("deviceName",name);
         model.addAttribute("paired",paired);model.addAttribute("networkLog",network);
         model.addAttribute("logRequested",logs.pendingRequest(identifier).isPresent());
+        // An open request: when it was made, until when the display may answer, whether it was asked to pull now, and
+        // when its next pull is due (the announced one, otherwise the last pull plus the fallback poll interval).
+        var request=logs.lastRequest(identifier).filter(r->logs.pendingRequest(identifier).isPresent());
+        if(request.isPresent()){
+            Long next=null,last=null;
+            try{
+                var view=registry.get(identifier);last=view.lastPullAt();
+                next=registry.expectedPull(identifier).orElse(last==null?null:last+registry.pollSeconds());
+            }catch(IllegalArgumentException notPaired){ /* nothing to expect */ }
+            var r=request.get();
+            model.addAttribute("request",java.util.Map.of("requestedAt",r.requestedAt(),"until",r.until(),
+                    "reach",r.reach()==null?"":r.reach().name(),"nextPullAt",next==null?0L:next*1000,"lastPullAt",last==null?0L:last*1000,
+                    "pollSeconds",registry.pollSeconds()));
+        }
         model.addAttribute("entries",entries);model.addAttribute("keep",DeviceLogs.KEEP);
         return "device-logs";
     }
     @GetMapping(value="/admin/clients/{identifier}/logs/{name}.txt",produces="text/plain;charset=UTF-8") @ResponseBody
-    org.springframework.http.ResponseEntity<String> downloadLog(@PathVariable String identifier,@PathVariable String name) throws IOException {
+    org.springframework.http.ResponseEntity<String> downloadLog(@PathVariable String identifier,@PathVariable String name,
+            @RequestParam(defaultValue="false") boolean server) throws IOException {
         java.util.Optional<DeviceLogs.Log> found;
         try{found=logs.read(identifier,name+".json");}catch(IllegalArgumentException e){found=java.util.Optional.empty();}
         if(found.isEmpty())return org.springframework.http.ResponseEntity.notFound().build();
         var entry=found.get().entry();
         String text="VibeDock device log of "+identifier+"\nRead: "+java.time.Instant.ofEpochMilli(entry.savedAt())+" over "+("usb".equals(entry.source())?"USB":"the network")
-                +"\nFirmware: "+entry.firmware()+" · board: "+entry.board()+"\n\n"+String.join("\n",found.get().lines())+"\n";
+                +"\nFirmware: "+entry.firmware()+" · board: "+entry.board()+"\n\n";
+        if(!server)text+=String.join("\n",found.get().lines())+"\n";
+        else{
+            // With the server's lines about the display in the same time, marked "server", in server time.
+            var lines=found.get().lines();
+            var merged=DeviceLogTimeline.merge(lines,entry.savedAt(),found.get().serverLines()==null?List.of():found.get().serverLines());
+            var out=new StringBuilder("Display lines and server lines, times in "+java.time.ZoneId.systemDefault().getId()+"\n");
+            for(var line:merged)out.append(line.time().isEmpty()?"        ":line.time()).append("  ").append("server".equals(line.source())?"server ":"display").append("  ").append(line.text()).append('\n');
+            text+=out;
+        }
         return org.springframework.http.ResponseEntity.ok()
-                .header("Content-Disposition","attachment; filename=\"vibedock-log-"+identifier.replace(':','-')+"-"+name+".txt\"").body(text);
+                .header("Content-Disposition","attachment; filename=\"vibedock-log-"+identifier.replace(':','-')+"-"+name+(server?"-with-server":"")+".txt\"").body(text);
     }
     @PostMapping("/admin/clients/{identifier}/logs/{name}/delete") String deleteLog(@PathVariable String identifier,@PathVariable String name) throws IOException {
         try{logs.delete(identifier,name+".json");}catch(IllegalArgumentException ignored){ /* nothing to delete */ }

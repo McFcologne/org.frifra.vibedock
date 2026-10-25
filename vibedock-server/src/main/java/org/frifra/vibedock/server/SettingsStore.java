@@ -1,6 +1,6 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.annotation.Value;
 import java.io.IOException;
@@ -91,16 +91,16 @@ public class SettingsStore {
         validate(current);
     }
     /** Earlier files had exactly one Codex and one Claude credential; they become the two default sources. */
-    private Settings read(com.fasterxml.jackson.databind.JsonNode root) throws IOException {
+    private Settings read(tools.jackson.databind.JsonNode root) throws IOException {
         if(root.has("accounts")){
-            if(root instanceof com.fasterxml.jackson.databind.node.ObjectNode object)object.remove(IMPORT_TRANSACTION);
+            if(root instanceof tools.jackson.databind.node.ObjectNode object)object.remove(IMPORT_TRANSACTION);
             return json.treeToValue(root,Settings.class);
         }
         List<String> ips=new ArrayList<>();root.path("allowedIps").forEach(n->ips.add(n.asText()));
         var devices=Arrays.asList(json.treeToValue(root.path("devices").isMissingNode()?json.createArrayNode():root.path("devices"),Device[].class));
         return new Settings(ips,credential(root.path("codex")),credential(root.path("claude")),devices);
     }
-    private static Credential credential(com.fasterxml.jackson.databind.JsonNode node){
+    private static Credential credential(tools.jackson.databind.JsonNode node){
         return new Credential(node.path("token").asText(""),node.path("accountId").asText(""));
     }
     public Settings get() { return current; }
@@ -110,7 +110,7 @@ public class SettingsStore {
     public UsagePolling polling() {
         var known=polling;if(known!=null)return known;
         try{known=Files.exists(pollingFile())?json.readValue(pollingFile().toFile(),UsagePolling.class):UsagePolling.DEFAULT;}
-        catch(IOException|RuntimeException e){known=UsagePolling.DEFAULT;}
+        catch(RuntimeException e){known=UsagePolling.DEFAULT;}
         return polling=known;
     }
     public synchronized void savePolling(UsagePolling next) throws IOException {
@@ -149,7 +149,7 @@ public class SettingsStore {
     /** Id renames saved by assignRandomIds whose designs were not updated yet (an interrupted start). */
     synchronized Map<String,String> pendingRenames() throws IOException {
         if(!Files.exists(pendingFile()))return Map.of();
-        return json.readValue(pendingFile().toFile(),new com.fasterxml.jackson.core.type.TypeReference<LinkedHashMap<String,String>>(){});
+        return json.readValue(pendingFile().toFile(),new tools.jackson.core.type.TypeReference<LinkedHashMap<String,String>>(){});
     }
     synchronized void clearPendingRenames() throws IOException {Files.deleteIfExists(pendingFile());}
     private Path adminPasswordFile(){return directory.resolve("admin-password");}
@@ -194,7 +194,7 @@ public class SettingsStore {
     synchronized void save(Settings settings,String importTransaction) throws IOException {
         validate(settings);
         var node=json.valueToTree(settings);
-        if(importTransaction!=null)((com.fasterxml.jackson.databind.node.ObjectNode)node).put(IMPORT_TRANSACTION,importTransaction);
+        if(importTransaction!=null)((tools.jackson.databind.node.ObjectNode)node).put(IMPORT_TRANSACTION,importTransaction);
         secrets.write(file,json.writeValueAsBytes(node));
         current=settings;
     }

@@ -1,6 +1,6 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.*;
@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Claude sign-ins: the CLI runs in the source's folder shortly before the token expires, not otherwise. */
 class ClaudeRenewalTest {
-    private final ObjectMapper json=new ObjectMapper();
+    private final ObjectMapper json=JsonCompatibility.mapper();
     private static String credentials(long expiresAtMillis){
         return "{\"claudeAiOauth\":{\"accessToken\":\"a\",\"refreshToken\":\"r\",\"expiresAt\":"+expiresAtMillis+"}}";
     }

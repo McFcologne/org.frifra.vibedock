@@ -1,6 +1,6 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -11,7 +11,7 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SecretStoreTest {
-    final ObjectMapper json=new ObjectMapper();
+    final ObjectMapper json=JsonCompatibility.mapper();
     @Test void wholeFileEncryptionMigratesToSecretFieldsAndPreservesEditableMetadata(@TempDir Path dir) throws Exception {
         var vault=new SecretStore(dir,"","",true);Path file=dir.resolve("auth/claude/.credentials.json");Files.createDirectories(file.getParent());
         String plain="{\"claudeAiOauth\":{\"accessToken\":\"access-secret\",\"refreshToken\":\"refresh-secret\",\"expiresAt\":1900000000000,\"scopes\":[\"user:profile\"]},\"label\":\"Work\"}";
@@ -20,7 +20,7 @@ class SecretStoreTest {
         legacyFile(vault,dir,settings,oldSettings);
         Path note=dir.resolve("auth/claude/note.txt");Files.writeString(note,"readable auxiliary file");
         var migrated=new SecretStore(dir,"","",true);
-        var stored=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(file.toFile());
+        var stored=(tools.jackson.databind.node.ObjectNode)json.readTree(file.toFile());
         assertEquals("Work",stored.path("label").asText());assertEquals(1900000000000L,stored.path("claudeAiOauth").path("expiresAt").asLong());
         assertTrue(stored.path("claudeAiOauth").path("scopes").isArray());
         assertTrue(stored.path("claudeAiOauth").path("accessToken").asText().startsWith(SecretStore.FIELD_PREFIX));
@@ -126,8 +126,8 @@ class SecretStoreTest {
         Path file=dir.resolve("settings.json"),id=dir.resolve(".installation-id");byte[] encrypted=Files.readAllBytes(file);String original=Files.readString(id);
         Files.delete(id);assertThrows(java.io.IOException.class,()->new SettingsStore(dir.toString(),json));assertFalse(Files.exists(id));assertArrayEquals(encrypted,Files.readAllBytes(file));
         Files.writeString(id,UUID.randomUUID().toString());assertThrows(java.io.IOException.class,()->new SettingsStore(dir.toString(),json));assertArrayEquals(encrypted,Files.readAllBytes(file));
-        Files.writeString(id,original);var damaged=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(encrypted);
-        var field=(com.fasterxml.jackson.databind.node.ObjectNode)damaged.path("accounts").get(0).path("manual");
+        Files.writeString(id,original);var damaged=(tools.jackson.databind.node.ObjectNode)json.readTree(encrypted);
+        var field=(tools.jackson.databind.node.ObjectNode)damaged.path("accounts").get(0).path("manual");
         String cipher=field.path("token").asText();int n=SecretStore.FIELD_PREFIX.length()+3;
         field.put("token",cipher.substring(0,n)+(cipher.charAt(n)=='A'?'B':'A')+cipher.substring(n+1));
         byte[] tampered=json.writeValueAsBytes(damaged);Files.write(file,tampered);

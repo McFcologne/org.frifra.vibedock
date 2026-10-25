@@ -1,6 +1,6 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import java.awt.Color;
@@ -11,7 +11,7 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class LayoutTest {
-    private final ObjectMapper json=new ObjectMapper();
+    private final ObjectMapper json=JsonCompatibility.mapper();
     private static final String ID="vibedock-design-test";
     private static final Layout CUSTOM=layout(List.of(2,1,0),true);
     /** Bands in the given order: 0 = usage codex+claude, 1 = usage claude+codex, 2 = context. */
@@ -185,7 +185,7 @@ class LayoutTest {
         assertEquals(mixed,mixed.fit(DisplayType.M1));assertEquals(compact,compact.fit(DisplayType.M1));
         assertEquals(new Layout(List.of(u,u,new Layout.Context(false))),new Layout(List.of(u,u,c,new Layout.Context(false))).fit(DisplayType.M1));
         assertEquals(new Layout(List.of(u,new Layout.Context(false))),mixed.fit(DisplayType.of("128x160")));assertEquals(new Layout(List.of(c,c,new Layout.Context(true))),compact.fit(DisplayType.of("128x160")));
-        var json=new com.fasterxml.jackson.databind.ObjectMapper();
+        var json=JsonCompatibility.mapper();
         assertEquals("{\"type\":\"usage\",\"sources\":[\"codex\"]}",json.writerFor(Layout.Band.class).writeValueAsString(u));
         assertEquals(c,json.readValue("{\"type\":\"usage\",\"sources\":[\"claude\"],\"compact\":true}",Layout.Band.class));
         for(var type:DisplayType.INVENTORY)for(var scheme:Scheme.values()){

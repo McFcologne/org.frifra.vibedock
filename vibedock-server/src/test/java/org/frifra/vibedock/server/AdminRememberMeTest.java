@@ -4,7 +4,7 @@ import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -74,7 +74,7 @@ class AdminRememberMeTest {
                 .andExpect(status().isForbidden()).andExpect(header().string("X-VibeDock-CSRF","invalid"));
         var restored=mvc.perform(atAdmin(get("/admin/csrf").accept("application/json").cookie(cookie)))
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store")).andReturn();
-        var token=new com.fasterxml.jackson.databind.ObjectMapper().readTree(restored.getResponse().getContentAsString());
+        var token=JsonCompatibility.mapper().readTree(restored.getResponse().getContentAsString());
         var session=(MockHttpSession)restored.getRequest().getSession(false);assertNotNull(session);
         mvc.perform(atAdmin(post("/admin/refresh").session(session).cookie(cookie).header(token.path("headerName").asText(),token.path("token").asText())))
                 .andExpect(redirectedUrl("/admin"));

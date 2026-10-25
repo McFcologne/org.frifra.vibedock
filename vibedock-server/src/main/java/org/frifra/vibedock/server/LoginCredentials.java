@@ -1,6 +1,6 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import java.nio.file.*;
 import java.io.IOException;
 
@@ -55,7 +55,7 @@ final class LoginCredentials {
             if(secrets!=null)bytes=secrets.read(file);
             else try (var input=Files.newInputStream(file,LinkOption.NOFOLLOW_LINKS)) { bytes=input.readNBytes(65537); }
             if (bytes.length>65536) return empty();
-            var entries=new java.util.ArrayList<com.fasterxml.jackson.databind.JsonNode>();collect(json.readTree(bytes),entries,0);
+            var entries=new java.util.ArrayList<tools.jackson.databind.JsonNode>();collect(json.readTree(bytes),entries,0);
             var best=entries.stream().filter(e->e.toString().contains("auth.x.ai")).findFirst().or(()->entries.stream().findFirst());
             if (best.isEmpty()) return empty();
             String token=best.get().path("key").textValue();
@@ -85,7 +85,7 @@ final class LoginCredentials {
             return new SettingsStore.Credential(token.textValue(),"");
         } catch (IOException | RuntimeException ignored) { return empty(); }
     }
-    private static void collect(com.fasterxml.jackson.databind.JsonNode node,java.util.List<com.fasterxml.jackson.databind.JsonNode> out,int depth) {
+    private static void collect(tools.jackson.databind.JsonNode node,java.util.List<tools.jackson.databind.JsonNode> out,int depth) {
         if (depth>4) return;
         if (node.isObject() && node.path("key").isTextual() && !node.path("key").textValue().isBlank()
                 && !node.path("key").textValue().startsWith("xai-")) out.add(node);

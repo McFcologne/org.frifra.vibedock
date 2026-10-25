@@ -44,6 +44,7 @@ String wifiProblem;  // why the last connection to the saved network failed, sho
 bool setupRequested = false;  // two quick power cycles: open the Wi-Fi setup although a network is saved
 // True once the saved network has connected at least once. Only such a proven network is waited for when it is
 // missing (e.g. a phone hotspot); a newly entered network that never worked opens the setup again with the reason.
+bool uiDark = true;  // last appearance received from the server; also used by the setup portal
 bool networkVerified = false;
 String pin;  // SHA-1 fingerprint of the https server certificate, learned over a fully verified connection
 String servers[2]; uint8_t serverCount = 0, serverIndex = 0, storedIndex = 0;
@@ -57,7 +58,7 @@ void applyOrientation(uint8_t next);
 bool powerSavingAllowed = false, powerSaving = false, dimmed = false;
 client_policy::PowerSource powerSource;
 uint32_t lastActivity = 0, lastPowerCheck = 0;
-int batteryLevel = -1;  // the estimate of the last power check (1.54 only, steps of 20 %), -1 unknown
+int batteryLevel = -1;  // the estimate of the last power check (1.54 and C6 1.69, steps of 20 %), -1 unknown
 client_policy::ToneSettings toneSettings;  // colour correction of the panel, set on the status page
 client_policy::Tone panelTone;
 
@@ -66,6 +67,7 @@ Mode mode = Mode::Starting;
 String pairingCode, shownIp;
 uint8_t wrongCodes = 0;
 bool haveImage = false, staleScreen = true;
+uint32_t imageRevision = 0;
 uint32_t lastPull = 0, lastImage = 0, lastFooter = 0, lastReconnect = 0;
 // The wait the server announced after the last pull (X-VibeDock-Next-Pull), 0: every poll interval. pending: it was
 // still asking a source of this display, so the picture may change shortly.
@@ -211,21 +213,50 @@ void loadLog() {
   for (auto &line : current) add(line);
   logStored = true; saveLog();
 }
+// Only native USB needs protection against an attached host that does not consume its TX buffer.
+#if defined(ESP32) && ARDUINO_USB_CDC_ON_BOOT
+#include "serial_reply.h"
+struct SerialReplyClock { uint32_t now(){return millis();} void pause(){delay(1);} };
+class SerialResponse:public Print {
+  BoundedSerialReply<decltype(Serial),SerialReplyClock> output;
+  bool first=true;
+public:
+  explicit SerialResponse(decltype(Serial) &port):output(port){}
+  using Print::write;
+  size_t write(const uint8_t *bytes,size_t length) override{
+    if(first){first=false;const uint8_t newline='\n';output.write(&newline,1);} // resync after an abandoned reply
+    return output.write(bytes,length);
+  }
+  size_t write(uint8_t byte) override{return write(&byte,1);}
+};
+#else
+using SerialResponse=decltype(Serial)&; // UART boards keep their existing output and memory footprint.
+#endif
+void flushSerialReply(){
+#if defined(ESP32) && ARDUINO_USB_CDC_ON_BOOT
+  Serial.setTxTimeoutMs(100); // bound the final drain before a setup restart
+#endif
+  Serial.flush();
+#if defined(ESP32) && ARDUINO_USB_CDC_ON_BOOT
+  Serial.setTxTimeoutMs(0);
+#endif
+}
 void serialLog() {
+  SerialResponse reply(Serial);
   if (logDirty) saveLog();
   // Written as JSON line by line, without a JsonDocument: the log is also read during a TLS handshake, when the
   // heap is nearly used up.
-  Serial.print(F("VIBEDOCK-LOG ["));
+  reply.print(F("VIBEDOCK-LOG ["));
   bool first = true;
-  auto line = [&first](const String &text) {
-    if (!first) Serial.print(',');
-    first = false; Serial.print('"');
+  auto line = [&first,&reply](const String &text) {
+    if (!first) reply.print(',');
+    first = false; reply.print('"');
     for (char c : text) {
-      if (c == '"' || c == '\\') { Serial.print('\\'); Serial.print(c); }
-      else if (uint8_t(c) < 32) Serial.print(' ');
-      else Serial.print(c);
+      if (c == '"' || c == '\\') { reply.print('\\'); reply.print(c); }
+      else if (uint8_t(c) < 32) reply.print(' ');
+      else reply.print(c);
     }
-    Serial.print('"');
+    reply.print('"');
   };
   if (logParked) {
     auto in = LittleFS.open("/log.txt", "r");
@@ -234,7 +265,7 @@ void serialLog() {
   } else {
     for (uint8_t i = 0; i < logCount; i++) line(logLines[(logNext + LOG_LINES - logCount + i) % LOG_LINES]);
   }
-  Serial.println(']');
+  reply.println(']');
 }
 String footerText;
 uint16_t footerBackground = TFT_BLACK, footerDrawn = TFT_BLACK;
@@ -451,13 +482,14 @@ String randomHex(size_t bytes) {
 
 // ---- configuration ----
 bool writeConfig();
+void saveLater();
 bool saveConfig() { PhaseScope saving(Phase::Config); return writeConfig(); }
 bool writeConfig() {
   JsonDocument doc;
   doc["identifier"] = identifier; doc["name"] = deviceName;
   doc["ssid"] = ssid; doc["password"] = password; doc["key"] = key; doc["poll"] = pollSeconds; doc["pin"] = pin;
   doc["verified"] = networkVerified; doc["brightness"] = brightness; doc["flipped"] = turns == 2; doc["turns"] = turns;
-  doc["powerSaving"] = powerSavingAllowed;
+  doc["powerSaving"] = powerSavingAllowed; doc["uiDark"] = uiDark;
 #ifdef VIBEDOCK_AUDIO_ES8311
   doc["volume"] = audio::volume();
 #endif
@@ -477,6 +509,7 @@ bool loadConfig() {
   if (file && file.size() <= 2048) {
     JsonDocument doc;
     if (!deserializeJson(doc, file)) {
+      uiDark = doc["uiDark"] | true;
       identifier = doc["identifier"].as<String>(); deviceName = doc["name"] | "";
       ssid = doc["ssid"].as<String>(); password = doc["password"].as<String>();
       key = doc["key"] | ""; pin = doc["pin"] | "";
@@ -550,11 +583,48 @@ void pageStart(const String &subtitle) {
   web.sendHeader("Cache-Control", "no-store");
   platform::chunkedStart(web, "text/html; charset=utf-8");
   web.sendContent_P(PAGE_HEAD);
+  web.sendContent(uiDark ? F("<style id=\"ui-light\" media=\"not all\">") : F("<style id=\"ui-light\">"));
+  web.sendContent(F(":root{color-scheme:light}body{background:#f3f5fa;color:#162030}"
+      ".card{background:#fff;border-color:#dce2ed}.net{border-color:#dce2ed}"
+      "header p,h2,.f,.muted,dt,.hint{color:#586b87}input[type=text],input[type=password]{background:#fff;border-color:#ccd5e4}"
+      "a{color:#5145d9}.problem{background:#fff3d6;border-color:#eed49c;color:#855000}"
+      ".sig:not(.l1):not(.l2):not(.l3) i{background:#ccd5e4}.ok{color:#167344}.warn{color:#965600}.bad{color:#b52230}</style>"));
   web.sendContent(String(F("<title>VibeDock - ")) + subtitle + F("</title><link rel=\"icon\" href=\"/favicon.ico\" sizes=\"32x32\">"
       "<link rel=\"icon\" href=\"/favicon.svg\" type=\"image/svg+xml\"><link rel=\"apple-touch-icon\" href=\"/apple-touch-icon.png\">"
       "</head><body><main><header>"));
   web.sendContent_P(PAGE_LOGO);
   web.sendContent(String(F("<div><h1>VibeDock</h1><p>")) + subtitle + F("</p></div></header>"));
+}
+// A tiny live status for open browser pages; no image buffer or persistent socket on the device.
+const char PAGE_LIVE[] PROGMEM = R"JS((()=>{
+  const light=document.getElementById('ui-light'), image=document.querySelector('img.screen');
+  let version=image?.dataset.imageVersion, loading=false;
+  async function poll(){
+    try {
+      if(document.hidden||loading)return;
+      const response=await fetch('/ui-state',{cache:'no-store'});
+      if(!response.ok)return;
+      const state=await response.json();
+      light.media=state.dark?'not all':'all';
+      const next=state.boot+':'+state.image;
+      if(image&&state.image&&version!==next){
+        loading=true;
+        image.onload=()=>{version=next;loading=false;};
+        image.onerror=()=>{loading=false;};
+        image.src='/image.bmp?v='+encodeURIComponent(next);
+      }
+    }catch(e){}finally{setTimeout(poll,5000);}
+  }
+  setTimeout(poll,5000);
+})();)JS";
+void uiState() {
+  JsonDocument doc;doc["dark"]=uiDark;doc["boot"]=diag.boot;
+  doc["image"]=haveImage && imageOnScreen && !staleScreen ? imageRevision : 0;
+  String text;serializeJson(doc,text);web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",text);
+}
+void serveUi() {
+  web.on("/ui-state",HTTP_GET,uiState);
+  web.on("/ui.js",HTTP_GET,[]{web.sendHeader("Cache-Control","no-store");web.send_P(200,"text/javascript",PAGE_LIVE);});
 }
 // Browser icons, the same as the administration's; registered in the setup portal and on the status page.
 void serveIcons() {
@@ -567,13 +637,14 @@ void serveIcons() {
 }
 void pageEnd() {
   web.sendContent_P(PAGE_HINT);
-  web.sendContent(F("</main></body></html>"));
+  web.sendContent(F("</main><script src=\"/ui.js\" defer></script></body></html>"));
   platform::chunkedEnd(web);
 }
 
 // ---- factory reset by power-cycling ----
 // Power-on and external resets count; software restarts and crashes clear the counter.
-bool quickBootPending = false;
+bool quickBootPending = false, usbBootConfirmed = false;
+void serialPoll(bool duringTls = false);
 // The first start of a new firmware is no power cycle either: flashing over USB resets the device several times
 // (scripts/flash.sh asks the chip, writes, then the device is plugged in again), which used to open the Wi-Fi setup.
 bool newFirmware() {
@@ -588,7 +659,7 @@ bool newFirmware() {
 uint8_t countQuickBoot() {
   bool updated = newFirmware();
   if (updated) logEvent(F("New firmware: this start is not counted as a power cycle"));
-  if (updated || !platform::powerCycleStart()) { LittleFS.remove("/boots"); return 0; }
+  if (updated || usbBootConfirmed || !platform::powerCycleStart()) { LittleFS.remove("/boots"); return 0; }
   int count = 0;
   auto in = LittleFS.open("/boots", "r");
   if (in) { count = max(in.read(), 0); in.close(); }
@@ -603,8 +674,14 @@ void settleQuickBoot() {
   if (quickBootPending && millis() >= client_policy::quickBootMs) { quickBootPending = false; LittleFS.remove("/boots"); }
 }
 void handleQuickBoots() {
+  serialPoll(); // accept a HELLO already queued during startup before counting this boot
   uint8_t boots = countQuickBoot();
   if (client_policy::factoryResetDue(boots)) {
+    // Give the flasher time to identify the new application before any destructive reset. Real unplugging
+    // still works: without an active USB confirmation the third quick start resets after this short grace.
+    uint32_t began = millis();
+    while (!usbBootConfirmed && uint32_t(millis() - began) < client_policy::usbBootGraceMs) { serialPoll(); delay(10); }
+    if (usbBootConfirmed) return;
     // Factory reset: our whole configuration (Wi-Fi, pairing key, servers) and the Wi-Fi credentials the ESP8266
     // SDK keeps in its own flash sectors. The identifier is derived from the MAC again; the setup password stays.
     message("Factory reset", Step::None, true); logEvent(String(F("Factory reset after ")) + String(boots) + F(" quick power cycles"));
@@ -615,8 +692,8 @@ void handleQuickBoots() {
     // Second quick start: unplugging once more resets everything, waiting opens the Wi-Fi setup (pairing stays).
     message("Unplug now for factory reset", Step::None, true); logEvent(F("Second quick power cycle: Wi-Fi setup unless unplugged"));
     showDetail("or wait: Wi-Fi setup");
-    while (quickBootPending) { settleQuickBoot(); delay(50); }
-    setupRequested = true;
+    while (quickBootPending) { serialPoll(); settleQuickBoot(); delay(50); }
+    setupRequested = !usbBootConfirmed;
   }
 }
 
@@ -744,7 +821,7 @@ void startPortal() {
   setupDns.start(53, "*", WiFi.softAPIP());
   showSetupCode(apName, apPassword);
   web.on("/", HTTP_GET, portalPage);
-  serveIcons();
+  serveIcons(); serveUi();
   web.on("/save", HTTP_POST, [] {
     if (web.arg("ssid").isEmpty() || web.arg("ssid").length() > 32 || web.arg("password").length() > 64) {
       web.sendHeader("Location", "/", true); web.send(303, "text/plain", ""); return;
@@ -976,7 +1053,7 @@ File *uploadFile = nullptr; String uploadRequest;
 int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
   if (!r.http.begin(*r.client, url)) return HTTPC_ERROR_CONNECTION_FAILED;
   const char *wanted[] = {"ETag", "X-VibeDock-Image-Format", "X-VibeDock-Poll-Seconds", "X-VibeDock-Tls-Pin", "X-VibeDock-Redraw", "X-VibeDock-Update", "x-MD5", "X-VibeDock-Length", "X-VibeDock-Send-Log", "X-VibeDock-Orientation",
-      "X-VibeDock-Base", "X-VibeDock-Check", "X-VibeDock-Payload", "X-VibeDock-Next-Pull"
+      "X-VibeDock-Base", "X-VibeDock-Check", "X-VibeDock-Payload", "X-VibeDock-Next-Pull", "X-VibeDock-UI"
 #ifdef VIBEDOCK_AUDIO_ES8311
       , "X-VibeDock-Quota"
 #endif
@@ -992,6 +1069,7 @@ int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
   r.http.addHeader("Authorization", String(F("Bearer ")) + key);
   r.http.addHeader("X-VibeDock-Device-IP", WiFi.localIP().toString());  // the server may only see a NAT gateway
   r.http.addHeader("X-VibeDock-Subnet-Mask", WiFi.subnetMask().toString());  // USB and legacy registrations learn their mask once
+  r.http.addHeader("X-VibeDock-UI", "1");
   r.http.addHeader("X-VibeDock-Footer", "server");  // this firmware shows the IP the server draws into the image
   r.http.addHeader("X-VibeDock-Firmware", VIBEDOCK_VERSION);  // lets the administration offer updates
   r.http.addHeader("X-VibeDock-Display", String(panel.width()) + "x" + String(panel.height()));  // suggests the display type
@@ -1168,6 +1246,12 @@ void pull() {
     audio::quotas(http.header("X-VibeDock-Quota").c_str());
 #endif
   }
+  if (code == 200 || code == 304) {
+    String appearance = http.header("X-VibeDock-UI");
+    if ((appearance == "dark" || appearance == "light") && uiDark != (appearance == "dark")) {
+      uiDark = appearance == "dark"; saveLater();
+    }
+  }
   String offered = code == 200 || code == 304 ? http.header("X-VibeDock-Update") : "";
   String logRequest = code == 200 || code == 304 ? http.header("X-VibeDock-Send-Log") : "";
   if (code > 0 && http.hasHeader("X-VibeDock-Poll-Seconds")) {
@@ -1217,6 +1301,7 @@ void pull() {
         ?readImageDelta(http.getStreamPtr(),size,length,payload,check,https?15000:8000)
         :readImage(http.getStreamPtr(),size,https?15000:8000));
     if (complete) {
+      ++imageRevision;
       lastImageSize=size;deltaReady=size.width==panel.width()&&size.height==panel.height();
       etag = http.header("ETag"); lastImage = millis(); haveImage = true; staleScreen = false; footer(); imageFailures = 0;
       if (first) logEvent(String(F("Image shown, read in ")) + String(millis() - reading) + " ms", true);
@@ -1311,7 +1396,11 @@ void statusPage() {
     String card = F("<section class=\"card\"><h2>Battery</h2><dl><dt>Measured voltage</dt><dd>");
     card += String(power.millivolts / 1000.0, 2) + F(" V</dd><dt>Estimated level</dt><dd>");
     card += power.estimatedPercent < 0 ? String(F("Unknown")) : String("~") + String(power.estimatedPercent) + " %";
+#ifdef VIBEDOCK_BATTERY_CHARGE
     card += F("</dd><dt>Charging signal</dt><dd>"); card += power.chargeSignal;
+#else
+    card += F("</dd><dt>Charging signal</dt><dd>none on this board");
+#endif
     card += powerRows();
     card += F("<dt>Battery present</dt><dd>Unknown</dd></dl><p class=\"muted\">Voltage-based estimate only. "
         "USB power and charging affect the reading. A voltage or charging signal does not prove a battery is fitted; "
@@ -1361,7 +1450,7 @@ void colourCard() {
   uint16_t w = lastImageSize.width ? lastImageSize.width : 240, h = lastImageSize.height ? lastImageSize.height : 240;
   String card = F("<form action=\"/colours\" method=\"post\"><section class=\"card\"><h2>Display colours</h2>"
       "<div style=\"display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start\"><figure style=\"margin:0;flex:none\"><img class=\"screen\" src=\"/image.bmp?t=");
-  card += millis(); card += F("\" width=\""); card += w; card += F("\" height=\""); card += h; card += F("\" style=\"width:"); card += w;
+  card += millis(); card += F("\" data-image-version=\""); card += String(diag.boot) + ":" + String(imageRevision); card += F("\" width=\""); card += w; card += F("\" height=\""); card += h; card += F("\" style=\"width:"); card += w;
   card += F("px;height:"); card += h;
   card += F("px;max-width:100%;object-fit:contain;image-rendering:pixelated\" alt=\"Current image\">"
       "<figcaption class=\"muted\">Uncorrected, as the server sends it. <a href=\"/\">Reload</a></figcaption></figure><div style=\"flex:1;min-width:200px\">");
@@ -1436,8 +1525,21 @@ void imagePage() {
   http.end();
 }
 // The server asks for an immediate pull, e.g. after a design change. No data: the pull itself is authenticated.
-uint32_t lastPullRequest = 0;
+uint32_t lastPullRequest = 0, lastUiRequest = 0;
 void handlePullRequest() {
+  // Cosmetic state only, on the existing LAN callback. A UI-only push never requests another image. The callback is
+  // unauthenticated and a change is saved to flash: at most one change per pause, like image pulls; one refused
+  // here arrives with the next image response (X-VibeDock-UI).
+  if (web.hasArg("ui")) {
+    String appearance=web.arg("ui");
+    if (appearance!="dark" && appearance!="light") { web.send(400,"text/plain",""); return; }
+    if (uiDark != (appearance=="dark")) {
+      if (lastUiRequest != 0 && !client_policy::pullRequestAllowed(millis(), lastUiRequest)) { web.send(429,"text/plain",""); return; }
+      lastUiRequest = millis(); if (lastUiRequest == 0) lastUiRequest = 1;
+      uiDark=appearance=="dark"; saveLater();
+    }
+    web.send(202,"text/plain",""); return;
+  }
   if (mode != Mode::Paired) { web.send(409, "text/plain", ""); return; }
   pullWaitMs = 0;  // the poll interval applies until the server answers again
   uint32_t poll = client_policy::clampPoll(pollSeconds) * 1000u;
@@ -1454,7 +1556,7 @@ void handlePullRequest() {
 }
 void startPairingServer() {
   web.on("/", HTTP_GET, statusPage);
-  serveIcons();
+  serveIcons(); serveUi();
   web.on("/image.bmp", HTTP_GET, imagePage);
   web.on("/colours", HTTP_POST, saveColours);
 #ifdef VIBEDOCK_AUDIO_ES8311
@@ -1487,43 +1589,47 @@ void batteryJson(JsonObject target) {
   }
 }
 void serialBattery() {
+  SerialResponse reply(Serial);
   JsonDocument doc; batteryJson(doc.to<JsonObject>());
-  Serial.print(F("VIBEDOCK-BATTERY ")); serializeJson(doc, Serial); Serial.println();
+  reply.print(F("VIBEDOCK-BATTERY ")); serializeJson(doc, reply); reply.println();
 }
 void serialReady() {
+  SerialResponse reply(Serial);
   JsonDocument doc; doc["identifier"] = identifier; doc["name"] = deviceName; doc["version"] = VIBEDOCK_VERSION; doc["paired"] = !key.isEmpty();
   doc["board"] = VIBEDOCK_BOARD; doc["chip"] = VIBEDOCK_CHIP;
   // Leave HELLO lightweight on other boards, including the ESP8266 TLS callback.
 #ifdef VIBEDOCK_BATTERY
   batteryJson(doc["battery"].to<JsonObject>());
 #endif
-  Serial.print(F("VIBEDOCK-READY ")); serializeJson(doc, Serial); Serial.println();
+  reply.print(F("VIBEDOCK-READY ")); serializeJson(doc, reply); reply.println();
 }
 void serialNetworks() {
+  SerialResponse reply(Serial);
   scanWifi();
   JsonDocument doc; JsonArray list = doc.to<JsonArray>();
   for (uint8_t i = 0; i < networkCount; i++) {
     JsonObject n = list.add<JsonObject>(); n["ssid"] = networks[i].ssid; n["rssi"] = networks[i].rssi; n["open"] = networks[i].open;
   }
-  Serial.print(F("VIBEDOCK-NETWORKS ")); serializeJson(doc, Serial); Serial.println();
+  reply.print(F("VIBEDOCK-NETWORKS ")); serializeJson(doc, reply); reply.println();
 }
 void serialSetup(const String &body) {
+  SerialResponse reply(Serial);
   JsonDocument doc;
-  if (deserializeJson(doc, body)) { Serial.println(F("VIBEDOCK-SETUP ERROR invalid request")); return; }
+  if (deserializeJson(doc, body)) { reply.println(F("VIBEDOCK-SETUP ERROR invalid request")); return; }
   String newSsid = doc["ssid"] | "", newPassword = doc["password"] | "";
-  if (newSsid.isEmpty() || newSsid.length() > 32 || newPassword.length() > 64) { Serial.println(F("VIBEDOCK-SETUP ERROR invalid Wi-Fi")); return; }
+  if (newSsid.isEmpty() || newSsid.length() > 32 || newPassword.length() > 64) { reply.println(F("VIBEDOCK-SETUP ERROR invalid Wi-Fi")); return; }
   int status = applyPairing(doc);
-  if (status == 400) { Serial.println(F("VIBEDOCK-SETUP ERROR no usable server address or invalid key")); return; }
+  if (status == 400) { reply.println(F("VIBEDOCK-SETUP ERROR no usable server address or invalid key")); return; }
   ssid = newSsid; password = newPassword; networkVerified = false;
-  if (status != 200 || !saveConfig()) { Serial.println(F("VIBEDOCK-SETUP ERROR storage")); return; }
-  Serial.println(F("VIBEDOCK-SETUP OK")); Serial.flush();
+  if (status != 200 || !saveConfig()) { reply.println(F("VIBEDOCK-SETUP ERROR storage")); return; }
+  reply.println(F("VIBEDOCK-SETUP OK")); flushSerialReply();
   message("Set up, restarting", Step::None);
   diagIntent(Intent::Setup); delay(500); ESP.restart();
 }
 // duringTls: called from inside a TLS handshake, which takes seconds on the ESP8266; only reading the log and the
 // hello answer then, nothing that scans, restarts or changes the configuration.
 bool usbDuringTls = false;
-void serialPoll(bool duringTls = false) {
+void serialPoll(bool duringTls) {
   if (!duringTls && usbDuringTls) {
     usbDuringTls = false; quickBootPending = false; LittleFS.remove("/boots"); logEvent(F("USB console: this start is not counted as a power cycle"));
   }
@@ -1534,6 +1640,7 @@ void serialPoll(bool duringTls = false) {
       // Opening the USB port can reset the chip like a power cycle (reset reason "External System"). A start that
       // talks to the administration over USB is not counted, so reading the log or pairing over the cable never
       // adds up to the Wi-Fi setup or a factory reset.
+      if (line.startsWith("VIBEDOCK-")) usbBootConfirmed = true;
       if (line.startsWith("VIBEDOCK-") && quickBootPending && duringTls) usbDuringTls = true;  // logged afterwards: little stack here
       else if (line.startsWith("VIBEDOCK-") && quickBootPending) {
         quickBootPending = false; LittleFS.remove("/boots"); logEvent(F("USB console: this start is not counted as a power cycle"));
@@ -1593,11 +1700,14 @@ void setup() {
   platform::crashBegin();  // the crash of the run before, and from now on the panic handler
   diagBegin();  // first: anything before would overwrite the state of the run before
   Serial.setRxBufferSize(1024); Serial.begin(115200);  // the flasher sends in paced chunks
+#if defined(ESP32) && ARDUINO_USB_CDC_ON_BOOT
+  Serial.setTxTimeoutMs(0); // an attached Mac must never hold the network startup waiting for USB reads
+#endif
 #ifdef VIBEDOCK_BOOT_TRACE
   pinMode(TFT_BL, OUTPUT); digitalWrite(TFT_BL, TFT_BACKLIGHT_ON); delay(3000);
 #endif
   BOOT_TRACE("serial");
-  Serial.println(); Serial.println(reinterpret_cast<const __FlashStringHelper *>(IDENTITY));
+  { SerialResponse reply(Serial); reply.println(); reply.println(reinterpret_cast<const __FlashStringHelper *>(IDENTITY)); }
   platform::onTlsWait([] { serialPoll(true); });  // the log stays readable during a long TLS handshake
 #ifdef VIBEDOCK_POWER_PIN
   pinMode(VIBEDOCK_POWER_PIN, OUTPUT); digitalWrite(VIBEDOCK_POWER_PIN, HIGH);  // boards that switch the panel's supply
@@ -1657,7 +1767,8 @@ void setup() {
   if (turns) applyOrientation(turns);
   loadLog();
   loadAnchor(); loadOtaKey();
-  serialReady();
+  // READY is sent only in response to HELLO; the UI and flash.sh actively query it.
+
   handleQuickBoots();
   if (ssid.isEmpty() || setupRequested) { startPortal(); return; }
   diagPhase(Phase::WiFi);
@@ -1704,7 +1815,8 @@ void powerPoll() {
 #ifdef VIBEDOCK_BATTERY
   if (millis() - lastPowerCheck >= client_policy::powerCheckMs) {
     lastPowerCheck = millis();
-    // Only the 1.54 reports charging; on the others a USB host alone means external power.
+    // Only the 1.54 reports charging; on the others a USB host alone means external power. The level comes from
+    // the boards that measure the battery voltage (1.54, C6 1.69).
     auto reading = battery::read();
     bool charging = strcmp(reading.chargeSignal, "active") == 0 || strcmp(reading.chargeSignal, "unstable") == 0;
     batteryLevel = reading.supported ? reading.estimatedPercent : -1;

@@ -11,17 +11,34 @@
     <form th:if="${networkLog}" th:action="@{/admin/clients/{id}/logs/request(id=${identifier})}" method="post">
       <button title="The display sends its log over its server connection">Read log over the network</button></form></div></div>
 <p class="notice" th:if="${logMessage}" th:text="${logMessage}" role="status"></p>
-<p class="notice" th:if="${logRequested and logMessage == null}">A log has been requested; the display sends it with its next pull. It appears here by itself.</p>
+<p class="notice log-request" th:if="${request != null}" role="status" data-log-request
+   th:attr="data-requested=${request.requestedAt},data-until=${request.until},data-reach=${request.reach},data-next-pull=${request.nextPullAt},data-last-pull=${request.lastPullAt},data-poll=${request.pollSeconds}">
+  A log has been requested; the display sends it with its next pull. It appears here by itself.</p>
 <p class="meta" th:if="${paired and !networkLog}">This display's firmware sends its log only over USB (Troubleshooting). Newer firmware can send it over the network.</p>
 <p class="meta" th:if="${entries.isEmpty()}">No logs saved yet.</p>
+<section class="card" th:unless="${entries.isEmpty()}">
+  <div class="card-head"><h3 class="grow">Key figures</h3></div>
+  <p class="meta">Per log, newest first; in brackets the change against the log below it. Free memory as the display reported it
+    (bytes, without IRAM).</p>
+  <table class="firmware-devices log-figures">
+    <thead><tr><th>Read</th><th>Firmware</th><th>Lowest free</th><th>Free after TLS</th><th>TLS stack</th><th>Slowest full picture</th><th>Pictures</th><th>Wi-Fi</th></tr></thead>
+    <tbody><tr th:each="item:${entries}">
+      <td th:text="${#dates.format(new java.util.Date(item.entry.savedAt), 'MM-dd HH:mm')}"></td>
+      <td th:text="${item.entry.firmware ?: 'unknown'}"></td>
+      <td th:each="cell:${item.cells}" th:text="${cell}"></td></tr></tbody>
+  </table>
+</section>
 <section class="card device-log" th:each="item:${entries}" th:with="entry=${item.entry}">
   <div class="card-head"><h3 class="grow" th:text="${#dates.format(new java.util.Date(entry.savedAt), 'yyyy-MM-dd HH:mm:ss')}">time</h3>
     <span class="badge" th:text="${entry.source == 'usb' ? 'USB' : 'Network'}">USB</span>
-    <a class="button secondary" th:href="@{/admin/clients/{id}/logs/{name}.txt(id=${identifier},name=${#strings.substringBefore(entry.name,'.json')})}">Download</a>
+    <label class="switch" th:if="${item.serverLines}" title="The server's own log entries about this display in the time of this log: image transfers (delta or full, bytes, next pull), starts, saved logs, updates. Also in the download while on.">
+      <input type="checkbox" data-log-server> Server lines</label>
+    <a class="button secondary" data-log-download th:href="@{/admin/clients/{id}/logs/{name}.txt(id=${identifier},name=${#strings.substringBefore(entry.name,'.json')})}">Download</a>
     <form th:action="@{/admin/clients/{id}/logs/{name}/delete(id=${identifier},name=${#strings.substringBefore(entry.name,'.json')})}" method="post">
       <button class="icon-button danger" title="Delete this log" aria-label="Delete this log" data-confirm="Delete this log?">✕</button></form></div>
   <p class="meta"><span th:text="${'Firmware ' + (entry.firmware ?: 'unknown') + ' · board ' + (entry.board ?: 'unknown') + ' · ' + entry.lines + ' lines'}"></span></p>
-  <details><summary>Show log</summary><pre class="log-lines" th:text="${item.text}"></pre></details>
+  <p class="meta" th:if="${item.serverLines}">Times in server time; the display's own times (UTC) are converted.</p>
+  <details><summary>Show log</summary><pre class="log-lines"><span th:each="line:${item.lines}" th:class="${line.source == 'server'} ? 'log-server' : 'log-display'" th:text="${(line.time.isEmpty() ? '' : line.time + '  ') + (line.source == 'server' ? 'server  ' : '') + line.text}"></span></pre></details>
 </section>
 </main>
 <footer th:replace="~{fragments :: footer}"></footer>

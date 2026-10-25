@@ -1,6 +1,6 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.*;
@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class ClientTest {
-    final ObjectMapper json=new ObjectMapper();
+    final ObjectMapper json=JsonCompatibility.mapper();
     final String key="ab".repeat(32);
     UsageService.Snapshot snapshot(){var p=new UsageService.Provider("unconfigured",null,null,null);
         return new UsageService.Snapshot(1,1800000000,Map.of("codex",p,"claude",p));}
@@ -71,7 +71,7 @@ class ClientTest {
         reloaded.paired(id,"Old firmware",key,"192.168.17.5",8080);
         reloaded.pulled(id,"192.168.20.4");assertEquals("192.168.17.5",reloaded.address(id).ip());
         var root=json.readTree(dir.resolve("clients.json").toFile());
-        ((com.fasterxml.jackson.databind.node.ObjectNode)root.path("devices").get(0)).remove("callbackNetwork");
+        ((tools.jackson.databind.node.ObjectNode)root.path("devices").get(0)).remove("callbackNetwork");
         json.writeValue(dir.resolve("clients.json").toFile(),root);
         var legacy=new ClientRegistry(dir.toString(),json,Clock.systemUTC());
         assertEquals("192.168.17.5",legacy.address(id).ip());
@@ -180,7 +180,7 @@ class ClientTest {
     }
     @Test void pairingSendsAddressesAndKeyAndRejectsWrongCodes(@TempDir Path dir) throws Exception {
         var registry=new ClientRegistry(dir.toString(),json,Clock.systemUTC());
-        var received=new java.util.concurrent.atomic.AtomicReference<com.fasterxml.jackson.databind.JsonNode>();
+        var received=new java.util.concurrent.atomic.AtomicReference<tools.jackson.databind.JsonNode>();
         var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
         server.createContext("/pair",exchange->{
             var body=json.readTree(exchange.getRequestBody().readAllBytes());received.set(body);

@@ -1,8 +1,14 @@
-// Loaded in <head>: applies the stored theme before the first paint (light is the default)
-// and wires every [data-theme-toggle] button once the page is ready.
+// Loaded in <head>: applies the instance appearance before the first paint (light is the default)
+// and wires every [data-theme-toggle] button once the page is ready. Pages without a session (sign-in) cannot save
+// it on the server: there the choice stays in this browser, which also remembers the last one saved.
 (() => {
   const root = document.documentElement;
-  try { if (localStorage.getItem('vibedock-theme') === 'dark') root.dataset.theme = 'dark'; } catch (e) { /* storage blocked */ }
+  const appearance = document.querySelector('meta[name="vibedock-ui-theme"]');
+  const canSave = !!document.querySelector('meta[name="csrf-token"]');
+  let local = null;
+  try { local = localStorage.getItem('vibedock-theme'); } catch (e) { /* storage blocked */ }
+  const remember = dark => { try { localStorage.setItem('vibedock-theme', dark ? 'dark' : 'light'); } catch (e) { /* storage blocked */ } };
+  if ((!canSave && local ? local : appearance?.content) === 'dark') root.dataset.theme = 'dark';
   // Forms post and the server redirects back: the page keeps its scroll position instead of jumping to the top or an
   // anchor (admin-ui.js stores it on submit). pagereveal comes before the first paint where browsers support it.
   let target = null;
@@ -26,10 +32,20 @@
         toggle.textContent = dark ? '☀ Light' : '☾ Dark';
         toggle.setAttribute('aria-pressed', String(dark));
       };
-      toggle.addEventListener('click', () => {
+      toggle.addEventListener('click', async () => {
         const dark = root.dataset.theme !== 'dark';
+        const token = document.querySelector('meta[name="csrf-token"]'), header = document.querySelector('meta[name="csrf-header"]');
+        if (token && header) {
+          toggle.disabled = true;
+          try {
+            // redirect: 'error': an expired session answers with the sign-in page, which must not count as saved.
+            const response = await fetch('/admin/ui-theme', {method: 'POST', redirect: 'error', headers: {[header.content]: token.content}, body: new URLSearchParams({dark: String(dark)})});
+            if (!response.ok) throw new Error('save failed');
+          } catch (e) { alert('The appearance could not be saved. Please try again.'); return; }
+          finally { toggle.disabled = false; }
+        }
+        remember(dark);
         if (dark) root.dataset.theme = 'dark'; else delete root.dataset.theme;
-        try { localStorage.setItem('vibedock-theme', dark ? 'dark' : 'light'); } catch (e) { /* storage blocked */ }
         for (const other of document.querySelectorAll('[data-theme-toggle]')) other.dispatchEvent(new Event('vibedock-theme'));
       });
       toggle.addEventListener('vibedock-theme', sync);

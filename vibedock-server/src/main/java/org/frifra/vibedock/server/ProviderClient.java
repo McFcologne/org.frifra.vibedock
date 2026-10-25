@@ -1,6 +1,6 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.*;
+import tools.jackson.databind.*;
 import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.net.URI;
@@ -201,7 +201,7 @@ public class ProviderClient {
             return new Window(Math.max(0,Math.min(100,n.path("utilization").doubleValue())),0);
         }
         if (!n.path("resets_at").isTextual()) throw new IOException("reset missing");
-        try { return window(n.path("utilization"),new ObjectMapper().getNodeFactory()
+        try { return window(n.path("utilization"),new tools.jackson.databind.json.JsonMapper().getNodeFactory()
                 .numberNode(OffsetDateTime.parse(n.path("resets_at").textValue()).toEpochSecond())); }
         catch (DateTimeException e) { throw new IOException("reset malformed"); }
     }

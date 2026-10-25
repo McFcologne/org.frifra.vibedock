@@ -1,6 +1,6 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
@@ -12,7 +12,7 @@ import static org.mockito.ArgumentMatchers.*;
 
 /** When displays pull next: after the next poll of the sources they show, pending while those are being asked. */
 class PullScheduleTest {
-    final ObjectMapper json=new ObjectMapper();
+    final ObjectMapper json=JsonCompatibility.mapper();
 
     @Test void theNextPollOfTheShownSourcesDecidesAndAPollInProgressIsPending(@TempDir Path dir) throws Exception {
         var settings=new SettingsStore(dir.toString(),json);

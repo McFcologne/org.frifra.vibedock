@@ -54,6 +54,7 @@
 <head th:fragment="head(title)">
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="csrf-token" th:content="${_csrf.token}"><meta name="csrf-header" th:content="${_csrf.headerName}">
+<meta name="vibedock-ui-theme" th:content="${uiDark} ? 'dark' : 'light'">
 <title th:text="${title} + ' · VibeDock'">VibeDock</title>
 <link rel="icon" href="/logo.svg" th:href="@{/logo.svg}" type="image/svg+xml">
 <link rel="alternate icon" href="/favicon.ico" th:href="@{/favicon.ico}" sizes="any">

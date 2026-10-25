@@ -47,7 +47,7 @@ RUN mvn -B verify -Drevision="$(cat /version)"
 FROM --platform=$BUILDPLATFORM node:22-bookworm-slim AS node
 
 FROM node:22-bookworm-slim AS login-clients
-RUN npm install -g @openai/codex@0.162.1 @anthropic-ai/claude-code@2.1.296 @xai-official/grok@1.0.52 @google/gemini-cli@0.64.0 esptool-js@0.6.1
+RUN npm install -g @openai/codex@0.164.0 @anthropic-ai/claude-code@2.1.310 @xai-official/grok@1.0.70 @google/gemini-cli@0.65.0 esptool-js@0.7.0
 
 # The runtime without the application: everything installed that carries a license, and the inventory of it
 # (/app/legal/components.json). Before the manual, so that the PDF lists the same components as the administration.

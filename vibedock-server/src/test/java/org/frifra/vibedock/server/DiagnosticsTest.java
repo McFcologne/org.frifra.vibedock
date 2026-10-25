@@ -1,6 +1,6 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.*;
@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Log freshness, log requests and the starts displays report: old firmware without them keeps working. */
 class DiagnosticsTest {
-    private final ObjectMapper json=new ObjectMapper();
+    private final ObjectMapper json=JsonCompatibility.mapper();
     private static final class TestClock extends Clock {
         long now=Instant.parse("2026-10-17T08:00:00Z").toEpochMilli();
         @Override public ZoneId getZone(){return ZoneOffset.UTC;}

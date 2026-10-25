@@ -1,4 +1,6 @@
 import {test,expect,editor} from './fixtures.mjs';
+import path from 'node:path';
+import {mkdir,writeFile,appendFile} from 'node:fs/promises';
 
 test('pairing form hides its trigger and restores it after Cancel and Escape',async ({page,app}) => {
   await page.goto(app.baseURL+'/admin/devices');
@@ -122,12 +124,12 @@ test('orientation turns on each click and saves at once; only touch boards offer
   await page.reload();await expect(value).toHaveText('0°');
 });
 
-test('battery power saving is an experimental switch only on boards with a battery',async ({page,app}) => {
+test('battery power saving is a switch only on boards with a battery',async ({page,app}) => {
   await page.goto(app.baseURL+'/admin/devices');
   await expect(page.locator('#device-vibedock-e2e-office [data-power-saving]')).toHaveCount(0);
   await expect(page.locator('#device-vibedock-e2e-shelf [data-power-saving]')).toHaveCount(1);
   const desk=page.locator('#device-vibedock-e2e-desk'), toggle=desk.getByRole('checkbox',{name:/Battery power saving/});
-  await expect(desk.locator('.power-saving .badge')).toHaveText('experimental');
+  await expect(desk.locator('.power-saving .badge')).toHaveCount(0);
   await expect(toggle).not.toBeChecked();
   const saved=page.waitForResponse(r=>r.url().endsWith('/power-saving')&&r.request().method()==='POST');
   await toggle.check();expect((await (await saved).json()).enabled).toBe(true);
@@ -560,4 +562,52 @@ test('closing the port choice after a port went away ends there, without the bro
   await dialog.getByRole('button',{name:'Close'}).click();
   await expect(page.locator('[data-usb-output]')).toContainText('no display chosen');
   expect(await page.evaluate(() => window.browserDialogs)).toBe(0);
+});
+
+test('a display log shows the server lines about it on demand, and key figures against the log before',async ({page,app}) => {
+  const logs = path.join(app.dir,'device-logs','vibedock-e2e-desk'); await mkdir(logs,{recursive:true});
+  const saved = Date.parse('2026-10-25T01:38:27Z'), before = Date.parse('2026-10-25T01:00:00Z');
+  const log = (at,lines) => writeFile(path.join(logs,`${String(at).padStart(13,'0')}-net.json`),JSON.stringify({savedAt:at,source:'net',firmware:'0.2.4',board:'waveshare-s3-touch-lcd-154',lines}));
+  await log(before,['10-25 00:59:00 http://192.168.1.10:10002: HTTP 200, heap 24000+0 IRAM','10-25 00:59:01 Image shown, read in 1500 ms']);
+  await log(saved,['+3s Wi-Fi Home: 192.168.1.31, -61 dBm, heap 23500','10-25 01:36:04 http://192.168.1.10:10002: HTTP 200','10-25 01:38:26 Log sent to the server']);
+  await appendFile(path.join(app.dir,'logs','vibedock.log'),
+    '2026-10-25T01:36:04.156Z  INFO 1 --- [exec-1] o.f.vibedock.server.DeviceApiController  : Image transfer vibedock-e2e-desk: delta, payload=198 bytes\n'+
+    '2026-10-25T01:36:05.000Z  INFO 1 --- [exec-2] o.f.vibedock.server.DeviceApiController  : Image transfer vibedock-e2e-shelf: another display\n');
+  await page.goto(app.baseURL+'/admin/clients/vibedock-e2e-desk/logs');
+  const figures = page.locator('.log-figures tbody tr');
+  await expect(figures).toHaveCount(2);
+  await expect(figures.first().locator('td').nth(2)).toHaveText('23,500 (-500)');
+  const card = page.locator('.device-log').first(), toggle = card.getByRole('checkbox',{name:'Server lines'});
+  await expect(page.locator('.device-log').nth(1).getByRole('checkbox',{name:'Server lines'})).toHaveCount(0);  // that log has none
+  await card.locator('summary').click();
+  const server = card.locator('.log-server');
+  await expect(server).toHaveCount(1);
+  await expect(server).toBeHidden();  // on demand
+  await expect(card.locator('.log-display').nth(1)).toHaveText(/^10-25 \d{2}:36:04  http:\/\/192\.168\.1\.10:10002: HTTP 200$/);
+  await toggle.check();
+  // Times in server time: the hour depends on the server's time zone.
+  await expect(server).toHaveText(/^10-25 \d{2}:36:04  server  Image transfer vibedock-e2e-desk: delta, payload=198 bytes$/);
+  await expect(card.getByRole('link',{name:'Download'})).toHaveAttribute('href',/server=true$/);
+  await toggle.uncheck();
+  await expect(server).toBeHidden();
+  await expect(card.getByRole('link',{name:'Download'})).not.toHaveAttribute('href',/server=true/);
+  const download = await page.request.get(app.baseURL+'/admin/clients/vibedock-e2e-desk/logs/'+String(saved).padStart(13,'0')+'-net.txt?server=true');
+  expect(await download.text()).toMatch(/10-25 \d{2}:36:04  server   Image transfer vibedock-e2e-desk: delta/);
+});
+
+test('the sign-in page keeps a light/dark choice in this browser; a saved one follows it there',async ({page,app}) => {
+  // Signed in: the choice is saved for the installation and remembered in this browser.
+  await page.goto(app.baseURL+'/admin');
+  const toggle=page.locator('[data-theme-toggle]');
+  await expect(toggle).toHaveAttribute('aria-pressed','false');await toggle.click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+  const signedOut=await page.context().browser().newContext();const login=await signedOut.newPage();
+  await login.goto(app.baseURL+'/login');
+  await expect(login.locator('html')).toHaveAttribute('data-theme','dark');  // from the server
+  // Without a session it cannot be saved on the server: it stays in this browser across a reload.
+  const own=login.locator('[data-theme-toggle]');await expect(own).toHaveAttribute('aria-pressed','true');await own.click();
+  await expect(login.locator('html')).not.toHaveAttribute('data-theme','dark');
+  await login.reload();await expect(login.locator('html')).not.toHaveAttribute('data-theme','dark');
+  await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','dark');  // the installation's choice stays
+  await signedOut.close();
 });

@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
+const source=readFileSync(new URL('../firmware/src/main.cpp',import.meta.url),'utf8');
+const script=source.match(/const char PAGE_LIVE\[\].*?R"JS\(([\s\S]*?)\)JS";/)[1];
+let calls=0, scheduled, state={dark:true,boot:7,image:1};
+const light={media:'not all'}, image={dataset:{imageVersion:'7:1'},src:'/image.bmp'};
+const document={hidden:false,getElementById:()=>light,querySelector:()=>image};
+vm.runInNewContext(script,{document,encodeURIComponent,setTimeout:(fn,ms)=>{assert.equal(ms,5000);scheduled=fn;},
+  fetch:async()=>{calls++;return {ok:true,json:async()=>state};}});
+await scheduled();assert.equal(calls,1);assert.equal(image.src,'/image.bmp');
+state={dark:false,boot:7,image:1};await scheduled();assert.equal(light.media,'all');assert.equal(image.src,'/image.bmp');
+state.image=2;await scheduled();assert.equal(image.src,'/image.bmp?v=7%3A2');
+const before=calls;await scheduled();assert.equal(calls,before,'do not poll during an image transfer');
+image.onload();await scheduled();assert.equal(calls,before+1);assert.equal(image.src,'/image.bmp?v=7%3A2');
+document.hidden=true;await scheduled();assert.equal(calls,before+1,'hidden tabs do not poll');
+document.hidden=false;state.dark=true;state.image=3;await scheduled();assert.equal(light.media,'not all');
+image.onerror();image.src='failed';await scheduled();assert.equal(image.src,'/image.bmp?v=7%3A3','retry failed image');
+image.onload();state.image=0;await scheduled();assert.equal(image.src,'/image.bmp?v=7%3A3','no image download without a complete device image');
+console.log('Live UI: theme changes, image revisions, retries and hidden-tab pauses passed');

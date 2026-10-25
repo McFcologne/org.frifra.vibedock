@@ -3,7 +3,7 @@ package org.frifra.vibedock.server;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -90,10 +90,10 @@ class SecurityRegressionTest {
  }
 
  @Test void httpPairingRemainsAvailableWithAVisibleWarning() throws Exception {
-  var captured=new java.util.concurrent.atomic.AtomicReference<com.fasterxml.jackson.databind.JsonNode>();
+  var captured=new java.util.concurrent.atomic.AtomicReference<tools.jackson.databind.JsonNode>();
   var observer=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
   observer.createContext("/pair",exchange->{
-   captured.set(new com.fasterxml.jackson.databind.ObjectMapper().readTree(exchange.getRequestBody()));
+   captured.set(JsonCompatibility.mapper().readTree(exchange.getRequestBody()));
    byte[] reply="{\"identifier\":\"vibedock-audit-pair\",\"name\":\"Synthetic pair target\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
    exchange.getResponseHeaders().set("Content-Type","application/json");exchange.sendResponseHeaders(200,reply.length);exchange.getResponseBody().write(reply);exchange.close();
   });observer.start();

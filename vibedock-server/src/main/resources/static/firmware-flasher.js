@@ -1,7 +1,7 @@
 // Flashes the VibeDock firmware over Web Serial with esptool-js: connect, back up the whole flash, write the image of the
 // chosen board at 0x0 (on ESP32 chips bootloader, partition table and app in one; the LittleFS settings stay), then
 // restart the device.
-import { restart, chooseDisplayPort } from './serial-console.js';
+import { restart, chooseDisplayPort, confirmUsbStart } from './serial-console.js';
 import { usbPairing } from './usb-pairing.js';
 const card = document.getElementById('web-flasher');
 const $ = selector => card.querySelector(selector);
@@ -58,7 +58,14 @@ if (!('serial' in navigator) || !window.isSecureContext) {
           ? `This display has an ${name}; several boards have it: ${matching.map(b => b.label).join(', ')}. Choose yours under Board above.`
           : `This display has an ${name}; no board of this installation has that chip.`);
       }
+      // esptool-js marks the ESP8266's missing SPI length registers with 0 instead of null, so its flash ID query takes
+      // the ESP32 path and reads 0 (the warning above). With null it uses the ESP8266 layout, like the Python esptool.
+      if (name === 'ESP8266' && loader.chip.SPI_MOSI_DLEN_OFFS === 0) {
+        loader.chip.SPI_MOSI_DLEN_OFFS = null; loader.chip.SPI_MISO_DLEN_OFFS = null;
+        terminal.writeLine('Reading the flash ID again with the ESP8266 SPI layout …');
+      }
       flashSize = await loader.detectFlashSize();
+      if (!flashSize) throw new Error('The flash chip of the display does not answer (Flash ID 0): connect again, with a lower speed or another cable; nothing was written');
       if (expected === 'ESP8266' && flashSize !== '4MB') throw new Error(`The display has ${flashSize} flash; this firmware is built for 4MB`);
       try { mac = await loader.chip.readMac(loader); } catch { mac = 'unknown'; }
       deviceInfo.textContent = `${chip} · MAC ${mac} · flash ${flashSize}`;
@@ -91,8 +98,13 @@ if (!('serial' in navigator) || !window.isSecureContext) {
     await loader.writeFlash({ fileArray: [{ data, address: 0 }], flashMode: 'dio', flashFreq: card.dataset.chip === 'ESP8266' ? '40m' : 'keep', flashSize: card.dataset.chip === 'ESP8266' ? flashSize : 'keep',
       eraseAll: false, compress: true, reportProgress: (index, written, total) => show(written, total) });
     terminal.writeLine('Done. Restarting the device …');
-    await loader.after('hard_reset');
+    await loader.after(loader.chip.CHIP_NAME === 'ESP8266' ? 'soft_reset' : 'hard_reset');
     await disconnect();
+    if (card.dataset.chip === 'ESP8266') {
+      terminal.writeLine('Confirming the M1 start over USB …');
+      try { await confirmUsbStart(serialPort); }
+      catch { terminal.writeLine('Firmware written, but the M1 did not confirm its USB start. Check the display before restarting it again.'); return; }
+    }
     terminal.writeLine(`Firmware ${card.dataset.version} installed. The device shows the version while it starts.`);
     askToPair();
   }));
@@ -116,11 +128,12 @@ const askToPair = pairing.ask, say = pairing.say, closeConsole = pairing.close;
 card.querySelector('[data-restart]').addEventListener('click', async () => {
   if (busy) return;
   try {
-    if (loader) { await loader.after('hard_reset'); await disconnect(); say(''); terminal.writeLine('Display restarted.'); return; }
+    if (loader) { await loader.after(loader.chip.CHIP_NAME === 'ESP8266' ? 'soft_reset' : 'hard_reset'); await disconnect(); if (card.dataset.chip === 'ESP8266') await confirmUsbStart(serialPort); say(''); terminal.writeLine('Display restarted.'); return; }
     await closeConsole();
     serialPort ??= await chooseDisplayPort();
     if (!serialPort) return;
     await restart(serialPort);
+    if (card.dataset.chip === 'ESP8266') await confirmUsbStart(serialPort);
     terminal.writeLine('Display restarted.');
   } catch (error) { terminal.writeLine('Restart failed: ' + (error?.message || error)); }
 });

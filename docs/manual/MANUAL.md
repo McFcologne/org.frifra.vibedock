@@ -36,7 +36,7 @@ liability are in sections 7 and 8 of the Apache License 2.0 (see [License](#lice
 
 VibeDock shows how much of your AI coding plans is left (Claude, Codex, Grok, Gemini, Cursor and others) on small
 desk displays. The **server** signs in to the providers, reads the usage, renders one image per display and
-serves it; the **displays** fetch their image every 30 seconds over Wi-Fi. A display can be a VibeTV M1, another
+serves it; the **displays** fetch it over Wi-Fi when it can change, usually only the parts that changed. A display can be a VibeTV M1, another
 supported ESP32 board, or any browser or program that loads a web page or a PNG (a *web display*).
 
 This manual walks through every page of the administration and through installing the firmware on a display.
@@ -438,7 +438,11 @@ delete it yourself.
 <img src="images/01-login.png" width="70%" alt="Sign-in page">
 
 Open `http://<host>:10001/admin` and sign in with the administration user. The session ends with **Sign out**
-at the top right. **Stay signed in** is enabled by default: this browser stays signed in for 30 days, renewed during use, including across browser and server restarts. Uncheck it for a session that expires after 15 minutes of inactivity. Signing out revokes this browser's saved login; changing or resetting the administration password signs out all browsers. Clearing browser cookies also requires a new sign-in. **Dark** switches between the light and the dark theme; the choice is kept in this browser.
+at the top right. **Stay signed in** is enabled by default: this browser stays signed in for 30 days, renewed during use, including across browser and server restarts. Turn it off for a session that expires after 15 minutes of inactivity. Signing out revokes this browser's saved login; changing or resetting the administration password signs out all browsers. Clearing browser cookies also requires a new sign-in. **Dark** switches between light and dark appearance. Once signed in, the choice is saved for the whole
+server instance and sent to capable devices: directly over their existing LAN callback, with the next authenticated
+image response as a fallback. Their setup/status web pages follow it live (up to five seconds while open). The
+preview reloads only after a new complete device image; hidden tabs pause polling. This appearance is separate
+from the theme of the display image. The switch on the sign-in page changes only that open page.
 The footer of every page links the README, this manual as PDF (**Manual (PDF)**) and the licenses.
 
 # Overview
@@ -609,6 +613,8 @@ columns on a desktop, with identical example data rendered by the same code as t
 the theme to the design selected under **Design for**, and saves it right away. For an inherited device design,
 enable **Custom design** first, or change the default design instead.
 
+<img src="images/35-theme-catalog.png" width="100%" alt="Theme gallery with the switches of this installation">
+
 **The toggle beside each theme name** controls which themes this installation offers. Switching it off removes a theme from
 new selections and skips it when swiping through themes on a display or web display. Existing default and device
 designs keep the theme they already use, and their other settings can still be edited. Enable the theme again to
@@ -620,6 +626,8 @@ The additional looks are **Mission Control**, **Departure Board**, **Nordic**, *
 both weather/mood positions and the available display sizes. Numeric quotas keep their meaning; the new themes
 use their own bar colours, with a warning colour below 20% remaining (E-Ink stays monochrome). No firmware update
 is needed.
+
+<!-- page break -->
 
 ## Bands
 
@@ -1052,7 +1060,7 @@ Battery presence and operation without USB have not been established. No motion-
 
 ### Battery power saving (experimental)
 
-Displays with a battery connection have the switch **Battery power saving** (marked *experimental*) on their device
+Displays with a battery connection have the switch **Battery power saving** on their device
 card: Waveshare 1.54, 1.47 and C6 1.69 (tested boards), Waveshare S3 1.69 and LilyGO T-Display-S3 (prepared). It is
 off by default. Switched on, the display saves power while it runs on its battery, that is without a computer on its
 USB port (and on the 1.54 without charging):
@@ -1071,7 +1079,7 @@ If the display misses updates on battery, switch it off again.
 
 **Battery icon.** While one of these displays runs on its battery, its picture shows a small battery at the top right
 of the first usage band (beside a status such as *Rate limited*, in window themes in the title bar), whether power
-saving is on or not. The 1.54 fills it to its measured level in steps of 20 %, red below 20 %; the others only know
+saving is on or not. The 1.54 and the C6 1.69 fill it to their measured level in steps of 20 %, red below 20 %; the others only know
 that they run on battery and show it empty. The device card's preview shows it as well. On USB it disappears. The
 server draws it into the image, so the display only sends one more header with its pulls; the image changes only when
 the level steps or the power source changes. The LilyGO T-Display has a battery connection too,
@@ -1097,6 +1105,13 @@ Every log read this way is also saved on the server. On the same page, each pair
 with the time they were read and how (USB or network), to show, download as text or delete. Removing
 the display removes its logs.
 
+On a display's log page, **Key figures** compares the logs: per log the lowest free memory, the free memory after a
+TLS handshake and its stack, the slowest complete picture, pictures shown and aborted, and the Wi-Fi signal, with the
+change against the log before in brackets. When a log is saved, the server also keeps its own log entries about that
+display from the same time: image transfers (delta or full, bytes, next pull), starts, saved logs and updates. The
+switch **Server lines** on a log shows them between the display's lines, in the accent colour, with all times in
+server time; while it is on, **Download** includes them too. Logs without such entries have no switch.
+
 The table also shows how fresh the **newest log** is: how long ago the server received it (server time; its lines can
 be much older), over USB or the network, the firmware it came from and, with firmware 0.2.0, the start it was sent in
 (boot id and run time). *Older firmware than now* marks a log from another firmware than the display runs today: read
@@ -1106,11 +1121,13 @@ minimum, Wi-Fi signal) and how the last start came about (*power-on*, *update*, 
 **Read over the network** there asks the display to send its log without a cable: it sends it right
 after its next image pull, over the same address and encryption as its images, within seconds when the server can
 ask it to pull now. This needs firmware newer than 0.1.1; older firmware sends its log only over USB. The request is
-valid for 10 minutes and for one log.
+valid for 10 minutes and for one log. While it is open, the log page says whether the display was asked to pull at
+once, when its next pull is due (the one the server announced, otherwise the last pull plus the fallback poll
+interval) and how late it is, and counts down to the end of the request.
 
 > Opening the USB port restarts the VibeTV M1. Read the log only after the display has finished what you want to
 > see: it shows an image or *Server unreachable*. An https connection takes the M1 a few seconds, and the first
-> attempt at an address can come only with the next poll (30 seconds by default).
+> attempt at an address can come only with the next pull.
 
 | Log line | Meaning and what to do |
 | --- | --- |

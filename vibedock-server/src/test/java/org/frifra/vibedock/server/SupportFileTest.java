@@ -1,9 +1,9 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -28,7 +28,7 @@ class SupportFileTest {
     @Autowired MockMvc mvc;
     @Autowired ClientRegistry clients;
     @Autowired DeviceLogs deviceLogs;
-    final ObjectMapper json=new ObjectMapper();
+    final ObjectMapper json=JsonCompatibility.mapper();
 
     @Autowired DeviceDiagnostics diagnostics;
     @Test void troubleshootingShowsHowOldTheNewestLogIsAndAsksForCurrentOnes() throws Exception {
@@ -73,7 +73,7 @@ class SupportFileTest {
             // Base64 ciphertext can contain words by chance; verify the envelope instead.
             var envelope=json.readTree(file);
             Set<String> fields=new HashSet<>();
-            envelope.fieldNames().forEachRemaining(fields::add);
+            envelope.propertyNames().iterator().forEachRemaining(fields::add);
             Assertions.assertEquals(Set.of("format","version","kdf","iterations","salt","cipher","nonce","data"),fields);
             Assertions.assertEquals("vibedock-support",envelope.path("format").asText());
             Assertions.assertEquals(1,envelope.path("version").asInt());
@@ -87,7 +87,7 @@ class SupportFileTest {
             // A changed ciphertext must fail authentication even with the correct key.
             ciphertext[0]^=1;
             var tampered=envelope.deepCopy();
-            ((com.fasterxml.jackson.databind.node.ObjectNode)tampered).put("data",Base64.getEncoder().encodeToString(ciphertext));
+            ((tools.jackson.databind.node.ObjectNode)tampered).put("data",Base64.getEncoder().encodeToString(ciphertext));
             mvc.perform(post("/admin/support/open").contentType("application/json").content(json.writeValueAsString(Map.of("content",json.writeValueAsString(tampered),"key",created.path("key").asText())))
                     .with(csrf()).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").value("Wrong key, or the file was changed"));
             // The wrong key opens nothing.

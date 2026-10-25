@@ -142,7 +142,7 @@ Every Codex, Claude, Grok and Gemini data source has its own sign-in under **Dat
 
 Status requests and code submission are available only on the authenticated administration port. Every write action requires CSRF protection. A second click does not start another parallel login for the same account. The cancel button (`Cancel`) stops the pending login process; it also expires after ten minutes. Cancellation does not log out a previously signed-in account. A server restart cancels pending sign-in flows while preserving successfully saved credentials.
 
-The Docker image includes the official **Codex 0.162.1**, **Claude Code 2.1.296**, **Grok Build 1.0.52** and **Gemini CLI 0.64.0** clients. Codex is controlled through its official App Server using `account/login/start`; Claude uses `auth login --claudeai --sso`; Grok uses `grok login --device-auth`; Gemini runs the CLI in a terminal with `NO_BROWSER=true` (details in [PROVIDERS.md](PROVIDERS.md)). The clients perform OAuth/SSO and credential storage. The Java service does not accept corporate passwords or certificates and does not generate tokens itself. Raw CLI output and credentials are not copied into logs or status responses. Successful sign-in does not immediately trigger device delivery; previously enabled periodic delivery continues.
+The Docker image includes the official **Codex 0.164.0**, **Claude Code 2.1.310**, **Grok Build 1.0.70** and **Gemini CLI 0.65.0** clients. Codex is controlled through its official App Server using `account/login/start`; Claude uses `auth login --claudeai --sso`; Grok uses `grok login --device-auth`; Gemini runs the CLI in a terminal with `NO_BROWSER=true` (details in [PROVIDERS.md](PROVIDERS.md)). The clients perform OAuth/SSO and credential storage. The Java service does not accept corporate passwords or certificates and does not generate tokens itself. Raw CLI output and credentials are not copied into logs or status responses. Successful sign-in does not immediately trigger device delivery; previously enabled periodic delivery continues.
 
 The terminal login script remains available for maintenance, but normal setup uses the buttons:
 
@@ -166,7 +166,7 @@ docker compose exec vibedock /app/login-provider.sh codex-logout
 docker compose exec vibedock /app/login-provider.sh claude-logout
 ```
 
-The token-removal checkboxes clear only manually stored tokens. For a complete logout, also log out the relevant official client; otherwise its cache becomes the active credential source again.
+The token-removal switches clear only manually stored tokens. For a complete logout, also log out the relevant official client; otherwise its cache becomes the active credential source again.
 
 Sources: [Codex App Server](https://learn.chatgpt.com/docs/app-server), [Codex authentication and headless operation](https://developers.openai.com/codex/auth), [Claude CLI authentication](https://code.claude.com/docs/en/cli-reference), [Claude credential storage](https://code.claude.com/docs/en/authentication). Cache fields are client implementation details and may change with client versions.
 
@@ -334,7 +334,7 @@ mvn verify
 ADMIN_PASSWORD='YOUR-OWN-PASSWORD' java -jar target/vibedock-server.jar
 ```
 
-Direct Java execution binds administration to `127.0.0.1` by default and the public port to all interfaces. Settings are stored under `./data`. Docker also uses Java 21. Spring Boot 3.5.16 is pinned.
+Direct Java execution binds administration to `127.0.0.1` by default and the public port to all interfaces. Settings are stored under `./data`. Docker also uses Java 21. Spring Boot 4.1.2 is pinned (Jackson 3.1.4); the JSON compatibility settings retain omitted primitive defaults in older settings and device requests. See [dependency upgrades](DEPENDENCIES.md).
 
 **Emoji graphics.** The JAR does not contain the Twemoji graphics. Started from the repository (its root or `vibedock-server`), the server finds `third-party/twemoji/svg` by itself. To run the JAR elsewhere, copy the folder `third-party/twemoji` next to it as `twemoji` (the server looks for `twemoji/svg` in its working directory), or set `EMOJI_DIR` to the `svg` folder; an explicitly set `EMOJI_DIR` always wins. The start log names the folder in use (`emoji set …`), or says that it is missing. Keep `LICENSE-GRAPHICS` and `README.md` with the graphics.
 
@@ -389,3 +389,15 @@ Browser tests start a fresh, loopback-only server for every test with temporary 
 The browser suite covers create-panel triggers and cancellation, adding and renaming sources, conditional save actions, saving designs right away, device overrides/inheritance, saving before switching targets, orientation, photo upload and slideshows, support files, footer/license navigation, and eight pages at desktop/mobile widths in light/dark modes. Layout checks cover overflow, footer placement, overview alignment and Appearance below Preview. These are structural layout checks, not pixel-by-pixel screenshot baselines. Existing Java renderer tests cover the display output and its themes. Playwright retains screenshots, browser traces and isolated-server logs on failures; open `e2e/playwright-report/index.html` for diagnostics.
 
 The GitHub Actions workflow runs the same checks on pushes and pull requests. It does not deploy, pair devices, flash firmware or use provider credentials.
+
+### Shared light and dark appearance
+
+The administration's Light/Dark switch stores the instance-wide choice in `themes.json`. Firmware advertising
+`X-VibeDock-UI: 1` receives `X-VibeDock-UI: light` or `dark` on authenticated image responses (200 and 304).
+Reachable devices also receive a small appearance-only push through the existing `/pull?ui=dark|light` callback,
+without downloading an image. The header is the fallback for devices behind NAT or temporarily offline.
+Setup and status pages retain the choice across restarts and update while open. A new unpaired
+device stays dark until it first receives a server preference. Older firmware continues unchanged. An open page polls a small local status every five seconds, pauses while hidden and refreshes its
+preview only after a complete new image. Preview refreshes stream a full image from the server only while the
+page is open; the device keeps no extra image buffer. This changes web-page appearance only, not the display
+image's colour scheme.

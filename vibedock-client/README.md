@@ -96,7 +96,9 @@ VIBEDOCK-BATTERY
 The reply starts with `VIBEDOCK-BATTERY ` followed by JSON containing `supported`, `voltageMv`,
 `estimatedPercent`, `chargeSignal` (`active`, `inactive`, `unstable` or `unknown`), `present`, `powerSource`
 (`battery`, `usb` or `unknown`) and `powerSaving` (`off`, `allowed` or `active`).
-`VIBEDOCK-HELLO` also includes these fields inside `battery` on this board. Other boards answer the explicit
+`VIBEDOCK-HELLO` also includes these fields inside `battery` on this board. The Waveshare ESP32-C6-Touch-LCD-1.69 measures
+the voltage the same way (GPIO 0, battery / 3, BAT_ADC in the vendor schematic) but has no charging signal
+(`chargeSignal: unknown`); its status page shows the same *Battery* card. Other boards answer the explicit
 battery request with `supported: false` and unknown measurements, without reading their pins.
 
 **Battery presence stays unknown (`present: null`).** The charging circuit does not reliably distinguish an
@@ -130,7 +132,7 @@ If the device still runs its original firmware, first follow [Build and test](#b
 2. **Open Wi-Fi setup.** The captive portal usually opens automatically. Otherwise, open `http://192.168.4.1` while connected to the setup network; the address is also shown on the display.
 3. **Choose your network.** Select a nearby network, enter its password and press **Save and connect**. Networks are sorted by signal strength; **Scan again** refreshes the list. You can also type the network name. The device restarts and connects.
 4. **Pair in the administration.** When the display shows **Invite in the administration**, note its IP address and six-digit pairing code. In the server administration, open **Devices → Pair device**, enter both and confirm. Reconnect your phone to your normal network if necessary.
-5. **Check the result.** The device receives its server addresses, access key and polling interval, then pulls its display image. The default interval is **30 seconds**. Its IP remains visible on the display.
+5. **Check the result.** The device receives its server addresses, access key and fallback poll interval, then pulls its display image. After that it pulls when the server says the picture can change next; the fallback interval (default **30 seconds**) applies to older servers and after failed pulls. Its IP remains visible on the display.
 
 **HTTP pairing is unencrypted.** Use it only on a trusted home network: network attackers can read the device key or replace its TLS/OTA trust keys. The pairing form shows a warning but remains available. **Devices → Firmware → Only pair** over USB is an alternative without reinstalling firmware.
 
@@ -224,7 +226,7 @@ While starting or waiting for a current image, the device shows **Wi-Fi → Pair
 | **Invite in the administration** / **Waiting for invitation** | Wi-Fi is connected. Pair using the IP and code on the display. |
 | **Connected** | The last server request succeeded. An unchanged image also counts as a successful update. |
 | **Server unreachable** | The connection failed. Check server availability and the announced addresses. The reason (TCP, DNS or the TLS error) is shown below, wrapped, with the failed address at the bottom. After a connection failure the device tries the next announced address right away (an answer that stalled after the TLS handshake first at the same address; then at the polling interval); the bottom line shows the address being tried. |
-| **Updates missing** | No successful image pull for three polling intervals; the old view is hidden to avoid showing stale data. At the default interval this is 90 seconds. |
+| **Updates missing** | No successful image pull for three fallback poll intervals, or for two intervals after the pull the server announced; the old view is hidden to avoid showing stale data. At the default interval this is at least 90 seconds. |
 | **Network not found**, **Wrong password** or **Connection failed (WPA2?)** | Check Wi-Fi credentials, signal and compatible network security. |
 | **Waiting for &lt;network&gt;** | A previously working network is unavailable. The device retries every 15 seconds and resumes automatically when it returns. |
 | **Image aborted** | An image transfer did not finish. Check connectivity and server status; the device will retry. |
@@ -238,16 +240,18 @@ The footer shows `IP: -- (no Wi-Fi)` without a connection and `Browser: 192.168.
 
 ### Change Wi-Fi while keeping pairing
 
-1. Unplug and reconnect power twice in quick succession, each interruption within about five seconds of startup.
+1. Unplug and reconnect power twice in quick succession, each interruption within about ten seconds of startup.
 2. On the second start, the display shows **Unplug now for factory reset** and **or wait: Wi-Fi setup**.
-3. **Leave the power connected** and wait about five seconds. The setup network opens.
+3. **Leave the power connected** and wait until ten seconds after startup. The setup network opens.
 4. Scan the new QR code and enter the new network settings. Pairing, device key and server addresses remain saved.
 
 ### Factory reset
 
 Use this when you want to clear the device configuration. It removes Wi-Fi settings, pairing, server addresses and local colour settings.
 
-1. Perform three quick power cycles, each within about five seconds of startup. At the second start, the display prompts **Unplug now for factory reset**.
+A USB console command cancels quick-boot setup/reset. The third quick start waits two seconds for this confirmation before erasing settings.
+
+1. Perform three quick power cycles, each within about ten seconds of startup. At the second start, the display prompts **Unplug now for factory reset**.
 2. On the third start, the device deletes its configuration and the ESP8266's saved Wi-Fi credentials, restarts and opens setup.
 3. Configure Wi-Fi and pair again. The server replaces the old registration with the same device identifier.
 
@@ -276,7 +280,11 @@ Power-on and external resets count toward this sequence; software restarts and c
 
 ## Build and test
 
-The firmware uses PlatformIO, independently of the server's Maven build. Use PlatformIO 6.2.0, `espressif8266@4.2.1`, ArduinoJson 7.4.2, TFT_eSPI 2.5.43, and QRCode 0.0.1. The pinned versions and display wiring are defined in [`firmware/platformio.ini`](firmware/platformio.ini). Python 3 is required for PlatformIO; a C++ compiler is required for the native policy test.
+The dependency migration uses Mbed TLS 3.6.7 on the M1 and Arduino-ESP32 3.3.12 on the ESP32 boards.
+See [Dependency upgrades and device checks](DEPENDENCIES.md) for the versions, build evidence, rollback and the
+hardware tests still needed. The earlier Core 2 workaround is no longer the selected build.
+
+The firmware uses PlatformIO, independently of the server's Maven build. Use PlatformIO 6.2.0, `espressif8266@4.2.1`, ArduinoJson 7.4.3, TFT_eSPI 2.5.43, and QRCode 0.0.1. The pinned versions and display wiring are defined in [`firmware/platformio.ini`](firmware/platformio.ini). Python 3 is required for PlatformIO; a C++ compiler is required for the native policy test.
 
 ### Install PlatformIO once
 
@@ -357,7 +365,7 @@ A successful test exits with code 0 and produces no output. It checks registrati
 
 Generated firmware, `firmware/.pio/`, and `.venv/` are excluded from Git. Builds embed neither Wi-Fi credentials nor provider tokens.
 
-Images are drawn one row at a time using a 480-byte input buffer and 240 16-bit pixels, instead of storing all 115200 bytes in RAM. The format is RGB565, most significant byte first. The image fills the whole screen. The device pulls the image with its key, accepts only complete 115 200-byte images with the expected format header (the size comes from that header, so a reverse proxy may drop `Content-Length`) and aborts after 8 seconds without data (15 seconds over https).
+Images are drawn one row at a time using one input row (two bytes per pixel, at most 960 bytes) and one row of 16-bit pixels, instead of storing the whole image in RAM (115,200 bytes at 240 × 240). The format is RGB565, most significant byte first, 16 to 480 pixels per side; the image is scaled to fill the whole screen. The device pulls the image with its key and accepts only complete images with the expected format header (the size comes from that header, so a reverse proxy may drop `Content-Length`). With current servers it usually receives only the changed rows (delta images, see [CLIENT-PROTOCOL.md](../vibedock-server/CLIENT-PROTOCOL.md)), checked against a hash over all rows; any doubt makes the next pull fetch the complete image. Reads abort after 8 seconds without data (15 seconds over https).
 
 References: [PlatformIO installation](https://docs.platformio.org/en/latest/core/installation/methods/pypi.html), [PlatformIO build command](https://docs.platformio.org/en/latest/core/userguide/cmd_run.html), [IntelliJ terminal](https://www.jetbrains.com/help/idea/terminal-emulator.html), [IntelliJ external tools](https://www.jetbrains.com/help/idea/configuring-third-party-tools.html).
 
@@ -367,17 +375,18 @@ References: [PlatformIO installation](https://docs.platformio.org/en/latest/core
 
 Follow [FLASHING.md](FLASHING.md) for device identification, a complete backup, verification, installation and recovery. Keep the backup private, record its SHA256 and device identity, and restore only a matching backup from that same device. Original firmware and device backups are not distributed with this project.
 
-After preparing and verifying the backup, `scripts/flash.sh [board]` detects the connected chip (and on the M1 its flash size), takes the board with that chip, or the board the VibeDock firmware on the device names, or offers the boards that share the chip, each marked tested on hardware or prepared (`--list` shows them), builds the candidate, shows the firmware details and asks for confirmation before writing. It writes firmware only, preserving LittleFS Wi-Fi and pairing settings. A full backup restore is a separate operation that replaces the entire flash. Neither the build configuration nor the native test installs anything on a device.
+After preparing and verifying the backup, `scripts/flash.sh [board]` first lets you choose a USB port when
+several are connected. Enumeration is passive; only the selected port is queried and may restart. It detects the connected chip (and on the M1 its flash size), takes the board with that chip, or the board the VibeDock firmware on the device names, or offers the boards that share the chip, each marked tested on hardware or prepared (`--list` shows them), builds the candidate, shows the firmware details and asks for confirmation before writing. It writes firmware only, preserving LittleFS Wi-Fi and pairing settings. The M1 starts automatically through a soft reset in both the script and browser flasher; ESP32 boards retain their hardware reset. Both flashers confirm the M1 start with an active USB HELLO and close the console afterwards, preventing this start from triggering quick-boot setup even when reinstalling the same version. If confirmation fails, they warn without repeating the reset. A full backup restore is a separate operation that replaces the entire flash. Neither the build configuration nor the native test installs anything on a device.
 
 ## Technical reference
 
 | Area | Implementation |
 | --- | --- |
 | Protocol | [Version 2](../vibedock-server/CLIENT-PROTOCOL.md): the server invites once; the device then pulls images. The server can request a pull with `POST /pull`, rate-limited to once every five seconds. |
-| Image | 240×240 RGB565, most significant byte first, exactly 115,200 bytes and the expected format header. Incomplete transfers are rejected. |
-| Memory and redraw | One 480-byte input row plus 240 16-bit pixels; no full framebuffer. Row hashes avoid redrawing unchanged image rows. |
+| Image | RGB565, most significant byte first, 16–480 px per side as named in the format header (240 × 240: 115,200 bytes), scaled to the screen. Delta images (`rgb565-delta-be-WxH`) carry only changed row spans and are checked by length, payload hash and a hash over all rows. Incomplete or failed transfers are rejected; the next pull gets the complete image. |
+| Memory and redraw | One input row (at most 960 bytes) plus one row of 16-bit pixels; no full framebuffer for server images. Row hashes avoid redrawing unchanged rows and are the basis for delta images. |
 | IP footer | Current server images carry the IP reported by the device (`X-VibeDock-Footer: server`). On its own status screens, the device draws the footer itself. |
-| Polling | Default 30 seconds; server-provided values are clamped to 10–3,600 seconds. Image reads use an eight-second abort limit; the browser BMP proxy has a separate transfer limit. |
+| Polling | Every answer announces the next pull (`X-VibeDock-Next-Pull`: 2 s to 10 minutes, 2 minutes for displays the server cannot reach directly). The fallback poll interval (default 30 seconds, clamped to 10–3,600 seconds) applies to older servers and after failed pulls. Image reads use an eight-second abort limit (15 seconds over https); the browser BMP proxy has a separate transfer limit. |
 | Version | Compiled in from the Git tag by `firmware/version.py`, like the server: `0.1.0` on the tag `0.1.0` (or `v0.1.0`), `0.1.0-3-g<commit>` after it, `-dirty` with uncommitted changes. |
 | Persistence | `/standalone.json` in LittleFS stores Wi-Fi, identifier, pairing credentials, server addresses and colour settings. Treat the file and device backups as private. The setup-network password is never stored. |
 | HTTPS | Pairing supplies a trusted root and certificate fingerprint. Normal requests check the fingerprint; after certificate renewal, root/hostname/validity verification allows learning a new fingerprint. Certificate checks require time from NTP (`pool.ntp.org`). Verification fails closed. The VibeTV M1 speaks TLS 1.3 (Mbed TLS; the full check once, then the pinned certificate) and TLS 1.2 only for servers that refuse 1.3; the ESP32 boards TLS 1.2. See [TLS.md](TLS.md). |
@@ -390,3 +399,9 @@ The complete HTTP contract is in [CLIENT-PROTOCOL.md](../vibedock-server/CLIENT-
 Native tests cover polling and retry timing, stale detection, clock rollover, address fallback, pairing lock, RGB565 decoding, row hashes and colour correction. Server tests also exercise the protocol with a simulated device. These checks do not replace hardware validation.
 
 Wi-Fi setup, pairing, image pulls, display output and colour calibration have been used on real devices. The redesigned startup/progress screens have been compiled but still need visual verification on the physical panel. See [server validation notes](../vibedock-server/VALIDATION.md) for further evidence and limits.
+
+The device's setup and status web pages inherit the server administration's Light/Dark choice through the next
+authenticated image response (including HTTP 304). Reachable devices also receive an appearance-only push
+over the existing `/pull` callback, independently of image updates. Open pages apply changes within five seconds and reload their preview only after a new
+complete image; hidden tabs pause polling. Preview updates stream a full image only while the page is open.
+The last choice persists across restarts; an unpaired device defaults to dark. The image colour scheme is separate.

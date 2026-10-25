@@ -1,7 +1,7 @@
 package org.frifra.vibedock.server;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -373,6 +373,8 @@ public class ClientRegistry {
     private final Map<String,Long> expectedPull=new java.util.concurrent.ConcurrentHashMap<>();
     /** The display was told to pull again in seconds: it counts as missing only well after that. */
     public void expectPull(String id,int seconds){expectedPull.put(id,clock.instant().getEpochSecond()+seconds);}
+    /** The pull last announced to a display (epoch seconds), if it follows X-VibeDock-Next-Pull. */
+    public Optional<Long> expectedPull(String id){return Optional.ofNullable(expectedPull.get(id));}
     public synchronized List<View> views(){return state.devices().stream().map(this::view).toList();}
     public synchronized View get(String id){return view(find(id));}
 

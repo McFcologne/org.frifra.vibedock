@@ -66,7 +66,7 @@ PY
 }
 esptool() { "$python" -m esptool --chip "$chip" --baud "${VIBEDOCK_BAUD:-115200}" "$@"; }
 
-# 1. Serial port: VIBEDOCK_SERIAL_PORT if set, otherwise every USB serial port where a (matching) chip answers.
+# 1. Serial port: VIBEDOCK_SERIAL_PORT if set, otherwise choose before any active chip query.
 candidates() {
     local ports=(/dev/cu.usbserial* /dev/cu.wchusbserial* /dev/cu.SLAB_USBtoUART* /dev/cu.usbmodem* /dev/ttyUSB* /dev/ttyACM*)
     [ ${#ports[@]} -gt 0 ] && printf '%s\n' "${ports[@]}"
@@ -87,48 +87,62 @@ if [ -z "$found" ]; then
         sleep 1
     fi
 fi
-esp_ports=(); esp_macs=(); esp_chips=()
+# Select the port before opening any of them: esptool's chip detection resets the selected device.
+# USB metadata is passive; serial.tools.list_ports does not open a serial connection.
+port_label() {
+    "$python" - "$1" <<'PYPORT' 2>/dev/null
+import sys
+from serial.tools import list_ports
+for port in list_ports.comports():
+    if port.device == sys.argv[1]:
+        print(" · ".join(str(v) for v in (port.description, port.serial_number) if v))
+        break
+PYPORT
+}
+ports=()
 while IFS= read -r candidate; do
-    if lsof "$candidate" >/dev/null 2>&1; then echo "Skipping $candidate: in use by another program." >&2; continue; fi
-    # Ask the chip, whatever it is: with a given board's chip esptool stopped on any other chip after it had already
-    # put it into its bootloader, without the reset after, so that display stayed dark. hard_reset lets devices that
-    # are not chosen start normally again. A port without a chip makes esptool fail; with pipefail that must not end
-    # the script.
-    answer=$("$python" -m esptool --chip auto --baud "${VIBEDOCK_BAUD:-115200}" --port "$candidate" --connect-attempts 2 \
-        --after hard_reset read_mac 2>&1 || true)
-    mac=$(sed -n 's/^MAC: *//p' <<< "$answer" | head -1)
-    # "Chip is ESP32-S3 (QFN56) ...", "Chip is ESP8266EX", "Chip is ESP32-D0WD-V3 ..."
-    case "$(sed -n 's/^Chip is //p' <<< "$answer" | head -1)" in
-        ESP8266*) detected=esp8266 ;; ESP32-S3*) detected=esp32s3 ;; ESP32-C3*) detected=esp32c3 ;;
-        ESP32-C6*) detected=esp32c6 ;; ESP32-S2*) detected=esp32s2 ;; ESP32*) detected=esp32 ;; *) detected="" ;;
-    esac
-    if [ -n "$mac" ] && [ "$chip" != auto ] && [ -n "$detected" ] && [ "$detected" != "$chip" ]; then
-        echo "Skipping $candidate: $detected, not the $chip of $board." >&2
-    elif [ -n "$mac" ]; then esp_ports+=("$candidate"); esp_macs+=("$mac"); esp_chips+=("${detected:-$chip}")
-    else echo "No ${board:-ESP} chip on $candidate: $(grep -m1 -iE 'error|fatal' <<< "$answer" || echo 'no answer')" >&2; fi
+    [ -n "$candidate" ] || continue
+    if lsof "$candidate" >/dev/null 2>&1; then
+        echo "Skipping $candidate: in use by another program." >&2
+    else
+        ports+=("$candidate")
+    fi
 done <<< "$found"
-# Native USB (ESP32-S3/C3/C6) drops off the bus for a moment after the reset.
-sleep 2
-if [ ${#esp_ports[@]} -eq 0 ]; then
-    echo "No ${board:-ESP} chip answered on: $(echo $found)" >&2
-    echo "Check the cable, close serial monitors and try again." >&2
-    echo "Native USB (ESP32-S3/C3/C6): hold BOOT while plugging in if the chip does not answer." >&2
-    exit 1
-elif [ ${#esp_ports[@]} -eq 1 ]; then
-    pick=0
+if [ ${#ports[@]} -eq 0 ]; then
+    echo "No available USB serial port. Close serial monitors and try again." >&2; exit 1
+elif [ ${#ports[@]} -eq 1 ]; then
+    port="${ports[0]}"
 else
-    echo "Several devices found:"
-    for i in "${!esp_ports[@]}"; do echo "  $((i + 1))) ${esp_ports[$i]}  ${esp_chips[$i]}  MAC ${esp_macs[$i]}"; done
-    read -r -p "Which one? [1-${#esp_ports[@]}] " choice
-    [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le ${#esp_ports[@]} ] || { echo "Nothing written."; exit 1; }
-    pick=$((choice - 1))
+    echo "Choose the USB port. Only the selected device will be queried and restarted:"
+    for i in "${!ports[@]}"; do
+        label=$(port_label "${ports[$i]}" || true)
+        printf '  %d) %s  %s\n' "$((i + 1))" "${ports[$i]}" "$label"
+    done
+    read -r -p "Which port? [1-${#ports[@]}] " choice
+    [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le ${#ports[@]} ] || { echo "Nothing queried or written."; exit 1; }
+    port="${ports[$((choice - 1))]}"
 fi
-port="${esp_ports[$pick]}"; chip="${esp_chips[$pick]}"
-# The others were reset to start their firmware again; the VibeTV M1's USB adapter may leave it in the bootloader.
-for i in "${!esp_ports[@]}"; do
-    [ "$i" = "$pick" ] || [ "${esp_chips[$i]}" != esp8266 ] && continue
-    echo "Not chosen: ${esp_ports[$i]} (esp8266). If its display stays dark, unplug it and plug it in again." >&2
-done
+echo "Querying only $port (this device may restart) …"
+answer=$("$python" -m esptool --chip auto --baud "${VIBEDOCK_BAUD:-115200}" --port "$port" --connect-attempts 2 \
+    --after hard_reset read_mac 2>&1 || true)
+mac=$(sed -n 's/^MAC: *//p' <<< "$answer" | head -1)
+case "$(sed -n 's/^Chip is //p' <<< "$answer" | head -1)" in
+    ESP8266*) detected=esp8266 ;; ESP32-S3*) detected=esp32s3 ;; ESP32-C3*) detected=esp32c3 ;;
+    ESP32-C6*) detected=esp32c6 ;; ESP32-S2*) detected=esp32s2 ;; ESP32*) detected=esp32 ;; *) detected="" ;;
+esac
+if [ -z "$mac" ] || [ -z "$detected" ]; then
+    echo "No supported ESP chip answered on $port. Check the cable and selected port." >&2
+    echo "Native USB (ESP32-S3/C3/C6): hold BOOT while plugging in if needed." >&2
+    exit 1
+fi
+if [ "$chip" != auto ] && [ "$detected" != "$chip" ]; then
+    echo "$port has $detected, not the $chip of $board. Nothing written." >&2; exit 1
+fi
+chip="$detected"
+# A probe can restart the M1 too: clear its quick-start counter before the potentially long build.
+if [ "$chip" = esp8266 ]; then reported_board "$port" >/dev/null || true; fi
+# Native USB briefly disconnects after resetting only the selected device.
+sleep 2
 
 # 2. Board: given, or the boards with this chip (one is taken, several are offered).
 if [ -z "$board" ]; then
@@ -173,7 +187,7 @@ fi
 echo
 echo "Board:      $board ($chip), $(status_of "$board")"
 [ "$(hardware_of "$board")" = tested ] || echo "Warning:    this firmware has never run on this board. If it fails, flash the board's previous firmware again."
-echo "Port:       $port  (MAC ${esp_macs[$pick]})"
+echo "Port:       $port  (MAC $mac)"
 [ -n "$size" ] && echo "Flash size: ${size} MB"
 echo "Firmware:   $image"
 echo "SHA-256:    $(shasum -a 256 "$image" | cut -d' ' -f1)"
@@ -184,10 +198,14 @@ if [ -z "$yes" ]; then
 fi
 
 if [ "$chip" = esp8266 ]; then
-    esptool --port "$port" --after no_reset \
+    esptool --port "$port" --after soft_reset \
         write_flash --flash_mode dio --flash_freq 40m --flash_size "${size}MB" 0x000000 "$image"
     echo
-    echo "Done. Unplug the device and plug it in again to start the new firmware."
+    if reported=$(reported_board "$port") && [ "$reported" = "$board" ]; then
+        echo "Done. The M1 answered over USB; this start is excluded from the setup/reset counter."
+    else
+        echo "Firmware written, but the M1 did not confirm its start over USB. Check the display before restarting it again." >&2
+    fi
 else
     esptool --port "$port" --after hard_reset write_flash 0x0 "$image"
     echo
