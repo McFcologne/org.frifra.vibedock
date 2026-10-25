@@ -1239,8 +1239,10 @@ int requestImage(ImageRequest &r, bool conditional, const char *resource = "imag
 // After a full check the server names the current certificate fingerprint; later requests use the simple check.
 void learnPin(ImageRequest &r) {
   if (!r.verified) return;
-  // The server's pin for its current certificate, otherwise the certificate this full check verified itself.
-  String next = r.http.hasHeader("X-VibeDock-Tls-Pin") ? r.http.header("X-VibeDock-Tls-Pin") : platform::verifiedFingerprint(r.client.get());
+  // The certificate this full check has just verified; the server's pin only where the board cannot name it. A pin
+  // the server checked earlier can be the one before a renewal.
+  String next = platform::verifiedFingerprint(r.client.get());
+  if (next.isEmpty() && r.http.hasHeader("X-VibeDock-Tls-Pin")) next = r.http.header("X-VibeDock-Tls-Pin");
   next.toLowerCase(); uint8_t fingerprint[20];
   if (next != pin && client_policy::parseFingerprint(next.c_str(), fingerprint)) { pin = next; saveConfig(); }
 }
