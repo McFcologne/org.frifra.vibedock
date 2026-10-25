@@ -134,14 +134,20 @@ class DeviceApiController {
     }
     /** The host and port a request was sent to: the first X-Forwarded-Host, else Host; null when neither is usable. */
     static String usedHost(String forwarded,String host){
-        String value=forwarded!=null&&!forwarded.isBlank()?forwarded.split(",")[0].trim():host;
-        return value!=null&&value.matches("[A-Za-z0-9.:\\[\\]-]{1,255}")?value.toLowerCase(Locale.ROOT):null;
+        String first=forwarded==null?"":forwarded.split(",",2)[0].trim();
+        String value=valid(first)?first:host;  // an empty or malformed forwarded host: the Host header
+        return valid(value)?value.toLowerCase(Locale.ROOT):null;
     }
-    /** "lan" or "external" when the host (with port, if the address names one) is that of an announced address, else "other". */
+    private static boolean valid(String host){return host!=null&&host.matches("[A-Za-z0-9.:\\[\\]-]{1,255}");}
+    /**
+     * "lan" or "external" when the host (with port, if the address names one) is that of an announced address, else
+     * "other". Without a configured internal address pairing announces the host the administration was opened with,
+     * which the device API does not know: then every address but the external one counts as the LAN.
+     */
     static String route(String used,String internal,String external){
         if(used==null)return "other";
         if(matches(used,external))return "external";
-        if(matches(used,internal))return "lan";
+        if(internal==null||internal.isBlank()||matches(used,internal))return "lan";
         return "other";
     }
     private static boolean matches(String used,String url){

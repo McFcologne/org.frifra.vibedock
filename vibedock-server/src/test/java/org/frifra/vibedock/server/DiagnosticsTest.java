@@ -164,5 +164,11 @@ class DiagnosticsTest {
         assertEquals("other",DeviceApiController.route("192.168.123.100:9999",internal,external));
         assertEquals("other",DeviceApiController.route(null,internal,external));
         assertNull(DeviceApiController.usedHost(null,"bad host/"));
+        // A forwarded header without a usable first host falls back to Host instead of failing the pull.
+        for(String bad:new String[]{",",", ,"," ","bad host/,x"})
+            assertEquals("192.168.123.100:10002",DeviceApiController.usedHost(bad,"192.168.123.100:10002"),bad);
+        // Without a configured internal address (pairing announced the administration's host) the rest is the LAN.
+        assertEquals("lan",DeviceApiController.route("192.168.1.10:10002","",external));
+        assertEquals("external",DeviceApiController.route("home.example.org:10002","",external));
     }
 }
