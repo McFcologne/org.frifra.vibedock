@@ -43,13 +43,15 @@ was flashed as part of the automated checks below.
 
 ## Validation
 
-- M1: compilation passed with Mbed TLS 3.6.7; RAM 46,560 / 81,920 bytes; flash 709,283 / 1,044,464 bytes.
+- M1: compilation passed with Mbed TLS 3.6.7 (sources checked against the release tree hash); RAM 46,708 / 81,920
+  bytes; flash 713,147 / 1,044,464 bytes (measured again with the transfer changes, 2026-10-25).
 - TLS host test with the firmware configuration and Mbed TLS 3.6.7: RSA and ECDSA certificates pass; a server
   preferring AES-256 still negotiates the supported AES-128; a wrong hostname is rejected. This Linux container
   test does not exercise ESP8266 IRAM allocation, physical Wi-Fi or embedded stack limits.
-- Native policy test: passed with AddressSanitizer and UndefinedBehaviorSanitizer.
-- Waveshare S3 Touch 1.54: Core 3 compilation and merged USB image passed; RAM 75,104 / 327,680 bytes;
-  flash 1,620,420 / 1,966,080 bytes. Hardware and longer-duration validation are pending.
+- Native policy and serial-reply tests: passed with AddressSanitizer and UndefinedBehaviorSanitizer; the quick-boot
+  test runs the real start functions with both sanitizers.
+- Waveshare S3 Touch 1.54: Core 3 compilation and merged USB image passed; RAM 75,168 / 327,680 bytes;
+  flash 1,632,968 / 1,966,080 bytes. Hardware and longer-duration validation are pending.
 - Waveshare S3 Touch 1.47: Core 3 compilation and merged USB image passed; audio-exclusion checks passed.
 - All nine final board environments compiled with the shared UI protocol, appearance push and live-page changes;
   all eight non-audio boards passed strict audio-exclusion checks.

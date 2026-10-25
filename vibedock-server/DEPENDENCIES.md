@@ -26,9 +26,9 @@ one data directory. No production data or running server is changed by the build
 
 ## Validation
 
-Java 21 Maven verification passes **232 tests with zero failures/errors/skips**, including the existing file-format
-and migration tests and the new UI persistence/header/callback checks. Detailed validation is recorded in
-[VALIDATION.md](VALIDATION.md). Provider sign-in with real accounts and the complete
+Java 21 Maven verification passes **236 tests with zero failures/errors/skips** (measured again for 0.3.0 with the
+transfer changes), including the existing file-format and migration tests and the new UI persistence/header/callback
+checks. Detailed validation is recorded in [VALIDATION.md](VALIDATION.md). Provider sign-in with real accounts and the complete
 Docker image/manual build still require an integration run; Maven verification alone does not establish these.
 
 References: [Spring Boot migration guide](https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.0-Migration-Guide),

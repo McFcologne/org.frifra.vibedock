@@ -368,9 +368,11 @@ FNV-1a-32 (offset `2166136261`, multiplier `16777619`, modulo 2^32), mapping a z
 row-table checks use ordinary FNV-1a without this zero mapping. These are error checks, not authentication.
 
 The firmware accepts a delta only over a complete, unscaled image with a matching base ETag and valid row
-state. Local setup/error screens, orientation or colour correction invalidate this basis. It reads one span
-at a time into the existing row buffer, applies colour correction and updates the panel. Volume overlays are
-local to the device; changes also update their saved background pixels. No full framebuffer is allocated.
+state, or over what a cut-off transfer left on screen (see *Resume* below). Local setup/error screens invalidate
+this basis; a turn or a new colour correction too, unless the display redraws the picture from its copy (3e). It
+reads one span at a time into the existing row buffer, applies colour correction and updates the panel. Volume
+overlays are local to the device; changes also update their saved background pixels. Only ESP32 boards with the
+memory for it keep a copy of the picture (the server's pixels before colour correction); the M1 has none.
 
 The new ETag is committed only after the exact length, terminator, payload checksum and row-table checksum
 have passed. After a rejected or invalid delta, the firmware clears its ETag and row hashes and requests a full

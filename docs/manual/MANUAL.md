@@ -1014,6 +1014,9 @@ seconds after power-on. The display then shows *Unplug now for factory reset*:
 - wait, and it opens the Wi-Fi setup (the pairing stays);
 - unplug once more, and it forgets Wi-Fi, pairing and server addresses (factory reset).
 
+Starts over USB do not count: reading the log, pairing over the cable or flashing new firmware (both flashers
+confirm the start of the M1 over USB) never add up to the Wi-Fi setup or a factory reset.
+
 A display with a battery fitted (Waveshare 1.54) keeps running on it when unplugged; disconnect the battery first.
 
 # Troubleshooting a display
