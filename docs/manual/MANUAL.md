@@ -89,12 +89,13 @@ board with the browser flasher. Nothing has to be installed next to it.
   the emoji graphics are part of the repository). The first build takes several minutes.
 - At run time the server needs internet access to the providers and to the weather service (Open-Meteo).
 
-Choose one of three ways:
+Choose one of these ways:
 
 | Way | When |
 | --- | --- |
 | [Build from the sources](#build-from-the-sources-docker-compose) | Default; updates with `git pull` |
-| [Ready-made image from a release](#ready-made-image-from-a-release) | No build on the target machine |
+| [Ready-made image from the registry](#ready-made-image-from-the-registry) | No build on the target machine |
+| [Image file](#image-file-for-a-machine-without-registry-access) | The target machine reaches no registry |
 | [Synology NAS](#synology-nas) | Container Manager on a Synology |
 
 ## Build from the sources (Docker Compose)
@@ -271,16 +272,22 @@ Use one of them as the image in the `docker run` command or the `compose.yaml` b
 `vibedock-server:amd64`; to update, pull again and recreate the container. On a Synology, *Container Manager ›
 Registry* finds `mcfcologne/vibedock-server` on Docker Hub, and *Image* then shows when a new version is available.
 
-## Ready-made image from a release
+## Image file for a machine without registry access
 
-Every GitHub release of the repository carries the image as `vibedock-server-<version>-amd64.tar.gz` and
-`vibedock-server-<version>-arm64.tar.gz`. Without GitHub access, `scripts/image.sh amd64` (or `arm64`) builds the same
-file on another machine. Load the file for your platform:
+Pull the image from the registry where possible (above). For a machine that cannot reach a registry, make an image
+file elsewhere: `scripts/image.sh amd64` (or `arm64`) builds it from the sources as
+`target/vibedock-server-<version>-amd64.tar`, or a machine with registry access saves the published one with
+`docker pull --platform linux/amd64 mcfcologne/vibedock-server:0.3.1` and
+`docker save mcfcologne/vibedock-server:0.3.1 -o vibedock-server-0.3.1-amd64.tar`. GitHub releases no longer carry
+the image (up to 0.3.0 they did, as `vibedock-server-<version>-<arch>.tar.gz`). Load the file for your platform:
 
 ```sh
 # loads the image vibedock-server:amd64 (the version is in the file name and in the administration)
-docker load -i vibedock-server-0.1.0-amd64.tar.gz
+docker load -i vibedock-server-0.3.1-amd64.tar
 ```
+
+An image saved from the registry keeps its name (`mcfcologne/vibedock-server:0.3.1`): use that name instead of
+`vibedock-server:amd64` below.
 
 Prepare the data directory and an environment file with the password (`chmod 600`, so it stays private), then start:
 
@@ -303,7 +310,7 @@ To update, load the new file, remove the container and start it again with the s
 `/srv/vibedock`:
 
 ```sh
-docker load -i vibedock-server-0.1.0-amd64.tar.gz
+docker load -i vibedock-server-0.3.1-amd64.tar
 docker rm -f vibedock-server
 docker run -d --name vibedock-server ...   # same command as above
 ```
@@ -349,13 +356,16 @@ Start, and update after loading a new image file:
 ```sh
 cd /opt/vibedock
 docker compose up -d                 # start
-docker load -i vibedock-server-0.1.0-amd64.tar.gz
+docker load -i vibedock-server-0.3.1-amd64.tar
 docker compose up -d --force-recreate   # update: same data, new image
 ```
 
 ## Synology NAS
 
-1. Build or download the **amd64** image file (B) and import it under **Container Manager › Image › Import**.
+1. Get the image: in **Container Manager › Registry** search `mcfcologne/vibedock-server` and download it (then set it
+   as `image:` in `compose.synology.yaml`), or import an image file from
+   [Image file for a machine without registry access](#image-file-for-a-machine-without-registry-access) under
+   **Container Manager › Image › Import**.
 2. Create the folder `/volume1/docker/vibedock-server/data` and give the container user (UID 10001) write access.
 3. Create a project in **Container Manager › Project** in `/volume1/docker/vibedock-server` with the file
    `compose.synology.yaml` from the repository. Write the password into the project (Container Manager does not
