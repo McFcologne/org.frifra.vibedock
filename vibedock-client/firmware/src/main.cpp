@@ -1274,6 +1274,7 @@ void updateProgress(size_t done, size_t total) {
 }
 void installUpdate(const String &version) {
   PhaseScope updating(Phase::Ota);
+  platform::UpdateReserve reserve;  // before the log line and the connection fragment the heap
   message(String(F("Updating to v")) + version, Step::None); updateProgress(0, 1); logEvent(String(F("Update to v")) + version + F(" started"));
   auto fail = [&](const String &reason) {
     updateError = version + ": " + reason; failedUpdate = version; logEvent(String(F("Update failed: ")) + reason);
@@ -1284,7 +1285,7 @@ void installUpdate(const String &version) {
   int code = requestImage(request, false, "firmware");
   int size = http.getSize();
   if (size <= 0) size = http.header("X-VibeDock-Length").toInt();  // behind a reverse proxy that drops Content-Length
-  if (code != 200 || size <= 0) { fail(code > 0 ? String(F("download HTTP ")) + String(code) : String("download failed")); return; }
+  if (code != 200 || size <= 0) { fail(code > 0 ? String(F("download HTTP ")) + String(code) : lastConnectionProblem.isEmpty() ? String("download failed") : String(F("download failed: ")) + lastConnectionProblem); return; }
   String error;
   bool installed = platform::installSigned(http.getStreamPtr(), size_t(size), http.header("x-MD5"), error, updateProgress);
   http.end();

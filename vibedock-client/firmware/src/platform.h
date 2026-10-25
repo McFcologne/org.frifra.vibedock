@@ -343,6 +343,18 @@ inline bool hasOtaKey() { return bool(otaKey()); }
 inline void clearOtaKey() { otaKey().reset(); }
 #endif
 
+// The ESP8266 updater needs one flash sector (4 KB) in one piece, which the heap rarely has after a TLS handshake:
+// UpdateReserve holds it from before the download's connection until installSigned gives it back to Update.begin.
+#if defined(ESP8266)
+inline std::unique_ptr<uint8_t[]> &updateBlock() { static std::unique_ptr<uint8_t[]> block; return block; }
+struct UpdateReserve {
+  UpdateReserve() { updateBlock().reset(new (std::nothrow) uint8_t[FLASH_SECTOR_SIZE]); }
+  ~UpdateReserve() { updateBlock().reset(); }
+};
+#else
+struct UpdateReserve {};
+#endif
+
 // Writes the signed firmware from the stream next to the running one and switches over only if the signature of the
 // paired server and the MD5 (x-MD5, over the whole body) match. false with the reason otherwise.
 inline bool installSigned(WiFiClient *stream, size_t size, const String &md5, String &error,
@@ -351,6 +363,7 @@ inline bool installSigned(WiFiClient *stream, size_t size, const String &md5, St
 #if defined(ESP8266)
   BearSSL::HashSHA256 hash; BearSSL::SigningVerifier verifier(otaKey().get());
   Update.installSignature(&hash, &verifier);
+  updateBlock().reset();  // right before the updater asks for it
   if (!Update.begin(size)) { error = "no space: " + Update.getErrorString(); return false; }
   if (md5.length() == 32) Update.setMD5(md5.c_str());
   while (done < size && millis() - lastData < 15000) {
