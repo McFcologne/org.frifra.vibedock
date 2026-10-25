@@ -1333,7 +1333,7 @@ void pull() {
     String server = servers[serverIndex];
     String answer = code >= 400 && code != 401 ? answerStart(http) : String();
     if (code > 0) logEvent(server + F(": HTTP ") + String(code) + (answer.isEmpty() ? "" : " \"" + answer + "\"")
-        + (server.startsWith("https") ? ", " + platform::tlsSummary() : String()), true);
+        + (server.startsWith("https") && !platform::tlsSummary().isEmpty() ? ", " + platform::tlsSummary() : String()), true);
     else logEvent(server + ": " + HTTPClient::errorToString(code) + (lastConnectionProblem.isEmpty() ? "" : ", " + lastConnectionProblem), true);
   }
   lastStatus = code;
