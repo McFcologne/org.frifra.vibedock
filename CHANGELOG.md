@@ -17,6 +17,10 @@ other boards are not affected.
   needs 4.6 kB for its stack), the M1 restarts (*Restart: too little memory in one piece …*, start kind `low-memory`)
   instead of failing on. Between log events its log lines are no longer kept in memory but only in its file; they took
   up to 7 kB of its heap. Needs the new firmware.
+- **M1 log after a broken-off handshake:** when a TLS connection broke off before the certificate was checked (for
+  example *-0x7200* from an address that does not answer with TLS), the log line listed every certificate problem at
+  once (*certificate expired, not yet valid, host name does not match, root from pairing does not match*). It now
+  names only the error. Needs the new firmware.
 
 ## 0.3.2
 

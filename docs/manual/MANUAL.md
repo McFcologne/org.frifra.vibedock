@@ -1173,7 +1173,8 @@ interval) and how late it is, and counts down to the end of the request.
 | `… TCP to … works, TLS or HTTP failed` | The port answers, but TLS or HTTP failed without a more precise reason. An ESP32 board against a server that offers only TLS 1.3: allow TLS 1.2 on the server for ESP32 boards. |
 | `… after TLS; sent …, got …` | The encrypted connection works; the HTTP request failed afterwards (for example read timeout or connection lost). Check the reverse proxy and the server's access log for the request. |
 | `Image shown, read in … ms` | The first image after a start or a problem arrived completely. |
-| `Image aborted: no data for 8 s at row …` / `connection closed at row …` | The answer started but the image did not arrive completely; over https the traffic figures follow. |
+| `Image aborted: no data for 8 s at row …` / `connection closed at row …` | The answer started but the image did not arrive completely; over https the traffic figures follow. Often, with a good signal: see [Slow pictures and aborted transfers](#slow-pictures-and-aborted-transfers-wi-fi). |
+| `… TCP to … works, no HTTP answer` | The connection was set up but the request or its answer got lost; the server's access log does not list the request. Now and then is harmless; often: see [Slow pictures and aborted transfers](#slow-pictures-and-aborted-transfers-wi-fi). |
 | `Image aborted: invalid delta, length or checksum` / `delta transfer interrupted` / `unsupported image or delta basis` | A partial update did not fit what the display shows or did not arrive completely; the display fetches the whole picture right away. Now and then is harmless; every time points to a proxy changing the answers. |
 | `Image not accepted: format …, … bytes announced` | The server's answer was not a VibeDock image: no or a wrong image format, typically a wrong address or a reverse proxy that answers itself. A missing `Content-Length` is fine. |
 | `Trying <address> next` | The display switches to its other server address. |
@@ -1183,6 +1184,7 @@ interval) and how late it is, and counts down to the end of the request.
 | `TLS 1.3 -0x7780 alert from the server 40 (handshake failure)` | Server and display share no algorithm (see the supported algorithms in `vibedock-client/TLS.md`); report the log. |
 | `TLS 1.3 -0x2700 certificate not trusted, root from pairing does not match` | The server's certificate now leads to another root (new certificate authority): pair the display again. |
 | `… certificate expired` / `not yet valid (clock?)` / `host name does not match` | Renew the server certificate, check the time, or use the host name the certificate is for. |
+| `TLS 1.3 -0x7200` (firmware before 0.3.3 also lists every certificate problem at once) | The address answered, but not with TLS, before any certificate was checked: typically the external https address tried from inside the LAN. Harmless when the internal address works. |
 | `TLS 1.3 -0x6800 timeout after …` | The server stopped answering during the handshake (15 s without progress). Check the reverse proxy. |
 | `TLS 1.3 … out of memory`, `needs … bytes for its stack`, or `-0x6E00 handshake failure` with a small `block` | Too little free memory on the M1. Report the log with its heap figures. |
 | `Server refuses TLS 1.3, using TLS 1.2` | The server speaks only TLS 1.2; the display uses it with the same certificate check. |
@@ -1192,6 +1194,39 @@ interval) and how late it is, and counts down to the end of the request.
 | `Server rejected the device key (401) three times: pairing removed` (before 0.3.3: `… (401): pairing removed`) | The server does not know the display (removed, or another server): pair it again. |
 | `Restart: too little memory in one piece (largest block …, heap …)` | The M1 had too little memory left for a TLS connection three pulls in a row and restarted itself (`start=low-memory`). Now and then is harmless; often: report the log. |
 | `Update to v… started` / `installed` / `Update failed: …` | Updates over Wi-Fi and why one failed; the running firmware stays on failure. |
+
+## Slow pictures and aborted transfers (Wi-Fi)
+
+**Signs:** the display log shows `Image aborted: no data for 8 s`, `delta transfer interrupted` or `TCP … works, no
+HTTP answer` again and again, a whole picture takes several seconds instead of about one, and the display still has a
+good signal (better than −60 dBm) and no Wi-Fi drops. **Devices** shows many whole pictures instead of small changes.
+
+**Cause:** a crowded 2.4 GHz channel. The signal is strong, but many packets have to be sent again. The VibeTV M1
+(ESP8266) suffers most: its small receive window cannot recover a lost packet quickly, so each loss stalls the
+transfer for a second or more, and a few losses in a row exceed the 8 s limit. ESP32 boards in the same network show
+little of it. Current firmware resumes a cut-off picture with its rest, so it still arrives, only slowly.
+
+**Check** in your router or Wi-Fi controller: the load (airtime) and interference of the 2.4 GHz channel and the
+retries of the display. In UniFi: **UniFi Devices** › the access point › **Radio Settings** (*Live Airtime*) and the
+client's *TX Retries*. Airtime far above 50 % or retries above 10 % on the display's channel point to this cause.
+
+**Remedies:**
+
+- Spread the access points over the 2.4 GHz channels 1, 6 and 11 and do not lock all of them to one channel (UniFi:
+  *Lock 2.4 GHz to Channel …* in the Wi-Fi settings); choose the channel with the least load from the controller's
+  scan of the neighbourhood.
+- Keep 20 MHz channel width on 2.4 GHz.
+- For a Wi-Fi network of displays: 2.4 GHz only, WPA2, Wi-Fi 4 mode (UniFi: *Force WiFi 4 Mode*), and no MLO,
+  802.11r/v or band steering.
+- Firmware before 0.3.3: many aborted pictures can exhaust the memory of the M1 until it sends its request without a
+  whole key and removes its pairing on the server's answer. Update the displays; 0.3.3 keeps the pairing and restarts
+  the display when memory runs low.
+
+**Displays in their own VLAN** (e.g. an IoT network): allow only the displays to reach the server's device port, for
+example in UniFi a zone *IoT* whose traffic to *Internal* is blocked, with one *Allow* policy from the displays' IP
+addresses to the server's IP and port above it. Open that subnet in the firewall of the server host as well (Synology:
+**Control Panel** › **Security** › **Firewall**), and make sure the host sends its answers back through the router of
+that VLAN (its default gateway). The displays keep using the internal address; nothing changes in their pairing.
 
 ## Check the server
 
