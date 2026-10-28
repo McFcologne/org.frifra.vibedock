@@ -130,6 +130,11 @@ class DiagnosticsTest {
         assertEquals(1,m.unexpectedStarts());
         var planned=SupportDiagnosis.display(m1,null,List.of(),List.of(start("0000bee1","update","ota",100L,null)),null,now,zone,NONE);
         assertTrue(planned.suspected().contains("The last restart was planned (update)"));assertEquals(0,planned.unexpectedStarts());
+        // The M1 restarts itself when too little memory is left in one piece: named, not counted as unexpected.
+        var lowMemory=SupportDiagnosis.display(m1,null,List.of(),List.of(start("0000bee2","low-memory","idle",30000L,4800L)),null,now,zone,NONE);
+        assertTrue(lowMemory.suspected().contains("The display restarted itself because too little memory was left in one piece (lowest free memory 4800 B)"));
+        assertEquals(0,lowMemory.unexpectedStarts());
+        assertTrue(DeviceDiagnostics.KINDS.contains("low-memory"));
         // Not connected, no crash reported: Wi-Fi or server; old firmware: no diagnosis.
         var silent=SupportDiagnosis.display(m1,null,null,List.of(),null,now,zone,NONE);
         assertTrue(silent.suspected().contains("No crash reported: Wi-Fi or server not reachable is more likely"));

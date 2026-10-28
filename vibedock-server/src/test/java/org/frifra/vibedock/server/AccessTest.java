@@ -516,7 +516,9 @@ class AccessTest {
                 .with(r->{r.setLocalPort(8080);r.setRemoteAddr("192.168.1.21");return r;})).andExpect(status().isOk());
         Assertions.assertEquals("192.168.1.21",clients.get("vibedock-access-test").ip());
         mvc.perform(get(path).header("Authorization","Bearer "+"cd".repeat(32)).with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isUnauthorized());
-        mvc.perform(get(path).with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isUnauthorized());
+        // Without a whole key (a display out of memory cuts its headers) 400: displays forget their pairing only on 401.
+        mvc.perform(get(path).with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isBadRequest());
+        mvc.perform(get(path).header("Authorization","Bearer "+key.substring(0,40)).with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isBadRequest());
         mvc.perform(get("/api/v1/clients/vibedock-unknown-1/image").header("Authorization","Bearer "+key).with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isUnauthorized());
         mvc.perform(post(path).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isMethodNotAllowed());
         mvc.perform(get(path).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isNotFound());
@@ -832,7 +834,7 @@ class AccessTest {
         Assertions.assertEquals("192.168.1.44",clients.address("vibedock-a1b2c3d4e5f6").ip(),"Use the device report, not the Docker gateway");
         mvc.perform(get("/admin/firmware/setup/vibedock-a1b2c3d4e5f6").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
                 .andExpect(jsonPath("$.status").value("Connected")).andExpect(jsonPath("$.ip").value("192.168.1.44"));
-        mvc.perform(get("/api/v1/clients/vibedock-a1b2c3d4e5f6/image").header("Authorization","Bearer wrong")
+        mvc.perform(get("/api/v1/clients/vibedock-a1b2c3d4e5f6/image").header("Authorization","Bearer "+"0".repeat(64))
                 .header("X-VibeDock-Device-IP","192.168.1.44").header("X-VibeDock-Firmware","0.1.1").header("X-VibeDock-Subnet-Mask","255.255.0.0")
                 .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/clients/vibedock-a1b2c3d4e5f6/image").header("Authorization","Bearer "+key)
@@ -901,7 +903,8 @@ class AccessTest {
                 .andExpect(jsonPath("$['"+id+"'].updating").value(true)).andExpect(jsonPath("$['"+id+"'].firmware").value("0.1.0"));
         // The download: only with the device key, only on the device port, signed with the key the device got when paired.
         String firmwarePath="/api/v1/clients/"+id+"/firmware";
-        mvc.perform(get(firmwarePath).with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isUnauthorized());
+        mvc.perform(get(firmwarePath).with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isBadRequest());
+        mvc.perform(get(firmwarePath).header("Authorization","Bearer "+"0".repeat(64)).with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isUnauthorized());
         mvc.perform(get(firmwarePath).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isNotFound());
         var download=mvc.perform(get(firmwarePath).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(8080);return r;}))
                 .andExpect(status().isOk()).andReturn().getResponse();

@@ -1158,7 +1158,7 @@ interval) and how late it is, and counts down to the end of the request.
 | Log line | Meaning and what to do |
 | --- | --- |
 | `Start v… board: boot=… reset=… start=power-on prev=unknown; Power on` | A start (firmware 0.2.0): its boot id, the platform's reset code and its kind. After a power cut the run before is unknown. |
-| `… start=update prev=… phase=ota …` / `start=setup` / `start=factory-reset` | A restart the display planned: not a crash. |
+| `… start=update prev=… phase=ota …` / `start=setup` / `start=factory-reset` / `start=low-memory` | A restart the display planned: not a crash. |
 | `… start=external …` | The reset button, or a USB port that was opened (esptool, serial monitor, *Restart display*). |
 | `… start=crash` / `watchdog` / `software` / `brownout` `prev=… phase=image up=5400 heap=…/…` | An unexpected restart and what the display was doing before (`phase`), how long it ran and its free memory then. On the M1 a crash record follows (`exception (reason …, cause … at 0x…)`). Report it with the firmware version; see `vibedock-client/FLASHING.md`, *Decoding a crash*. |
 | `Start v… board, Power on` / `External System` / `Software/System restart: stack overflow …` | The same from firmware up to 0.1.1, without boot id and kind. |
@@ -1188,7 +1188,9 @@ interval) and how late it is, and counts down to the end of the request.
 | `Server refuses TLS 1.3, using TLS 1.2` | The server speaks only TLS 1.2; the display uses it with the same certificate check. |
 | `<address>: HTTP 200, TLS 1.3 …` | Works: cipher suite, duration and memory of the connection. |
 | `<address>: HTTP 400 "<html>…"` | A reverse proxy answered, not the VibeDock server (the text is the start of its page). Check the proxy's target and that the display really speaks TLS to the https port. |
-| `Server rejected the device key (401): pairing removed` | The server does not know the display (removed, or another server): pair it again. |
+| `Server rejected the device key (401), 1 of 3` | The server did not accept the key. After the third answer like this in a row the display removes its pairing; one in between is harmless. |
+| `Server rejected the device key (401) three times: pairing removed` (before 0.3.3: `… (401): pairing removed`) | The server does not know the display (removed, or another server): pair it again. |
+| `Restart: too little memory in one piece (largest block …, heap …)` | The M1 had too little memory left for a TLS connection three pulls in a row and restarted itself (`start=low-memory`). Now and then is harmless; often: report the log. |
 | `Update to v… started` / `installed` / `Update failed: …` | Updates over Wi-Fi and why one failed; the running firmware stays on failure. |
 
 ## Check the server

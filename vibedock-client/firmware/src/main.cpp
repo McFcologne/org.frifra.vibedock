@@ -146,7 +146,7 @@ String diagHeader() {
 // ---- device log: the last events, kept in /log.txt across restarts and read over USB (VIBEDOCK-LOG) ----
 // What the display did and why a connection failed; no keys, passwords or tokens.
 bool clockSet();
-constexpr uint8_t LOG_LINES = 24;  // up to 4 kB of heap, given back during a TLS handshake (parkLog)
+constexpr uint8_t LOG_LINES = 24;  // up to 7 kB of heap; on the ESP8266 only while an event is written (parkLog)
 String logLines[LOG_LINES]; uint8_t logNext = 0, logCount = 0;
 String logLast; uint16_t logRepeats = 0;
 bool logStored = false;  // the storage is mounted; until then events stay in memory
@@ -205,7 +205,12 @@ void logEvent(const String &text, bool frequent = false) {
   for (uint8_t i = 1; frequent && i <= 4 && i <= logCount; i++) seen |= logLines[(logNext + LOG_LINES - i) % LOG_LINES].endsWith(" " + text.substring(0, 260));
   logLines[logNext] = String(stamp) + " " + text.substring(0, 260);
   logNext = (logNext + 1) % LOG_LINES; if (logCount < LOG_LINES) logCount++;
+#if defined(ESP8266)
+  (void)seen;
+  parkLog();  // the M1's heap is small: between events the lines are only in /log.txt (parkLog writes it)
+#else
   if (!seen || millis() - logSavedAt >= 60000) saveLog(); else logDirty = true;
+#endif
 }
 // The log of the earlier runs comes first; this run's events follow.
 void loadLog() {
@@ -1327,11 +1332,26 @@ struct ModemAwake {
 #endif
   }
 };
+uint8_t rejectedKeys = 0;  // 401 answers in a row; the third removes the pairing
+#if defined(ESP8266)
+constexpr uint32_t LOW_MEMORY_BLOCK = 6144;  // the TLS 1.3 stack (4608 bytes) and some room for the request
+#endif
 void pull() {
   lastPull = millis();
   if (WiFi.status() != WL_CONNECTED) return;
   ModemAwake awake;
   diagSample();
+#if defined(ESP8266)
+  // Too little memory in one piece for a TLS handshake (its 4.6 kB stack) or whole request headers, three pulls in a
+  // row: a planned restart instead of failing on, with cut-off requests the server may reject.
+  static uint8_t lowMemory = 0;
+  uint32_t block = ESP.getMaxFreeBlockSize();
+  if (block >= LOW_MEMORY_BLOCK) lowMemory = 0;
+  else if (++lowMemory >= 3) {
+    logEvent(String(F("Restart: too little memory in one piece (largest block ")) + String(block) + F(", heap ") + String(ESP.getFreeHeap()) + ")");
+    diagIntent(Intent::LowMemory); delay(500); ESP.restart();
+  }
+#endif
   if (reasonOnScreen && (!haveImage || staleScreen)) {  // the reason stays, the address line says what runs now
     display.fillRect(0, 210, 240, 10, TFT_BLACK);
     showWrapped(String(F("trying ")) + servers[serverIndex], 211, 1, MUTED, 1); present();
@@ -1363,7 +1383,7 @@ void pull() {
     if (storedIndex != serverIndex) saveConfig();  // flash only when the answering address changes
   }
   if (code == 200 || code == 304) {
-    learnPin(request); updateError = "";
+    learnPin(request); updateError = ""; rejectedKeys = 0;
 #ifdef VIBEDOCK_AUDIO_ES8311
     audio::quotas(http.header("X-VibeDock-Quota").c_str());
 #endif
@@ -1472,8 +1492,14 @@ void pull() {
   } else if (code == 304) {
     lastImage = millis(); staleScreen = false;
   } else if (code == 401) {
-    logEvent(F("Server rejected the device key (401): pairing removed"));
-    http.end(); unpair(); return;
+    // Only a key rejected three pulls in a row removes the pairing: one 401 can answer a request whose headers were
+    // cut off (out of memory), and older servers answer a missing key with 401 too.
+    if (++rejectedKeys < 3) {
+      logEvent(String(F("Server rejected the device key (401), ")) + String(rejectedKeys) + F(" of 3"));
+      http.end(); return;
+    }
+    logEvent(F("Server rejected the device key (401) three times: pairing removed"));
+    rejectedKeys = 0; http.end(); unpair(); return;
   } else if (code < 0) {
     // Connection failed: try the other announced address next time. An answer that stalled after a successful TLS
     // handshake (lost packets on the way) is first retried at the same address.
