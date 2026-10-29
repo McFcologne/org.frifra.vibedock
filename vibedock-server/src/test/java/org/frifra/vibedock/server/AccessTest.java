@@ -473,6 +473,21 @@ class AccessTest {
                 .andExpect(jsonPath("$.providers.claude.status").value("authentication_required"))
                 .andExpect(jsonPath("$.providers.claude.fiveHour").isEmpty());
     }
+    @Test void aSourceWithoutFiguresNamesTheReasonOnlyInTheAdministration() throws Exception {
+        store.save(new SettingsStore.Settings(List.of("127.0.0.1"),new SettingsStore.Credential("codex-secret",""),
+                new SettingsStore.Credential("claude-secret",""),List.of()));
+        when(providers.fetch(eq("codex"),any())).thenReturn(new ProviderClient.Reading(new ProviderClient.Window(12,1900000000),new ProviderClient.Window(30,1900500000)));
+        when(providers.fetch(eq("claude"),any())).thenThrow(new ProviderClient.Failure("unavailable",0,"no Code Assist project; open the Gemini CLI once with this account"));
+        usage.refresh();
+        for(var page:List.of("/admin","/admin/sources"))
+            mvc.perform(get(page).with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString(">Unavailable</span>")))
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString("No Code Assist project; open the Gemini CLI once with this account")));
+        mvc.perform(get("/admin/sources/state.json").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(jsonPath("$.claude.badge").value("Unavailable")).andExpect(jsonPath("$.codex.reason").value(""));
+        mvc.perform(get("/api/v1/usage").with(r->{r.setLocalPort(8080);return r;}))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Code Assist"))));
+    }
     @Test void rateLimitCooldownAlsoAppliesToManualRefresh() throws Exception {
         store.save(new SettingsStore.Settings(List.of(),new SettingsStore.Credential("test-token",""),new SettingsStore.Credential("",""),List.of()));
         when(providers.fetch(eq("codex"),any())).thenThrow(new ProviderClient.Failure("rate_limited",java.time.Instant.now().getEpochSecond()+300));

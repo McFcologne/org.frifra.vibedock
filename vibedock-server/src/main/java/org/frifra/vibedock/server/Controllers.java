@@ -62,6 +62,7 @@ class Controllers {
         Map<String,String> figures=new LinkedHashMap<>();
         snapshot.providers().forEach((id,p)->figures.put(id,figures(p)));
         model.addAttribute("figures",figures);
+        model.addAttribute("badges",badges(snapshot.providers()));model.addAttribute("reasons",reasons(snapshot.providers()));
         var effective=store.effective();
         Map<String,String> sourceDetails=new LinkedHashMap<>();
         for(var account:store.get().accounts()){
@@ -81,12 +82,35 @@ class Controllers {
     /** Remaining share per window as on the display, e.g. "5h 80 % · Week 74 % left"; empty without values. */
     /** The badge text of a source's state, as the overview and the data sources page show it. */
     static String badge(UsageService.Provider p){
-        return switch(p.status()){case "ok"->"Current";case "suspended"->"Paused";default->p.status().replace('_',' ');};
+        return switch(p.status()){
+            case "ok"->"Current";case "suspended"->"Paused";case "partial"->"Partial";case "waiting"->"Waiting";
+            case "unconfigured"->"Not connected";case "authentication_required"->"Sign-in required";case "rate_limited"->"Rate limited";
+            case "upstream_error"->"Provider error";case "invalid_response"->"Invalid answer";case "unavailable"->"Unavailable";case "stale"->"Stale";
+            default->{String text=p.status().replace('_',' ');yield text.isEmpty()?text:Character.toUpperCase(text.charAt(0))+text.substring(1);}
+        };
+    }
+    /** Why a source shows no current figures, below its badge; empty while it is current, paused or waiting. */
+    String reason(String id,UsageService.Provider p){
+        String detail=usage.reason(id);
+        String text=switch(p.status()){
+            case "ok","suspended","waiting"->"";
+            case "unconfigured"->"Not signed in yet";
+            case "authentication_required"->"Sign in again under Manage"+(detail.isEmpty()?"":" ("+detail+")");
+            case "partial"->"The provider reports only one of the two windows";
+            default->detail.isEmpty()?(p.status().equals("unavailable")?"The provider answered without usage figures":""):detail;
+        };
+        return text.isEmpty()?text:Character.toUpperCase(text.charAt(0))+text.substring(1);
+    }
+    private Map<String,String> badges(Map<String,UsageService.Provider> providers){
+        Map<String,String> out=new LinkedHashMap<>();providers.forEach((id,p)->out.put(id,badge(p)));return out;
+    }
+    private Map<String,String> reasons(Map<String,UsageService.Provider> providers){
+        Map<String,String> out=new LinkedHashMap<>();providers.forEach((id,p)->out.put(id,reason(id,p)));return out;
     }
     /** Current state of every source, for the pages to update their badges while a collection is pending. */
     @GetMapping(value="/admin/sources/state.json",produces="application/json") @ResponseBody Map<String,Map<String,String>> sourceState(){
         Map<String,Map<String,String>> out=new LinkedHashMap<>();
-        usage.snapshot().providers().forEach((id,p)->out.put(id,Map.of("status",p.status(),"badge",badge(p),"figures",figures(p))));
+        usage.snapshot().providers().forEach((id,p)->out.put(id,Map.of("status",p.status(),"badge",badge(p),"figures",figures(p),"reason",reason(id,p))));
         return out;
     }
     static String figures(UsageService.Provider p){
@@ -131,7 +155,8 @@ class Controllers {
         model.addAttribute("sources",store.get().accounts().stream().map(a->new SourceView(a.id(),a.type(),SettingsStore.Account.typeLabel(a.type()),
                 a.label(),effective.account(a.id()).map(e->!e.manual().token().isBlank()).orElse(false),a.manual().accountId(),a.suspended())).toList());
         model.addAttribute("types",SettingsStore.Account.TYPES);
-        model.addAttribute("sourceStates",usage.snapshot().providers());
+        var states=usage.snapshot().providers();
+        model.addAttribute("sourceStates",states);model.addAttribute("badges",badges(states));model.addAttribute("reasons",reasons(states));
         model.addAttribute("polling",store.polling());
         var intervals=new java.util.HashMap<String,Integer>();
         for(var a:store.get().accounts()){var minutes=usage.interval(a.id());if(minutes!=null)intervals.put(a.id(),minutes);}

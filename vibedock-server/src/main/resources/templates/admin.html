@@ -11,8 +11,8 @@
 <section class="card" id="status">
   <div class="card-head"><span class="icon"><svg th:replace="~{fragments :: icon('activity')}"></svg></span><h3 class="grow">Data sources</h3><span class="meta" th:text="${snapshot.providers.size()} + ' accounts'"></span></div>
   <ul class="status-list">
-    <li th:each="entry:${snapshot.providers}"><span th:replace="~{fragments :: sourceTile(${sourceTypes.get(entry.key)})}"></span><div class="source-summary"><strong th:text="${snapshot.label(entry.key)}"></strong><span class="meta" th:text="${sourceDetails.get(entry.key)}"></span><span class="meta" th:attr="data-source-figures=${entry.key}" th:text="${figures.get(entry.key)}"></span></div>
-      <span class="badge" th:attr="data-source-badge=${entry.key},data-status=${entry.value.status}" th:classappend="${entry.value.status == 'ok'} ? 'ok'" th:text="${entry.value.status == 'ok' ? 'Current' : (entry.value.status == 'suspended' ? 'Paused' : #strings.replace(entry.value.status,'_',' '))}"></span></li>
+    <li th:each="entry:${snapshot.providers}"><span th:replace="~{fragments :: sourceTile(${sourceTypes.get(entry.key)})}"></span><div class="source-summary"><strong th:text="${snapshot.label(entry.key)}"></strong><span class="meta" th:text="${sourceDetails.get(entry.key)}"></span><span class="meta" th:attr="data-source-figures=${entry.key}" th:text="${figures.get(entry.key)}"></span><span class="meta source-reason" th:attr="data-source-reason=${entry.key}" th:text="${reasons.get(entry.key)}"></span></div>
+      <span class="badge" th:attr="data-source-badge=${entry.key},data-status=${entry.value.status}" th:classappend="${entry.value.status == 'ok'} ? 'ok'" th:text="${badges.get(entry.key)}"></span></li>
   </ul>
 </section>
 <aside class="card overview-display">
