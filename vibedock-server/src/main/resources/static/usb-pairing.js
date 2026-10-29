@@ -49,6 +49,7 @@ export function usbPairing(pair, { port = () => undefined, setPort = () => {}, b
       if (!current()) { await opened.close(); return; }
       console_ = opened;
       device = await hello();
+      networks = [];  // a new connection (possibly another display) starts with its own list
       const list = await scanNetworks();
       if (!current()) return;
       choose(list[0]?.ssid ?? '');
@@ -66,19 +67,26 @@ export function usbPairing(pair, { port = () => undefined, setPort = () => {}, b
     const scanned = console_.wait('VIBEDOCK-NETWORKS ', 20000);
     await console_.send('VIBEDOCK-SCAN');
     let list = []; try { list = JSON.parse((await scanned).slice('VIBEDOCK-NETWORKS '.length)); } catch { /* type the name instead */ }
-    networks = list;
+    networks = merged(list);
     return list;
+  }
+  // A rescan updates the list instead of replacing it: networks it did not see this time (a scan misses some) stay,
+  // dimmed and below the others, until the next connection to a display. Strongest first.
+  function merged(list) {
+    const seen = new Set(list.map(n => n.ssid));
+    const kept = networks.filter(n => !seen.has(n.ssid)).map(n => ({ ...n, missing: true }));
+    return [...list.map(n => ({ ...n, missing: false })).sort((a, b) => b.rssi - a.rssi), ...kept];
   }
   pair.querySelector('[data-net-refresh]').addEventListener('click', async event => {
     const button = event.currentTarget; if (button.disabled || !console_) return;
     button.disabled = true; button.textContent = 'Scanning …';
     try {
       const kept = pairForm.elements.ssid.value, list = await scanNetworks();
-      if (!kept || !list.some(n => n.ssid === kept)) choose(list[0]?.ssid ?? kept);
+      if (!kept) choose(list[0]?.ssid ?? '');  // a chosen network stays chosen, also when this scan missed it
       if (!pop.hidden) renderPicker();  // the open list shows the new scan, not the old one
       say(list.length ? `${list.length} networks found` : 'No networks found; type the name in the search field.', !list.length);
     } catch (error) { say(error.message, true); }
-    finally { button.disabled = false; button.textContent = 'Refresh networks'; }
+    finally { button.disabled = false; button.textContent = 'Refresh networks'; if (!pop.hidden) renderPicker(); }
   });
   // Network picker: a dropdown with a search field over the networks the display sees (strongest first). A name that
   // is not in the list (a hidden network) can be typed into the search and used as it is.
@@ -86,6 +94,7 @@ export function usbPairing(pair, { port = () => undefined, setPort = () => {}, b
   const pop = picker.querySelector('.net-pick-pop'), search = pop.querySelector('input'), options = pop.querySelector('ul');
   let networks = [], active = 0;
   const LOCK = '<svg class="net-lock" viewBox="0 0 12 12" aria-label="password"><rect x="2.5" y="5.5" width="7" height="5" rx="1"/><path d="M4 5.5V4a2 2 0 0 1 4 0v1.5" fill="none" stroke-width="1.3"/></svg>';
+  // The same bars as on the device card and in the overview (DeviceDiagnostics.Network.level).
   function bars(rssi) {
     const level = rssi >= -55 ? 4 : rssi >= -67 ? 3 : rssi >= -75 ? 2 : 1;
     return `<svg class="net-bars" viewBox="0 0 16 12" aria-label="${rssi} dBm">${[0, 1, 2, 3].map(i =>
@@ -99,14 +108,14 @@ export function usbPairing(pair, { port = () => undefined, setPort = () => {}, b
   function renderPicker() {
     const query = search.value.trim(), lower = query.toLowerCase();
     const items = networks.filter(n => n.ssid.toLowerCase().includes(lower)).map(n => ({ ssid: n.ssid, html:
-      `<span class="net-name"></span><span class="net-meta">${n.open ? 'open' : LOCK} ${bars(n.rssi)}</span>` }));
+      `<span class="net-name"></span><span class="net-meta">${n.missing ? 'not found in the last scan' : `${n.open ? 'open' : LOCK} ${bars(n.rssi)}`}</span>`, missing: n.missing }));
     if (query && !networks.some(n => n.ssid === query)) items.push({ ssid: query, html: '<span class="net-name"></span><span class="net-meta">hidden network</span>', typed: true });
     options.replaceChildren();
     active = Math.min(active, Math.max(items.length - 1, 0));
     items.forEach((item, i) => {
       const li = document.createElement('li'); li.setAttribute('role', 'option'); li.innerHTML = item.html;
       li.querySelector('.net-name').textContent = item.typed ? `Use “${item.ssid}”` : item.ssid;
-      li.dataset.ssid = item.ssid; li.classList.toggle('active', i === active);
+      li.dataset.ssid = item.ssid; li.classList.toggle('active', i === active); li.classList.toggle('net-missing', !!item.missing);
       li.setAttribute('aria-selected', String(item.ssid === pairForm.elements.ssid.value));
       li.addEventListener('mousedown', e => { e.preventDefault(); choose(item.ssid); });
       options.append(li);
