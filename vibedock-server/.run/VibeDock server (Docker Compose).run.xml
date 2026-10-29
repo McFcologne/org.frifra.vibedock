@@ -10,6 +10,14 @@
               <option name="name" value="COMPOSE_BAKE" />
               <option name="value" value="false" />
             </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="DEMO_USAGE" />
+              <option name="value" value="true" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="VIBEDOCK_MANUAL" />
+              <option name="value" value="full" />
+            </DockerEnvVarImpl>
           </list>
         </option>
         <option name="commandLineOptions" value="--build" />

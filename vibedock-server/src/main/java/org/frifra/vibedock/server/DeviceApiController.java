@@ -28,14 +28,24 @@ class DeviceApiController {
         this.delta=delta;this.schedule=schedule;
         this.power=power;this.logs=logs;this.events=events;this.diagnostics=diagnostics;this.registry=registry;this.designs=designs;this.addresses=addresses;this.trust=trust;this.firmware=firmware;this.signing=signing;
     }
-    /** The device authenticates with its key; unknown devices and wrong keys get the same 401. */
+    /**
+     * Why a device request is refused, null when its key fits. Unknown devices and wrong keys get the same 401, on
+     * which a display forgets its pairing. A key that is missing or not 64 hex digits gets 400 instead: a display that
+     * ran out of memory sends its headers cut off, and must not lose its pairing for that.
+     */
+    HttpStatus refused(String identifier,String authorization){
+        String key=authorization!=null&&authorization.startsWith("Bearer ")?authorization.substring(7).trim():null;
+        if(key==null||!key.matches("[a-f0-9]{64}"))return HttpStatus.BAD_REQUEST;
+        return registry.authenticate(identifier,key)?null:HttpStatus.UNAUTHORIZED;
+    }
     @GetMapping("/api/v1/clients/{identifier}/image")
     ResponseEntity<byte[]> image(@PathVariable String identifier,@RequestHeader(value="Authorization",required=false) String authorization,
                                  @RequestHeader(value="If-None-Match",required=false) String etag,HttpServletRequest request) throws IOException {
-        String key=authorization!=null&&authorization.startsWith("Bearer ")?authorization.substring(7).trim():null;
-        if(!registry.authenticate(identifier,key)){
-            log.info("Pull rejected (401) for {} from {}: unknown device or wrong key",identifier,request.getRemoteAddr());
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        HttpStatus refused=refused(identifier,authorization);
+        if(refused!=null){
+            log.info(refused==HttpStatus.UNAUTHORIZED?"Pull rejected (401) for {} from {}: unknown device or wrong key"
+                    :"Pull rejected (400) for {} from {}: key missing or incomplete",identifier,request.getRemoteAddr());
+            return ResponseEntity.status(refused).build();
         }
         String peer=deviceAddress(request.getHeader("X-VibeDock-Device-IP"),request.getRemoteAddr());
         boolean serverFooter="server".equals(request.getHeader("X-VibeDock-Footer"));
@@ -218,8 +228,8 @@ class DeviceApiController {
     @PostMapping("/api/v1/clients/{identifier}/log")
     ResponseEntity<Void> log(@PathVariable String identifier,@RequestHeader(value="Authorization",required=false) String authorization,
                              @RequestHeader(value="X-VibeDock-Log-Request",required=false) String requestId,HttpServletRequest request) throws IOException {
-        String key=authorization!=null&&authorization.startsWith("Bearer ")?authorization.substring(7).trim():null;
-        if(!registry.authenticate(identifier,key))return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        HttpStatus refused=refused(identifier,authorization);
+        if(refused!=null)return ResponseEntity.status(refused).build();
         byte[] body=request.getInputStream().readNBytes(DeviceLogs.MAX_BYTES+1);
         if(body.length>DeviceLogs.MAX_BYTES)return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).build();
         if(!logs.takeRequest(identifier,requestId)){
@@ -237,8 +247,8 @@ class DeviceApiController {
     @GetMapping("/api/v1/clients/{identifier}/firmware")
     ResponseEntity<byte[]> firmware(@PathVariable String identifier,@RequestHeader(value="Authorization",required=false) String authorization,
                                     HttpServletRequest request) throws IOException {
-        String key=authorization!=null&&authorization.startsWith("Bearer ")?authorization.substring(7).trim():null;
-        if(!registry.authenticate(identifier,key))return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        HttpStatus refused=refused(identifier,authorization);
+        if(refused!=null)return ResponseEntity.status(refused).build();
         var signed=firmware.signed(registry.get(identifier).board(),signing);
         if(signed.isEmpty())return ResponseEntity.notFound().build();
         log.info("Device {} downloads firmware {} ({}) for an update over Wi-Fi",identifier,signed.get().version(),registry.get(identifier).board().id());

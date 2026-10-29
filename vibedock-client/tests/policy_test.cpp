@@ -233,6 +233,7 @@ int main(){
   assert(std::string(startKind(ResetKind::Software,Intent::Update))=="update");assert(std::string(startKind(ResetKind::Software,Intent::None))=="software");
   assert(std::string(startKind(ResetKind::Panic,Intent::Update))=="crash");assert(std::string(startKind(ResetKind::PowerOn,Intent::Setup))=="power-on");
   assert(std::string(startKind(ResetKind::Watchdog,Intent::None))=="watchdog");assert(std::string(startKind(ResetKind::External,Intent::None))=="external");
+  assert(std::string(startKind(ResetKind::Software,Intent::LowMemory))=="low-memory");
   assert(std::string(phaseName(uint8_t(Phase::Ota)))=="ota");assert(phaseName(0)==nullptr);assert(phaseName(12)==nullptr);
   // Diagnosis records: valid only with magic and check; any changed byte (memory after a power cut) is unknown.
   DiagRecord r{diagMagic,0x1a2b3c4d,100,20000,15000,-60,uint8_t(Phase::Image),0,1,0};r.check=diagCheck(r);assert(diagValid(r));

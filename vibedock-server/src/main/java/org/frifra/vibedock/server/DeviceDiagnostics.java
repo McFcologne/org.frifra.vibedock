@@ -29,7 +29,7 @@ class DeviceDiagnostics {
     private static final Logger log=LoggerFactory.getLogger(DeviceDiagnostics.class);
     static final int KEEP=20;
     /** Start kinds the firmware reports; anything else is stored as "other". */
-    static final Set<String> KINDS=Set.of("power-on","update","setup","factory-reset","external","crash","watchdog","brownout","software","deep-sleep","other");
+    static final Set<String> KINDS=Set.of("power-on","update","setup","factory-reset","low-memory","external","crash","watchdog","brownout","software","deep-sleep","other");
     /** Kinds that are not a planned restart and not a power cut: what a support report counts as unexpected. */
     static final Set<String> UNEXPECTED=Set.of("crash","watchdog","brownout","software");
     /** Phases of the previous start, as the firmware names them. */

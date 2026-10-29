@@ -161,6 +161,7 @@ static String describe(int code, uint32_t flags = 0) {
     case MBEDTLS_ERR_SSL_HANDSHAKE_FAILURE: text += F(" handshake failure"); break;  // also when memory runs out (see block)
     default: break;
   }
+  if (flags == uint32_t(-1)) flags = 0;  // the handshake broke off before the certificate check: nothing to report
   if (flags & MBEDTLS_X509_BADCERT_EXPIRED) text += F(", certificate expired");
   if (flags & MBEDTLS_X509_BADCERT_FUTURE) text += F(", certificate not yet valid (clock?)");
   if (flags & MBEDTLS_X509_BADCERT_CN_MISMATCH) text += F(", host name does not match");

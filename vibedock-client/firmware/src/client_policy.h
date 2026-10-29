@@ -248,7 +248,7 @@ constexpr uint8_t nextBrightness(uint8_t percent, bool up) { return clampBrightn
 constexpr uint8_t dimmedBrightness(uint8_t percent) { return percent < minBrightness ? percent : minBrightness; }
 // ---- diagnosis: why the display started, and the last state of the run before (kept across a reset) ----
 // What the firmware meant to do when it restarted itself; a restart without one is unexpected.
-enum class Intent : uint8_t { None = 0, Update = 1, Setup = 2, FactoryReset = 3 };
+enum class Intent : uint8_t { None = 0, Update = 1, Setup = 2, FactoryReset = 3, LowMemory = 4 };
 // The reset as the platform reports it, reduced to what tells planned from unexpected.
 enum class ResetKind : uint8_t { PowerOn, External, Software, Panic, Watchdog, Brownout, DeepSleep, Other };
 // The start kind for the server (DeviceDiagnostics.KINDS): a software restart with an intent is that intent, any
@@ -257,6 +257,7 @@ constexpr const char *startKind(ResetKind reset, Intent intent) {
   return reset == ResetKind::Software && intent == Intent::Update ? "update"
        : reset == ResetKind::Software && intent == Intent::Setup ? "setup"
        : reset == ResetKind::Software && intent == Intent::FactoryReset ? "factory-reset"
+       : reset == ResetKind::Software && intent == Intent::LowMemory ? "low-memory"
        : reset == ResetKind::PowerOn ? "power-on" : reset == ResetKind::External ? "external" : reset == ResetKind::Software ? "software"
        : reset == ResetKind::Panic ? "crash" : reset == ResetKind::Watchdog ? "watchdog" : reset == ResetKind::Brownout ? "brownout"
        : reset == ResetKind::DeepSleep ? "deep-sleep" : "other";

@@ -78,6 +78,8 @@ final class SupportDiagnosis {
                     if("brownout".equals(start.kind()))suspected.add("Power supply too weak (brownout)");
                 }
                 case "update","setup","factory-reset" -> suspected.add("The last restart was planned ("+start.kind()+")");
+                case "low-memory" -> suspected.add("The display restarted itself because too little memory was left in one piece"
+                        +(start.previousHeapMin()==null?"":" (lowest free memory "+start.previousHeapMin()+" B)"));
                 case "external" -> suspected.add("Reset by the button or over USB (also esptool or a serial monitor)");
                 case "power-on" -> suspected.add("Power on: plugged in or a power cut; the run before is unknown");
                 default -> {}
