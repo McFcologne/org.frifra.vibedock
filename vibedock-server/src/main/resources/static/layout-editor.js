@@ -197,8 +197,7 @@
       const entry = catalog.devices.find(d => d.identifier === option.value);
       if (entry) option.textContent = entry.name + (entry.overridden ? ' · own design' : ' · default');
     });
-    // A device design: the selection above already names the device and whether it has its own design.
-    $('#design-title').hidden = target !== 'default';
+    $('#design-title').textContent = target === 'default' ? 'Default design' : device().name + (device().overridden ? ' · own design' : ' · follows the default');
   }
   // The case takes the display's shape before the new image arrives (it would otherwise follow it late).
   function fitCase() {

@@ -89,13 +89,6 @@
   <span>VibeDock <span th:text="${appVersion}">development</span></span>
   <nav aria-label="Project information"><a th:href="${readmeUrl}" target="_blank" rel="noopener noreferrer">README</a><a th:if="${manualAvailable}" th:href="@{/admin/manual.pdf}" target="_blank" rel="noopener">Manual (PDF)</a><a th:href="@{/admin/licenses}">Licenses &amp; notices</a></nav>
 </div></footer>
-<!-- Wi-Fi, signal and the route of a display's last pull (device card and overview); hidden while nothing is known. -->
-<p th:fragment="networkLine(net)" class="meta network-line" data-live="network">
-        <th:block th:if="${net != null and (net.ssid != null or net.rssi != null)}"><svg class="wifi-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 8.5a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1.2"/></svg>
-          <span th:if="${net.ssid != null}" th:text="${net.ssid}" title="Wi-Fi"></span><th:block th:if="${net.ssid != null and net.rssi != null}">·</th:block>
-          <span th:if="${net.rssi != null}" th:classappend="${net.rssi < -75} ? 'weak-signal'" th:title="${net.rssi < -75 ? 'Weak signal' : 'Signal'}" th:text="${'−' + (-net.rssi) + ' dBm'}"></span></th:block>
-        <span th:if="${net != null and net.route != null}" class="route-chip" th:classappend="${net.route == 'external'} ? 'external'"
-              th:title="${'Last pull over ' + (net.host ?: 'an unknown address')}" th:text="${net.route == 'external' ? 'External' : net.route == 'lan' ? 'LAN' : 'Other'}"></span></p>
 <span th:fragment="sourceTile(type)" class="source-tile" th:classappend="${'tile-' + type}" aria-hidden="true">
       <svg th:if="${type == 'codex'}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l7 6-7 6"/><path d="M13 19h7"/></svg>
       <svg th:if="${type == 'cursor'}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l16 6.5-7 2.5-2.5 7z"/></svg>

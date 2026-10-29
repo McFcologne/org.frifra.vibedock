@@ -75,11 +75,7 @@ class Controllers {
         model.addAttribute("sourceTypes",sourceTypes);
         model.addAttribute("defaultScheme",clients.defaultDesign().scheme().label);
         model.addAttribute("deviceStatus",devices.status());
-        var views=clients.views();
-        model.addAttribute("clients",views);model.addAttribute("networks",networks());
-        long following=views.stream().filter(c->!c.overridden()).count();
-        model.addAttribute("defaultUsers",views.isEmpty()?null:following==0?(views.size()==1?"The display has its own design":"All "+views.size()+" displays have their own design")
-                :following==views.size()?"Used by all "+views.size()+(views.size()==1?" display":" displays"):"Used by "+following+" of "+views.size()+" displays");
+        model.addAttribute("clients",clients.views());
         model.addAttribute("firmwareVersions",firmware.versions());
         return "admin";
     }
@@ -124,15 +120,12 @@ class Controllers {
         return parts.isEmpty()?"":String.join(" · ",parts)+" left";
     }
     private static String left(ProviderClient.Window w){return String.format(Locale.ROOT,"%.0f %%",Math.max(0,Math.min(100,100-w.usedPercent())));}
-    /** Wi-Fi, signal and the address the last pull used, per display (as far as known since the server started). */
-    private Map<String,DeviceDiagnostics.Network> networks(){
-        var networks=new java.util.HashMap<String,DeviceDiagnostics.Network>();
-        if(diagnostics!=null)for(var c:clients.views()){var n=diagnostics.network(c.identifier());if(n!=null)networks.put(c.identifier(),n);}
-        return networks;
-    }
     @GetMapping("/admin/devices") String devices(Model model,HttpServletRequest request) {
         model.addAttribute("clients",clients.views());
-        model.addAttribute("networks",networks());
+        // Wi-Fi, signal and the address the last pull used, per display (as far as known since the server started).
+        var networks=new java.util.HashMap<String,DeviceDiagnostics.Network>();
+        if(diagnostics!=null)for(var c:clients.views()){var n=diagnostics.network(c.identifier());if(n!=null)networks.put(c.identifier(),n);}
+        model.addAttribute("networks",networks);
         // The preview's link changes with the design and with the photo a slideshow shows now, so the card follows it.
         var previews=new java.util.HashMap<String,String>();
         for(var c:clients.views())previews.put(c.identifier(),c.design().hashCode()+designs.currentPhoto(c.design(),c.identifier()).map(p->"-"+p).orElse(""));

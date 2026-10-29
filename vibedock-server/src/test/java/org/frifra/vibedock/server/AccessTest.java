@@ -308,13 +308,7 @@ class AccessTest {
             var card=html.substring(html.indexOf("data-device=\""+id+"\""));card=card.substring(0,card.indexOf("</section>"));
             Assertions.assertTrue(card.contains("Home Wi-Fi")&&card.contains("−80 dBm")&&card.contains("weak-signal"),card);
             Assertions.assertTrue(card.contains("route-chip external")&&card.contains("Last pull over home.example.org:10002"),card);
-            // The overview lists the same line per display, and how many displays follow the default design.
-            var overview=mvc.perform(get("/admin").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
-                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-            var row=overview.substring(overview.indexOf("data-device=\""+id+"\""));row=row.substring(0,row.indexOf("</li>"));
-            Assertions.assertTrue(row.contains("Home Wi-Fi")&&row.contains("−80 dBm")&&row.contains("route-chip external"),row);
-            Assertions.assertTrue(overview.matches("(?s).*(Used by (all \\d+ displays?|\\d+ of \\d+ displays)|have their own design|has its own design).*"),overview);
-        }finally{clients.configure(internal,external,poll);clients.remove(id);}
+        }finally{clients.configure(internal,external,poll);}
     }
     @Test void removalErrorsDoNotOpenPairingButPairingErrorsDo() throws Exception {
         var removed=mvc.perform(post("/admin/clients/vibedock-missing/remove").with(user("admin").roles("ADMIN")).with(csrf())

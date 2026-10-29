@@ -149,9 +149,7 @@ try {
 
     // Overview
     await go('/admin'); await shot('02-overview', page, {fullPage: true});
-    await page.evaluate(() => { document.documentElement.dataset.theme = 'dark';
-      // As after a click: the switch then offers the light mode.
-      for (const toggle of document.querySelectorAll('[data-theme-toggle]')) toggle.dispatchEvent(new Event('vibedock-theme')); }); await shot('03-overview-dark', page, {fullPage: true});
+    await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; }); await shot('03-overview-dark', page, {fullPage: true});
     await page.evaluate(() => { delete document.documentElement.dataset.theme; });
 
     // Devices

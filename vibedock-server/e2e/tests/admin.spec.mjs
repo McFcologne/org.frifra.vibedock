@@ -243,7 +243,7 @@ for(const width of [1024,360]) for(const dark of [false,true]) {
       expect(footer.y).toBeGreaterThanOrEqual(main.y+main.height-1);
       if(route==='/admin'&&width===1024) {
         const sources=await page.locator('#status').boundingBox(), display=await page.locator('.overview-display').boundingBox(), devices=await page.locator('#device-summary').boundingBox();
-        expect(Math.abs(sources.y-display.y)).toBeLessThan(2);  // both start at the top; each ends below its own content
+        expect(Math.abs(sources.y-display.y)).toBeLessThan(2);expect(sources.height).toBeGreaterThanOrEqual(display.height-1);
         expect(devices.y).toBeGreaterThanOrEqual(Math.max(sources.y+sources.height,display.y+display.height));
       }
       if(route==='/admin/design') {
