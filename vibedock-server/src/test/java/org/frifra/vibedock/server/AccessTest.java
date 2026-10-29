@@ -965,6 +965,10 @@ class AccessTest {
         Assertions.assertNull(clients.get(id).updateError());
         mvc.perform(pull.apply("0.2.0")).andExpect(header().doesNotExist("X-VibeDock-Update"));
         Assertions.assertFalse(clients.get(id).updating());
+        // An update error stays while the device runs the same firmware and ends once it reports another one (e.g. installed over USB).
+        mvc.perform(pull.apply("0.2.0").header("X-VibeDock-Update-Error","0.3.0: no answer"));
+        mvc.perform(pull.apply("0.2.0"));Assertions.assertEquals("0.3.0: no answer",clients.get(id).updateError());
+        mvc.perform(pull.apply("0.3.0"));Assertions.assertNull(clients.get(id).updateError());
         clients.remove(id);
     }
     @Test void invitingIsAdminOnly() throws Exception {
