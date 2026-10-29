@@ -2,7 +2,7 @@
   "format": "org.frifra.vibedock.theme",
   "schemaVersion": 1,
   "id": "nordic",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Nordic",
   "author": "VibeDock contributors; Twemoji contributors (icon)",
   "license": "Apache-2.0 AND CC-BY-4.0",
@@ -11,17 +11,23 @@
     "version": 1
   },
   "definition": "style.json",
-  "defaultIcon": "legacy",
+  "defaultIcon": "theme",
   "icons": [
     {
       "id": "legacy",
       "label": "Existing theme illustration",
       "file": "assets/default.svg"
+    },
+    {
+      "id": "theme",
+      "label": "Nordic cabin",
+      "file": "assets/theme.svg"
     }
   ],
   "files": {
     "assets/default.svg": "d32bd9f51b2a54f620f9693e833935c5e2cb2304cbf89aab75fd10f054711ce5",
-    "license.txt": "e66889aec2db95d895e3dd9ff7498b20aeb9278f30951cffabc1222fd5725f7b",
-    "style.json": "2282100c2fad0d8d0d7f625c47f88bacbfb8bde5ee47e45936104677911cdc1e"
+    "license.txt": "8c301a734b12bde1081d42ca166e4b8649f968554aa7b3cda7fa48e47f06e03d",
+    "style.json": "2282100c2fad0d8d0d7f625c47f88bacbfb8bde5ee47e45936104677911cdc1e",
+    "assets/theme.svg": "b5fb09f41e51a58b0b2fbc2bf0e9b7a70028960bbd01dc724116c2188259a163"
   }
 }

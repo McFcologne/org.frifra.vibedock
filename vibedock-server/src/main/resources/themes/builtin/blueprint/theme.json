@@ -2,7 +2,7 @@
   "format": "org.frifra.vibedock.theme",
   "schemaVersion": 1,
   "id": "blueprint",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Blueprint",
   "author": "VibeDock contributors; Twemoji contributors (icon)",
   "license": "Apache-2.0 AND CC-BY-4.0",
@@ -11,17 +11,23 @@
     "version": 1
   },
   "definition": "style.json",
-  "defaultIcon": "legacy",
+  "defaultIcon": "theme",
   "icons": [
     {
       "id": "legacy",
       "label": "Existing theme illustration",
       "file": "assets/default.svg"
+    },
+    {
+      "id": "theme",
+      "label": "Blueprint robot",
+      "file": "assets/theme.svg"
     }
   ],
   "files": {
     "assets/default.svg": "19465c86b21ef41109f66ce89051da87c220c29d5f8c8c876ee0e933873f1f65",
-    "license.txt": "d25f99c9b99099a056521e6b50d307eb2c3baddc484d9df0a0107201f2e8184c",
-    "style.json": "3a69a4dd9bd0938447d7382ed83e99f74a41b2b9275750237176950bfb463490"
+    "license.txt": "ceb2de6d094855700ff8d9d5c3e56b7bb93f4b846a4a0e5f389f9b815f5da297",
+    "style.json": "3a69a4dd9bd0938447d7382ed83e99f74a41b2b9275750237176950bfb463490",
+    "assets/theme.svg": "5a3092199748dc2994e2e21ac5f366fab57139f063e3016c992f5e5c47fb7717"
   }
 }

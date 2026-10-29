@@ -2,7 +2,7 @@
   "format": "org.frifra.vibedock.theme",
   "schemaVersion": 1,
   "id": "vs_code",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "VS Code",
   "author": "VibeDock contributors; Twemoji contributors (icon)",
   "license": "Apache-2.0 AND CC-BY-4.0",
@@ -11,17 +11,23 @@
     "version": 1
   },
   "definition": "style.json",
-  "defaultIcon": "legacy",
+  "defaultIcon": "theme",
   "icons": [
     {
       "id": "legacy",
       "label": "Existing theme illustration",
       "file": "assets/default.svg"
+    },
+    {
+      "id": "theme",
+      "label": "Code brackets",
+      "file": "assets/theme.svg"
     }
   ],
   "files": {
     "assets/default.svg": "d32bd9f51b2a54f620f9693e833935c5e2cb2304cbf89aab75fd10f054711ce5",
-    "license.txt": "e66889aec2db95d895e3dd9ff7498b20aeb9278f30951cffabc1222fd5725f7b",
-    "style.json": "40c596f9e2bf2d001f0d0d1ed8341b62f43ff2ea489cd4405156ba5f4e60bcb0"
+    "license.txt": "8c301a734b12bde1081d42ca166e4b8649f968554aa7b3cda7fa48e47f06e03d",
+    "style.json": "40c596f9e2bf2d001f0d0d1ed8341b62f43ff2ea489cd4405156ba5f4e60bcb0",
+    "assets/theme.svg": "6525ca0a246be285d33836a5d6679bf6f8db1a889a479e9a63c8d22a73d8797f"
   }
 }

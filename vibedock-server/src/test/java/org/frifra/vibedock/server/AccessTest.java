@@ -1135,4 +1135,17 @@ class AccessTest {
         Assertions.assertEquals(List.of("claude","codex"),store.get().accounts().stream().map(SettingsStore.Account::id).toList());
         clients.remove("vibedock-order-one");clients.remove("vibedock-order-two");
     }
+    @org.junit.jupiter.api.Test void themeIconCatalogAndRastersStayOnTheAuthenticatedAdminListener() throws Exception {
+        mvc.perform(get("/admin/designs").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.icons.length()").value(70));
+        mvc.perform(get("/admin/themes/debugger/icons/theme.png").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(status().isOk()).andExpect(content().contentType("image/png"));
+        mvc.perform(get("/admin/themes/debugger/icons/theme.png").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10002);return r;}))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/admin/themes/debugger/icons/absent.png").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/admin/themes/debugger/icons/theme.png").header("Accept","application/json").with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(status().isUnauthorized());
+    }
+
 }

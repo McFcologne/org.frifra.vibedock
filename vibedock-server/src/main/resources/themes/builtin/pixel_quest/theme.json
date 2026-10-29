@@ -2,7 +2,7 @@
   "format": "org.frifra.vibedock.theme",
   "schemaVersion": 1,
   "id": "pixel_quest",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Pixel Quest",
   "author": "VibeDock contributors; Twemoji contributors (icon)",
   "license": "Apache-2.0 AND CC-BY-4.0",
@@ -11,17 +11,23 @@
     "version": 1
   },
   "definition": "style.json",
-  "defaultIcon": "legacy",
+  "defaultIcon": "theme",
   "icons": [
     {
       "id": "legacy",
       "label": "Existing theme illustration",
       "file": "assets/default.svg"
+    },
+    {
+      "id": "theme",
+      "label": "Treasure chest",
+      "file": "assets/theme.svg"
     }
   ],
   "files": {
     "assets/default.svg": "d32bd9f51b2a54f620f9693e833935c5e2cb2304cbf89aab75fd10f054711ce5",
-    "license.txt": "e66889aec2db95d895e3dd9ff7498b20aeb9278f30951cffabc1222fd5725f7b",
-    "style.json": "1f3490c2db88d6d74a02d6d5116e19f375e1eb755c0a83670766bd4010545ec9"
+    "license.txt": "8c301a734b12bde1081d42ca166e4b8649f968554aa7b3cda7fa48e47f06e03d",
+    "style.json": "1f3490c2db88d6d74a02d6d5116e19f375e1eb755c0a83670766bd4010545ec9",
+    "assets/theme.svg": "a9a93808460d5dfa39cad64f8995ea77ea79d5ee52fb878d975f6e0f2588687e"
   }
 }

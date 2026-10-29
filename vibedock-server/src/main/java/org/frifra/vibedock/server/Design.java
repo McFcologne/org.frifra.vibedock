@@ -5,7 +5,19 @@ package org.frifra.vibedock.server;
  * ("" = none); weather is the place for the forecast (null = none). photos: instead of the status, uploaded photos
  * (null = the status only).
  */
-public record Design(Scheme scheme,String mood,WeatherService.Place weather,Layout layout,Photos photos) {
+public record Design(Scheme scheme,String mood,WeatherService.Place weather,Layout layout,Photos photos,
+                     @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) Icon icon) {
+    /** null on Design means the original emoticon/no-icon selection; a catalog reference remains fixed across swipes. */
+    public record Icon(String mode,String theme,String id) {
+        public Icon {
+            if("theme-default".equals(mode)){
+                if(theme!=null||id!=null)throw new IllegalArgumentException("Theme default follows the selected theme");
+            }else if("theme-catalog".equals(mode)){
+                if(theme==null||id==null||!theme.matches("[a-z][a-z0-9._-]{0,79}")||!id.matches("[a-z][a-z0-9._-]{0,79}"))
+                    throw new IllegalArgumentException("Choose a theme and an icon");
+            }else throw new IllegalArgumentException("Unknown icon selection mode");
+        }
+    }
     /**
      * A slideshow of photos of the {@link PhotoLibrary}, each shown for seconds, in their order or shuffled. from/to
      * ("HH:mm", both or neither): the photos only in that time of day (e.g. 22:00 to 07:00), the status otherwise.
@@ -46,6 +58,7 @@ public record Design(Scheme scheme,String mood,WeatherService.Place weather,Layo
     }
     public Design(Scheme scheme,String mood,WeatherService.Place weather){this(scheme,mood,weather,Layout.DEFAULT);}
     public Design(Scheme scheme,String mood,WeatherService.Place weather,Layout layout){this(scheme,mood,weather,layout,null);}
-    public Design withScheme(Scheme other){return new Design(other,mood,weather,layout,photos);}
-    public Design withLayout(Layout other){return new Design(scheme,mood,weather,other,photos);}
+    public Design(Scheme scheme,String mood,WeatherService.Place weather,Layout layout,Photos photos){this(scheme,mood,weather,layout,photos,null);}
+    public Design withScheme(Scheme other){return new Design(other,mood,weather,layout,photos,icon);}
+    public Design withLayout(Layout other){return new Design(scheme,mood,weather,other,photos,icon);}
 }

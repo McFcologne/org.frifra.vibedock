@@ -9,7 +9,8 @@ import java.util.Objects;
 class DesignService {
     /** An unsaved design from the editor; mood "" or "-" is none, an empty weather location turns weather off. */
     /** display: the device's display type id (editor of a device), null keeps the current one. */
-    record Input(String mood,String scheme,String weatherLocation,Layout layout,boolean inherit,String display,Design.Photos photos) {
+    record Input(String mood,String scheme,String weatherLocation,Layout layout,boolean inherit,String display,Design.Photos photos,Design.Icon icon) {
+        Input(String mood,String scheme,String weatherLocation,Layout layout,boolean inherit,String display,Design.Photos photos){this(mood,scheme,weatherLocation,layout,inherit,display,photos,null);}
         Input(String mood,String scheme,String weatherLocation,Layout layout,boolean inherit,String display){this(mood,scheme,weatherLocation,layout,inherit,display,null);}
     }
     private final UsageService usage;private final StatusImage renderer;private final Twemoji twemoji;private final WeatherService weather;
@@ -37,7 +38,7 @@ class DesignService {
         values.put("codex",new UsageService.Provider("ok",time,new ProviderClient.Window(0,time+5*3600),new ProviderClient.Window(22,time+6*86400)));
         values.put("claude",new UsageService.Provider("ok",time,new ProviderClient.Window(5,time+3*3600),new ProviderClient.Window(14,time+5*86400)));
         return renderer.render(new UsageService.Snapshot(1,time,values),"192.168.1.50",new StatusImage.Look(
-                twemoji.image("😎",Twemoji.SIZE).orElse(null),scheme,twemoji.image("⛅",24).orElse(null),"13°",Layout.DEFAULT)).png();
+                ThemeIcons.image(new Design.Icon("theme-default",null,null),scheme,Twemoji.SIZE).orElse(null),scheme,twemoji.image("⛅",24).orElse(null),"13°",Layout.DEFAULT)).png();
     }
     /**
      * What a display shows now: the current photo of its slideshow while that is active, otherwise the status.
@@ -114,7 +115,9 @@ class DesignService {
     /** battery: the display runs on its battery (a small icon at the top right), null otherwise. */
     StatusImage.Image render(Design design,String ip,DisplayType type,double scale,StatusImage.Battery battery) throws IOException {
         var current=weather.current(design.weather());
-        var look=new StatusImage.Look(twemoji.image(design.mood(),(int)Math.round(Twemoji.SIZE*scale)).orElse(null),design.scheme(),
+        int iconSize=(int)Math.round(Twemoji.SIZE*scale);
+        var icon=ThemeIcons.image(design.icon(),design.scheme(),iconSize).or(()->twemoji.image(design.mood(),iconSize));
+        var look=new StatusImage.Look(icon.orElse(null),design.scheme(),
                 current.flatMap(c->twemoji.image(WeatherService.emoji(c.code(),c.day()),(int)Math.round(24*scale))).orElse(null),
                 current.map(c->WeatherService.temperature(c.temperature())).orElse(null),design.layout(),battery);
         return renderer.render(usage.snapshot(),ip,look,type,scale);
@@ -135,11 +138,13 @@ class DesignService {
         if(themes!=null&&!themes.enabled(scheme)&&!scheme.id().equals(previous.scheme().id()))throw new IllegalArgumentException("This theme is disabled for this instance");
         input.layout().validateSources(usage.snapshot().providers().keySet());
         if(!Objects.equals(input.mood(),previous.mood()))twemoji.validate(input.mood());
+        if(input.icon()!=null&&!Objects.equals(input.icon(),previous.icon())&&!ThemeIcons.available(input.icon(),scheme))
+            throw new IllegalArgumentException("This theme icon is unavailable");
         String place=input.weatherLocation().strip();
         var resolved=previous.weather()!=null&&place.equals(previous.weather().name())?previous.weather():weather.locate(place);
         // Photos removed from the library meanwhile drop out of the selection.
         var chosen=input.photos();
         var selected=chosen==null?null:new Design.Photos(chosen.images().stream().filter(photos::exists).toList(),chosen.seconds(),chosen.shuffle(),chosen.from(),chosen.to(),chosen.paused());
-        return new Design(scheme,input.mood(),resolved,input.layout(),selected);
+        return new Design(scheme,input.mood(),resolved,input.layout(),selected,input.icon());
     }
 }

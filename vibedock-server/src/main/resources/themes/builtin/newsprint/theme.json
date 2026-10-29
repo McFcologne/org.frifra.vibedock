@@ -2,7 +2,7 @@
   "format": "org.frifra.vibedock.theme",
   "schemaVersion": 1,
   "id": "newsprint",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Newsprint",
   "author": "VibeDock contributors; Twemoji contributors (icon)",
   "license": "Apache-2.0 AND CC-BY-4.0",
@@ -11,17 +11,23 @@
     "version": 1
   },
   "definition": "style.json",
-  "defaultIcon": "legacy",
+  "defaultIcon": "theme",
   "icons": [
     {
       "id": "legacy",
       "label": "Existing theme illustration",
       "file": "assets/default.svg"
+    },
+    {
+      "id": "theme",
+      "label": "Engraved coffee",
+      "file": "assets/theme.svg"
     }
   ],
   "files": {
     "assets/default.svg": "7ff1e31926a41d521fdb51e948fc39747e4a3ded2344c1692a052acd880fed37",
-    "license.txt": "c3ebe816135d208a8d03dcea3e9ed58bbda9d5309d7a23a60e5f6c87ad2eeb54",
-    "style.json": "edae82189bf784897ed0437272bdfcb04ea242fb4d0332fd522438e1a3fb58dd"
+    "license.txt": "9e117044824ff879c8e4fa219e0e6c5cb9be9883beed6c564e87319db473e846",
+    "style.json": "edae82189bf784897ed0437272bdfcb04ea242fb4d0332fd522438e1a3fb58dd",
+    "assets/theme.svg": "7ec7b32cf47b73e3e68e832f98e4402699f63298a18191b3afd46aa70b601849"
   }
 }
