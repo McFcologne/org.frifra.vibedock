@@ -64,8 +64,11 @@ test('only CSRF rejections are retried and at most once',async ({page,app})=>{
 });
 
 
-test('leaving the editor immediately still queues its last edit with keepalive',async ({page,app})=>{
+test('leaving the editor right after an edit through the navigation saves it first',async ({page,app})=>{
   await editor(page,app);await page.locator('#design-scheme').selectOption('ocean');
-  await page.goto(app.baseURL+'/admin/sources');
+  // A link of the administration waits for the save; the next page then already has the edit.
+  await page.getByRole('navigation',{name:'Administration'}).getByRole('link',{name:'Data sources'}).click();
+  await expect(page).toHaveURL(app.baseURL+'/admin/sources');
+  expect((await (await page.request.get(app.baseURL+'/admin/designs')).json()).defaults.scheme).toBe('ocean');
   await editor(page,app);await expect(page.locator('#design-scheme')).toHaveValue('ocean');
 });

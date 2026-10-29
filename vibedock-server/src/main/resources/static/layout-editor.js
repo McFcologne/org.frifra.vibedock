@@ -409,9 +409,20 @@
   });
   $('#layout-emoji').addEventListener('change', event => { draft.mood = event.target.value === '-' ? '' : event.target.value; changed(); });
   $('#design-form').addEventListener('submit', event => { event.preventDefault(); save(); });
-  // Leaving within the save delay: send the last edit along (keepalive outlives the page).
+  // A link to another page of the administration (navigation, footer) waits for the pending save first, so the edit
+  // is stored before the next page loads it; on an error the page stays and shows it.
+  document.addEventListener('click', event => {
+    const link = event.target.closest?.('a[href]');
+    if (!dirty || !catalog || !link || link.target || event.defaultPrevented || event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const url = new URL(link.href, location.href);
+    if (url.origin !== location.origin || (url.pathname === location.pathname && url.hash)) return;
+    event.preventDefault();
+    save().then(() => { if (!dirty) location.assign(url.href); });
+  });
+  // Leaving otherwise within the save delay: send the last edit along (keepalive outlives the page). Also while a save is
+  // running: leaving the page can cancel its request, and the edit stays unsaved until that request has answered.
   window.addEventListener('pagehide', () => {
-    if (!dirty || busy || !catalog) return;
+    if (!dirty || !catalog) return;
     fetch('/admin/designs/' + encodeURIComponent(target), {method: 'POST', credentials: 'same-origin', keepalive: true,
       headers: {'Content-Type': 'application/json', [csrfHeader]: csrf}, body: JSON.stringify({...draft, inherit})});
   });
