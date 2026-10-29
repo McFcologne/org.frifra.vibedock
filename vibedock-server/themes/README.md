@@ -3,14 +3,16 @@
 A `.vibetheme` file is a ZIP with `theme.json` at its root and all referenced files inside it. It is a portable theme,
 not an instance backup: it contains no accounts, device identifiers, credentials, Wi-Fi settings or design assignments.
 
-This first slice defines and tests the **archive and manifest**. It does not install packages, add an upload endpoint,
-change the renderer or expose an editor. A successful `ThemePackage.read` establishes structure and integrity only;
-the renderer must separately validate its definition and graphics before installation or rendering. In particular,
+The archive reader defines and tests the **archive and manifest**. The drawing reader now validates the recipe and
+the server loads all 35 built-in themes from package directories. There is still no upload endpoint, installation UI
+or editor. A successful `ThemePackage.read` establishes structure and integrity only; `ThemeDefinition.read` separately
+validates the renderer version and recipe. Graphics still need validation before installation or rendering. In particular,
 an `.svg` extension and checksum do not make SVG content safe to render. No package content is executed or fetched.
 
-The format is a draft until the renderer and import/export PRs are complete. A final v1 definition must be capable
-of reproducing all existing themes; the example's small palette is an envelope fixture, not the finished drawing
-language or a promise that new styles need only six colours.
+The format remains a draft during the stacked implementation. The drawing recipes reproduce all existing themes,
+with pixel comparisons against the frozen renderer. Their supported primitives and limits are documented in
+[`drawing.md`](drawing.md); adding a theme using those capabilities does not require adding a Java theme constant.
+Introducing a new kind of drawing primitive would require a compatible renderer update.
 
 ## Manifest
 

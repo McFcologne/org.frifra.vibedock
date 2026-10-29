@@ -60,3 +60,16 @@ mvn -DargLine=-Djava.awt.headless=true -Dtest=ThemeRenderingCompatibilityTest,Th
 
 This proof runs before and after structural changes. A successful comparison does not claim coverage of every possible
 layout or future rendering operation; expand its cases when introducing new drawing capabilities in stage 3.
+
+## Drawing packages (stage 3)
+
+The original 35 built-in appearances now load from self-contained directories in
+`vibedock-server/src/main/resources/themes/builtin/`. Their manifests, checksums and drawing definitions are validated
+before use. Existing Java constants retain only the stable IDs; palette values and font choices come from the files.
+The drawing language selects existing rendering recipes and adds bounded vector decorations; it does not replace
+those proven algorithms with a general-purpose scripting language. See the [drawing-language reference](../../vibedock-server/themes/drawing.md).
+
+The stage-2 frozen renderer is unchanged. Its same-runtime comparison remains the acceptance gate for all original
+themes. Further tests pack/read each built-in theme and render it under a different ID, exercise the custom example,
+check schema conformance and reject unsupported engines and unbounded drawing instructions. Theme import/export UI,
+live catalog replacement, asset validation for imported graphics and theme-icon selection remain later stages.

@@ -1,0 +1,27 @@
+{
+  "format": "org.frifra.vibedock.theme",
+  "schemaVersion": 1,
+  "id": "handheld",
+  "version": "1.0.0",
+  "name": "Handheld LCD",
+  "author": "VibeDock contributors; Twemoji contributors (icon)",
+  "license": "Apache-2.0 AND CC-BY-4.0",
+  "renderer": {
+    "id": "vibedock-2d",
+    "version": 1
+  },
+  "definition": "style.json",
+  "defaultIcon": "legacy",
+  "icons": [
+    {
+      "id": "legacy",
+      "label": "Existing theme illustration",
+      "file": "assets/default.svg"
+    }
+  ],
+  "files": {
+    "assets/default.svg": "a860eafef10242b3b82012394910768a5f03c2fd6be66d4815bf0ad23bc9c245",
+    "license.txt": "99d24d1fb7c0d918c0614a514fd9c910a220a4e8c7cf746ba5ec7f9fd3947908",
+    "style.json": "89badc3e7266bfe3865d3d44ca84a41ad6a07152e2f5178ec694e5a8d90366c1"
+  }
+}

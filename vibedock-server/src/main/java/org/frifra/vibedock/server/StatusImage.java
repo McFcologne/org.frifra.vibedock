@@ -90,6 +90,7 @@ public class StatusImage {
             }
             g.setColor(new Color(scheme.background));g.fillRect(0,0,w,h);
             backdrop(g,scheme);
+            scheme.drawing.layers().drawBackground(g,w,h);
             // Classic Mac, Windows and the LCD: no anti-aliasing, crisp pixels like the originals.
             boolean smooth=scheme.style!=Scheme.Style.MAC&&scheme.style!=Scheme.Style.WINDOWS&&scheme.style!=Scheme.Style.LCD&&scheme.style!=Scheme.Style.QUEST;
             g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,smooth?RenderingHints.VALUE_TEXT_ANTIALIAS_ON:RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
@@ -180,7 +181,7 @@ public class StatusImage {
      */
     private void context(Graphics2D g,UsageService.Snapshot snapshot,String ip,Look look,Layout.Context band,int y){
         var scheme=look.scheme();
-        if(scheme.style==Scheme.Style.CODE){g.setColor(new Color(ThemeArtwork.footerBackground(scheme)));g.fillRect(0,y,w,56);}
+        if(scheme.style==Scheme.Style.CODE||scheme.drawing.footerBackground()!=null){g.setColor(new Color(ThemeArtwork.footerBackground(scheme)));g.fillRect(0,y,w,56);}
         // Time of the newest provider reading, not of this rendering: the image (and its ETag) only changes with new data.
         var observed=snapshot.providers().values().stream().map(UsageService.Provider::observedAt).filter(Objects::nonNull).max(Long::compare);
         String time=observed.map(t->DateTimeFormatter.ofPattern("HH:mm").withZone(zone).format(Instant.ofEpochSecond(t))).orElse("--:--");
@@ -426,7 +427,7 @@ public class StatusImage {
             default -> {
                 g.setColor(new Color(scheme.track));g.fillRoundRect(x,top,width,height,height,height);
                 if(fill>0){
-                    int colour=barColor(left),bar=Math.max(fill,height);
+                    int colour=scheme.drawing.barColor()!=null&&left>=20?scheme.drawing.barColor():barColor(left),bar=Math.max(fill,height);
                     if(scheme.style==Scheme.Style.NEON){
                         // A soft glow around the bar in its own colour.
                         for(int r=3;r>=1;r--){g.setColor(new Color(colour>>16&255,colour>>8&255,colour&255,28+12*(3-r)));g.fillRoundRect(x-r,top-r,bar+2*r,height+2*r,height+2*r,height+2*r);}

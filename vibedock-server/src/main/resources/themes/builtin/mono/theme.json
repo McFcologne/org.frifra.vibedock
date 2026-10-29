@@ -1,0 +1,27 @@
+{
+  "format": "org.frifra.vibedock.theme",
+  "schemaVersion": 1,
+  "id": "mono",
+  "version": "1.0.0",
+  "name": "Mono",
+  "author": "VibeDock contributors; Twemoji contributors (icon)",
+  "license": "Apache-2.0 AND CC-BY-4.0",
+  "renderer": {
+    "id": "vibedock-2d",
+    "version": 1
+  },
+  "definition": "style.json",
+  "defaultIcon": "legacy",
+  "icons": [
+    {
+      "id": "legacy",
+      "label": "Existing theme illustration",
+      "file": "assets/default.svg"
+    }
+  ],
+  "files": {
+    "assets/default.svg": "c42f819447dd37c4e596f14d0090e3479e7dfd28f78c510c887baa1ae779b00c",
+    "license.txt": "d74770eab23c4ce0a914b3c6a6e17c7ebd069b961f7bde827039120c01b972d3",
+    "style.json": "6677d2bf26c89064fc34e3ce1e00cdcfbee1cc7643bb9cdb917fa39eea38eb3d"
+  }
+}

@@ -1,4 +1,7 @@
 {
+  "format": "vibedock-2d",
+  "version": 1,
+  "preset": "modern",
   "palette": {
     "background": "#000000",
     "title": "#80d8ff",
@@ -6,5 +9,44 @@
     "muted": "#8a97a8",
     "track": "#2a3546",
     "warning": "#ffb84d"
+  },
+  "font": "DejaVu Sans",
+  "layers": {
+    "background": [
+      {
+        "op": "grid",
+        "x": 0,
+        "y": 0,
+        "width": {
+          "relative": 1,
+          "pixels": 0
+        },
+        "height": {
+          "relative": 1,
+          "pixels": 0
+        },
+        "color": "@title",
+        "opacity": 0.08,
+        "step": 16
+      }
+    ],
+    "band": [
+      {
+        "op": "rect",
+        "x": 2,
+        "y": 2,
+        "width": {
+          "relative": 1,
+          "pixels": -4
+        },
+        "height": {
+          "relative": 1,
+          "pixels": -4
+        },
+        "color": "@track",
+        "fill": false,
+        "radius": 8
+      }
+    ]
   }
 }
