@@ -269,6 +269,18 @@ class AccessTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Back to the administration")))
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Whitelabel"))));
     }
+    @Test void theAddressAloneOpensTheOverviewAndUnknownPagesLeadBackToIt() throws Exception {
+        for(var path:List.of("/","/admin/"))
+            mvc.perform(get(path).with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;})).andExpect(redirectedUrl("/admin"));
+        mvc.perform(get("/").header("Accept","text/html").with(r->{r.setLocalPort(10001);return r;})).andExpect(redirectedUrl("/login"));
+        mvc.perform(get("/").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNotFound());
+        mvc.perform(get("/error").requestAttr("jakarta.servlet.error.status_code",404).header("Accept","text/html")
+                .with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("<meta http-equiv=\"refresh\" content=\"3;url=/admin\">")));
+        mvc.perform(get("/error").requestAttr("jakarta.servlet.error.status_code",403).header("Accept","text/html")
+                .with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("http-equiv=\"refresh\""))));
+    }
     @Test void everyAdministrationPageRendersAndSavesOnlyItsOwnSettings() throws Exception {
         for(String page:List.of("/admin","/admin/devices","/admin/design","/admin/sources","/admin/server"))
             mvc.perform(get(page).with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
