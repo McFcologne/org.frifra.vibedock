@@ -539,7 +539,8 @@ bool loadConfig() {
     if (!deserializeJson(doc, file)) {
       uiDark = doc["uiDark"] | true;
       identifier = doc["identifier"].as<String>(); deviceName = doc["name"] | "";
-      ssid = doc["ssid"].as<String>(); password = doc["password"].as<String>();
+      // A missing or null value is no network: as<String>() would read it as the text "null".
+      ssid = doc["ssid"] | ""; password = doc["password"] | "";
       key = doc["key"] | ""; pin = doc["pin"] | "";
       // Configurations from before this flag worked with their network already.
       networkVerified = doc["verified"].isNull() ? !ssid.isEmpty() : doc["verified"].as<bool>(); pollSeconds = client_policy::clampPoll(doc["poll"] | client_policy::defaultPollSeconds);
