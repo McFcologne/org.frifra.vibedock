@@ -461,7 +461,7 @@ test('pair device offers Wi-Fi or USB, remembers the choice and pairs over USB w
   await page.reload();await page.getByRole('button',{name:'Pair device'}).click();await expect(wifi).toBeChecked();
 });
 
-test('a rescan with the network list open shows the new networks in it',async ({page,app}) => {
+test('a rescan with the network list open adds new networks and keeps missed ones',async ({page,app}) => {
   await page.addInitScript(() => {
     let scans = 0;
     const port = { buffer: '', getInfo: () => ({ usbVendorId: 0x303a, usbProductId: 0x1001 }), async setSignals() {},
@@ -474,7 +474,7 @@ test('a rescan with the network list open shows the new networks in it',async ({
             const line = self.buffer.slice(0, i), say = text => self.controller.enqueue(new TextEncoder().encode(text + '\n'));
             if (line === 'VIBEDOCK-HELLO') say('VIBEDOCK-READY ' + JSON.stringify({ identifier: 'vibedock-e2e-new', name: 'Kitchen', version: '0.2.4', board: 'waveshare-s3-touch-lcd-154', paired: false }));
             if (line === 'VIBEDOCK-SCAN') say('VIBEDOCK-NETWORKS ' + JSON.stringify(scans++ === 0 ? [{ ssid: 'Home', rssi: -50, open: false }]
-              : [{ ssid: 'Home', rssi: -48, open: false }, { ssid: 'Garden', rssi: -80, open: true }]));
+              : [{ ssid: 'Garden', rssi: -80, open: true }]));  // the rescan misses Home
           }
         } });
       },
@@ -491,7 +491,9 @@ test('a rescan with the network list open shows the new networks in it',async ({
   await form.locator('.net-pick-button').click();await expect(list).toHaveCount(1);
   await form.getByRole('button',{name:'Refresh networks'}).click();
   await expect(form.locator('.net-pick-pop')).toBeVisible();
-  await expect(list).toHaveCount(2);await expect(list.nth(1)).toContainText('Garden');
+  await expect(list).toHaveCount(2);await expect(list.nth(0)).toContainText('Garden');
+  await expect(list.nth(1)).toContainText('Home');await expect(list.nth(1)).toContainText('not found in the last scan');
+  await expect(form.locator('[data-net-value]')).toHaveText('Home');  // still chosen
 });
 
 test('leaving USB pairing frees the port and starts the form again, also with Escape',async ({page,app}) => {
