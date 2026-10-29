@@ -613,6 +613,9 @@ class AccessTest {
                     .with(r->{r.setLocalPort(8080);return r;})).andReturn();
             mvc.perform(post("/admin/clients/"+id+"/logs/request").with(admin).with(csrf()).with(r->{r.setLocalPort(10001);return r;}))
                     .andExpect(flash().attributeCount(0));
+            // With a display that sends its log over the network the table offers to ask all of them at once.
+            mvc.perform(get("/admin/troubleshooting").with(admin).with(r->{r.setLocalPort(10001);return r;}))
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString("Read all over the network")));
             // The log page names the open request with its times and the next pull it waits for.
             mvc.perform(get("/admin/clients/"+id+"/logs").with(admin).with(r->{r.setLocalPort(10001);return r;}))
                     .andExpect(content().string(org.hamcrest.Matchers.containsString("data-log-request")))

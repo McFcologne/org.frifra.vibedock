@@ -34,17 +34,20 @@
 </section>
 
 <section class="card">
-  <div class="card-head"><h3 class="grow">Paired displays</h3></div>
+  <div class="card-head"><h3 class="grow">Paired displays</h3>
+    <button type="button" class="secondary" data-request-logs th:if="${#lists.contains(targets.![network], true)}"
+            title="Every display that can sends its current log over its server connection">Read all over the network</button></div>
+  <ul class="status-list" data-request-states hidden></ul>
   <p class="meta" th:if="${#lists.isEmpty(targets)}">No displays paired yet. A log read over USB is kept anyway.</p>
-  <table class="firmware-devices" data-log-targets th:unless="${#lists.isEmpty(targets)}">
+  <table class="firmware-devices log-targets" data-log-targets th:unless="${#lists.isEmpty(targets)}">
     <thead><tr><th>Display</th><th>Board · firmware now</th><th>Newest log</th><th>Saved logs</th><th></th></tr></thead>
     <tbody><tr th:each="t:${targets}" th:with="c=${t.device}">
       <td><strong th:text="${c.name}"></strong><br><span class="meta" th:text="${c.status}"></span>
         <th:block th:if="${t.live != null}"><br><span class="meta" th:text="${t.liveSummary()}"></span></th:block>
         <th:block th:if="${t.start != null}"><br><span class="badge" th:classappend="${t.start.unexpected()} ? 'warn' : 'ok'"
             th:text="${'Last start: ' + t.start.kind + (t.start.unexpected() and t.start.previousPhase != null ? ', before in ' + t.start.previousPhase : '') + (t.start.crashCode != null ? ', crash at ' + t.start.crashAddresses() : '')}"></span></th:block></td>
-      <td th:text="${c.board.label + ' · ' + (c.firmware ?: 'unknown')}"></td>
-      <td data-log-fresh><th:block th:if="${t.latest != null}">
+      <td data-label="Board · firmware" th:text="${c.board.label + ' · ' + (c.firmware ?: 'unknown')}"></td>
+      <td data-log-fresh data-label="Newest log"><th:block th:if="${t.latest != null}">
           <span th:text="${t.age}" th:title="${'Received ' + t.received + ' (server time); its lines can be older'}"></span>
           · <span th:text="${t.latest.source == 'usb' ? 'USB' : 'network'}"></span><br>
           <span class="meta" th:text="${t.logSummary()}"></span>
@@ -53,7 +56,7 @@
         <th:block th:switch="${t.request.name()}">
           <span th:case="'PENDING'" class="meta"><br>Requested, waiting<th:block th:if="${t.reach != null and t.reach.name() == 'UNREACHABLE'}"> (not reachable now: sends it with its next pull)</th:block></span>
           <span th:case="'TIMED_OUT'" class="meta"><br>Request timed out</span></th:block></td>
-      <td><a th:href="@{/admin/clients/{id}/logs(id=${c.identifier})}" th:text="${t.logs + ' of ' + keep}"></a></td>
+      <td data-label="Saved logs"><a th:href="@{/admin/clients/{id}/logs(id=${c.identifier})}" th:text="${t.logs + ' of ' + keep}"></a></td>
       <td><form th:if="${t.network}" th:action="@{/admin/clients/{id}/logs/request(id=${c.identifier})}" method="post">
           <button class="secondary" title="The display sends its log over its server connection">Read over the network</button></form>
         <span th:unless="${t.network}" class="meta" title="This firmware sends its log only over USB; update it to read it over the network">USB only</span></td></tr></tbody>
@@ -83,7 +86,7 @@
     <label class="check"><input type="checkbox" name="hideHosts" value="true"> Also hide host names and public IP addresses</label>
     <button>Create support file</button></div></form>
   <div class="notice" data-support-key hidden><p><strong>Key of <span data-support-name></span></strong> (shown only now):</p>
-    <div class="web-link"><code data-support-key-value></code>
+    <div class="web-link support-key"><code data-support-key-value></code>
       <button type="button" class="icon-button" data-copy-from="[data-support-key-value]" title="Copy key" aria-label="Copy key"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg></button></div></div>
   <p class="notice error" data-support-error hidden></p>
 </section>

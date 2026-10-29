@@ -52,37 +52,47 @@ card.querySelector('[data-usb-restart]').addEventListener('click', () => run(asy
 
 // "Request current logs": every display that can is asked for its log; the list shows per display whether it arrived,
 // is awaited (also when it could not be reached at once: then it comes with its next pull), timed out or is USB only.
-const requestButton = document.querySelector('[data-request-logs]'), requestStates = document.querySelector('[data-request-states]');
+// The same request from "Read all over the network" (Paired displays) and from the support file card; the states show
+// below the button used, and the table of the displays follows while logs arrive.
+const requestButtons = [...document.querySelectorAll('[data-request-logs]')];
 const stateText = row => ({
   RECEIVED: 'Received', TIMED_OUT: 'No answer within 10 minutes', USB_ONLY: 'Only over USB (older firmware)', NONE: 'Not requested', ERROR: 'Could not be checked',
   PENDING: row.reach === 'UNREACHABLE' ? 'Not reachable now: it sends the log with its next pull' : row.reach === 'NO_ADDRESS' ? 'Waiting for its next pull' : 'Requested, waiting …'
 }[row.state] || row.state);
-const showStates = rows => {
-  requestStates.replaceChildren(...rows.map(row => {
+const showStates = (list, rows) => {
+  list.replaceChildren(...rows.map(row => {
     const item = document.createElement('li'), name = document.createElement('strong'), state = document.createElement('span');
     name.textContent = row.name; state.className = 'badge' + (row.state === 'RECEIVED' ? ' ok' : row.state === 'PENDING' ? ' custom' : '');
     state.textContent = stateText(row); item.append(name, state); return item;
   }));
-  requestStates.hidden = !rows.length;
+  list.hidden = !rows.length;
+};
+const refreshTable = async () => {
+  const table = document.querySelector('[data-log-targets]'); if (!table) return;
+  const page = new DOMParser().parseFromString(await (await fetch(location.pathname, { credentials: 'same-origin', headers: { Accept: 'text/html' } })).text(), 'text/html');
+  const next = page.querySelector('[data-log-targets] tbody'); if (next) table.querySelector('tbody').replaceWith(next);
 };
 let watching = null;
-requestButton?.addEventListener('click', async () => {
-  requestButton.disabled = true; clearTimeout(watching);
+for (const requestButton of requestButtons) requestButton.addEventListener('click', async () => {
+  const requestStates = requestButton.closest('.card').querySelector('[data-request-states]');
+  for (const list of document.querySelectorAll('[data-request-states]')) if (list !== requestStates) list.hidden = true;
+  requestButtons.forEach(b => b.disabled = true); clearTimeout(watching);
   try {
     const response = await fetch('/admin/support/request-logs', { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json', ...csrf } });
     if (!response.ok) throw new Error('HTTP ' + response.status);
-    showStates(await response.json());
+    showStates(requestStates, await response.json());
+    refreshTable().catch(() => {});
     const started = Date.now();
     const watch = async () => {
       try {
         const rows = await (await fetch('/admin/support/log-requests', { credentials: 'same-origin', headers: { Accept: 'application/json' } })).json();
-        showStates(rows);
+        showStates(requestStates, rows); await refreshTable();
         if (rows.some(r => r.state === 'PENDING' && r.reach !== 'UNREACHABLE') && Date.now() - started < 60000) watching = setTimeout(watch, 3000);
       } catch { /* the list stays as it is */ }
     };
     watching = setTimeout(watch, 2000);
-  } catch (error) { showStates([{ name: 'Request failed', state: error.message }]); }
-  requestButton.disabled = false;
+  } catch (error) { showStates(requestStates, [{ name: 'Request failed', state: error.message }]); }
+  requestButtons.forEach(b => b.disabled = false);
 });
 // Support file: the server answers the encrypted file and its key once; the file is downloaded, the key shown.
 const create = document.querySelector('[data-support-create]'), keyBox = document.querySelector('[data-support-key]');

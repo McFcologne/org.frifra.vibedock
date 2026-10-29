@@ -325,7 +325,17 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 @media(max-width:460px){.app-footer-inner{padding:16px 14px}.app-footer nav{gap:16px}}
 .firmware-facts{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 18px;margin:14px 0 0;font-size:13px}.firmware-facts dt{color:var(--muted)}.firmware-facts dd{margin:0;min-width:0}
 .hash{overflow-wrap:anywhere;font-size:12px}.badge.update{text-decoration:none;margin-left:6px}.badge.update:hover{filter:brightness(1.1)}
-.firmware-devices{width:100%;border-collapse:collapse;margin:18px 0 0;font-size:13px}.firmware-devices th{text-align:left;font-weight:600;color:var(--muted);padding:0 8px 8px 0}.firmware-devices td{border-top:1px solid var(--line);padding:9px 8px 9px 0}
+.firmware-devices{width:100%;border-collapse:collapse;margin:18px 0 0;font-size:13px}
+/* Logs table: long start reasons and firmware names wrap instead of pushing the buttons out of the card; on a phone
+   every display is a block with labelled lines. */
+.log-targets td{overflow-wrap:anywhere}.log-targets .badge{white-space:normal;overflow-wrap:anywhere;max-width:100%}
+.log-targets td:last-child{width:170px}.log-targets td:last-child button{width:100%;margin:0}
+@media(max-width:700px){.log-targets thead{display:none}.log-targets,.log-targets tbody,.log-targets tr,.log-targets td{display:block;width:auto}
+  .log-targets tr{border-top:1px solid var(--line);padding:10px 0}.firmware-devices.log-targets td{border:0;padding:3px 0}
+  .log-targets td[data-label]::before{content:attr(data-label);display:block;color:var(--muted);font-size:11.5px}.log-targets td:last-child{width:auto}}
+/* The key of a support file in full length; it wraps instead of being cut off. */
+.web-link.support-key{grid-template-columns:minmax(0,1fr) auto}.support-key code{white-space:normal;overflow-wrap:anywhere;text-overflow:clip}
+[data-support-open] input[name=key]{flex:1 1 24em;min-width:0}.firmware-devices th{text-align:left;font-weight:600;color:var(--muted);padding:0 8px 8px 0}.firmware-devices td{border-top:1px solid var(--line);padding:9px 8px 9px 0}
 .flash-steps{margin:14px 0 0;padding-left:20px;display:grid;gap:16px;font-size:13.5px}.flash-steps li>p{margin:6px 0 0}
 .flash-steps pre,.flash-log{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.55 ui-monospace,SFMono-Regular,monospace;background:var(--soft,rgba(127,127,127,.08));border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:8px 0 0}
 .flash-row{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;margin-top:10px}.flash-row button,.flash-row select{margin:0}.flash-row select{width:auto}
