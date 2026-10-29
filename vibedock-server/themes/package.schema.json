@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:org.frifra.vibedock:theme-package:1",
+  "title": "VibeDock theme package manifest (draft for 0.4)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schemaVersion", "id", "version", "name", "author", "license", "renderer", "definition", "defaultIcon", "icons", "files"],
+  "properties": {
+    "format": {"const": "org.frifra.vibedock.theme"},
+    "schemaVersion": {"const": 1},
+    "id": {"$ref": "#/$defs/id"},
+    "version": {"type": "string", "maxLength": 40, "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},
+    "name": {"$ref": "#/$defs/shortText"},
+    "author": {"$ref": "#/$defs/text"},
+    "license": {"$ref": "#/$defs/text"},
+    "renderer": {
+      "type": "object", "additionalProperties": false, "required": ["id", "version"],
+      "properties": {"id": {"$ref": "#/$defs/id"}, "version": {"type": "integer", "minimum": 1, "maximum": 2147483647}}
+    },
+    "definition": {"allOf": [{"$ref": "#/$defs/path"}, {"pattern": "\\.json$"}]},
+    "defaultIcon": {"$ref": "#/$defs/id"},
+    "icons": {
+      "type": "array", "minItems": 1, "maxItems": 32,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["id", "label", "file"],
+        "properties": {"id": {"$ref": "#/$defs/id"}, "label": {"$ref": "#/$defs/shortText"}, "file": {"$ref": "#/$defs/image"}}
+      }
+    },
+    "preview": {"$ref": "#/$defs/image"},
+    "files": {
+      "type": "object", "minProperties": 1, "maxProperties": 63,
+      "propertyNames": {"allOf": [{"$ref": "#/$defs/path"}, {"pattern": "\\.(json|png|svg|txt)$"}, {"not": {"const": "theme.json"}}]},
+      "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{0,79}$"},
+    "shortText": {"type": "string", "minLength": 1, "maxLength": 80, "pattern": "[^\\s]", "not": {"pattern": "[\\u0000-\\u001f\\u007f-\\u009f]"}},
+    "text": {"type": "string", "minLength": 1, "maxLength": 160, "pattern": "[^\\s]", "not": {"pattern": "[\\u0000-\\u001f\\u007f-\\u009f]"}},
+    "path": {"type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[a-z0-9][a-z0-9._/-]*$", "not": {"pattern": "(^|/)\\.{1,2}(/|$)|//|/$"}},
+    "image": {"allOf": [{"$ref": "#/$defs/path"}, {"pattern": "\\.(png|svg)$"}]}
+  }
+}
