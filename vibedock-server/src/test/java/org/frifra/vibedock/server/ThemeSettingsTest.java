@@ -4,7 +4,6 @@ import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
-import java.util.Arrays;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ThemeSettingsTest {
@@ -19,7 +18,7 @@ class ThemeSettingsTest {
 
     @Test void availabilityPersistsAndSwipesSkipInEitherDirection(@TempDir Path dir) throws Exception {
         var settings=new ThemeSettings(dir.toString(),JsonCompatibility.mapper());
-        for(var theme:Scheme.values())assertTrue(settings.enabled(theme));
+        for(var theme:ThemeCatalog.builtins().all())assertTrue(settings.enabled(theme));
         settings.setEnabled(Scheme.OCEAN,false);
         var loaded=new ThemeSettings(dir.toString(),JsonCompatibility.mapper());
         assertFalse(loaded.enabled(Scheme.OCEAN));
@@ -31,11 +30,11 @@ class ThemeSettingsTest {
     }
     @Test void theLastThemeCannotBeDisabledAndWrapsToItself(@TempDir Path dir) throws Exception {
         var settings=new ThemeSettings(dir.toString(),JsonCompatibility.mapper());
-        for(var theme:Scheme.values())if(theme!=Scheme.PORCELAIN)settings.setEnabled(theme,false);
+        for(var theme:ThemeCatalog.builtins().all())if(theme!=Scheme.PORCELAIN)settings.setEnabled(theme,false);
         assertThrows(IllegalArgumentException.class,()->settings.setEnabled(Scheme.PORCELAIN,false));
         assertEquals(Scheme.PORCELAIN,settings.shifted(Scheme.PORCELAIN,1));
         assertEquals(Scheme.PORCELAIN,settings.shifted(Scheme.MIDNIGHT,-1));
         var restored=new ThemeSettings(dir.toString(),JsonCompatibility.mapper());
-        assertEquals(1,Arrays.stream(Scheme.values()).filter(restored::enabled).count());
+        assertEquals(1,ThemeCatalog.builtins().all().stream().filter(restored::enabled).count());
     }
 }

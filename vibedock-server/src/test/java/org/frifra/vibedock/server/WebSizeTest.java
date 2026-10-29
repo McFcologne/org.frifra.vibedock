@@ -29,7 +29,7 @@ class WebSizeTest {
         var renderer=new StatusImage("Europe/Berlin");
         var snapshot=new UsageService.Snapshot(1,0,new LinkedHashMap<>(),Map.of());
         var emoji=new java.awt.image.BufferedImage(132,132,java.awt.image.BufferedImage.TYPE_INT_ARGB);
-        for(var scheme:Scheme.values()){
+        for(var scheme:ThemeCatalog.builtins().all()){
             var look=new StatusImage.Look(emoji,scheme,null,"12°",Layout.DEFAULT);
             var image=renderer.render(snapshot,"VibeDock server v1",look,DisplayType.M1,3);
             Assertions.assertEquals(0,image.rgb565().length);

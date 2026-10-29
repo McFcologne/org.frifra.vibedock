@@ -12,7 +12,7 @@ class BatteryIconTest {
     private final UsageService.Snapshot snapshot=snapshot("ok");
 
     @Test void theIconChangesOnlyTheTopRightCornerInEveryScheme() throws Exception {
-        for(var scheme:Scheme.values())for(var layout:List.of(Layout.DEFAULT,halfAndCompact())){
+        for(var scheme:ThemeCatalog.builtins().all())for(var layout:List.of(Layout.DEFAULT,halfAndCompact())){
             var plain=image(scheme,layout,null,snapshot);
             for(Integer level:new Integer[]{null,10,60,100}){
                 var battery=image(scheme,layout,new StatusImage.Battery(level),snapshot);
@@ -27,7 +27,7 @@ class BatteryIconTest {
     }
     @Test void aStatusMovesLeftOfTheIconInsteadOfUnderIt() throws Exception {
         var limited=snapshot("rate_limited");
-        for(var scheme:Scheme.values()){
+        for(var scheme:ThemeCatalog.builtins().all()){
             var plain=image(scheme,Layout.DEFAULT,null,limited);var battery=image(scheme,Layout.DEFAULT,new StatusImage.Battery(40),limited);
             for(int y=0;y<240;y++)for(int x=0;x<240;x++)if(plain.getRGB(x,y)!=battery.getRGB(x,y))
                 Assertions.assertTrue(y<28,scheme+": only the heading row changes, at "+x+","+y);
