@@ -47,7 +47,10 @@ class DeviceDiagnostics {
      * pull reached the server: route "lan" (the internal address), "external" (the external address) or "other",
      * host the address it used.
      */
-    record Network(String ssid,Integer rssi,String route,String host) {}
+    record Network(String ssid,Integer rssi,String route,String host) {
+        /** Signal bars 1 to 4 as in the Wi-Fi list of USB pairing (bars() in usb-pairing.js); 0 without a signal. */
+        public int level(){return rssi==null?0:rssi>=-55?4:rssi>=-67?3:rssi>=-75?2:1;}
+    }
     private final Map<String,String[]> routes=new ConcurrentHashMap<>();
     /**
      * One start: seenAt is the server time of its first report. previous*: the last state of the start before, null

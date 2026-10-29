@@ -91,7 +91,8 @@
 </div></footer>
 <!-- Wi-Fi, signal and the route of a display's last pull (device card and overview); hidden while nothing is known. -->
 <p th:fragment="networkLine(net)" class="meta network-line" data-live="network">
-        <th:block th:if="${net != null and (net.ssid != null or net.rssi != null)}"><svg class="wifi-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 8.5a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1.2"/></svg>
+        <th:block th:if="${net != null and (net.ssid != null or net.rssi != null)}"><svg th:if="${net.rssi != null}" class="net-bars" viewBox="0 0 16 12" aria-hidden="true"><rect th:each="i:${#numbers.sequence(0,3)}" th:x="${i * 4}" th:y="${9 - i * 3}" width="3" th:height="${3 + i * 3}" rx=".8" th:classappend="${i >= net.level()} ? 'off'"/></svg>
+          <svg th:unless="${net.rssi != null}" class="wifi-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 8.5a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1.2"/></svg>
           <span th:if="${net.ssid != null}" th:text="${net.ssid}" title="Wi-Fi"></span><th:block th:if="${net.ssid != null and net.rssi != null}">·</th:block>
           <span th:if="${net.rssi != null}" th:classappend="${net.rssi < -75} ? 'weak-signal'" th:title="${net.rssi < -75 ? 'Weak signal' : 'Signal'}" th:text="${'−' + (-net.rssi) + ' dBm'}"></span></th:block>
         <span th:if="${net != null and net.route != null}" class="route-chip" th:classappend="${net.route == 'external'} ? 'external'"

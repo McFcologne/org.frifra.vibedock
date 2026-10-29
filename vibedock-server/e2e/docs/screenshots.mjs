@@ -97,9 +97,9 @@ try {
   const pull = (identifier, headers) => fetch(`${API}/api/v1/clients/${identifier}/image`, {headers: {Authorization: 'Bearer ' + key, 'X-VibeDock-Footer': 'server', ...headers}});
   const m1 = {'X-VibeDock-Ota': '1', 'X-VibeDock-Board': 'vibedock-m1', 'X-VibeDock-Display': '240x240'};
   if (!own) {
-    await pull('vibedock-0a1b2c000001', {...m1, 'X-VibeDock-Device-IP': '192.168.1.21', 'X-VibeDock-Firmware': version});
-    await pull('vibedock-0a1b2c000002', {...m1, 'X-VibeDock-Device-IP': '192.168.1.22', 'X-VibeDock-Firmware': '0.0.9'});  // older than any release: offered an update
-    await pull('vibedock-0a1b2c000003', {...m1, 'X-VibeDock-Device-IP': '192.168.1.23', 'X-VibeDock-Firmware': version});
+    await pull('vibedock-0a1b2c000001', {...m1, 'X-VibeDock-Device-IP': '192.168.1.21', 'X-VibeDock-Firmware': version, 'X-VibeDock-Diag': 'boot=0000a001;up=86400;rssi=-52;ssid=Home'});
+    await pull('vibedock-0a1b2c000002', {...m1, 'X-VibeDock-Device-IP': '192.168.1.22', 'X-VibeDock-Firmware': '0.0.9', 'X-VibeDock-Diag': 'boot=0000a002;up=86400;rssi=-63;ssid=Home'});  // older than any release: offered an update
+    await pull('vibedock-0a1b2c000003', {...m1, 'X-VibeDock-Device-IP': '192.168.1.23', 'X-VibeDock-Firmware': version, 'X-VibeDock-Diag': 'boot=0000a003;up=86400;rssi=-79;ssid=Workshop'});  // weak signal
   }
 
   if (serve) {
@@ -263,7 +263,7 @@ try {
         return response.status;
       }, [bench, display]);
       if (saved !== 200) throw new Error(`Display ${display} not saved: ${saved}`);
-      await pull(bench, {'X-VibeDock-Ota': '1', 'X-VibeDock-Board': board, 'X-VibeDock-Device-IP': '192.168.1.23', 'X-VibeDock-Firmware': version});
+      await pull(bench, {'X-VibeDock-Ota': '1', 'X-VibeDock-Board': board, 'X-VibeDock-Device-IP': '192.168.1.23', 'X-VibeDock-Firmware': version, 'X-VibeDock-Diag': 'boot=0000a003;up=86400;rssi=-79;ssid=Workshop'});  // weak signal
       await go('/admin/devices');
       const image = await page.request.get(`${B}/admin/clients/${bench}/preview.png`);
       const [width] = display === 'vibedock-m1' ? [240] : display.split('x').map(Number);

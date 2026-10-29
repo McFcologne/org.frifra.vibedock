@@ -72,13 +72,15 @@ export function usbPairing(pair, { port = () => undefined, setPort = () => {}, b
   pair.querySelector('[data-net-refresh]').addEventListener('click', async event => {
     const button = event.currentTarget; if (button.disabled || !console_) return;
     button.disabled = true; button.textContent = 'Scanning …';
+    // An open list shows that it is being replaced, not the old networks until the scan ends.
+    if (!pop.hidden) options.innerHTML = '<li class="net-empty">Scanning …</li>';
     try {
       const kept = pairForm.elements.ssid.value, list = await scanNetworks();
       if (!kept || !list.some(n => n.ssid === kept)) choose(list[0]?.ssid ?? kept);
       if (!pop.hidden) renderPicker();  // the open list shows the new scan, not the old one
       say(list.length ? `${list.length} networks found` : 'No networks found; type the name in the search field.', !list.length);
     } catch (error) { say(error.message, true); }
-    finally { button.disabled = false; button.textContent = 'Refresh networks'; }
+    finally { button.disabled = false; button.textContent = 'Refresh networks'; if (!pop.hidden) renderPicker(); }
   });
   // Network picker: a dropdown with a search field over the networks the display sees (strongest first). A name that
   // is not in the list (a hidden network) can be typed into the search and used as it is.
@@ -86,6 +88,7 @@ export function usbPairing(pair, { port = () => undefined, setPort = () => {}, b
   const pop = picker.querySelector('.net-pick-pop'), search = pop.querySelector('input'), options = pop.querySelector('ul');
   let networks = [], active = 0;
   const LOCK = '<svg class="net-lock" viewBox="0 0 12 12" aria-label="password"><rect x="2.5" y="5.5" width="7" height="5" rx="1"/><path d="M4 5.5V4a2 2 0 0 1 4 0v1.5" fill="none" stroke-width="1.3"/></svg>';
+  // The same bars as on the device card and in the overview (DeviceDiagnostics.Network.level).
   function bars(rssi) {
     const level = rssi >= -55 ? 4 : rssi >= -67 ? 3 : rssi >= -75 ? 2 : 1;
     return `<svg class="net-bars" viewBox="0 0 16 12" aria-label="${rssi} dBm">${[0, 1, 2, 3].map(i =>

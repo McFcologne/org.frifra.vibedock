@@ -307,6 +307,8 @@ class AccessTest {
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
             var card=html.substring(html.indexOf("data-device=\""+id+"\""));card=card.substring(0,card.indexOf("</section>"));
             Assertions.assertTrue(card.contains("Home Wi-Fi")&&card.contains("−80 dBm")&&card.contains("weak-signal"),card);
+            // −80 dBm: one of the four bars of USB pairing.
+            Assertions.assertTrue(card.contains("class=\"net-bars\"")&&card.split("class=\"off\"",-1).length-1==3,card);
             Assertions.assertTrue(card.contains("route-chip external")&&card.contains("Last pull over home.example.org:10002"),card);
             // The overview lists the same line per display, and how many displays follow the default design.
             var overview=mvc.perform(get("/admin").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
