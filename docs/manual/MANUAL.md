@@ -1190,7 +1190,7 @@ interval) and how late it is, and counts down to the end of the request.
 | `Server refuses TLS 1.3, using TLS 1.2` | The server speaks only TLS 1.2; the display uses it with the same certificate check. |
 | `<address>: HTTP 200, TLS 1.3 …` | Works: cipher suite, duration and memory of the connection. |
 | `<address>: HTTP 400 "<html>…"` | A reverse proxy answered, not the VibeDock server (the text is the start of its page). Check the proxy's target and that the display really speaks TLS to the https port. |
-| `Server rejected the device key (401), 1 of 3` | The server did not accept the key. After the third answer like this in a row the display removes its pairing; one in between is harmless. |
+| `Server rejected the device key (401), 1 of 3` | The server did not accept the key. After the third answer like this in an unbroken row the display removes its pairing; any other answer, or none, starts the count again. |
 | `Server rejected the device key (401) three times: pairing removed` (before 0.3.3: `… (401): pairing removed`) | The server does not know the display (removed, or another server): pair it again. |
 | `Restart: too little memory in one piece (largest block …, heap …)` | The M1 had too little memory left for a TLS connection three pulls in a row and restarted itself (`start=low-memory`). Now and then is harmless; often: report the log. |
 | `Update to v… started` / `installed` / `Update failed: …` | Updates over Wi-Fi and why one failed; the running firmware stays on failure. |

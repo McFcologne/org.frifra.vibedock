@@ -4,23 +4,64 @@ The release workflow publishes the section of the tagged version (`## 0.1.0` for
 
 ## 0.3.3
 
-M1 displays keep their pairing and recover on their own when their memory runs low. Update the server image first: it
-already protects every M1 from losing its pairing over a request cut off for lack of memory. Then update the M1
-displays over Wi-Fi from the administration for the restart on low memory and the smaller heap use of the log. The
-other boards are not affected.
+Displays keep their pairing and an M1 recovers on its own when its memory runs low; the administration names why a
+data source has no figures and shows the Wi-Fi of every display on the overview. Update the server image first: it
+already protects every display from losing its pairing over a request cut off for lack of memory. Then update the
+displays over Wi-Fi from the administration: every board gets the pairing protection and the fix for a missing Wi-Fi
+name, the M1 also the restart on low memory and the smaller heap use of its log.
 
-- **M1 keeps its pairing when memory runs low:** after a night of aborted transfers an M1 had so little memory left
-  that it sent its request without a whole key, and on the server's 401 it removed its pairing. The server now answers
-  a missing or cut-off key with 400, which every firmware ignores; firmware 0.3.3 also removes its pairing only after
-  three 401 answers in a row (log *Server rejected the device key (401), 1 of 3*).
+### Displays
+
+- **Pairing kept on single rejections:** after a night of aborted transfers an M1 had so little memory left that it
+  sent its request without a whole key, and on the server's 401 it removed its pairing. The server now answers a
+  missing or cut-off key with 400, which every firmware ignores; firmware 0.3.3 on every board removes its pairing
+  only after three 401 answers in an unbroken row (log *Server rejected the device key (401), 1 of 3*); any other
+  answer, or none, starts the count again.
 - **M1 restarts itself when memory runs low:** when three pulls in a row find no block of 6 kB left (a TLS connection
   needs 4.6 kB for its stack), the M1 restarts (*Restart: too little memory in one piece …*, start kind `low-memory`)
-  instead of failing on. Between log events its log lines are no longer kept in memory but only in its file; they took
-  up to 7 kB of its heap. Needs the new firmware.
+  instead of failing on. Between log events its log lines are no longer kept in memory but only in its file, also
+  when the same event repeats; they took up to 7 kB of its heap.
 - **M1 log after a broken-off handshake:** when a TLS connection broke off before the certificate was checked (for
   example *-0x7200* from an address that does not answer with TLS), the log line listed every certificate problem at
   once (*certificate expired, not yet valid, host name does not match, root from pairing does not match*). It now
-  names only the error. Needs the new firmware.
+  names only the error.
+- **No network "null":** a display whose configuration holds no Wi-Fi name read it as the text *null* and tried to
+  connect to a network of that name (*Network "null" was not found*); it now opens its setup instead.
+
+### Administration
+
+- **No more 404 when coming back:** the address of the administration port alone (for example a bookmark of
+  `https://host:10001/`) now opens the overview; before it showed *There is no page at this address*. Other unknown
+  administration pages still show the 404 page, which now leads to the overview by itself after 3 seconds.
+- **Why a data source has no figures:** below the badge the overview and the data sources page name the reason of
+  the last answer, for example *No Code Assist project; open the Gemini CLI once with this account* or *Sign in
+  again under Manage (HTTP 401)*. The reason is shown in the administration only, never in the usage API.
+- **Badges in one style:** source states read *Unavailable*, *Sign-in required*, *Rate limited*, *Provider error*
+  and so on instead of the raw *unavailable*, *authentication required*. The route on the device card reads
+  **LAN**, **External** or **Other**; the address of the last pull stays in its tooltip.
+- **Overview:** the device list shows the Wi-Fi, signal and route of every display, as its card does, so a display
+  with a weak signal stands out. The *Default display* box ends below its content and says how many displays use the
+  default design.
+- **Signal bars:** the device cards and the overview show the Wi-Fi signal with the four blue bars of the network list
+  in USB pairing, next to the value in dBm.
+- **USB pairing:** *Refresh networks* updates the network list instead of replacing it: new networks and signals
+  come in, a network the scan missed stays below the others as *not found in the last scan*, and the chosen network
+  stays chosen.
+- **Display editor:** for a device design the coloured box no longer repeats the device name of the selection above;
+  *Display* has its own line below the explanation. A link of the administration clicked right after an edit waits
+  for the save; before, the edit was sent along only as the page closed, and could be lost when a save was already
+  running.
+- **Data source cards of one row are equally high:** a paused source (without the *Updates* line) no longer ends
+  higher than its neighbour; *Manage* stays at the bottom of every card.
+- **Troubleshooting:** long start reasons and firmware names wrap instead of pushing the buttons out of the table; on a
+  phone every display is a block with labelled lines. *Read all over the network* above the table asks every display
+  that can for its current log (as *Request current logs* in the support file card) and the table follows while the
+  logs arrive.
+- **Support file key:** shown in full length, it wraps instead of being cut off; the key field of *Open a support
+  file* takes the free width.
+- **Made-up Wi-Fi with DEMO_USAGE:** a display that has not reported its Wi-Fi shows *Demo Wi-Fi*, a signal between
+  −45 and −85 dBm and the route LAN or External, so the overview and the device cards can be tried without real
+  displays. Reported values always come first.
 
 ## 0.3.2
 
