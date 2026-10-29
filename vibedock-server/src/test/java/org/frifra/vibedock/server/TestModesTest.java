@@ -22,6 +22,7 @@ class TestModesTest {
     @Autowired MockMvc mvc;
     @Autowired SettingsStore store;
     @Autowired UsageService usage;
+    @Autowired ClientRegistry clients;
 
     @Test void administrationOpensWithoutSignInOnItsPortOnly() throws Exception {
         mvc.perform(get("/admin").with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isOk())
@@ -30,6 +31,18 @@ class TestModesTest {
         mvc.perform(get("/admin").with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNotFound());
         mvc.perform(get("/login").with(r->{r.setLocalPort(10001);return r;})).andExpect(redirectedUrl("/admin"));
         mvc.perform(get("/admin/events").with(r->{r.setLocalPort(10001);return r;})).andExpect(request().asyncStarted());
+    }
+    @Test void displaysWithoutReportedWifiShowMadeUpValues() throws Exception {
+        String id="vibedock-demo-wifi";
+        clients.paired(id,"Demo Wi-Fi card","cd".repeat(32),"192.168.1.30",80);
+        try{
+            var net=DemoUsage.network(id);
+            Assertions.assertTrue(net.rssi()<=-45&&net.rssi()>=-85&&List.of("lan","external").contains(net.route()),net.toString());
+            for(var page:List.of("/admin","/admin/devices"))
+                mvc.perform(get(page).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isOk())
+                        .andExpect(content().string(org.hamcrest.Matchers.containsString("Demo Wi-Fi</span>")))
+                        .andExpect(content().string(org.hamcrest.Matchers.containsString("−"+(-net.rssi())+" dBm")));
+        }finally{clients.remove(id);}
     }
     @Test void sourcesWithoutSignInReportMadeUpUsage() throws Exception {
         var s=store.get();

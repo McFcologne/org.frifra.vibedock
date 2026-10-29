@@ -36,6 +36,7 @@ class Controllers {
     @org.springframework.beans.factory.annotation.Autowired private DesignService designs;
     @org.springframework.beans.factory.annotation.Autowired(required=false) private DeviceDiagnostics diagnostics;
     @org.springframework.beans.factory.annotation.Value("${vibedock.admin-auth:password}") private String auth;
+    @org.springframework.beans.factory.annotation.Value("${vibedock.demo-usage:false}") private boolean demo;
     /** Without sign-in (ADMIN_AUTH=none) the login page, e.g. a bookmark or after "Sign out", leads to the administration. */
     @GetMapping("/login") String login() { return "none".equals(auth) ? "redirect:/admin" : "login"; }
     /** The address of the administration port alone, e.g. a bookmark, opens the overview instead of a 404 page. */
@@ -127,7 +128,11 @@ class Controllers {
     /** Wi-Fi, signal and the address the last pull used, per display (as far as known since the server started). */
     private Map<String,DeviceDiagnostics.Network> networks(){
         var networks=new java.util.HashMap<String,DeviceDiagnostics.Network>();
-        if(diagnostics!=null)for(var c:clients.views()){var n=diagnostics.network(c.identifier());if(n!=null)networks.put(c.identifier(),n);}
+        for(var c:clients.views()){
+            var n=diagnostics==null?null:diagnostics.network(c.identifier());
+            if(n==null&&demo)n=DemoUsage.network(c.identifier());  // DEMO_USAGE: real values always come first
+            if(n!=null)networks.put(c.identifier(),n);
+        }
         return networks;
     }
     @GetMapping("/admin/devices") String devices(Model model,HttpServletRequest request) {

@@ -12,11 +12,20 @@ import java.time.Clock;
 /**
  * DEMO_USAGE=true, for tests without real accounts (no rate limits): every data source reports made-up usage that
  * grows within its 5-hour and weekly window and starts again with the next one, also without a sign-in. No provider
- * is asked. Displays pair and pull as usual.
+ * is asked. Displays pair and pull as usual; one without a reported Wi-Fi shows made-up Wi-Fi values.
  */
 @Configuration
 @ConditionalOnProperty(name="vibedock.demo-usage",havingValue="true")
 class DemoUsage {
+    /**
+     * The made-up Wi-Fi of a display the server knows nothing about yet: signal between −45 and −85 dBm and the route
+     * derived from its identifier, so the demo shows strong and weak displays, LAN and external.
+     */
+    static DeviceDiagnostics.Network network(String identifier){
+        int seed=Math.floorMod(identifier.hashCode(),1000);
+        boolean external=seed%3==0;
+        return new DeviceDiagnostics.Network("Demo Wi-Fi",-45-seed%41,external?"external":"lan",external?"demo.example.org:10002":"192.168.1.10:10002");
+    }
     @Bean @Primary ProviderClient demoProviders(HttpClient http,ObjectMapper json,Clock clock){
         LoggerFactory.getLogger(DemoUsage.class).warn("DEMO_USAGE is on: made-up usage readings, no provider is asked");
         return new ProviderClient(http,json){
