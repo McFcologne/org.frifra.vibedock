@@ -188,15 +188,22 @@ void unparkLog() {
 // frequent: events that can come with every poll (server answers). A new one is written at once like all others, so
 // that a reset (e.g. when a USB port is opened) does not lose it; one already among the last lines (two servers
 // failing in turn) at most once a minute.
+// The count of a repeated event on its line ("[x3]"), replacing an older count.
+String withRepeats(String line) {
+  int mark = line.indexOf(" [x"); if (mark > 0) line.remove(mark);
+  return logRepeats ? line + " [x" + String(logRepeats + 1) + "]" : line;
+}
 void logEvent(const String &text, bool frequent = false) {
-  unparkLog();
-  // A repeated event replaces its line with a count instead of filling the log.
-  if (text == logLast && logCount > 0) {
-    String &line = logLines[(logNext + LOG_LINES - 1) % LOG_LINES];
-    int mark = line.indexOf(" [x"); if (mark > 0) line.remove(mark);
-    line += " [x" + String(++logRepeats + 1) + "]";
-    return;  // not stored again: a repeat changes nothing worth the flash write
+  // A repeated event replaces its line with a count instead of filling the log. Not stored again: a repeat changes
+  // nothing worth the flash write. A parked log stays parked (its heap stays free): the count goes onto the line
+  // with the next other event, and reading the log adds it meanwhile.
+  if (text == logLast && (logCount > 0 || logParked)) {
+    logRepeats++;
+    if (!logParked) { String &line = logLines[(logNext + LOG_LINES - 1) % LOG_LINES]; line = withRepeats(line); }
+    return;
   }
+  unparkLog();
+  if (logRepeats && logCount > 0) { String &line = logLines[(logNext + LOG_LINES - 1) % LOG_LINES]; line = withRepeats(line); }
   logLast = text; logRepeats = 0;
   char stamp[24]; time_t now = time(nullptr);
   if (clockSet()) { struct tm t; gmtime_r(&now, &t); strftime(stamp, sizeof(stamp), "%m-%d %H:%M:%S", &t); }
@@ -271,9 +278,11 @@ void serialLog() {
     reply.print('"');
   };
   if (logParked) {
-    auto in = LittleFS.open("/log.txt", "r");
-    while (in && in.available()) { String text = in.readStringUntil('\n'); if (!text.isEmpty()) line(text); }
+    // The last line of the file without the count of repeats collected since it was parked: added here.
+    auto in = LittleFS.open("/log.txt", "r"); String last;
+    while (in && in.available()) { String text = in.readStringUntil('\n'); if (text.isEmpty()) continue; if (!last.isEmpty()) line(last); last = text; }
     if (in) in.close();
+    if (!last.isEmpty()) line(withRepeats(last));
   } else {
     for (uint8_t i = 0; i < logCount; i++) line(logLines[(logNext + LOG_LINES - logCount + i) % LOG_LINES]);
   }
@@ -1379,12 +1388,13 @@ void pull() {
     else logEvent(server + ": " + HTTPClient::errorToString(code) + (lastConnectionProblem.isEmpty() ? "" : ", " + lastConnectionProblem), true);
   }
   lastStatus = code;
+  if (code != 401) rejectedKeys = 0;  // only 401 answers in an unbroken row count (any other answer or no answer ends it)
   if (code > 0) {
     failedInRow = 0; pendingGesture = "";  // the server has it (an older one ignores it)
     if (storedIndex != serverIndex) saveConfig();  // flash only when the answering address changes
   }
   if (code == 200 || code == 304) {
-    learnPin(request); updateError = ""; rejectedKeys = 0;
+    learnPin(request); updateError = "";
 #ifdef VIBEDOCK_AUDIO_ES8311
     audio::quotas(http.header("X-VibeDock-Quota").c_str());
 #endif

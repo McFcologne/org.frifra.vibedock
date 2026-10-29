@@ -135,7 +135,7 @@ X-VibeDock-Board: vibedock-m1
 | **200** | width × height × 2 bytes of RGB565 pixels in the resolution of the device's display type, headers `ETag`, `X-VibeDock-Image-Format: rgb565-be-<width>x<height>` (VibeTV M1: `rgb565-be-240x240`, 115 200 bytes), `X-VibeDock-Poll-Seconds` |
 | **304** | image unchanged since the given `ETag` (no body) |
 | **400** | no key, or not 64 hex digits (headers cut off by a display out of memory); the display keeps its pairing (server 0.3.3) |
-| **401** | unknown device or wrong key; the device was removed and returns to pairing mode (firmware 0.3.3: after three 401 answers in a row) |
+| **401** | unknown device or wrong key; the device was removed and returns to pairing mode (firmware 0.3.3: after three 401 answers in an unbroken row; any other answer or a failed connection starts the count again) |
 
 The endpoint exists only on the public port. Unknown identifiers and wrong keys get the same **401**; the log and firmware endpoints answer a missing or malformed key with **400** as well. The IP allowlist of `/api/v1/usage` does not apply; the device key is the authorization. The device uses the poll interval from the latest `X-VibeDock-Poll-Seconds` (10–3600 s, default 30, *Fallback poll interval* in the administration UI); current firmware pulls when `X-VibeDock-Next-Pull` says instead (section 3h) and uses the poll interval only as a fallback. While a display shows a slideshow, it gets the time of one photo when that is shorter (at least 10 s). In a slideshow, a swipe (section 3d) shows the next or previous photo instead of changing the colour scheme.
 
