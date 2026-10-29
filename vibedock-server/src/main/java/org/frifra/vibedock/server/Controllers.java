@@ -38,6 +38,8 @@ class Controllers {
     @org.springframework.beans.factory.annotation.Value("${vibedock.admin-auth:password}") private String auth;
     /** Without sign-in (ADMIN_AUTH=none) the login page, e.g. a bookmark or after "Sign out", leads to the administration. */
     @GetMapping("/login") String login() { return "none".equals(auth) ? "redirect:/admin" : "login"; }
+    /** The address of the administration port alone, e.g. a bookmark, opens the overview instead of a 404 page. */
+    @GetMapping({"/","/admin/"}) String root() { return "redirect:/admin"; }
     /** Read only, authenticated bootstrap for writes from a page whose servlet session has expired. */
     @GetMapping("/admin/csrf") @ResponseBody
     Map<String,String> csrf(org.springframework.security.web.csrf.CsrfToken token){
