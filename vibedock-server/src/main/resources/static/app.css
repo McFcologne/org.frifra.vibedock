@@ -411,6 +411,8 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 .switch:has(input:disabled){opacity:.55;cursor:not-allowed}
 /* Cards side by side share their height; the footer stays at the bottom. */
 .grid-2>.client-card{align-self:stretch;display:flex;flex-direction:column}.client-card>.client-body{flex:1}
+/* Source cards of one row are equally high (a paused one has no "Updates" line); "Manage" stays at the bottom. */
+.grid-2>.card.source{align-self:stretch;display:flex;flex-direction:column}.card.source>.source-state{flex:1;align-content:start}
 /* Page changes, e.g. after posting a form, cross-fade instead of flashing; the app bar stays in place. */
 @view-transition{navigation:auto}
 ::view-transition-old(root),::view-transition-new(root){animation-duration:.12s}
