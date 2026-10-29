@@ -60,7 +60,11 @@ public class UsageService {
     private void report(SettingsStore.Account account,String status,String detail){
         report(account.label()+" ("+account.typeLabel(account.type())+")",account.id(),status,detail);
     }
+    private final Map<String,String> reasons=new ConcurrentHashMap<>();
+    /** What the provider's last answer lacked, e.g. "HTTP 401"; for the administration only, never in the API. */
+    public String reason(String id){return reasons.getOrDefault(id,"");}
     private void report(String name,String key,String status,String detail){
+        reasons.put(key,status.equals("ok")||detail==null?"":detail);
         String line=status+(detail==null||detail.isEmpty()?"":" ("+detail+")");
         if(line.equals(logged.put(key,line)))return;
         if(status.equals("ok")||status.equals("partial"))log.info("{} usage: {}",name,line);
@@ -186,7 +190,7 @@ public class UsageService {
                 else { p.failed(now); next.put(name,new Provider(e.status,previous,null,null)); }
             }
             catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
-            catch (Exception e) { p.failed(now); report(account,"upstream_error",e.toString()); next.put(name,new Provider("upstream_error",previous,null,null)); }
+            catch (Exception e) { p.failed(now); report(account,"upstream_error",e.toString()); reasons.put(name,"no answer from the provider"); next.put(name,new Provider("upstream_error",previous,null,null)); }
         }
         pace.keySet().retainAll(configuration.accounts().stream().map(SettingsStore.Account::id).toList());
         if (!configuration.equals(settings.effective())) return;

@@ -16,6 +16,10 @@
           badge.dataset.status = state.status; badge.textContent = state.badge; badge.classList.toggle('ok', state.status === 'ok');
           const figures = document.querySelector(`[data-source-figures="${badge.dataset.sourceBadge}"]`);
           if (figures) figures.textContent = state.figures;
+          // Overview: the reason alone; data sources page: its "Data" line.
+          const reason = document.querySelector(`[data-source-reason="${badge.dataset.sourceBadge}"]`);
+          if (reason) reason.textContent = reason.classList.contains('source-reason') ? state.reason
+            : state.status === 'ok' ? 'Current usage available' : state.reason || 'Not available yet';
         }
       }
     } catch { /* try again */ }
