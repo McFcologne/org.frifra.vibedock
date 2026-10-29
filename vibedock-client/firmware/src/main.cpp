@@ -1308,10 +1308,26 @@ void installUpdate(const String &version) {
   updateProgress(1, 1); message("Update installed, restarting", Step::None); logEvent(String(F("Update to v")) + version + F(" installed"));
   diagIntent(Intent::Update); delay(800); ESP.restart();
 }
+// A parked log with repeats counted since it was parked: their count onto the last line of /log.txt, copied line by
+// line so the lines stay out of the heap. Only for the upload, which sends the file as it is.
+void storeRepeats() {
+  if (!logParked || !logRepeats) return;
+  File in = LittleFS.open("/log.txt", "r"), out = LittleFS.open("/log.tmp", "w");
+  if (!in || !out) { if (in) in.close(); if (out) out.close(); return; }
+  String last;
+  while (in.available()) {
+    String text = in.readStringUntil('\n'); if (text.isEmpty()) continue;
+    if (!last.isEmpty()) { out.print(last); out.print('\n'); }
+    last = text;
+  }
+  if (!last.isEmpty()) { out.print(withRepeats(last)); out.print('\n'); }
+  in.close(); out.close(); LittleFS.rename("/log.tmp", "/log.txt");
+}
 // Sends /log.txt to the server that asked for it (X-VibeDock-Send-Log), over the same address and TLS as the images.
 void uploadLog(const String &requestId) {
   PhaseScope sending(Phase::Log);
   saveLog();  // the file holds every line; while parked it is complete already
+  storeRepeats();  // except the count of repeats since then
   File file = LittleFS.open("/log.txt", "r");
   if (!file) return;
   uploadFile = &file; uploadRequest = requestId;
