@@ -55,8 +55,9 @@ class LayoutTest {
     @Test void defaultIsPixelIdenticalToTheFrozenRendererInEveryTheme() throws Exception {
         var before=new LegacyStatusImage("Europe/Berlin");var after=new StatusImage("Europe/Berlin");
         // The frozen renderer knows the schemes up to Classic Windows; the later ones have no earlier image.
-        for(var scheme:Scheme.values())for(int variant=0;variant<3;variant++)for(boolean weather:List.of(false,true)){
-            if(scheme.ordinal()>Scheme.CLASSIC_WINDOWS.ordinal())continue;
+        for(var scheme:ThemeCatalog.builtins().all())for(int variant=0;variant<3;variant++)for(boolean weather:List.of(false,true)){
+            if(!List.of(Scheme.MIDNIGHT,Scheme.OCEAN,Scheme.FOREST,Scheme.SUNSET,Scheme.LAVENDER,Scheme.MONO,
+                    Scheme.PAPER,Scheme.SKY,Scheme.SAND,Scheme.TERMINAL_GREEN,Scheme.TERMINAL_AMBER,Scheme.CLASSIC_MAC,Scheme.CLASSIC_WINDOWS).contains(scheme))continue;
             var oldLook=new LegacyStatusImage.Look(icon(44),scheme,weather?icon(24):null,weather?"13°":null);
             var look=new StatusImage.Look(icon(44),scheme,weather?icon(24):null,weather?"13°":null,Layout.DEFAULT);
             var expected=before.render(snapshot(variant),"192.168.1.50",oldLook);var actual=after.render(snapshot(variant),"192.168.1.50",look);
@@ -67,7 +68,7 @@ class LayoutTest {
     @Test void customLayoutsKeepTheFooterAndWirePixelsForEveryTheme() throws Exception {
         var renderer=new StatusImage("Europe/Berlin");
         var orders=List.of(List.of(0,1,2),List.of(1,0,2),List.of(2,0,1),List.of(0,2,1),List.of(1,2,0),List.of(2,1,0));
-        for(var scheme:Scheme.values())for(var order:orders)for(boolean moodLeft:List.of(false,true)){
+        for(var scheme:ThemeCatalog.builtins().all())for(var order:orders)for(boolean moodLeft:List.of(false,true)){
             var layout=layout(order,moodLeft);
             var actual=renderer.render(snapshot(0),"192.168.1.50",new StatusImage.Look(icon(44),scheme,icon(24),"13°",layout));
             assertEquals(115200,actual.rgb565().length);
@@ -91,7 +92,7 @@ class LayoutTest {
     @Test void usageBandsKeepTheirHeightWhenTheWeatherBandMovesUp() throws Exception {
         var renderer=new StatusImage("Europe/Berlin");
         var moved=new Layout(List.of(new Layout.Context(false),new Layout.Usage(List.of("codex")),new Layout.Usage(List.of("claude"))));
-        for(var scheme:Scheme.values())for(int variant=0;variant<3;variant++){
+        for(var scheme:ThemeCatalog.builtins().all())for(int variant=0;variant<3;variant++){
             // The blueprint grid and the neon horizon belong to the screen, not to a band.
             if(scheme.style==Scheme.Style.BLUEPRINT||scheme.style==Scheme.Style.NEON)continue;
             var original=renderer.render(snapshot(variant),"192.168.1.50",new StatusImage.Look(icon(44),scheme,icon(24),"13°")).rgb565();
@@ -188,7 +189,7 @@ class LayoutTest {
         var json=JsonCompatibility.mapper();
         assertEquals("{\"type\":\"usage\",\"sources\":[\"codex\"]}",json.writerFor(Layout.Band.class).writeValueAsString(u));
         assertEquals(c,json.readValue("{\"type\":\"usage\",\"sources\":[\"claude\"],\"compact\":true}",Layout.Band.class));
-        for(var type:DisplayType.INVENTORY)for(var scheme:Scheme.values()){
+        for(var type:DisplayType.INVENTORY)for(var scheme:ThemeCatalog.builtins().all()){
             var image=renderer.render(snapshot(1),"192.168.1.50",new StatusImage.Look(icon(44),scheme,icon(24),"13°",CUSTOM),type);
             assertEquals(type.width()*type.height()*2,image.rgb565().length,type.id());
             var png=javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(image.png()));

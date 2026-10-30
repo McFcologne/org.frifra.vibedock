@@ -29,3 +29,34 @@ persisted migration before its first write. A missing theme must not silently re
 The first end-to-end shareable-theme milestone is stage 5; the requested editor and new collection are complete only
 after stage 7. Stage 1 alone is not advertised as user-installable themes. The envelope description and fixture live
 in [`vibedock-server/themes/`](../../vibedock-server/themes/README.md).
+
+## Catalog migration and rendering proof (stage 2)
+
+`Scheme` is now an immutable definition with an explicit ID, rather than a Java enum. `ThemeCatalog` owns lookup,
+ordering and wraparound; appearance families no longer depend on ordinal ranges. The built-in IDs, labels, order,
+colours and drawing code remain unchanged. New in-memory catalogs can contain definitions outside the original 35;
+runtime loading and installation remain later stages.
+
+The design JSON still stores `scheme` as its original lowercase ID. Reading also accepts the former uppercase enum
+names. Availability still uses `themes.json` with `disabled` as an array of IDs and `dark` as a boolean; reading does
+not rewrite the file. Empty emoji choices and explicit emoji selections survive a design round trip. Unknown saved
+IDs continue to be rejected at this stage; installed/missing package handling is part of stage 5.
+
+`BaselineScheme`, `BaselineThemeArtwork` and `BaselineStatusImage` in the test sources freeze commit `85466a9` before
+this migration. Only class names and Spring annotations were changed in these copies. They are independent of the
+new catalog and of future drawing definitions. Do not regenerate them to make a rendering difference pass.
+
+`ThemeRenderingCompatibilityTest` compares decoded full-colour PNG pixels and RGB565 wire pixels for all 35 themes:
+eight panel sizes, six combinations of data/layout/icons/battery state, plus fractional and fitted-browser scales
+(1,750 comparisons). This includes limited, incomplete and absent quota data, split and compact bands, a moved context
+band and top alignment. Both sides use the same JVM, fonts and versioned Twemoji assets, avoiding platform-specific
+golden-image differences. Existing orientation tests continue to cover device rotation separately.
+
+Run the comparison from `vibedock-server/` using Java 21:
+
+```sh
+mvn -DargLine=-Djava.awt.headless=true -Dtest=ThemeRenderingCompatibilityTest,ThemeCatalogTest,ThemeSettingsTest test
+```
+
+This proof runs before and after structural changes. A successful comparison does not claim coverage of every possible
+layout or future rendering operation; expand its cases when introducing new drawing capabilities in stage 3.

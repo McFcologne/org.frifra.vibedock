@@ -132,7 +132,7 @@ class DesignService {
         if(input==null||input.layout()==null||input.mood()==null||input.scheme()==null||input.weatherLocation()==null)
             throw new IllegalArgumentException("Complete the design before saving");
         var scheme=Scheme.parse(input.scheme());
-        if(themes!=null&&!themes.enabled(scheme)&&scheme!=previous.scheme())throw new IllegalArgumentException("This theme is disabled for this instance");
+        if(themes!=null&&!themes.enabled(scheme)&&!scheme.id().equals(previous.scheme().id()))throw new IllegalArgumentException("This theme is disabled for this instance");
         input.layout().validateSources(usage.snapshot().providers().keySet());
         if(!Objects.equals(input.mood(),previous.mood()))twemoji.validate(input.mood());
         String place=input.weatherLocation().strip();
