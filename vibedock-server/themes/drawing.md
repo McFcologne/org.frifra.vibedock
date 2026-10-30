@@ -56,7 +56,7 @@ loops, file/resource requests, text commands or image commands. Icons are separa
 
 The [`minimal` example](examples/minimal/style.json) uses a faint background grid and a rounded band outline. It is
 rendered by `ThemeDefinitionTest` into `target/theme-package-example.png` without registering the theme in the live
-catalog. Upload/install and the editing UI are later stages.
+catalog. Import/export is available in administration; the visual editing UI is a later stage.
 
 ## Built-in packages and compatibility
 

@@ -88,3 +88,25 @@ choice. The theme overview shows the new defaults as samples, without changing e
 faceless IDE-style bug with six legs and a breakpoint. `ThemeIconImageTest` renders all defaults inside their actual
 themes on square and narrow panels into `target/theme-icons-*.png` for visual review. The frozen legacy pixel
 comparison remains unchanged. Firmware and the device protocol still receive rendered pixels only.
+
+## Live import/export (stage 5)
+
+The Themes section now exports deterministic, compressed `.vibetheme` archives and inspects imports before offering
+install, update or independent copy. Built-ins stay immutable. Theme definitions and all graphics are validated before
+atomic persistence; a volatile immutable instance snapshot changes only after the file replacement succeeds. There
+is no process-global installed catalog. Exact repeated imports are idempotent; other updates require a higher version.
+
+The renderer resolves each persisted ID against one current snapshot, including icon assets, so a selected theme can
+be updated without rewriting device designs or restarting. Missing IDs stay stored and temporarily render Midnight;
+disabled IDs are retained, and a missing last-enabled package temporarily exposes Midnight without changing the file.
+Used themes/fixed icons cannot be removed. Registry writes recheck new references while holding the same registry
+lock used by removal. Browser catalog refreshes preserve an in-flight design draft.
+
+Export compacts JSON and uses maximum ZIP/DEFLATE compression, retaining artwork and license bytes. The measured
+bundled example is 11,611 bytes without authoring references and 15,188 with them. Optional `authoring/agent.txt` and
+two minified schemas help a human-authorized agent develop the theme; they are inert, untrusted reference data and
+never executed. Installation drops those generated references, and export regenerates current ones. The complete
+format, endpoints, limits, data-directory layout and rollback are in the [package reference](../../vibedock-server/themes/README.md).
+
+The visual editor remains stage 6. Custom theme selection uses configuration version 4 and the same pre-theme-feature
+backup introduced in stage 4. Returning all designs to built-in themes with Emoticon restores the version-3 shape.

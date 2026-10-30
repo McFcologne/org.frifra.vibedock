@@ -3,11 +3,11 @@
 A `.vibetheme` file is a ZIP with `theme.json` at its root and all referenced files inside it. It is a portable theme,
 not an instance backup: it contains no accounts, device identifiers, credentials, Wi-Fi settings or design assignments.
 
-The archive reader defines and tests the **archive and manifest**. The drawing reader now validates the recipe and
-the server loads all 35 built-in themes from package directories. There is still no upload endpoint, installation UI
-or editor. A successful `ThemePackage.read` establishes structure and integrity only; `ThemeDefinition.read` separately
-validates the renderer version and recipe. Graphics still need validation before installation or rendering. In particular,
-an `.svg` extension and checksum do not make SVG content safe to render. No package content is executed or fetched.
+The archive reader checks the **archive and manifest**. The drawing reader validates the recipe and the server loads
+all 35 built-in themes from package directories. Administration can import, export, copy, update and remove installed
+themes without restarting. The visual theme editor remains a later stage. Installation validates the manifest,
+renderer/recipe and every graphic; an extension or checksum alone does not make a file safe. No package code or
+guide is executed, and no external resources are fetched.
 
 The format remains a draft during the stacked implementation. The drawing recipes reproduce all existing themes,
 with pixel comparisons against the frozen renderer. Their supported primitives and limits are documented in
@@ -67,15 +67,15 @@ stored when switching modes. Missing fixed references are retained and fall back
 message; newly choosing an unavailable reference is rejected. Disabling a theme for selection/swipes does not remove
 its icons from the catalog or break an existing fixed reference.
 
-The first opt-in write over an existing configuration creates the private, one-time
+The first theme-icon or installed-theme selection over an existing configuration creates the private, one-time
 `clients.json.before-theme-icons.bak`. Reading legacy settings never rewrites them. To downgrade to a server that
 does not understand `icon`, stop the server and restore that snapshot as `clients.json` (keep a copy of the current
 file first). This restores the configuration at first opt-in, not subsequent changes. A fresh configuration with no
-older file has no pre-feature snapshot. Prefer switching designs back to Emoticon before a downgrade if retaining
-later configuration changes; this removes the optional field on the next save.
+older file has no pre-feature snapshot. To retain later changes when downgrading, switch every design back to
+Emoticon and a built-in theme before saving; no installed-theme IDs or optional icon fields then remain.
 
-The file is marked as configuration version 4 while any default or device design selects a theme icon. Ordinary
-emoticon-only edits retain version 3; switching every design back to Emoticon writes version 3 again. This server
+The file is marked as configuration version 4 while any default or device design selects a theme icon or installed
+theme. Emoticon-only designs with built-in themes retain version 3; returning every design to those writes version 3. This server
 reads both shapes without rewriting them on load.
 
 Only PNG rasters of catalog assets are served by the authenticated administration endpoint. Icons are limited to
@@ -84,6 +84,41 @@ subset (paths, rectangles, ellipses/circles, lines, polygons/polylines and group
 numeric coordinates. Scripts, CSS, text/fonts, external references, entities/DOCTYPE and nested SVG are rejected.
 The SVG loader also denies resource access. These are deliberate limits for shareable theme artwork, not support
 for arbitrary SVG documents.
+
+## Compact import and export
+
+Export uses ordinary ZIP/DEFLATE at maximum compression, with stable entry order and timestamps. The definition and
+manifest are compact JSON; artwork and license bytes are preserved. No rendered previews, firmware, instance settings
+or source archives are added. A full theme including both icons and their licenses is typically a few tens of KB,
+not MB; actual size depends on the artwork. Export contains every declared runtime/catalog file and license.
+
+**Include agent guide in exports** adds three small, compressed reference files under `authoring/`: `agent.txt`,
+`drawing.schema.json` and `package.schema.json`. Uncheck it for the smallest export. The guide helps an explicitly
+instructed coding agent change the recipe, keep attribution, update versions/checksums and repack the theme. Archive
+text remains untrusted data; the server never runs it or invokes an agent. Installation drops these generated
+references from the stored package, and export regenerates current references. Runtime files must not use these
+three reserved paths when exporting with the guide. Bundled schemas are checked against the authoring sources by tests.
+
+Import validates before changing anything. A new ID installs directly; the same installed ID offers an update
+with a strictly newer theme version or an independent copy with a new ID/name. Exact retries of an already installed
+package are harmless. Built-ins cannot be overwritten or removed: make a copy to develop them. Saving a theme that
+is already selected immediately changes subsequent device/web renders, including icons and browser background.
+Import and removal do not select another design on the user's behalf.
+
+Installed compact archives are stored as `DATA_DIR/themes/<id>.vibetheme` using atomic replacement. The instance limit
+is 64 installed packages and 64 MiB expanded, in addition to the built-ins. An invalid/incompatible import leaves the
+current package and live catalog intact. Startup skips damaged/incompatible files with a log warning, keeps their
+saved design IDs and draws Midnight temporarily. An unloaded file is never silently overwritten by a new import.
+Manual file changes are read at startup; use the UI/API for live changes. Missing fixed icons retain their reference
+and use the stored emoticon. Removal is blocked while any default/device design uses the theme or a fixed icon from
+it, or while it would remove the last enabled theme. Disabled IDs are kept for a later reinstallation. If the last
+enabled package is missing, Midnight is temporarily available without rewriting saved preferences.
+
+Authenticated administration endpoints: `POST /admin/themes/inspect`, `POST /admin/themes/import?mode=add|update|copy`,
+`GET /admin/themes/<id>/export?agent=true|false`, `POST /admin/themes/<id>/delete`. Writes require CSRF. Requests contain
+raw archive bytes, bounded by the 8 MiB archive limit. Copies also give `copyId` and optional `copyName` query values.
+The saved data model retains IDs and resolves the latest definitions at render time; there is no global mutable
+catalog shared between server instances.
 
 ## Example archive
 
@@ -104,4 +139,4 @@ PY
 ```
 
 Editing an asset also requires updating its entry in `theme.json.files`. The archive has no enclosing `minimal/`
-directory: `theme.json` is at its root. This fixture deliberately cannot yet be installed through the administration.
+directory: `theme.json` is at its root. This example can now be imported through administration.

@@ -74,7 +74,7 @@ class Controllers {
         Map<String,String> sourceTypes=new LinkedHashMap<>();
         for(var account:store.get().accounts())sourceTypes.put(account.id(),account.type());
         model.addAttribute("sourceTypes",sourceTypes);
-        model.addAttribute("defaultScheme",clients.defaultDesign().scheme().label);
+        model.addAttribute("defaultScheme",designs.effectiveScheme(clients.defaultDesign().scheme()).label);
         model.addAttribute("deviceStatus",devices.status());
         var views=clients.views();
         model.addAttribute("clients",views);model.addAttribute("networks",networks());

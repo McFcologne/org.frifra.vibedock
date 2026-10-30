@@ -31,9 +31,10 @@ final class ThemePackage {
     }
     /** File arrays are private: callers cannot change bytes after their digest was checked. */
     static final class Contents {
-        private final Manifest manifest;private final Map<String,byte[]> files;
-        private Contents(Manifest manifest,Map<String,byte[]> files){this.manifest=manifest;this.files=Map.copyOf(files);}
+        private final Manifest manifest;private final Map<String,byte[]> files;private final int expanded;
+        private Contents(Manifest manifest,Map<String,byte[]> files,int expanded){this.manifest=manifest;this.files=Map.copyOf(files);this.expanded=expanded;}
         Manifest manifest(){return manifest;}
+        int expandedBytes(){return expanded;}
         Set<String> paths(){return files.keySet();}
         byte[] file(String path){var bytes=files.get(path);if(bytes==null)throw invalid("File not found: "+path);return bytes.clone();}
     }
@@ -62,7 +63,7 @@ final class ThemePackage {
         if(!entries.keySet().equals(manifest.files().keySet()))throw invalid("ZIP files must match the manifest exactly");
         for(var entry:entries.entrySet())
             if(!sha256(entry.getValue()).equals(manifest.files().get(entry.getKey())))throw invalid("Checksum mismatch: "+entry.getKey());
-        return new Contents(manifest,entries);
+        return new Contents(manifest,entries,total);
     }
 
     static Manifest manifest(byte[] bytes) throws IOException {
