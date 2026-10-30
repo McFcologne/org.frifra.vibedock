@@ -43,6 +43,17 @@ public final class Scheme {
     public static final Scheme GIT_DIFF=builtin("git_diff");
     public static final Scheme DEBUGGER=builtin("debugger");
 
+    public static final Scheme WINDOWS_XP=builtin("windows_xp");
+    public static final Scheme WINDOWS_7=builtin("windows_7");
+    public static final Scheme DOS=builtin("dos");
+    public static final Scheme NUCLEAR=builtin("nuclear");
+    public static final Scheme HALLOWEEN=builtin("halloween");
+    public static final Scheme CHRISTMAS=builtin("christmas");
+    public static final Scheme WINTER=builtin("winter");
+    public static final Scheme CYBERPUNK=builtin("cyberpunk");
+    public static final Scheme ORBITAL=builtin("orbital");
+    public static final Scheme OSCILLOSCOPE=builtin("oscilloscope");
+
     /**
      * MODERN: rounded colour bars; TERMINAL: monospaced phosphor text with ASCII bars and scan lines; MAC: 1-bit
      * windows; WINDOWS: grey bevelled windows with a navy title bar on a teal desktop; FLUENT: light rounded windows

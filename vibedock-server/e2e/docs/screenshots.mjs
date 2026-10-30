@@ -201,6 +201,9 @@ try {
     // The theme gallery below the editor gets a picture of its own (its first two rows); the editor pictures leave it out.
     const withoutThemes = () => page.addStyleTag({content: '.theme-catalog{display:none!important}'});
     await go('/admin/design'); await page.waitForTimeout(800);
+    await page.locator('#design-themes .theme-card').nth(5).scrollIntoViewIfNeeded();
+    await expect.poll(() => page.locator('#design-themes img').evaluateAll(images => images.slice(0, 10).every(img => img.complete && img.naturalWidth > 0))).toBe(true);
+    await page.evaluate(() => scrollTo({top: 0, behavior: 'instant'}));
     const catalog = await page.locator('#design-themes').boundingBox(), secondRow = await page.locator('#design-themes .theme-card').nth(5).boundingBox();
     await shot('35-theme-catalog', page, {fullPage: true, clip: {x: catalog.x, y: catalog.y, width: catalog.width, height: secondRow.y + secondRow.height - catalog.y + 16}});
     await withoutThemes(); await shot('30-display-default', page, {fullPage: true});

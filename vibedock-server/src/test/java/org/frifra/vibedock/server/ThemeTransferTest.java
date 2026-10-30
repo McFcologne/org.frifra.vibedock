@@ -30,7 +30,7 @@ class ThemeTransferTest {
         try{
             mvc.perform(admin(post("/admin/themes/inspect")).with(csrf()).content(archive)).andExpect(status().isOk()).andExpect(jsonPath("$.exists").value(false));
             mvc.perform(admin(post("/admin/themes/import")).with(csrf()).content(archive)).andExpect(status().isOk()).andExpect(jsonPath("$.id").value(id));
-            mvc.perform(admin(get("/admin/designs"))).andExpect(jsonPath("$.schemes.length()").value(36));
+            mvc.perform(admin(get("/admin/designs"))).andExpect(jsonPath("$.schemes.length()").value(ThemeCatalog.builtins().all().size()+1));
             var selected=library.snapshot().catalog().find(id).orElseThrow();registry.configureDesign(new Design(selected,"",null));
             byte[] before=designs.render(registry.defaultDesign(),"test").png();
             mvc.perform(admin(post("/admin/themes/"+id+"/delete")).with(csrf())).andExpect(status().isConflict());

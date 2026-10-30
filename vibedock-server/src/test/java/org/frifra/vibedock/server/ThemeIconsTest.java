@@ -13,7 +13,7 @@ import static org.mockito.Mockito.*;
 class ThemeIconsTest {
     private static final Design.Icon DEFAULT=new Design.Icon("theme-default",null,null);
     @Test void allCatalogIconsAreSelfContainedAndRasterizable() throws Exception {
-        assertEquals(70,ThemeIcons.catalog().size());assertEquals(35,ThemeIcons.catalog().stream().filter(ThemeIcons.Entry::themeDefault).count());
+        assertEquals(80,ThemeIcons.catalog().size());assertEquals(45,ThemeIcons.catalog().stream().filter(ThemeIcons.Entry::themeDefault).count());
         for(var icon:ThemeIcons.catalog()){
             assertTrue(ThemeIcons.png(icon.theme(),icon.id()).isPresent(),icon.theme()+"/"+icon.id());
             assertTrue(icon.image().startsWith("/admin/themes/"));

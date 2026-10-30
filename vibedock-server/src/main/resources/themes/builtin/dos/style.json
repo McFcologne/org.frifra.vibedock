@@ -1,0 +1,34 @@
+{
+  "format": "vibedock-2d",
+  "version": 1,
+  "preset": "terminal",
+  "palette": {
+    "background": "#080b12",
+    "title": "#e2e5d2",
+    "text": "#c6cbbc",
+    "muted": "#8f9b92",
+    "track": "#29372f",
+    "warning": "#f1ca68"
+  },
+  "font": "DejaVu Sans Mono",
+  "layers": {
+    "background": [],
+    "band": [
+      {
+        "op": "rect",
+        "x": 3,
+        "y": 3,
+        "width": {
+          "relative": 1,
+          "pixels": -7
+        },
+        "height": {
+          "relative": 1,
+          "pixels": -4
+        },
+        "color": "#6b7a74",
+        "fill": false
+      }
+    ]
+  }
+}

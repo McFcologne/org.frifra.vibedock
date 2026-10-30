@@ -60,7 +60,7 @@ catalog. Import/export is available in administration; the visual theme editor e
 
 ## Built-in packages and compatibility
 
-All 35 built-in directories live in `src/main/resources/themes/builtin/`. The server verifies each manifest, file
+All 45 built-in directories live in `src/main/resources/themes/builtin/`. The server verifies each manifest, file
 checksum and drawing recipe at startup. Corrupt built-in resources fail initialization rather than silently changing
 an existing design. `catalog.json` lists their original order, checked against the current catalog by tests.
 
