@@ -1,0 +1,27 @@
+{
+  "format": "org.frifra.vibedock.theme",
+  "schemaVersion": 1,
+  "id": "sky",
+  "version": "1.0.0",
+  "name": "Sky (light)",
+  "author": "VibeDock contributors; Twemoji contributors (icon)",
+  "license": "Apache-2.0 AND CC-BY-4.0",
+  "renderer": {
+    "id": "vibedock-2d",
+    "version": 1
+  },
+  "definition": "style.json",
+  "defaultIcon": "legacy",
+  "icons": [
+    {
+      "id": "legacy",
+      "label": "Existing theme illustration",
+      "file": "assets/default.svg"
+    }
+  ],
+  "files": {
+    "assets/default.svg": "68dc119e054a8660c1d0e7ee999b649be22309e050a7f68ba9458f36eb2db489",
+    "license.txt": "f6386f05a3a675d510a399984ca54bcbe1c748e4a9fb5101f8796e5a506ef4b6",
+    "style.json": "62adc077a3dc71efed768574d9357571a68b4f115d9c6dd406a504bfd2d2d208"
+  }
+}

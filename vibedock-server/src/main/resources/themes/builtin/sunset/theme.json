@@ -1,0 +1,27 @@
+{
+  "format": "org.frifra.vibedock.theme",
+  "schemaVersion": 1,
+  "id": "sunset",
+  "version": "1.0.0",
+  "name": "Sunset",
+  "author": "VibeDock contributors; Twemoji contributors (icon)",
+  "license": "Apache-2.0 AND CC-BY-4.0",
+  "renderer": {
+    "id": "vibedock-2d",
+    "version": 1
+  },
+  "definition": "style.json",
+  "defaultIcon": "legacy",
+  "icons": [
+    {
+      "id": "legacy",
+      "label": "Existing theme illustration",
+      "file": "assets/default.svg"
+    }
+  ],
+  "files": {
+    "assets/default.svg": "4fa646a4dbc10513ddeb70561789483638faf456e15186f4eb7291c5c455cbb6",
+    "license.txt": "8c39ebeb7d9f4bc6b69a8455ce4ed50da521f4e6793dda686f2bbd9ad3ebe7c9",
+    "style.json": "85af081fb816af22bd4854a9760b4c40f50002aadcba4f89d00407052f57c227"
+  }
+}

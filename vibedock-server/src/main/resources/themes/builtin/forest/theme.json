@@ -1,0 +1,27 @@
+{
+  "format": "org.frifra.vibedock.theme",
+  "schemaVersion": 1,
+  "id": "forest",
+  "version": "1.0.0",
+  "name": "Forest",
+  "author": "VibeDock contributors; Twemoji contributors (icon)",
+  "license": "Apache-2.0 AND CC-BY-4.0",
+  "renderer": {
+    "id": "vibedock-2d",
+    "version": 1
+  },
+  "definition": "style.json",
+  "defaultIcon": "legacy",
+  "icons": [
+    {
+      "id": "legacy",
+      "label": "Existing theme illustration",
+      "file": "assets/default.svg"
+    }
+  ],
+  "files": {
+    "assets/default.svg": "afd54f75d4bbb47593548f756b0ff8c4612fef66b7f8a6cfd6128b7fa28aa194",
+    "license.txt": "ef24f6e5a6fb6d682b798715bdbdc47fb40926ad8bbe46590975cfe0a2e1641b",
+    "style.json": "f28d76195e892ddd454f23a972bd17cdbe728afc370b81339e4537e245feb8a1"
+  }
+}
