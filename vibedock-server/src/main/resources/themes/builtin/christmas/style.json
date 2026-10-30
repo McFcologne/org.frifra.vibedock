@@ -3,46 +3,318 @@
   "version": 1,
   "preset": "modern",
   "palette": {
-    "background": "#102d28",
-    "title": "#f1d294",
-    "text": "#f2eddd",
-    "muted": "#b3c4b7",
-    "track": "#2e5344",
-    "warning": "#ffad93"
+    "background": "#0e3027",
+    "title": "#fff2c9",
+    "text": "#fff4dc",
+    "muted": "#c6ceb1",
+    "track": "#315343",
+    "warning": "#ffc966"
   },
   "font": "DejaVu Sans",
   "layers": {
-    "background": [],
+    "background": [
+      {
+        "op": "gradient",
+        "x": 0,
+        "y": 0,
+        "width": {
+          "relative": 1,
+          "pixels": 0
+        },
+        "height": {
+          "relative": 1,
+          "pixels": 0
+        },
+        "color": "#163f32",
+        "to": "#08281f"
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 0.1111111111111111,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.95,
+          "pixels": 0
+        },
+        "width": 2,
+        "height": 2,
+        "color": "#e6d3a5",
+        "opacity": 0.25
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 0.2222222222222222,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.84,
+          "pixels": 0
+        },
+        "width": 2,
+        "height": 2,
+        "color": "#e6d3a5",
+        "opacity": 0.25
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 0.3333333333333333,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.95,
+          "pixels": 0
+        },
+        "width": 2,
+        "height": 2,
+        "color": "#e6d3a5",
+        "opacity": 0.25
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 0.4444444444444444,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.84,
+          "pixels": 0
+        },
+        "width": 2,
+        "height": 2,
+        "color": "#e6d3a5",
+        "opacity": 0.25
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 0.5555555555555556,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.95,
+          "pixels": 0
+        },
+        "width": 2,
+        "height": 2,
+        "color": "#e6d3a5",
+        "opacity": 0.25
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 0.6666666666666666,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.84,
+          "pixels": 0
+        },
+        "width": 2,
+        "height": 2,
+        "color": "#e6d3a5",
+        "opacity": 0.25
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 0.7777777777777778,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.95,
+          "pixels": 0
+        },
+        "width": 2,
+        "height": 2,
+        "color": "#e6d3a5",
+        "opacity": 0.25
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 0.8888888888888888,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.84,
+          "pixels": 0
+        },
+        "width": 2,
+        "height": 2,
+        "color": "#e6d3a5",
+        "opacity": 0.25
+      }
+    ],
     "band": [
       {
         "op": "rect",
         "x": 3,
-        "y": 3,
+        "y": 4,
         "width": {
           "relative": 1,
           "pixels": -7
         },
         "height": {
           "relative": 1,
-          "pixels": -4
+          "pixels": -5
         },
-        "color": "#b1a373",
+        "color": "#335e44",
         "fill": false,
-        "radius": 5
+        "radius": 7
+      },
+      {
+        "op": "rect",
+        "x": 5,
+        "y": 6,
+        "width": {
+          "relative": 1,
+          "pixels": -10
+        },
+        "height": 21,
+        "color": "#902d36",
+        "radius": 4
+      },
+      {
+        "op": "gradient",
+        "x": 7,
+        "y": 7,
+        "width": {
+          "relative": 1,
+          "pixels": -14
+        },
+        "height": 8,
+        "color": "#c64c4e",
+        "to": "#a42c39",
+        "opacity": 0.85
       },
       {
         "op": "line",
         "x": 10,
-        "y": 28,
+        "y": 29,
         "width": {
           "relative": 1,
           "pixels": -20
         },
         "height": 0,
-        "color": "#b2544f",
+        "color": "#e9c577",
         "opacity": 0.7
+      },
+      {
+        "op": "line",
+        "x": 8,
+        "y": 3,
+        "width": {
+          "relative": 1,
+          "pixels": -16
+        },
+        "height": 0,
+        "color": "#bc9d5f",
+        "opacity": 0.8
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 0.1,
+          "pixels": -1.5
+        },
+        "y": 2,
+        "width": 3,
+        "height": 3,
+        "color": "#f5d06d"
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 0.2,
+          "pixels": -1.5
+        },
+        "y": 2,
+        "width": 3,
+        "height": 3,
+        "color": "#ef6965"
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 0.3,
+          "pixels": -1.5
+        },
+        "y": 2,
+        "width": 3,
+        "height": 3,
+        "color": "#91c89a"
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 0.4,
+          "pixels": -1.5
+        },
+        "y": 2,
+        "width": 3,
+        "height": 3,
+        "color": "#f5d06d"
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 0.5,
+          "pixels": -1.5
+        },
+        "y": 2,
+        "width": 3,
+        "height": 3,
+        "color": "#ef6965"
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 0.6,
+          "pixels": -1.5
+        },
+        "y": 2,
+        "width": 3,
+        "height": 3,
+        "color": "#91c89a"
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 0.7,
+          "pixels": -1.5
+        },
+        "y": 2,
+        "width": 3,
+        "height": 3,
+        "color": "#f5d06d"
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 0.8,
+          "pixels": -1.5
+        },
+        "y": 2,
+        "width": 3,
+        "height": 3,
+        "color": "#ef6965"
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 0.9,
+          "pixels": -1.5
+        },
+        "y": 2,
+        "width": 3,
+        "height": 3,
+        "color": "#91c89a"
       }
     ]
   },
-  "barColor": "#d98579"
+  "barColor": "#e6c46b"
 }

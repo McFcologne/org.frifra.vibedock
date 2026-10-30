@@ -3,18 +3,18 @@
   "version": 1,
   "preset": "mission",
   "palette": {
-    "background": "#101d32",
-    "title": "#c6dbef",
-    "text": "#ecf2f7",
-    "muted": "#98afc5",
-    "track": "#29455b",
-    "warning": "#f6c67c"
+    "background": "#091523",
+    "title": "#f0e8ce",
+    "text": "#e3e8e9",
+    "muted": "#9aafba",
+    "track": "#2b4254",
+    "warning": "#f7bc65"
   },
   "font": "DejaVu Sans Mono",
   "layers": {
     "background": [
       {
-        "op": "grid",
+        "op": "gradient",
         "x": 0,
         "y": 0,
         "width": {
@@ -25,12 +25,156 @@
           "relative": 1,
           "pixels": 0
         },
-        "color": "#5185a8",
-        "step": 24,
-        "opacity": 0.08
+        "color": "#102235",
+        "to": "#050f1b"
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 1,
+          "pixels": -55
+        },
+        "y": {
+          "relative": 1,
+          "pixels": -52
+        },
+        "width": 52,
+        "height": 30,
+        "color": "#98876b",
+        "fill": false,
+        "opacity": 0.22
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 0.06,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.8,
+          "pixels": 0
+        },
+        "width": 1,
+        "height": 1,
+        "color": "#e1dfc9",
+        "opacity": 0.6
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 0.25,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.94,
+          "pixels": 0
+        },
+        "width": 1,
+        "height": 1,
+        "color": "#e1dfc9",
+        "opacity": 0.6
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 0.42,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.86,
+          "pixels": 0
+        },
+        "width": 1,
+        "height": 1,
+        "color": "#e1dfc9",
+        "opacity": 0.6
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 0.64,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.98,
+          "pixels": 0
+        },
+        "width": 1,
+        "height": 1,
+        "color": "#e1dfc9",
+        "opacity": 0.6
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 0.8,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.76,
+          "pixels": 0
+        },
+        "width": 1,
+        "height": 1,
+        "color": "#e1dfc9",
+        "opacity": 0.6
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 0.92,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.91,
+          "pixels": 0
+        },
+        "width": 1,
+        "height": 1,
+        "color": "#e1dfc9",
+        "opacity": 0.6
       }
     ],
     "band": [
+      {
+        "op": "rect",
+        "x": 4,
+        "y": 3,
+        "width": {
+          "relative": 1,
+          "pixels": -8
+        },
+        "height": {
+          "relative": 1,
+          "pixels": -5
+        },
+        "color": "#112235",
+        "radius": 2
+      },
+      {
+        "op": "rect",
+        "x": 4,
+        "y": 3,
+        "width": {
+          "relative": 1,
+          "pixels": -9
+        },
+        "height": {
+          "relative": 1,
+          "pixels": -6
+        },
+        "color": "#3c5364",
+        "fill": false,
+        "radius": 2
+      },
+      {
+        "op": "rect",
+        "x": 4,
+        "y": 5,
+        "width": 2,
+        "height": 14,
+        "color": "#ddbc79"
+      },
       {
         "op": "line",
         "x": 10,
@@ -40,10 +184,31 @@
           "pixels": -20
         },
         "height": 0,
-        "color": "#688aa4",
-        "opacity": 0.5
+        "color": "#385063"
+      },
+      {
+        "op": "line",
+        "x": {
+          "relative": 1,
+          "pixels": -25
+        },
+        "y": 4,
+        "width": 16,
+        "height": 0,
+        "color": "#ddbc79"
+      },
+      {
+        "op": "line",
+        "x": {
+          "relative": 1,
+          "pixels": -9
+        },
+        "y": 4,
+        "width": 0,
+        "height": 10,
+        "color": "#ddbc79"
       }
     ]
   },
-  "barColor": "#78c9df"
+  "barColor": "#ddbc79"
 }
