@@ -91,4 +91,16 @@ class ThemeTransferTest {
                 .andExpect(status().isBadRequest());
         mvc.perform(admin(post("/admin/theme-editor/preview.png")).with(csrf()).param("display","huge-unknown").content(body)).andExpect(status().isBadRequest());
     }
+
+    @Test void editorUploadReturnsOnlyStaticPngAndRequiresCsrf() throws Exception {
+        byte[] svg="<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\"><script>alert(1)</script><rect width=\"48\" height=\"48\" fill=\"#ff0000\"/></svg>".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] body=mvc.perform(admin(post("/admin/theme-editor/icon")).param("format","svg").with(csrf()).content(svg))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.file").value("icon.png"))
+                .andExpect(jsonPath("$.removed").value(1)).andReturn().getResponse().getContentAsByteArray();
+        var json=new tools.jackson.databind.json.JsonMapper();byte[] png=Base64.getDecoder().decode(json.readTree(body).get("data").textValue());
+        assertEquals(0xff0000,ThemeIconAsset.draw("icon.png",png,48).getRGB(24,24)&0xffffff);
+        mvc.perform(admin(post("/admin/theme-editor/icon")).param("format","svg").content(svg)).andExpect(status().isForbidden());
+        mvc.perform(admin(post("/admin/theme-editor/icon")).param("format","svg").with(csrf()).content(new byte[ThemeIconAsset.MAX_BYTES+1])).andExpect(status().isBadRequest());
+        mvc.perform(post("/admin/theme-editor/icon").param("format","svg").with(user("admin").roles("ADMIN")).with(csrf()).content(svg).with(r->{r.setLocalPort(10002);return r;})).andExpect(status().isNotFound());
+    }
 }

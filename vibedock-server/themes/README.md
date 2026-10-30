@@ -81,7 +81,7 @@ reads both shapes without rewriting them on load.
 Only PNG rasters of catalog assets are served by the authenticated administration endpoint. Icons are limited to
 128 KiB and rasterized to at most 512×512. PNG sources are at most 1024×1024. SVG uses a small namespace-aware shape
 subset (paths, rectangles, ellipses/circles, lines, polygons/polylines and groups), at most 2048 XML nodes and bounded
-numeric coordinates. Scripts, CSS, text/fonts, external references, entities/DOCTYPE and nested SVG are rejected.
+numeric coordinates. Scripts, stylesheets, text/fonts, external references, entities/DOCTYPE and nested SVG are rejected. Literal inline presentation styles (fill, stroke, color and opacity), currentColor and empty definitions are supported.
 The SVG loader also denies resource access. These are deliberate limits for shareable theme artwork, not support
 for arbitrary SVG documents.
 
@@ -165,3 +165,11 @@ The admin-only editor endpoints are `GET /admin/themes/{id}/edit`, `GET /admin/t
 `POST /admin/theme-editor/preview.png?display=<panel-id>`, `POST /admin/theme-editor/export?agent=true|false`
 and `POST /admin/theme-editor/save`. Writes require the existing CSRF token. JSON drafts are bounded to 12 MiB
 before binding (including base64 artwork); all existing package/graphic/renderer limits also apply.
+
+
+Editor SVG uploads are explicitly cleaned and converted to static PNGs before entering a draft. Unsupported elements,
+attributes and style declarations are removed; literal presentation styles are flattened. Scripts, animation, fonts,
+references and external resources never reach the rasterizer. The UI reports removed items and asks for preview
+review because details can change. XML with entities/DOCTYPE, oversized files and graphics with no visible static
+shapes are rejected. This cleanup does not silently modify imported theme archives: package import stays strict.
+The default icon is shown first in the editor; optional alternatives sit under **Additional catalog icons**.

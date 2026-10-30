@@ -105,7 +105,8 @@ final class ThemeLibrary {
             var contents=ThemePackage.read(bytes);var definition=ThemeDefinition.read(contents);
             for(String path:contents.paths())if(path.endsWith(".png")||path.endsWith(".svg")){
                 try{ThemeIconAsset.draw(path,contents.file(path),Twemoji.SIZE);}
-                catch(Exception e){throw new IllegalArgumentException("Unsupported theme graphic: "+path);}
+                catch(Exception e){String reason=e instanceof IllegalArgumentException?e.getMessage():"Invalid or unreadable image";
+                    throw new IllegalArgumentException("Unsupported theme graphic: "+path+" ("+reason+")",e);}
             }
             var m=contents.manifest();return new Item(contents,new Scheme(m.id(),m.name(),definition),false);
         }catch(IOException|tools.jackson.core.JacksonException e){throw new IllegalArgumentException("Could not read the theme archive or definition",e);}

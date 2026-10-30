@@ -100,4 +100,21 @@ class ThemeIconsTest {
         assertThrows(Exception.class,()->ThemeIconAsset.draw("icon.png",PhotoTest.png(1025,1,0),44));
         assertThrows(Exception.class,()->ThemeIconAsset.draw("icon.png","not an image".getBytes(StandardCharsets.UTF_8),44));
     }
+
+    @Test void literalPresentationStylesCurrentColorAndEmptyDefsRender() throws Exception {
+        String svg="<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" color=\"#ffffff\"><defs/><path d=\"M4 4 L44 4 L44 44 L4 44 Z\" fill=\"none\" stroke=\"currentColor\" style=\"stroke-width: 2px;\"/></svg>";
+        var image=ThemeIconAsset.draw("icon.svg",svg.getBytes(StandardCharsets.UTF_8),48);
+        assertEquals(0xffffff,image.getRGB(4,24)&0xffffff);assertTrue((image.getRGB(4,24)>>>24)>0);
+        assertThrows(Exception.class,()->ThemeIconAsset.draw("icon.svg",svg.replace("stroke-width: 2px;","fill: url(https://example.com/x);").getBytes(StandardCharsets.UTF_8),48));
+    }
+    @Test void editorSvgCleanupKeepsStaticShapesAndDropsActiveAndExternalContent() throws Exception {
+        String svg="<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\"><defs/><script>alert(1)</script><image href=\"https://example.com/x\"/><rect x=\"4\" y=\"4\" width=\"40\" height=\"40\" onclick=\"alert(2)\" style=\"fill:#ff0000;stroke-width:2px;filter:url(https://example.com/y)\"/></svg>";
+        var result=ThemeIconAsset.staticSvg(svg.getBytes(StandardCharsets.UTF_8));assertTrue(result.removed()>=5);
+        assertEquals(0xff0000,ThemeIconAsset.draw("icon.png",result.png(),48).getRGB(24,24)&0xffffff);
+        assertTrue(result.png().length<ThemeIconAsset.MAX_BYTES);
+        String deep="<svg xmlns=\"http://www.w3.org/2000/svg\">"+"<g>".repeat(70)+"<rect width=\"48\" height=\"48\"/>"+"</g>".repeat(70)+"</svg>";
+        assertThrows(Exception.class,()->ThemeIconAsset.staticSvg(deep.getBytes(StandardCharsets.UTF_8)));
+        assertThrows(Exception.class,()->ThemeIconAsset.staticSvg("<svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>".getBytes(StandardCharsets.UTF_8)));
+        assertThrows(Exception.class,()->ThemeIconAsset.staticSvg("<!DOCTYPE svg [<!ENTITY x SYSTEM 'file:///etc/hosts'>]><svg xmlns=\"http://www.w3.org/2000/svg\">&x;</svg>".getBytes(StandardCharsets.UTF_8)));
+    }
 }

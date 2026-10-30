@@ -768,8 +768,10 @@ unchanged. For an installed theme, **Edit theme** prepares a newer version; **Cr
 3. Add borders, shapes, grids or gradients under **Decorations and borders**. Each layer is behind the content;
    positions/sizes combine percentages of the image or usage band with pixel offsets. Order, opacity and corner
    radius are adjustable. Existing decorations stay unchanged unless you edit them.
-4. Choose the theme's default icon or upload PNG / safe SVG artwork. **Replace artwork** changes an icon, while
-   **Add icon** extends its catalog. Selecting the radio button previews that icon as the theme default. Existing
+4. The **Default theme icon** is the one shown by Theme default. **Additional catalog icons** contains optional
+   alternatives, including a preserved legacy illustration. **Replace artwork** changes an icon; **Add icon** extends
+   its catalog. Upload PNG / SVG up to 128 KiB. SVGs are cleaned and converted to static PNGs; a removal notice means
+   details may have changed, so check the preview. XML entities and graphics with no static shapes are rejected. Selecting the radio button previews that icon as the theme default. Existing
    Emoticon selections on devices are unaffected; users can select Theme default or a fixed Theme catalog icon.
 5. Check **Preview** for the desired panel size. It uses sample readings and the actual device renderer.
 6. **Save theme** installs the new theme or updates an installed one. It does not select it for a device; return to

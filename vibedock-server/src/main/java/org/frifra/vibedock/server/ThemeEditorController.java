@@ -40,6 +40,17 @@ final class ThemeEditorController {
         return ResponseEntity.ok().contentType(MediaType.parseMediaType("application/zip")).cacheControl(CacheControl.noStore())
                 .header(HttpHeaders.CONTENT_DISPOSITION,ContentDisposition.attachment().filename(input.id()+".vibetheme").build().toString()).body(bytes);
     }
+    @PostMapping("/admin/theme-editor/icon") @ResponseBody Map<String,Object> icon(HttpServletRequest request,@RequestParam String format) throws IOException {
+        byte[] bytes;try(var in=request.getInputStream()){bytes=in.readNBytes(ThemeIconAsset.MAX_BYTES+1);}
+        if(bytes.length==0||bytes.length>ThemeIconAsset.MAX_BYTES)throw new IllegalArgumentException("Choose an icon of at most 128 KiB");
+        try{
+            int removed=0;
+            if("svg".equals(format)){var converted=ThemeIconAsset.staticSvg(bytes);bytes=converted.png();removed=converted.removed();}
+            else if("png".equals(format))ThemeIconAsset.draw("icon.png",bytes,Twemoji.SIZE);
+            else throw new IllegalArgumentException("Choose PNG or SVG artwork");
+            return Map.of("file","icon.png","data",Base64.getEncoder().encodeToString(bytes),"removed",removed,"converted","svg".equals(format));
+        }catch(IllegalArgumentException e){throw e;}catch(Exception e){throw new IllegalArgumentException("Could not read a static SVG or PNG image");}
+    }
     @PostMapping("/admin/theme-editor/save") @ResponseBody Map<String,String> save(HttpServletRequest request) throws IOException {
         var item=editor.save(draft(request));poke.pullNow(registry.all());
         return Map.of("id",item.scheme().id(),"name",item.scheme().label,"version",item.contents().manifest().version());

@@ -30,16 +30,21 @@ test('customize opens a separate editor and an exported draft installs only afte
 });
 
 test('uploaded icons can become the default; unsafe graphics cannot be saved',async({page,app})=>{
-  await open(page,app,'blueprint');await page.locator('#te-id').fill('browser.icons');
+  await open(page,app,'blueprint');await expect(page.locator('.te-icon:visible')).toHaveCount(1);await expect(page.locator('#te-icons > details')).not.toHaveAttribute('open','');await page.locator('#te-id').fill('browser.icons');
+  await page.locator('#te-icons').screenshot({path:'test-results/theme-icon-editor.png'});
   const svg=Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" fill="#ff0000"/></svg>');
   await page.locator('#te-icon-add').setInputFiles({name:'dot.svg',mimeType:'image/svg+xml',buffer:svg});
-  const row=page.locator('.te-icon').last();await row.getByLabel('Theme default').check();
+  const row=page.locator('.te-icon').filter({has:page.getByRole('img',{name:'dot.svg',exact:true})});await row.getByLabel('Theme default').check();
+  await expect(page.locator('#te-upload-status')).toContainText('SVG converted to a static PNG');
   await expect(page.locator('#te-status')).toHaveText('Current draft · device renderer');
   await page.locator('#te-save').click();await expect(page.locator('#te-saved')).toContainText('v1.0.0 saved');
   const bad=Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
-  await page.locator('.te-icon').last().locator('input[type=file]').setInputFiles({name:'bad.svg',mimeType:'image/svg+xml',buffer:bad});
-  await expect(page.locator('#te-error')).toContainText('Unsupported theme graphic');await expect(page.locator('#te-image')).toBeHidden();
-  await page.locator('#te-save').click();await expect(page.locator('#te-error')).toContainText('Unsupported theme graphic');
+  await page.locator('.te-icon').first().locator('input[type=file]').setInputFiles({name:'bad.svg',mimeType:'image/svg+xml',buffer:bad});
+  await expect(page.locator('#te-error')).toContainText('No visible static shapes');
+  const sanitized=Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><script>alert(1)</script><rect width="48" height="48" fill="#00ff00"/></svg>');
+  await page.locator('.te-icon').first().locator('input[type=file]').setInputFiles({name:'static.svg',mimeType:'image/svg+xml',buffer:sanitized});
+  await expect(page.locator('#te-upload-status')).toContainText('unsupported items removed');
+  await expect(page.locator('#te-status')).toHaveText('Current draft · device renderer');
   expect((await installed(page,'browser.icons')).version).toBe('1.0.0');
 });
 

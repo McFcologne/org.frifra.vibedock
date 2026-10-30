@@ -42,10 +42,10 @@ final class ThemeEditor {
             if(icon==null)throw new IllegalArgumentException("Choose a theme icon");
             String file=icon.file();
             if(icon.data()!=null){
-                if(file==null||!(file.endsWith(".png")||file.endsWith(".svg"))||icon.data().length()>2_800_000)
-                    throw new IllegalArgumentException("Choose a PNG or safe SVG of at most 2 MiB");
+                if(file==null||!(file.endsWith(".png")||file.endsWith(".svg"))||icon.data().length()>4*((ThemeIconAsset.MAX_BYTES+2)/3))
+                    throw new IllegalArgumentException("Choose a PNG or safe SVG of at most 128 KiB");
                 byte[] bytes;try{bytes=Base64.getDecoder().decode(icon.data());}catch(IllegalArgumentException e){throw new IllegalArgumentException("Invalid icon data");}
-                if(bytes.length>ThemePackage.MAX_FILE)throw new IllegalArgumentException("Choose an icon of at most 2 MiB");
+                if(bytes.length>ThemeIconAsset.MAX_BYTES)throw new IllegalArgumentException("Choose an icon of at most 128 KiB");
                 file="assets/editor-"+ThemePackage.sha256(bytes)+(file.endsWith(".svg")?".svg":".png");artwork.put(file,bytes);
             }else if(m.icons().stream().noneMatch(i->i.file().equals(icon.file())))throw new IllegalArgumentException("Choose an existing icon file or upload an image");
             icons.add(new ThemePackage.Icon(icon.id(),icon.label(),file));
