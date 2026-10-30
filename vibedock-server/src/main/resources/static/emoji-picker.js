@@ -44,8 +44,17 @@
     b.classList.remove('inherited'); b.replaceChildren();
     if (value === '' && b.dataset.allowDefault) { b.classList.add('inherited'); file = b.dataset.defaultFile; value = file ? 'default' : '-'; }
     if (value === '-' || !value) { const n = document.createElement('span'); n.className = 'none'; n.textContent = 'none'; b.append(n); return; }
-    if (file) { const img = document.createElement('img'); img.src = images + file + '.png'; img.alt = value; b.append(img); }
-    else b.textContent = value;
+    // Saved designs only carry the Unicode identifier. Resolve the bundled asset exactly as Twemoji.fileNames does.
+    const points=Array.from(value.trim()).map(c=>c.codePointAt(0));
+    const full=points.map(c=>c.toString(16)).join('-'),plain=points.filter(c=>c!==0xfe0f).map(c=>c.toString(16)).join('-');
+    const candidates=file?[file]:[...new Set(points.includes(0x200d)?[full,plain]:[plain,full])];
+    const img=document.createElement('img');img.alt='Selected emoticon';let index=0;
+    img.addEventListener('error',()=>{
+      if(!b.contains(img))return; // A response from a previous selection must not replace the current one.
+      if(++index<candidates.length){img.src=images+candidates[index]+'.png';return;}
+      const unavailable=document.createElement('span');unavailable.className='none';unavailable.textContent='Unavailable';b.replaceChildren(unavailable);
+    });
+    img.src=images+candidates[0]+'.png';b.append(img);
   };
   let opener = null;
   document.querySelectorAll('[data-emoji-open]').forEach(b => {
