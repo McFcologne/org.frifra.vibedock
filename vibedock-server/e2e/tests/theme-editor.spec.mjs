@@ -34,7 +34,7 @@ test('uploaded icons can become the default; unsafe graphics cannot be saved',as
   await page.locator('#te-icons').screenshot({path:'test-results/theme-icon-editor.png'});
   const svg=Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" fill="#ff0000"/></svg>');
   await page.locator('#te-icon-add').setInputFiles({name:'dot.svg',mimeType:'image/svg+xml',buffer:svg});
-  const row=page.locator('.te-icon').filter({has:page.getByRole('img',{name:'dot.svg',exact:true})});await row.getByLabel('Theme default').check();
+  const row=page.locator('.te-icon').filter({has:page.getByRole('img',{name:'dot.svg',exact:true})});await row.getByLabel('Creator',{exact:true}).fill('Test artist');await row.getByLabel('Theme default').check();
   await expect(page.locator('#te-upload-status')).toContainText('SVG cleaned; vector format retained');
   await expect(page.locator('#te-status')).toHaveText('Current draft · device renderer');
   await page.locator('#te-save').click();await expect(page.locator('#te-saved')).toContainText('v1.0.0 saved');
@@ -43,7 +43,7 @@ test('uploaded icons can become the default; unsafe graphics cannot be saved',as
   await expect(page.locator('#te-error')).toContainText('No visible static shapes');
   const sanitized=Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><script>alert(1)</script><rect width="48" height="48" fill="#00ff00"/></svg>');
   await page.locator('.te-icon').first().locator('input[type=file]').setInputFiles({name:'static.svg',mimeType:'image/svg+xml',buffer:sanitized});
-  await expect(page.locator('#te-upload-status')).toContainText('unsupported items removed');
+  await expect(page.locator('#te-upload-status')).toContainText('unsupported items removed');await page.locator('.te-icon').first().getByLabel('Creator',{exact:true}).fill('Test artist');
   await expect(page.locator('#te-status')).toHaveText('Current draft · device renderer');
   expect((await installed(page,'browser.icons')).version).toBe('1.0.0');
 });
@@ -92,7 +92,7 @@ test('transparent single-color PNG can be recolored, reset and exported with a s
   const base64=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=c.height=8;const g=c.getContext('2d');g.fillStyle='#000000';g.fillRect(2,2,4,4);return c.toDataURL('image/png').split(',')[1];});
   await page.locator('#te-icon-add').setInputFiles({name:'mark.png',mimeType:'image/png',buffer:Buffer.from(base64,'base64')});
   const row=page.locator('.te-icon').filter({has:page.getByRole('img',{name:'mark.png',exact:true})});
-  await row.getByLabel('Theme default').check();await expect(row.getByLabel('Override main color')).toBeEnabled();
+  await row.getByLabel('Creator',{exact:true}).fill('Test artist');await row.getByLabel('Theme default').check();await expect(row.getByLabel('Override main color')).toBeEnabled();
   await row.getByLabel('Override main color').check();
   await row.getByLabel('PNG main color').fill('#00ff00');await row.getByLabel('PNG main color').dispatchEvent('change');
   await expect(row.getByLabel('PNG main color')).toHaveValue('#00ff00');

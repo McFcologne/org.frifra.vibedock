@@ -12,6 +12,7 @@ class ThemeEditorTest {
     private static final JsonMapper JSON=new JsonMapper();
     static ThemeEditor.Draft edit(ThemeEditor.Draft draft,Map<String,Object> changes){
         var node=JSON.valueToTree(draft);changes.forEach((key,value)->((tools.jackson.databind.node.ObjectNode)node).set(key,JSON.valueToTree(value)));
+        if(changes.containsKey("icons"))for(var icon:node.get("icons"))if(!icon.hasNonNull("author"))((tools.jackson.databind.node.ObjectNode)icon).put("author","Test artist");
         return JSON.treeToValue(node,ThemeEditor.Draft.class);
     }
     @Test void everyBuiltInBecomesALosslessIndependentDraftWithoutInstallation() throws Exception {
@@ -20,7 +21,9 @@ class ThemeEditorTest {
             var state=editor.open(original.scheme().id(),false);var d=state.draft();assertNotEquals(d.id(),d.sourceId());assertTrue(state.builtin());
             var copy=ThemePackage.read(editor.archive(d,false));var source=original.contents();
             assertEquals(ThemeDefinition.read(source),ThemeDefinition.read(copy));
-            assertEquals(source.manifest().icons(),copy.manifest().icons());assertEquals(source.manifest().defaultIcon(),copy.manifest().defaultIcon());
+            assertEquals(source.manifest().icons().stream().map(i->List.of(i.id(),i.label(),i.file())).toList(),
+                    copy.manifest().icons().stream().map(i->List.of(i.id(),i.label(),i.file())).toList());
+            assertTrue(copy.manifest().icons().stream().allMatch(i->i.author()!=null));assertEquals(source.manifest().defaultIcon(),copy.manifest().defaultIcon());
             for(String file:source.paths())if(!file.endsWith(".json"))assertArrayEquals(source.file(file),copy.file(file),file);
         }
         assertEquals(35,library.snapshot().items().size());assertFalse(Files.exists(directory.resolve("themes")));
@@ -64,7 +67,8 @@ class ThemeEditorTest {
         var replacement=new ThemeEditor.Icon("dot","Dot","upload.svg",Base64.getEncoder().encodeToString("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\"><circle cx=\"24\" cy=\"24\" r=\"20\" fill=\"#00ff00\"/></svg>".getBytes()));
         var saved=editor.save(edit(next,Map.of("icons",List.of(replacement)))).contents();
         assertEquals(1,saved.paths().stream().filter(path->path.startsWith("assets/editor-")).count());
-        assertArrayEquals(BuiltinThemes.get("midnight").contents().file("license.txt"),saved.file("license.txt"));
+        assertFalse(new String(saved.file("license.txt")).contains("Twemoji"));
+        assertTrue(new String(saved.file("credits.txt")).contains("Test artist"));
         assertFalse(saved.paths().contains("assets/theme.svg"),"replaced source artwork is omitted");
         assertFalse(saved.paths().contains("assets/default.svg"),"an undeclared legacy alternative is omitted");
         var exported=ThemePackage.read(library.export("editor.art",false));

@@ -20,6 +20,7 @@ final class ThemeArchive {
     static byte[] edited(ThemePackage.Contents source,ThemePackage.Manifest manifest,byte[] drawing,Map<String,byte[]> artwork,boolean guide) throws IOException {
         var files=new TreeMap<String,byte[]>();
         for(var path:source.paths())files.put(path,source.file(path));
+        if(ThemeCredits.generatedCredits(source))files.remove("credits.txt");
         files.put(manifest.definition(),drawing);files.putAll(artwork);
         var referenced=new HashSet<String>();manifest.icons().forEach(i->referenced.add(i.file()));referenced.add(manifest.definition());
         files.keySet().removeIf(path->path.matches("assets/editor-[0-9a-f]{64}\\.(png|svg)")&&!referenced.contains(path));
@@ -30,6 +31,9 @@ final class ThemeArchive {
         var manifest=new ThemePackage.Manifest(m.id(),m.version(),m.name(),m.author(),m.license(),m.renderer(),m.definition(),m.defaultIcon(),m.icons(),path,m.files());
         var files=new TreeMap<String,byte[]>();for(String name:source.paths())files.put(name,source.file(name));
         files.put(path,png);files.put(ThemePreviewPage.FILE,new byte[0]);return encode(manifest,files,guide,null,null);
+    }
+    static byte[] rebuild(ThemePackage.Manifest manifest,Map<String,byte[]> files) throws IOException {
+        return encode(manifest,new TreeMap<>(files),files.containsKey("authoring/agent.txt"),null,null);
     }
     private static byte[] encode(ThemePackage.Manifest manifest,TreeMap<String,byte[]> files,boolean guide,String copyId,String copyName) throws IOException {
         var runtime=new HashSet<String>();runtime.add(manifest.definition());if(manifest.preview()!=null)runtime.add(manifest.preview());

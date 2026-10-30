@@ -36,7 +36,7 @@ class ThemeTransferController {
         return Map.of("id",installed.scheme().id(),"name",installed.scheme().label,"version",installed.contents().manifest().version());
     }
     @GetMapping("/admin/themes/{id}/export") ResponseEntity<byte[]> export(@PathVariable String id,@RequestParam(defaultValue="true") boolean agent) throws IOException {
-        var contents=ThemePackage.read(library.export(id,agent));byte[] bytes=ThemeArchive.preview(contents,designs.themePreview(contents,DisplayType.M1),agent);
+        var contents=ThemeCredits.prepare(ThemePackage.read(library.export(id,agent)),true);byte[] bytes=ThemeArchive.preview(contents,designs.themeExportPreview(contents,DisplayType.M1),agent);
         return ResponseEntity.ok().contentType(MediaType.parseMediaType("application/zip"))
                 .cacheControl(CacheControl.noStore()).header(HttpHeaders.CONTENT_DISPOSITION,ContentDisposition.attachment().filename(id+".vibetheme").build().toString()).body(bytes);
     }

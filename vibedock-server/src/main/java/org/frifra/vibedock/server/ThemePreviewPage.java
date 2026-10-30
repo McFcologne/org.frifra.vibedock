@@ -20,7 +20,7 @@ final class ThemePreviewPage {
         if(m.preview()!=null)out.append("<h2>Display preview</h2><figure><img src=\"").append(escape(m.preview())).append("\" alt=\"Theme rendered with sample readings\"/><figcaption>Actual VibeDock renderer · sample readings</figcaption></figure>");
         out.append("<h2>Included icons</h2><section>");
         for(var icon:m.icons())out.append("<figure class=\"icon\"><img src=\"").append(escape(icon.file())).append("\" alt=\"").append(escape(icon.label())).append("\"/><figcaption>")
-                .append(escape(icon.label())).append(icon.id().equals(m.defaultIcon())?" · default":" · catalog alternative").append("<p><code>").append(escape(icon.file())).append("</code></p></figcaption></figure>");
+                .append(escape(icon.label())).append(icon.id().equals(m.defaultIcon())?" · default":" · catalog alternative").append("<p>Creator: ").append(escape(icon.author()==null?"Not specified":icon.author())).append("</p><p>License: ").append(escape(icon.license()==null?"Not specified":icon.license())).append("</p><p><code>").append(escape(icon.file())).append("</code></p></figcaption></figure>");
         out.append("</section><p>Author: ").append(escape(m.author())).append("</p><p>License: ").append(escape(m.license())).append(". See the included license notices.</p></main></body></html>");
         return out.toString().getBytes(StandardCharsets.UTF_8);
     }

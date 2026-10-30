@@ -36,8 +36,8 @@ final class ThemeEditorController {
         return ResponseEntity.ok().contentType(MediaType.IMAGE_PNG).cacheControl(CacheControl.noStore()).body(designs.themePreview(contents,type));
     }
     @PostMapping("/admin/theme-editor/export") @ResponseBody ResponseEntity<byte[]> export(HttpServletRequest request,@RequestParam(defaultValue="true") boolean agent) throws IOException {
-        var input=draft(request);var contents=ThemePackage.read(editor.archive(input,agent));
-        byte[] bytes=ThemeArchive.preview(contents,designs.themePreview(contents,DisplayType.M1),agent);
+        var input=draft(request);var contents=ThemeCredits.prepare(ThemePackage.read(editor.archive(input,agent)),true);
+        byte[] bytes=ThemeArchive.preview(contents,designs.themeExportPreview(contents,DisplayType.M1),agent);
         return ResponseEntity.ok().contentType(MediaType.parseMediaType("application/zip")).cacheControl(CacheControl.noStore())
                 .header(HttpHeaders.CONTENT_DISPOSITION,ContentDisposition.attachment().filename(input.id()+".vibetheme").build().toString()).body(bytes);
     }

@@ -13,7 +13,7 @@ The included package.schema.json and drawing.schema.json are authoring reference
 The definition selects a preset plus palette/font and optional layers; it is not JavaScript or a general layout language.
 Use existing primitives; do not invent unsupported operations. Coordinates are pixels or {relative: fraction, pixels: offset}.
 Layers (background/band) have at most 32 shapes each: rect, ellipse, line, gradient or grid. Preserve low-quota warnings.
-Icons are relative PNG/SVG files; defaultIcon names one of icons[].id. Use small original artwork, with a readable
+Icon entries may include author/license. Credit the actual artist for each custom icon; never assign Twemoji merely because the package was copied from a built-in. Keep inherited contributions when modifying/recoloring their artwork. Icons are relative PNG/SVG files; defaultIcon names one of icons[].id. Use small original artwork, with a readable
 silhouette at 44 pixels. SVG must be self-contained simple shapes: no scripts, stylesheets, text/fonts, href, image, use,
 external references, entities or DOCTYPE. Literal inline fill/stroke/color/opacity styles and currentColor are supported. Icons: at most 128 KiB; PNG source at most 1024x1024. Do not fetch resources.
 

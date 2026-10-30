@@ -42,13 +42,21 @@ class DesignService {
         var m=contents.manifest();var scheme=new Scheme(m.id(),m.name(),ThemeDefinition.read(contents));
         return samplePreview(scheme,ThemeIcons.image(contents,m.defaultIcon(),Twemoji.SIZE).orElse(null),display);
     }
+    byte[] themeExportPreview(ThemePackage.Contents contents,DisplayType display) throws IOException {
+        var m=contents.manifest();var scheme=new Scheme(m.id(),m.name(),ThemeDefinition.read(contents));
+        // Export only the package's own artwork; do not silently introduce a separately licensed weather emoji.
+        return samplePreview(scheme,ThemeIcons.image(contents,m.defaultIcon(),Twemoji.SIZE).orElse(null),display,false);
+    }
     private byte[] samplePreview(Scheme scheme,java.awt.image.BufferedImage icon,DisplayType display) throws IOException {
+        return samplePreview(scheme,icon,display,true);
+    }
+    private byte[] samplePreview(Scheme scheme,java.awt.image.BufferedImage icon,DisplayType display,boolean weatherIcon) throws IOException {
         long time=java.time.Instant.parse("2026-10-14T05:12:00Z").getEpochSecond();
         var values=new java.util.LinkedHashMap<String,UsageService.Provider>();
         values.put("codex",new UsageService.Provider("ok",time,new ProviderClient.Window(0,time+5*3600),new ProviderClient.Window(22,time+6*86400)));
         values.put("claude",new UsageService.Provider("ok",time,new ProviderClient.Window(5,time+3*3600),new ProviderClient.Window(14,time+5*86400)));
         return renderer.render(new UsageService.Snapshot(1,time,values),"192.168.1.50",new StatusImage.Look(
-                icon,scheme,twemoji.image("⛅",24).orElse(null),"13°",Layout.DEFAULT),display).png();
+                icon,scheme,weatherIcon?twemoji.image("⛅",24).orElse(null):null,"13°",Layout.DEFAULT),display).png();
     }
     /**
      * What a display shows now: the current photo of its slideshow while that is active, otherwise the status.

@@ -93,11 +93,11 @@
       const converted=await response.json();if(!response.ok)throw new Error(converted.error||'Could not prepare the icon.');
       const data=converted.data;
       $('te-upload-status').textContent=converted.vector?'SVG cleaned; vector format retained'+(converted.removed?' · '+converted.removed+' unsupported items removed. Check the preview; details may have changed.':'. Check the preview.'):'PNG validated.';
-      if(existing){existing.file='uploaded.'+ext.slice(1);existing.data=data;existing.label=file.name.replace(/\.[^.]+$/,'').slice(0,80);pngSources.set(existing,Promise.resolve(converted));tints.delete(existing);}
+      if(existing){existing.file='uploaded.'+ext.slice(1);existing.data=data;existing.author='';existing.license='';existing.label=file.name.replace(/\.[^.]+$/,'').slice(0,80);pngSources.set(existing,Promise.resolve(converted));tints.delete(existing);}
       else{
         if(draft.icons.length>=32)throw new Error('A theme can have at most 32 icons.');
         let id='icon',n=1;while(draft.icons.some(i=>i.id===id))id='icon-'+n++;
-        const icon={id,label:file.name.slice(0,80),file:'uploaded.'+ext.slice(1),data};draft.icons.push(icon);pngSources.set(icon,Promise.resolve(converted));
+        const icon={id,label:file.name.slice(0,80),file:'uploaded.'+ext.slice(1),data,author:'',license:''};draft.icons.push(icon);pngSources.set(icon,Promise.resolve(converted));
       }
       busy=false;icons();changed();
     }catch(e){fail(e.message||'Could not read icon.');}finally{busy=false;controls.disabled=false;}
@@ -146,6 +146,8 @@
       const use=document.createElement('input');use.type='radio';use.name='default-icon';use.checked=draft.defaultIcon===icon.id;
       use.addEventListener('change',()=>{draft.defaultIcon=icon.id;icons();changed();});fields.append(label('Icon ID',id),label('Label',name));row.append(label('Theme default',use));
       row.prepend(el('h4',icon===chosen?'Default theme icon':'Catalog alternative'));row.append(el('p',icon.label));
+      const creator=input(icon.author||'',value=>icon.author=value);creator.maxLength=160;creator.required=true;creator.readOnly=!icon.data&&['Twemoji contributors','VibeDock contributors'].includes(icon.author);creator.title=creator.readOnly?'Source attribution stays with this artwork. Replace the file to enter a new creator.':'';row.append(label('Creator',creator));
+      const license=input(icon.license||'',value=>icon.license=value);license.maxLength=160;license.readOnly=creator.readOnly;fields.append(label('Icon license (optional)',license));
       const original=originalIcons.get(icon.file);
       if(!icon.data&&original){const image=document.createElement('img');image.src='/admin/themes/'+encodeURIComponent(draft.sourceId)+'/icons/'+encodeURIComponent(original)+'.png';image.alt=icon.label;image.width=56;image.height=56;row.append(image);}
       if(icon.data){const image=document.createElement('img');image.src='data:image/'+(icon.file.endsWith('.svg')?'svg+xml':'png')+';base64,'+icon.data;image.alt=icon.label;image.width=56;image.height=56;row.append(image);}

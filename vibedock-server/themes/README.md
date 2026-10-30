@@ -184,3 +184,18 @@ uses relative package assets and has no JavaScript or external resources. Only t
 it is validated as bounded static XHTML with fixed styles, constrained tags/attributes and a restrictive resource
 policy. Arbitrary HTML is rejected. The page is regenerated when package metadata changes. Existing packages without
 HTML remain valid. Older staged readers without this additive preview support cannot import these extended exports.
+
+
+## Icon creators and attribution
+
+Icons optionally declare `author` and `license` alongside `id`, `label` and `file`; older three-field packages remain
+readable. The editor resolves known built-in assets by their exact bytes. New custom uploads need a real creator
+before save/export; the server does not infer a creator from a file name or assign Twemoji to custom artwork.
+Recognized source contributions remain attributed when recoloring an inherited asset. Replacing artwork starts
+with an empty creator field so the uploader can enter the actual artist.
+
+Generated `credits.txt` and the offline page name each icon creator. A Twemoji catalog alternative still counts as
+included artwork, even when a custom default icon is selected. Once the last Twemoji asset is removed, its generated
+VibeDock/Twemoji notice section and combined-license marker are removed. Unknown imported license/credit texts are
+preserved. Export snapshots use the package's own icons and omit the extra weather emoji to avoid adding a separate
+Twemoji graphic implicitly. General application notices remain unchanged: the app itself still bundles Twemoji.

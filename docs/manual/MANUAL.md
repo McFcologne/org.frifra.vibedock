@@ -768,7 +768,8 @@ unchanged. For an installed theme, **Edit theme** prepares a newer version; **Cr
 3. Add borders, shapes, grids or gradients under **Decorations and borders**. Each layer is behind the content;
    positions/sizes combine percentages of the image or usage band with pixel offsets. Order, opacity and corner
    radius are adjustable. Existing decorations stay unchanged unless you edit them.
-4. The **Default theme icon** is the one shown by Theme default. **Additional catalog icons** contains optional
+4. Enter the actual **Creator** for your own uploaded artwork; its optional icon license is separate from the theme author. Twemoji attribution stays only for retained Twemoji artwork, including catalog alternatives.
+   The **Default theme icon** is the one shown by Theme default. **Additional catalog icons** contains optional
    alternatives, including a preserved legacy illustration. **Replace artwork** changes an icon; **Add icon** extends
    its catalog. Upload PNG / SVG up to 128 KiB. SVGs are cleaned and retain their vector format; a removal notice means
    details may have changed, so check the preview. XML entities and graphics with no static shapes are rejected. Selecting the radio button previews that icon as the theme default. Existing
