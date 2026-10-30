@@ -4,7 +4,7 @@ A `.vibetheme` file is a ZIP with `theme.json` at its root and all referenced fi
 not an instance backup: it contains no accounts, device identifiers, credentials, Wi-Fi settings or design assignments.
 
 The archive reader checks the **archive and manifest**. The drawing reader validates the recipe and the server loads
-all 35 built-in themes from package directories. Administration can import, export, copy, update and remove installed
+all 45 built-in themes from package directories. Administration can import, export, copy, update and remove installed
 themes without restarting. The visual theme editor is available through **Customize** / **Edit theme** on each gallery card. Installation validates the manifest,
 renderer/recipe and every graphic; an extension or checksum alone does not make a file safe. No package code or
 guide is executed, and no external resources are fetched.

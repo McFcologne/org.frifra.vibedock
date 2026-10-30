@@ -31,11 +31,11 @@ test('compressed theme exports can be copied, used and removed without restartin
 test('invalid imports and cancelling an inspected archive leave the catalog unchanged',async({page,app})=>{
   await editor(page,app);
   await page.locator('#theme-import-file').setInputFiles({name:'bad.vibetheme',mimeType:'application/zip',buffer:Buffer.from('bad archive')});
-  await expect(page.locator('#design-error')).toBeVisible();await expect(page.locator('.theme-card')).toHaveCount(35);
+  await expect(page.locator('#design-error')).toBeVisible();await expect(page.locator('.theme-card')).toHaveCount(45);
   const bytes=await exported(page,false);
   await page.locator('#theme-import-file').setInputFiles({name:'theme.vibetheme',mimeType:'application/zip',buffer:bytes});
   await expect(page.locator('#theme-import-review')).toBeVisible();await page.locator('#theme-import-cancel').click();
-  await expect(page.locator('#theme-import-review')).toBeHidden();await expect(page.locator('.theme-card')).toHaveCount(35);
+  await expect(page.locator('#theme-import-review')).toBeHidden();await expect(page.locator('.theme-card')).toHaveCount(45);
 });
 
 test('an import finishing during a pending design save does not replace that draft',async({page,app})=>{

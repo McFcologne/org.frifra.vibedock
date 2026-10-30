@@ -1,0 +1,63 @@
+{
+  "format": "vibedock-2d",
+  "version": 1,
+  "preset": "modern",
+  "palette": {
+    "background": "#17231b",
+    "title": "#e7dc58",
+    "text": "#e2e6ca",
+    "muted": "#9aa98c",
+    "track": "#354633",
+    "warning": "#f6a75c"
+  },
+  "font": "DejaVu Sans Mono",
+  "layers": {
+    "background": [
+      {
+        "op": "grid",
+        "x": 0,
+        "y": 0,
+        "width": {
+          "relative": 1,
+          "pixels": 0
+        },
+        "height": {
+          "relative": 1,
+          "pixels": 0
+        },
+        "color": "#7d9363",
+        "step": 16,
+        "opacity": 0.07
+      }
+    ],
+    "band": [
+      {
+        "op": "rect",
+        "x": 3,
+        "y": 3,
+        "width": {
+          "relative": 1,
+          "pixels": -7
+        },
+        "height": {
+          "relative": 1,
+          "pixels": -4
+        },
+        "color": "#718255",
+        "fill": false
+      },
+      {
+        "op": "rect",
+        "x": 4,
+        "y": 4,
+        "width": 3,
+        "height": {
+          "relative": 1,
+          "pixels": -9
+        },
+        "color": "#d7cb45"
+      }
+    ]
+  },
+  "barColor": "#c5d542"
+}

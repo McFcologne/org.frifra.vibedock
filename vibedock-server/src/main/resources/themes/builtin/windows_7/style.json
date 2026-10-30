@@ -1,0 +1,210 @@
+{
+  "format": "vibedock-2d",
+  "version": 1,
+  "preset": "modern",
+  "palette": {
+    "background": "#76b3d2",
+    "title": "#153651",
+    "text": "#163348",
+    "muted": "#46677d",
+    "track": "#cfdbdd",
+    "warning": "#a63038"
+  },
+  "font": "DejaVu Sans",
+  "layers": {
+    "background": [
+      {
+        "op": "gradient",
+        "x": 0,
+        "y": 0,
+        "width": {
+          "relative": 1,
+          "pixels": 0
+        },
+        "height": {
+          "relative": 1,
+          "pixels": 0
+        },
+        "color": "#2078aa",
+        "to": "#b4dfee"
+      },
+      {
+        "op": "ellipse",
+        "x": {
+          "relative": 0.25,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.55,
+          "pixels": 0
+        },
+        "width": {
+          "relative": 0.85,
+          "pixels": 0
+        },
+        "height": {
+          "relative": 0.8,
+          "pixels": 0
+        },
+        "color": "#c6f4ec",
+        "opacity": 0.3
+      },
+      {
+        "op": "line",
+        "x": {
+          "relative": 0.05,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.99,
+          "pixels": 0
+        },
+        "width": {
+          "relative": 0.95,
+          "pixels": 0
+        },
+        "height": {
+          "relative": -0.7,
+          "pixels": 0
+        },
+        "color": "#d4f8ff",
+        "opacity": 0.45
+      },
+      {
+        "op": "line",
+        "x": {
+          "relative": 0.28,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 1,
+          "pixels": 0
+        },
+        "width": {
+          "relative": 0.72,
+          "pixels": 0
+        },
+        "height": {
+          "relative": -0.42,
+          "pixels": 0
+        },
+        "color": "#ffffff",
+        "opacity": 0.3
+      }
+    ],
+    "band": [
+      {
+        "op": "rect",
+        "x": 2,
+        "y": 2,
+        "width": {
+          "relative": 1,
+          "pixels": -4
+        },
+        "height": {
+          "relative": 1,
+          "pixels": -3
+        },
+        "color": "#275a80",
+        "radius": 8
+      },
+      {
+        "op": "rect",
+        "x": 3,
+        "y": 3,
+        "width": {
+          "relative": 1,
+          "pixels": -6
+        },
+        "height": {
+          "relative": 1,
+          "pixels": -5
+        },
+        "color": "#aed3e8",
+        "radius": 7
+      },
+      {
+        "op": "gradient",
+        "x": 4,
+        "y": 4,
+        "width": {
+          "relative": 1,
+          "pixels": -8
+        },
+        "height": 25,
+        "color": "#d9f3fa",
+        "to": "#77accd"
+      },
+      {
+        "op": "gradient",
+        "x": 4,
+        "y": 4,
+        "width": {
+          "relative": 1,
+          "pixels": -8
+        },
+        "height": 10,
+        "color": "#ffffff",
+        "to": "#c6e3f0",
+        "opacity": 0.65
+      },
+      {
+        "op": "rect",
+        "x": 6,
+        "y": 28,
+        "width": {
+          "relative": 1,
+          "pixels": -12
+        },
+        "height": {
+          "relative": 1,
+          "pixels": -30
+        },
+        "color": "#f8fbfc",
+        "radius": 1
+      },
+      {
+        "op": "line",
+        "x": 6,
+        "y": 28,
+        "width": {
+          "relative": 1,
+          "pixels": -12
+        },
+        "height": 0,
+        "color": "#648da7"
+      },
+      {
+        "op": "rect",
+        "x": 3,
+        "y": 3,
+        "width": {
+          "relative": 1,
+          "pixels": -7
+        },
+        "height": {
+          "relative": 1,
+          "pixels": -5
+        },
+        "color": "#e0f5ff",
+        "fill": false,
+        "radius": 7
+      },
+      {
+        "op": "line",
+        "x": 7,
+        "y": {
+          "relative": 1,
+          "pixels": -2
+        },
+        "width": {
+          "relative": 1,
+          "pixels": -14
+        },
+        "height": 0,
+        "color": "#386a91"
+      }
+    ]
+  },
+  "barColor": "#5baf35"
+}

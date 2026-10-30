@@ -48,7 +48,7 @@ class ThemeLibraryTest {
         var library=new ThemeLibrary(dir.toString());byte[] first=theme("user.space","1.0.0","#123456");
         assertFalse(library.inspect(first).exists());var item=library.install(first,"add",null,null);
         var unchanged=library.snapshot();assertSame(item,library.install(first,"add",null,null));assertSame(unchanged,library.snapshot());
-        assertEquals(0x123456,item.scheme().background);assertEquals(36,library.snapshot().catalog().all().size());
+        assertEquals(0x123456,item.scheme().background);assertEquals(46,library.snapshot().catalog().all().size());
         assertTrue(library.inspect(theme("user.space","1.0.1","#654321")).canUpdate());
         library.install(theme("user.space","1.0.1","#654321"),"update",null,null);
         assertEquals(0x654321,library.snapshot().catalog().find("user.space").orElseThrow().background);
@@ -58,8 +58,8 @@ class ThemeLibraryTest {
         var reloaded=new ThemeLibrary(dir.toString());assertEquals(library.snapshot().catalog().all(),reloaded.snapshot().catalog().all());
         assertEquals("Independent copy",reloaded.snapshot().catalog().find("user.second").orElseThrow().label);
         assertFalse(ThemePackage.read(library.export("user.space",false)).paths().contains("authoring/agent.txt"));
-        library.remove("user.second");assertEquals(36,library.snapshot().catalog().all().size());
-        assertEquals(35,new ThemeLibrary(Files.createTempDirectory(dir,"separate").toString()).snapshot().catalog().all().size(),"instance catalogs never leak through globals");
+        library.remove("user.second");assertEquals(46,library.snapshot().catalog().all().size());
+        assertEquals(45,new ThemeLibrary(Files.createTempDirectory(dir,"separate").toString()).snapshot().catalog().all().size(),"instance catalogs never leak through globals");
     }
     @Test void invalidPackagesNeverReplaceTheWorkingFileAndBuiltinsStayProtected(@TempDir Path dir) throws Exception {
         var library=new ThemeLibrary(dir.toString());var first=theme("user.space","1.0.0","#123456");library.install(first,"add",null,null);
@@ -75,7 +75,7 @@ class ThemeLibraryTest {
     }
     @Test void badStartupPackagesAreSkippedWithoutBeingOverwritten(@TempDir Path dir) throws Exception {
         Files.createDirectories(dir.resolve("themes"));var file=dir.resolve("themes/user.broken.vibetheme");Files.write(file,new byte[]{1,2,3});
-        var library=new ThemeLibrary(dir.toString());assertEquals(35,library.snapshot().catalog().all().size());
+        var library=new ThemeLibrary(dir.toString());assertEquals(45,library.snapshot().catalog().all().size());
         assertThrows(ThemeLibrary.Conflict.class,()->library.install(theme("user.broken","1.0.0","#123456"),"add",null,null));
         assertArrayEquals(new byte[]{1,2,3},Files.readAllBytes(file));
     }

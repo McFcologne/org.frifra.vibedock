@@ -59,9 +59,15 @@ test('default design is saved right away',async ({page,app}) => {
 test('theme gallery selects real themes and persists instance availability without replacing an existing design',async ({page,app}) => {
   await editor(page,app);
   const grid=page.locator('#theme-grid'),nordic=grid.locator('[data-theme="nordic"]');
-  await expect(grid.locator('.theme-card')).toHaveCount(35);
-  await expect(page.locator('#theme-count')).toHaveText('35 / 35 enabled');
-  for(const id of ['github_dark','vs_code','terminal','git_diff','debugger']){
+  await expect(grid.locator('.theme-card')).toHaveCount(45);
+  await expect(page.locator('#theme-count')).toHaveText('45 / 45 enabled');
+  await grid.locator('.theme-card').nth(5).scrollIntoViewIfNeeded();
+  await expect.poll(()=>grid.locator('img').evaluateAll(images=>images.slice(0,10).every(img=>img.complete&&img.naturalWidth>0))).toBe(true);
+  await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));
+  const catalog=await page.locator('#design-themes').boundingBox(),secondRow=await grid.locator('.theme-card').nth(5).boundingBox();
+  const scroll=await page.evaluate(()=>({x:scrollX,y:scrollY}));
+  await page.screenshot({path:'test-results/theme-gallery-45.png',fullPage:true,clip:{x:catalog.x+scroll.x,y:catalog.y+scroll.y,width:catalog.width,height:secondRow.y+secondRow.height-catalog.y+16}});
+  for(const id of ['github_dark','vs_code','terminal','git_diff','debugger','windows_xp','windows_7','dos','nuclear','halloween','christmas','winter','cyberpunk','orbital','oscilloscope']){
     const card=grid.locator(`[data-theme="${id}"]`);
     await expect(card.getByRole('checkbox')).toBeChecked();
     const selected=page.waitForResponse(r=>r.url().endsWith('/admin/designs/default')&&r.request().method()==='POST');
@@ -75,7 +81,7 @@ test('theme gallery selects real themes and persists instance availability witho
   await expect(page.locator('#design-scheme')).toHaveValue('nordic');
   await nordic.getByRole('checkbox').uncheck();
   await expect(page.locator('#theme-message')).toContainText('Nordic disabled');
-  await expect(page.locator('#theme-count')).toHaveText('34 / 35 enabled');
+  await expect(page.locator('#theme-count')).toHaveText('44 / 45 enabled');
   await expect(page.locator('#design-scheme')).toHaveValue('nordic');
   await expect(page.locator('#design-scheme option[value=nordic]')).toBeDisabled();
   await page.reload();await expect(nordic.getByRole('checkbox')).not.toBeChecked();
@@ -87,7 +93,7 @@ test('theme gallery selects real themes and persists instance availability witho
   await expect(grid.locator('[data-theme="mission_control"] button')).toBeDisabled();
   await page.locator('#design-override').check();
   await expect(grid.locator('[data-theme="mission_control"] button')).toBeEnabled();
-  await nordic.getByRole('checkbox').check();await expect(page.locator('#theme-count')).toHaveText('35 / 35 enabled');
+  await nordic.getByRole('checkbox').check();await expect(page.locator('#theme-count')).toHaveText('45 / 45 enabled');
   await expect(nordic.getByRole('button',{name:'Use theme',exact:true})).toBeEnabled();
 });
 

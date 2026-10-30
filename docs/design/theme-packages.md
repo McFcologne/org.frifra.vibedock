@@ -124,3 +124,29 @@ its lock to reject concurrent overwrites; preview/export do not poke devices or 
 work warns, validation errors retain the draft, and the gallery refreshes on focus without replacing a pending design.
 Stage 6 introduces no firmware, dependency or format/schema change. It edits existing preset-based layouts with
 bounded drawing layers; the next collection remains a separate stage.
+
+## Theme collection (stage 7)
+
+Ten new built-ins append to the original 35, in this order: Windows XP, Windows 7, DOS, Nuclear, Halloween,
+Christmas, Winter, Cyberpunk, Orbital and Oscilloscope. The earlier IDs, order and rendered pixels stay unchanged;
+swipe cycling now includes the enabled additions before wrapping to Midnight. Instance toggles work as before.
+
+The collection uses existing presets and bounded decorative layers, without new renderer primitives, dependencies
+or firmware. Each package contains one original, attributed Apache-2.0 SVG default icon, a drawing recipe and its
+license. There is no inherited legacy icon. Theme default must still be explicitly selected on existing designs.
+OS themes are visual homages with original desktop illustrations, not redistributed OS logos or wallpapers.
+
+`ThemeCollectionTest` checks independent export/import rendering on every panel and three data states; it writes
+five-column square/narrow review sheets. `ThemeRenderingCompatibilityTest` retains the frozen 35-theme pixel
+comparisons, and `ThemesImageTest` regenerates the 45-theme README/manual overview.
+
+Regenerate both overview images from `vibedock-server/` with Java 21 and Maven:
+
+```sh
+VIBEDOCK_THEMES_IMAGE=../docs/manual/themes.png mvn test -Dtest=ThemesImageTest,ThemeCollectionTest
+cp target/theme-collection-vibedock-m1.png ../docs/manual/theme-collection.png
+```
+
+The matching narrow-panel review sheet is `target/theme-collection-135x240.png`.
+
+![The ten new themes with their original default icons](../manual/theme-collection.png)

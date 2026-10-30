@@ -1,0 +1,29 @@
+{
+  "format": "org.frifra.vibedock.theme",
+  "schemaVersion": 1,
+  "id": "windows_7",
+  "version": "1.0.0",
+  "name": "Windows 7",
+  "author": "VibeDock contributors",
+  "license": "Apache-2.0",
+  "renderer": {
+    "id": "vibedock-2d",
+    "version": 1
+  },
+  "definition": "style.json",
+  "defaultIcon": "theme",
+  "icons": [
+    {
+      "id": "theme",
+      "label": "Glass desktop",
+      "file": "assets/theme.svg",
+      "author": "VibeDock contributors",
+      "license": "Apache-2.0"
+    }
+  ],
+  "files": {
+    "style.json": "1e6d4993a5ed52ab1f94c44adea039d2d2507e5149b162ca0ab3f448d6eb1d33",
+    "assets/theme.svg": "074a81bdad359da942cae633b2781cc180af44b21550800c8169aca350e47006",
+    "license.txt": "d88663a05b1c7234a52d07ba4837e86d21c983c3202488133c987bdf68fb5f48"
+  }
+}

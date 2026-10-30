@@ -111,7 +111,10 @@ The administration's light/dark appearance is independent of the display theme. 
 
 ## Display themes
 
-<p align="center"><img src="docs/manual/themes.png" width="820" alt="The thirty-five display themes with example data"></p>
+<p align="center"><img src="docs/manual/themes.png" width="820" alt="The forty-five display themes with example data"></p>
+
+The 0.4 collection adds Windows XP, Windows 7, DOS, Nuclear, Halloween, Christmas, Winter, Cyberpunk, Orbital
+and Oscilloscope, each with original optional theme artwork. Existing designs retain their selected emoticon.
 
 **Display → Themes** shows every theme in a five-column gallery, rendered with the same sample readings. Choose a
 theme for the default or a device override, or disable it for the whole instance. Disabled themes are skipped by
