@@ -1,0 +1,1 @@
+- Omit unreferenced graphics from theme exports while retaining declared catalog icons and license notices. Name replacement artwork after its uploaded file instead of retaining the previous illustration label.

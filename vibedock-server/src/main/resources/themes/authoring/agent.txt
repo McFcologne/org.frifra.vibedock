@@ -20,7 +20,7 @@ external references, entities or DOCTYPE. Literal inline fill/stroke/color/opaci
 After editing, recompute theme.json.files SHA-256 over each file's exact bytes, including this reference if retained.
 Every non-manifest file must be declared; no extra files, absolute paths, parent segments or backslashes. Save as a
 ZIP with DEFLATE compression and extension .vibetheme; theme.json belongs at its root. Do not include rendered
-screenshots or extra source archives unless requested. Keep required license texts and all referenced artwork.
+screenshots or extra source archives unless requested. The optional generated preview.html is a static offline asset sheet: keep it and its referenced preview PNG unchanged, or remove both plus the preview property/files entries before editing metadata or icon references. The server recreates the page and real display snapshot on export. Keep required license texts and all referenced artwork.
 
 If working in the VibeDock repository, use its existing Java renderer and tests to preview at 240x240, narrow and
 high-DPI sizes; preserve existing layouts and emoticons. In another workspace, validate against the included schemas

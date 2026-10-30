@@ -25,10 +25,17 @@ final class ThemeArchive {
         files.keySet().removeIf(path->path.matches("assets/editor-[0-9a-f]{64}\\.(png|svg)")&&!referenced.contains(path));
         return encode(manifest,files,guide,null,null);
     }
+    static byte[] preview(ThemePackage.Contents source,byte[] png,boolean guide) throws IOException {
+        var m=source.manifest();String path="preview/display-"+ThemePackage.sha256(png)+".png";
+        var manifest=new ThemePackage.Manifest(m.id(),m.version(),m.name(),m.author(),m.license(),m.renderer(),m.definition(),m.defaultIcon(),m.icons(),path,m.files());
+        var files=new TreeMap<String,byte[]>();for(String name:source.paths())files.put(name,source.file(name));
+        files.put(path,png);files.put(ThemePreviewPage.FILE,new byte[0]);return encode(manifest,files,guide,null,null);
+    }
     private static byte[] encode(ThemePackage.Manifest manifest,TreeMap<String,byte[]> files,boolean guide,String copyId,String copyName) throws IOException {
         var runtime=new HashSet<String>();runtime.add(manifest.definition());if(manifest.preview()!=null)runtime.add(manifest.preview());
         manifest.icons().forEach(icon->runtime.add(icon.file()));
-        files.keySet().removeIf(path->GUIDES.contains(path)&&!runtime.contains(path));
+        files.keySet().removeIf(path->!runtime.contains(path)&&(GUIDES.contains(path)||path.endsWith(".png")||path.endsWith(".svg")));
+        if(files.containsKey(ThemePreviewPage.FILE))files.put(ThemePreviewPage.FILE,ThemePreviewPage.page(manifest));
         // Only JSON whitespace is removed; images, artwork, attribution and license bytes stay intact.
         files.put(manifest.definition(),JSON.writeValueAsBytes(JSON.readTree(files.get(manifest.definition()))));
         if(guide){

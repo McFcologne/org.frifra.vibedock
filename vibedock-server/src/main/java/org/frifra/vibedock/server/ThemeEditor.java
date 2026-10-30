@@ -26,6 +26,14 @@ final class ThemeEditor {
                 JSON.readTree(source.file(m.definition())),m.icons().stream().map(i->new Icon(i.id(),i.label(),i.file(),null)).toList());
         return new State(draft,item.builtin(),Arrays.stream(Scheme.Style.values()).map(s->s.name().toLowerCase(Locale.ROOT)).toList(),DisplayType.INVENTORY);
     }
+    Map<String,Object> pngSource(String id,String icon) throws IOException {
+        var item=library.snapshot().item(id).orElseThrow(()->new ThemeLibrary.Conflict("Theme not found"));
+        var contents=item.contents();var selected=contents.manifest().icons().stream().filter(i->i.id().equals(icon)).findFirst().orElseThrow(()->new IllegalArgumentException("Icon not found"));
+        if(!selected.file().endsWith(".png"))throw new IllegalArgumentException("Choose a PNG icon");
+        byte[] bytes=contents.file(selected.file());
+        try{var info=ThemeIconAsset.pngInfo(bytes);return Map.of("data",Base64.getEncoder().encodeToString(bytes),"canRecolor",info.supported(),"color",info.color());}
+        catch(Exception e){throw new IllegalArgumentException("Could not read PNG artwork");}
+    }
     private static String patch(String version){
         var parts=version.split("\\.");String next=parts[0]+"."+parts[1]+"."+new java.math.BigInteger(parts[2]).add(java.math.BigInteger.ONE);
         return next.length()<=40?next:version;

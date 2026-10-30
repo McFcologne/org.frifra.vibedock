@@ -3,6 +3,7 @@
   const root=document.querySelector('#theme-editor');if(!root)return;
   const $=id=>root.querySelector('#'+id), form=$('te-form'),controls=$('te-controls');
   const csrf=document.querySelector('meta[name="csrf-token"]').content,csrfHeader=document.querySelector('meta[name="csrf-header"]').content;
+  const pngSources=new WeakMap(),tints=new WeakMap();
   let draft,originalIcons=new Map(),dirty=false,timer,revision=0,previewRequest,previewURL,busy=false;
   const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text)n.textContent=text;if(cls)n.className=cls;return n;};
   const label=(text,input)=>{const l=el('label',text);l.append(input);return l;};
@@ -91,15 +92,47 @@
       const response=await fetch('/admin/theme-editor/icon?format='+ext.slice(1),{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/octet-stream',[csrfHeader]:csrf},body:file});
       const converted=await response.json();if(!response.ok)throw new Error(converted.error||'Could not prepare the icon.');
       const data=converted.data;
-      $('te-upload-status').textContent=converted.converted?'SVG converted to a static PNG'+(converted.removed?' · '+converted.removed+' unsupported items removed. Check the preview; details may have changed.':'. Check the preview.'):'PNG validated.';
-      if(existing){existing.file='uploaded.png';existing.data=data;}
+      $('te-upload-status').textContent=converted.vector?'SVG cleaned; vector format retained'+(converted.removed?' · '+converted.removed+' unsupported items removed. Check the preview; details may have changed.':'. Check the preview.'):'PNG validated.';
+      if(existing){existing.file='uploaded.'+ext.slice(1);existing.data=data;existing.label=file.name.replace(/\.[^.]+$/,'').slice(0,80);pngSources.set(existing,Promise.resolve(converted));tints.delete(existing);}
       else{
         if(draft.icons.length>=32)throw new Error('A theme can have at most 32 icons.');
         let id='icon',n=1;while(draft.icons.some(i=>i.id===id))id='icon-'+n++;
-        draft.icons.push({id,label:file.name.slice(0,80),file:'uploaded.png',data});
+        const icon={id,label:file.name.slice(0,80),file:'uploaded.'+ext.slice(1),data};draft.icons.push(icon);pngSources.set(icon,Promise.resolve(converted));
       }
       busy=false;icons();changed();
     }catch(e){fail(e.message||'Could not read icon.');}finally{busy=false;controls.disabled=false;}
+  }
+  function pngSource(icon){
+    if(!pngSources.has(icon)){
+      const original=originalIcons.get(icon.file);
+      pngSources.set(icon,(async()=>{
+        if(icon.data){const r=await fetch('/admin/theme-editor/icon?format=png',{method:'POST',credentials:'same-origin',headers:{[csrfHeader]:csrf},body:Uint8Array.from(atob(icon.data),c=>c.charCodeAt(0))});const info=await r.json();if(!r.ok)throw new Error(info.error||'Could not inspect PNG.');return info;}
+        return (await response('/admin/themes/'+encodeURIComponent(draft.sourceId)+'/editor-icons/'+encodeURIComponent(original))).json();
+      })());
+    }
+    return pngSources.get(icon);
+  }
+  function pngControls(row,icon){
+    const group=el('div'),toggle=document.createElement('input'),picker=document.createElement('input'),note=el('small','Checking PNG colors…');
+    toggle.type='checkbox';toggle.disabled=true;picker.type='color';picker.hidden=true;picker.setAttribute('aria-label','PNG main color');
+    const choice=label('Override main color',toggle);group.append(choice,picker,note);row.append(group);
+    pngSource(icon).then(info=>{
+      if(!row.isConnected)return;const tint=tints.get(icon);toggle.disabled=!info.canRecolor;toggle.checked=!!tint?.enabled;
+      picker.value=tint?.color||info.color||'#000000';picker.hidden=!toggle.checked;
+      note.textContent=info.canRecolor?'Single-color PNG. Transparency is preserved.':'Only single-color PNGs with transparency support a color override.';
+    }).catch(e=>{note.textContent=e.message;});
+    async function apply(){
+      if(busy)return;busy=true;controls.disabled=true;
+      try{
+        const source=await pngSource(icon);let data=source.data;
+        if(toggle.checked){
+          const r=await fetch('/admin/theme-editor/icon?format=png&color='+encodeURIComponent(picker.value),{method:'POST',credentials:'same-origin',headers:{[csrfHeader]:csrf},body:Uint8Array.from(atob(source.data),c=>c.charCodeAt(0))});
+          const info=await r.json();if(!r.ok)throw new Error(info.error||'Could not recolor PNG.');data=info.data;
+        }
+        icon.data=data;tints.set(icon,{enabled:toggle.checked,color:picker.value});busy=false;icons();changed();
+      }catch(e){fail(e.message);}finally{busy=false;controls.disabled=false;}
+    }
+    toggle.addEventListener('change',apply);picker.addEventListener('change',apply);
   }
   function icons(){
     const list=$('te-icons');list.replaceChildren();
@@ -115,12 +148,12 @@
       row.prepend(el('h4',icon===chosen?'Default theme icon':'Catalog alternative'));row.append(el('p',icon.label));
       const original=originalIcons.get(icon.file);
       if(!icon.data&&original){const image=document.createElement('img');image.src='/admin/themes/'+encodeURIComponent(draft.sourceId)+'/icons/'+encodeURIComponent(original)+'.png';image.alt=icon.label;image.width=56;image.height=56;row.append(image);}
-      if(icon.data&&icon.file.endsWith('.png')){const image=document.createElement('img');image.src='data:image/png;base64,'+icon.data;image.alt=icon.label;image.width=56;image.height=56;row.append(image);}
+      if(icon.data){const image=document.createElement('img');image.src='data:image/'+(icon.file.endsWith('.svg')?'svg+xml':'png')+';base64,'+icon.data;image.alt=icon.label;image.width=56;image.height=56;row.append(image);}
       const advanced=el('details');advanced.append(el('summary','Icon name and ID'),fields);row.append(advanced);
       const tools=el('div',null,'te-actions'),replace=document.createElement('input');replace.type='file';replace.accept='.png,.svg';replace.setAttribute('aria-label','Replace '+icon.label);
       replace.addEventListener('change',()=>upload(replace.files[0],icon));
       const remove=button('Remove icon',()=>{draft.icons.splice(draft.icons.indexOf(icon),1);if(draft.defaultIcon===icon.id)draft.defaultIcon=draft.icons[0].id;icons();changed();});remove.disabled=draft.icons.length===1;
-      tools.append(label('Replace artwork',replace),remove);row.append(tools,el('p',icon.data?'New artwork · validated in preview':'Artwork: '+icon.file,'meta'));(icon===chosen?list:extraList).append(row);
+      tools.append(label('Replace artwork',replace),remove);row.append(tools,el('p',icon.data?'New artwork · validated in preview':'Artwork: '+icon.file,'meta'));if(icon.file.endsWith('.png'))pngControls(row,icon);(icon===chosen?list:extraList).append(row);
     }
     extra.open=draft.icons.some(i=>i!==chosen&&i.data);list.append(extra);
   }

@@ -148,8 +148,8 @@ directory: `theme.json` is at its root. This example can now be imported through
 package, and **Create copy** starts another independent ID. The design tab refreshes its catalog when focused again.
 The editor changes palette colors, preset, font, optional bar/footer colors, bounded background/band decorations,
 icon labels/IDs, default icon and uploaded PNG/safe SVG artwork. Existing definitions and original license files
-remain intact until edited; removing an icon does not remove inherited attribution. Unreferenced editor-uploaded
-artwork is omitted on subsequent saves so repeated replacements do not accumulate in the archive.
+remain intact until edited; removing an icon does not remove inherited attribution. Unreferenced graphics, including replaced inherited illustrations, are omitted on saves and exports so repeated
+replacements do not accumulate in the archive. Declared catalog icons and license notices remain included.
 
 Previews use the actual device renderer and selectable supported panel sizes with stable sample readings.
 Drafts are page-local: no autosave, installation, device action or provider request during preview/export.
@@ -167,9 +167,20 @@ and `POST /admin/theme-editor/save`. Writes require the existing CSRF token. JSO
 before binding (including base64 artwork); all existing package/graphic/renderer limits also apply.
 
 
-Editor SVG uploads are explicitly cleaned and converted to static PNGs before entering a draft. Unsupported elements,
+Editor SVG uploads are explicitly cleaned and retain their vector format before entering a draft. Unsupported elements,
 attributes and style declarations are removed; literal presentation styles are flattened. Scripts, animation, fonts,
 references and external resources never reach the rasterizer. The UI reports removed items and asks for preview
 review because details can change. XML with entities/DOCTYPE, oversized files and graphics with no visible static
 shapes are rejected. This cleanup does not silently modify imported theme archives: package import stays strict.
 The default icon is shown first in the editor; optional alternatives sit under **Additional catalog icons**.
+
+
+Single-color PNGs with transparency support an optional main-color override in the editor. Alpha and source dimensions
+remain unchanged; indexed PNGs are converted to RGBA before recoloring. Multicolor, opaque or empty PNGs are not recolored.
+Unchecking the override restores the original bytes within that editing session; saved/exported PNGs contain the chosen color.
+
+Downloaded packages include `preview.html` and a small PNG snapshot from the real sample renderer. The offline page
+uses relative package assets and has no JavaScript or external resources. Only the root `preview.html` is allowed;
+it is validated as bounded static XHTML with fixed styles, constrained tags/attributes and a restrictive resource
+policy. Arbitrary HTML is rejected. The page is regenerated when package metadata changes. Existing packages without
+HTML remain valid. Older staged readers without this additive preview support cannot import these extended exports.

@@ -80,8 +80,8 @@ final class ThemeIconAsset {
             var children=node.getChildNodes();for(int n=0;n<children.getLength();n++)queue.addLast(children.item(n));
         }
     }
-    record StaticUpload(byte[] png,int removed) {}
-    /** Editor uploads only: discard unsupported content, flatten literal styles, then rasterize without external resources. */
+    record StaticUpload(byte[] svg,int removed) {}
+    /** Editor uploads only: discard unsupported content, flatten literal styles, retain safe vector shapes without external resources. */
     static StaticUpload staticSvg(byte[] bytes) throws Exception {
         var document=parseSvg(bytes);var root=document.getDocumentElement();
         if(!"svg".equals(root.getLocalName())||!"http://www.w3.org/2000/svg".equals(root.getNamespaceURI()))throw invalid("Choose an SVG document");
@@ -121,10 +121,28 @@ final class ThemeIconAsset {
         var image=draw("icon.svg",output.toByteArray(),Twemoji.MAX_SIZE);boolean visible=false;
         for(int y=0;y<image.getHeight()&&!visible;y++)for(int x=0;x<image.getWidth();x++)if((image.getRGB(x,y)>>>24)!=0){visible=true;break;}
         if(!visible)throw invalid("No visible static shapes remain after SVG cleanup");
-        var png=new ByteArrayOutputStream();ImageIO.write(image,"png",png);
-        if(png.size()>MAX_BYTES)throw invalid("The static PNG exceeds 128 KiB; use simpler artwork");
-        return new StaticUpload(png.toByteArray(),removed);
+        return new StaticUpload(output.toByteArray(),removed);
     }
+    record PngInfo(boolean supported,String color) {}
+    static PngInfo pngInfo(byte[] bytes) throws Exception {
+        draw("icon.png",bytes,Twemoji.SIZE);var image=ImageIO.read(new ByteArrayInputStream(bytes));
+        Integer rgb=null;boolean transparent=false,visible=false;
+        for(int y=0;y<image.getHeight();y++)for(int x=0;x<image.getWidth();x++){
+            int pixel=image.getRGB(x,y),alpha=pixel>>>24;if(alpha<255)transparent=true;if(alpha==0)continue;
+            visible=true;int color=pixel&0xffffff;
+            if(rgb==null)rgb=color;else if(rgb!=color)return new PngInfo(false,"#000000");
+        }
+        return new PngInfo(visible&&transparent,String.format("#%06x",rgb==null?0:rgb));
+    }
+    static byte[] recolorPng(byte[] bytes,String color) throws Exception {
+        if(color==null||!color.matches("#[0-9a-fA-F]{6}"))throw invalid("Choose an RGB color");
+        if(!pngInfo(bytes).supported())throw invalid("Color override needs a single-color PNG with transparency");
+        var source=ImageIO.read(new ByteArrayInputStream(bytes));var image=new BufferedImage(source.getWidth(),source.getHeight(),BufferedImage.TYPE_INT_ARGB);int rgb=Integer.parseInt(color.substring(1),16);
+        for(int y=0;y<image.getHeight();y++)for(int x=0;x<image.getWidth();x++)image.setRGB(x,y,(source.getRGB(x,y)&0xff000000)|rgb);
+        var output=new ByteArrayOutputStream();ImageIO.write(image,"png",output);
+        if(output.size()>MAX_BYTES)throw invalid("Recolored PNG exceeds 128 KiB");return output.toByteArray();
+    }
+
     private static void attribute(String name,String value){
         switch(name){
             case "xmlns" -> {if(!value.equals("http://www.w3.org/2000/svg"))throw invalid();}

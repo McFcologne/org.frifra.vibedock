@@ -63,6 +63,7 @@ final class ThemePackage {
         if(!entries.keySet().equals(manifest.files().keySet()))throw invalid("ZIP files must match the manifest exactly");
         for(var entry:entries.entrySet())
             if(!sha256(entry.getValue()).equals(manifest.files().get(entry.getKey())))throw invalid("Checksum mismatch: "+entry.getKey());
+        if(entries.containsKey(ThemePreviewPage.FILE))ThemePreviewPage.validate(entries.get(ThemePreviewPage.FILE),manifest);
         return new Contents(manifest,entries,total);
     }
 
@@ -96,7 +97,7 @@ final class ThemePackage {
         Map<String,String> files=new LinkedHashMap<>();
         for(var file:fileMap.properties()){
             String path=path(file.getKey());
-            if(path.equals("theme.json")||!path.matches(".*\\.(json|png|svg|txt)"))throw invalid("Unsupported package file: "+path);
+            if(path.equals("theme.json")||!path.equals(ThemePreviewPage.FILE)&&!path.matches(".*\\.(json|png|svg|txt)"))throw invalid("Unsupported package file: "+path);
             if(!file.getValue().isTextual()||!file.getValue().textValue().matches("[0-9a-f]{64}"))throw invalid("Expected a SHA-256 checksum for "+path);
             files.put(path,file.getValue().textValue());
         }

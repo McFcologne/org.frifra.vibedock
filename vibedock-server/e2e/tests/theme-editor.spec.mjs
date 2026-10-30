@@ -35,7 +35,7 @@ test('uploaded icons can become the default; unsafe graphics cannot be saved',as
   const svg=Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" fill="#ff0000"/></svg>');
   await page.locator('#te-icon-add').setInputFiles({name:'dot.svg',mimeType:'image/svg+xml',buffer:svg});
   const row=page.locator('.te-icon').filter({has:page.getByRole('img',{name:'dot.svg',exact:true})});await row.getByLabel('Theme default').check();
-  await expect(page.locator('#te-upload-status')).toContainText('SVG converted to a static PNG');
+  await expect(page.locator('#te-upload-status')).toContainText('SVG cleaned; vector format retained');
   await expect(page.locator('#te-status')).toHaveText('Current draft · device renderer');
   await page.locator('#te-save').click();await expect(page.locator('#te-saved')).toContainText('v1.0.0 saved');
   const bad=Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
@@ -84,4 +84,35 @@ test('returning from a saved theme refreshes the gallery without replacing a pen
     await expect(page.locator('[data-theme="browser.focus"]')).toBeVisible();await expect(page.locator('#design-scheme')).toHaveValue('ocean');
     release();await expect.poll(async()=>page.evaluate(async()=>(await(await fetch('/admin/designs')).json()).defaults.scheme)).toBe('ocean');
   }finally{release();await other.close();}
+});
+
+
+test('transparent single-color PNG can be recolored, reset and exported with a safe offline page',async({page,app})=>{
+  await open(page,app);await page.locator('#te-id').fill('browser.png');
+  const base64=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=c.height=8;const g=c.getContext('2d');g.fillStyle='#000000';g.fillRect(2,2,4,4);return c.toDataURL('image/png').split(',')[1];});
+  await page.locator('#te-icon-add').setInputFiles({name:'mark.png',mimeType:'image/png',buffer:Buffer.from(base64,'base64')});
+  const row=page.locator('.te-icon').filter({has:page.getByRole('img',{name:'mark.png',exact:true})});
+  await row.getByLabel('Theme default').check();await expect(row.getByLabel('Override main color')).toBeEnabled();
+  await row.getByLabel('Override main color').check();
+  await row.getByLabel('PNG main color').fill('#00ff00');await row.getByLabel('PNG main color').dispatchEvent('change');
+  await expect(row.getByLabel('PNG main color')).toHaveValue('#00ff00');
+  await expect(page.locator('#te-status')).toHaveText('Current draft · device renderer');
+  const download=page.waitForEvent('download');await page.locator('#te-export').click();const bytes=await readFile(await(await download).path());
+  expect(bytes.includes(Buffer.from('preview.html'))).toBe(true);
+  await row.getByLabel('Override main color').uncheck();await expect(row.getByLabel('PNG main color')).toBeHidden();
+  await page.locator('#te-save').click();await expect(page.locator('#te-saved')).toContainText('v1.0.0 saved');
+  await expect(page.locator('.te-icon').first().getByLabel('Override main color')).toBeEnabled();
+});
+
+
+test('unpacked preview.html opens offline with local artwork and an actual display snapshot',async({browser})=>{
+  const context=await browser.newContext();const page=await context.newPage(),requests=[];
+  page.on('request',r=>requests.push(r.url()));
+  try{
+    await page.goto(new URL('../../target/theme-preview-offline/preview.html',import.meta.url).href);
+    await expect(page.getByRole('heading',{name:'Midnight',exact:true})).toBeVisible();
+    await expect.poll(()=>page.locator('img').evaluateAll(images=>images.length>=3&&images.every(i=>i.complete&&i.naturalWidth>0))).toBe(true);
+    expect(requests.every(url=>url.startsWith('file:'))).toBe(true);
+    await expect(page.locator('script')).toHaveCount(0);
+  }finally{await context.close();}
 });

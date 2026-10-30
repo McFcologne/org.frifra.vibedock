@@ -65,6 +65,10 @@ class ThemeEditorTest {
         var saved=editor.save(edit(next,Map.of("icons",List.of(replacement)))).contents();
         assertEquals(1,saved.paths().stream().filter(path->path.startsWith("assets/editor-")).count());
         assertArrayEquals(BuiltinThemes.get("midnight").contents().file("license.txt"),saved.file("license.txt"));
-        assertArrayEquals(BuiltinThemes.get("midnight").contents().file("assets/theme.svg"),saved.file("assets/theme.svg"));
+        assertFalse(saved.paths().contains("assets/theme.svg"),"replaced source artwork is omitted");
+        assertFalse(saved.paths().contains("assets/default.svg"),"an undeclared legacy alternative is omitted");
+        var exported=ThemePackage.read(library.export("editor.art",false));
+        assertTrue(exported.paths().contains(exported.manifest().icons().getFirst().file()));
+        assertEquals(1,exported.paths().stream().filter(path->path.endsWith(".svg")||path.endsWith(".png")).count());
     }
 }

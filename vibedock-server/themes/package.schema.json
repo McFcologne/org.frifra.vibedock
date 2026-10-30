@@ -29,7 +29,7 @@
     "preview": {"$ref": "#/$defs/image"},
     "files": {
       "type": "object", "minProperties": 1, "maxProperties": 63,
-      "propertyNames": {"allOf": [{"$ref": "#/$defs/path"}, {"pattern": "\\.(json|png|svg|txt)$"}, {"not": {"const": "theme.json"}}]},
+      "propertyNames": {"allOf": [{"$ref": "#/$defs/path"}, {"anyOf": [{"pattern": "\\.(json|png|svg|txt)$"}, {"const": "preview.html"}]}, {"not": {"const": "theme.json"}}]},
       "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
     }
   },

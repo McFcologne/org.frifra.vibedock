@@ -744,7 +744,7 @@ smileys stay recognisable against their backgrounds, also on scaled web displays
 
 Under **Display › Themes**, **Export** downloads a small compressed `.vibetheme` ZIP with the theme definition, its
 icons and licenses. **Include agent guide in exports** adds a short reference prompt and format schemas for developing
-the theme with a coding agent. Uncheck it for the smallest file. The server never executes that text or invokes an
+the theme with a coding agent. Uncheck it for the smallest file. After extracting the archive, open **preview.html** for an offline view of the real renderer snapshot and included icons; no scripts or external resources are needed. The server never executes that text or invokes an
 agent; no accounts, device settings or firmware are added to the export.
 
 **Import theme** checks a package before installing it. A new ID can be installed directly. For an existing installed
@@ -770,8 +770,9 @@ unchanged. For an installed theme, **Edit theme** prepares a newer version; **Cr
    radius are adjustable. Existing decorations stay unchanged unless you edit them.
 4. The **Default theme icon** is the one shown by Theme default. **Additional catalog icons** contains optional
    alternatives, including a preserved legacy illustration. **Replace artwork** changes an icon; **Add icon** extends
-   its catalog. Upload PNG / SVG up to 128 KiB. SVGs are cleaned and converted to static PNGs; a removal notice means
+   its catalog. Upload PNG / SVG up to 128 KiB. SVGs are cleaned and retain their vector format; a removal notice means
    details may have changed, so check the preview. XML entities and graphics with no static shapes are rejected. Selecting the radio button previews that icon as the theme default. Existing
+   For single-color PNGs with transparency, **Override main color** changes the color while preserving alpha. Multicolor or opaque images keep their colors.
    Emoticon selections on devices are unaffected; users can select Theme default or a fixed Theme catalog icon.
 5. Check **Preview** for the desired panel size. It uses sample readings and the actual device renderer.
 6. **Save theme** installs the new theme or updates an installed one. It does not select it for a device; return to
