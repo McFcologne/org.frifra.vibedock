@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Theme editor')}"></head>
+<body>
+<header th:replace="~{fragments :: appbar('design')}"></header>
+<main id="theme-editor">
+<div class="page-heading"><div><a href="/admin/design#design-themes">← All themes</a><h2>Theme editor</h2><p id="te-source">Loading theme…</p></div></div>
+<p id="te-error" class="notice error" role="alert" hidden></p>
+<form id="te-form" autocomplete="off">
+<fieldset id="te-controls" disabled>
+<div class="te-layout"><div>
+<section class="card"><h3>Theme details</h3><p class="meta">Save an independent copy of a built-in theme, or update your own theme with a newer version. Device designs stay selected as they are.</p>
+<div class="te-fields">
+<label>Name<input id="te-name" maxlength="80" required></label>
+<label>Theme ID<input id="te-id" pattern="[a-z][a-z0-9._\-]{0,79}" maxlength="80" required></label>
+<label>Version<input id="te-version" pattern="(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)" maxlength="40" required></label>
+<label>Author and attribution<input id="te-author" maxlength="160" required></label>
+<label>License<input id="te-license" maxlength="160" required></label>
+</div><p class="meta">Keep attribution and license notices for inherited artwork. Original license files stay in the package.</p></section>
+<section class="card"><h3>Appearance</h3>
+<div class="te-fields"><label>Layout style<select id="te-preset"></select></label>
+<label>Font<select id="te-font"><option>DejaVu Sans</option><option>DejaVu Sans Mono</option><option>DejaVu Serif</option></select></label></div>
+<div id="te-palette" class="te-fields"></div>
+<div class="te-fields"><label>Footer background<select id="te-footer-mode"><option value="auto">Style default</option><option value="custom">Custom color</option></select><input id="te-footer" type="color" aria-label="Footer color" hidden></label>
+<label>Usage bar<select id="te-bar-mode"><option value="auto">Quota colors / style default</option><option value="custom">Custom color</option></select><input id="te-bar" type="color" aria-label="Usage bar color" hidden><small id="te-bar-note"></small></label></div>
+</section>
+<section class="card"><h3>Decorations and borders</h3><p class="meta">Layers sit beneath the content. Position and size combine a percentage of the area with an optional pixel offset.</p>
+<div id="te-layers"></div></section>
+<section class="card"><h3>Theme icons</h3><p class="meta">Choose a default or add PNG / safe SVG artwork (up to 2 MiB each). These icons travel with the theme; existing Emoticon choices remain unchanged.</p>
+<div id="te-icons"></div><label class="button secondary">Add icon<input id="te-icon-add" type="file" accept="image/png,image/svg+xml,.svg" hidden></label>
+</section>
+</div><aside class="te-preview"><section class="card"><h3>Preview</h3>
+<label>Display<select id="te-display"></select></label>
+<img id="te-image" alt="Unsaved theme with sample usage, rendered as on the device" hidden>
+<p id="te-status" class="meta" role="status" aria-live="polite">Loading…</p>
+<p class="meta">Sample values · same renderer as the displays. Preview and export do not change your installation.</p>
+<div class="te-actions"><button id="te-save" type="submit">Save theme</button><button id="te-export" type="button" class="secondary">Export draft</button></div>
+<label class="check"><input id="te-agent" type="checkbox" checked> Include agent guide in export</label>
+<p id="te-saved" role="status" aria-live="polite"></p>
+</section></aside></div>
+</fieldset></form>
+</main>
+<script defer src="/theme-editor.js"></script>
+</body></html>

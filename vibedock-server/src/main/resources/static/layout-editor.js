@@ -306,6 +306,8 @@
       const title=element('div','theme-card-heading');title.append(heading,label);card.append(title,image,choose);
       const tools=element('div','theme-card-tools');
       if(!s.missing){
+        const edit=element('a','button secondary',s.builtin?'Customize':'Edit theme');edit.href='/admin/themes/'+encodeURIComponent(s.id)+'/edit';edit.target='_blank';edit.rel='noopener';tools.append(edit);
+        if(!s.builtin){const copy=element('a','button secondary','Create copy');copy.href=edit.href+'?copy=true';copy.target='_blank';copy.rel='noopener';tools.append(copy);}
         const download=element('a','button secondary','Export');download.href='/admin/themes/'+encodeURIComponent(s.id)+'/export';
         download.addEventListener('click',async event=>{
           event.preventDefault();await save();if(dirty)return;
@@ -345,6 +347,17 @@
     // Importing a package must not replace a draft edited while its request was in flight.
     if(dirty||busy){renderIconControls();controls();schedulePreview();}else loadTarget();
   }
+  // A theme edited in another tab must appear without replacing this tab's design or pending save.
+  let catalogRefresh=0;
+  window.addEventListener('focus',async()=>{
+    if(!catalog)return;const current=++catalogRefresh;
+    try{
+      const response=await fetch('/admin/designs',{credentials:'same-origin'});if(!response.ok)throw new Error('Could not reload themes.');
+      const next=await response.json();if(current!==catalogRefresh)return;
+      catalog.schemes=next.schemes;catalog.icons=next.icons;
+      themeOptions();themeGallery();renderIconControls();controls();schedulePreview();
+    }catch(e){error(e.message);}
+  });
   $('#theme-import-file').addEventListener('change',async event=>{
     const file=event.target.files[0];if(!file||themeTransferBusy)return;
     themeTransferBusy=true;event.target.disabled=true;$('#theme-import-review').hidden=true;error('');

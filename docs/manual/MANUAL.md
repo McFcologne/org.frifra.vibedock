@@ -625,7 +625,7 @@ on the right is rendered by the server exactly as the display will show it. Ever
 
 ## Themes
 
-**Appearance → Browse all themes** jumps to the gallery below the editor. It shows all thirty-five themes in five
+**Appearance → Browse all themes** jumps to the gallery below the editor. It shows the thirty-five built-in themes and installed themes in five
 columns on a desktop, with identical example data rendered by the same code as the displays. **Use theme** applies
 the theme to the design selected under **Design for**, and saves it right away. For an inherited device design,
 enable **Custom design** first, or change the default design instead.
@@ -756,6 +756,31 @@ selected theme affects its next image without a server restart or firmware updat
 keep at least one theme enabled. An invalid import leaves the working package intact. If a package file is missing
 or damaged at startup, its saved selection is kept and Midnight shows temporarily; restoring the same ID recovers it.
 Packages persist in the data directory under `themes/`; keep that folder with your configuration backups.
+
+## Creating and editing a theme
+
+In the theme gallery, **Customize** opens a built-in theme as an independent copy in a new tab. Its original stays
+unchanged. For an installed theme, **Edit theme** prepares a newer version; **Create copy** gives it an independent ID.
+
+1. Set a name and unique theme ID. Keep author attribution and license notices for artwork you reuse.
+2. Change palette colors, font and layout style under **Appearance**. Bar/footer colors can follow the style or be
+   customized where supported. Styles with text or palette-based bars use those colors instead of a bar override.
+3. Add borders, shapes, grids or gradients under **Decorations and borders**. Each layer is behind the content;
+   positions/sizes combine percentages of the image or usage band with pixel offsets. Order, opacity and corner
+   radius are adjustable. Existing decorations stay unchanged unless you edit them.
+4. Choose the theme's default icon or upload PNG / safe SVG artwork. **Replace artwork** changes an icon, while
+   **Add icon** extends its catalog. Selecting the radio button previews that icon as the theme default. Existing
+   Emoticon selections on devices are unaffected; users can select Theme default or a fixed Theme catalog icon.
+5. Check **Preview** for the desired panel size. It uses sample readings and the actual device renderer.
+6. **Save theme** installs the new theme or updates an installed one. It does not select it for a device; return to
+   **All themes** and choose **Use theme**. Updating an already selected theme affects its next image.
+
+<img src="images/36-theme-editor.png" width="100%" alt="Visual theme editor with palette controls and a device-rendered preview">
+
+The theme editor does **not** save automatically. **Export draft** downloads your current work without installing it;
+its optional agent guide is the same as on gallery exports. Leaving an edited page warns before discarding changes.
+If another editor updated or removed the source, saving is rejected and your controls stay intact: keep that tab open,
+reopen the current theme in another tab, compare and reapply the changes. Original license files travel with copies.
 
 ## What the displays show
 

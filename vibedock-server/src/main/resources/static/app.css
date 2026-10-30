@@ -476,3 +476,20 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 .theme-icon-sample{display:block;margin:8px 0;border-radius:7px;border:1px solid var(--line);padding:4px;box-sizing:content-box;background:conic-gradient(#72777e 25%,#525961 0 50%,#72777e 0 75%,#525961 0) 0 0/16px 16px}
 .theme-transfer-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 0}.theme-transfer-actions .check{margin:0}.theme-copy-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}.theme-card-tools{display:flex;gap:8px;margin:8px 0}.theme-card-tools .button,.theme-card-tools button{flex:1;margin:0;padding:6px 8px;font-size:12px}.theme-card>small{display:block}@media(max-width:480px){.theme-copy-fields{grid-template-columns:1fr}}
 #theme-import-review,.theme-card h4,.theme-card>small{overflow-wrap:anywhere}.theme-copy-fields label{min-width:0}
+
+/* Theme authoring uses the device renderer; controls edit only the draft. */
+#theme-editor fieldset{border:0;padding:0;margin:0;min-width:0}
+.te-layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px;align-items:start}
+.te-layout .card{margin-bottom:18px}.te-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0}
+.te-fields label{min-width:0}.te-fields input:not([type=checkbox]):not([type=radio]),.te-fields select{width:100%;box-sizing:border-box}
+.te-fields input[type=color]{height:38px;padding:3px;cursor:pointer}.te-preview{position:sticky;top:128px}
+#te-image{display:block;max-width:100%;height:auto;margin:16px auto;image-rendering:auto}#te-image[hidden]{display:none}
+.te-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0}.te-actions select{width:auto}
+.te-shape,.te-icon{border:1px solid var(--line);border-radius:10px;padding:12px;margin:12px 0}
+.te-length{display:flex;gap:8px}.te-length label{flex:1}.te-icon .meta{overflow-wrap:anywhere}
+@media(max-width:800px){.te-layout{grid-template-columns:1fr}.te-preview{position:static;grid-row:1}.te-fields{grid-template-columns:1fr}#te-image{max-height:320px;width:auto}}
+
+.te-icon input[type=radio]{width:auto;padding:0;min-height:0;accent-color:var(--accent)}
+
+#te-image{max-height:360px;object-fit:contain}.te-preview .card{max-height:calc(100vh - 155px);overflow:auto}
+@media(max-width:800px){.te-preview .card{max-height:none;overflow:visible}}

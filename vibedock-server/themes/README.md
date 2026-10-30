@@ -5,7 +5,7 @@ not an instance backup: it contains no accounts, device identifiers, credentials
 
 The archive reader checks the **archive and manifest**. The drawing reader validates the recipe and the server loads
 all 35 built-in themes from package directories. Administration can import, export, copy, update and remove installed
-themes without restarting. The visual theme editor remains a later stage. Installation validates the manifest,
+themes without restarting. The visual theme editor is available through **Customize** / **Edit theme** on each gallery card. Installation validates the manifest,
 renderer/recipe and every graphic; an extension or checksum alone does not make a file safe. No package code or
 guide is executed, and no external resources are fetched.
 
@@ -140,3 +140,28 @@ PY
 
 Editing an asset also requires updating its entry in `theme.json.files`. The archive has no enclosing `minimal/`
 directory: `theme.json` is at its root. This example can now be imported through administration.
+
+
+## Visual theme editor
+
+**Customize** opens a built-in theme as an independent draft in another tab; **Edit theme** updates an installed
+package, and **Create copy** starts another independent ID. The design tab refreshes its catalog when focused again.
+The editor changes palette colors, preset, font, optional bar/footer colors, bounded background/band decorations,
+icon labels/IDs, default icon and uploaded PNG/safe SVG artwork. Existing definitions and original license files
+remain intact until edited; removing an icon does not remove inherited attribution. Unreferenced editor-uploaded
+artwork is omitted on subsequent saves so repeated replacements do not accumulate in the archive.
+
+Previews use the actual device renderer and selectable supported panel sizes with stable sample readings.
+Drafts are page-local: no autosave, installation, device action or provider request during preview/export.
+**Save theme** explicitly installs a new ID or updates an installed theme with a newer version, through the same
+validated atomic importer. It does not select a theme in any design. **Export draft** produces the same compact
+`.vibetheme` archive, optionally with the agent guide/schemas, without installing it. Leaving an edited page warns
+about unsaved changes; closing it discards the draft. A source package revision digest prevents a stale editor from
+overwriting an intervening update, even if it submits a larger version; the page retains its controls on error.
+If the source was updated or removed, reopen a current editor in another tab to compare and reapply your changes.
+This first editor uses preset-based layouts and visual controls, not arbitrary scripts or draggable text layouts.
+
+The admin-only editor endpoints are `GET /admin/themes/{id}/edit`, `GET /admin/themes/{id}/editor?copy=true`,
+`POST /admin/theme-editor/preview.png?display=<panel-id>`, `POST /admin/theme-editor/export?agent=true|false`
+and `POST /admin/theme-editor/save`. Writes require the existing CSRF token. JSON drafts are bounded to 12 MiB
+before binding (including base64 artwork); all existing package/graphic/renderer limits also apply.

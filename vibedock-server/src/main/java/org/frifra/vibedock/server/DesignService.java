@@ -36,12 +36,19 @@ class DesignService {
     /** Stable sample readings, rendered by the same code as devices; no provider or weather network calls. */
     byte[] themePreview(Scheme scheme) throws IOException {
         var snapshot=themeSnapshot();scheme=snapshot.effective(scheme);
+        return samplePreview(scheme,ThemeIcons.image(new Design.Icon("theme-default",null,null),scheme,Twemoji.SIZE,snapshot::contents).orElse(null),DisplayType.M1);
+    }
+    byte[] themePreview(ThemePackage.Contents contents,DisplayType display) throws IOException {
+        var m=contents.manifest();var scheme=new Scheme(m.id(),m.name(),ThemeDefinition.read(contents));
+        return samplePreview(scheme,ThemeIcons.image(contents,m.defaultIcon(),Twemoji.SIZE).orElse(null),display);
+    }
+    private byte[] samplePreview(Scheme scheme,java.awt.image.BufferedImage icon,DisplayType display) throws IOException {
         long time=java.time.Instant.parse("2026-10-14T05:12:00Z").getEpochSecond();
         var values=new java.util.LinkedHashMap<String,UsageService.Provider>();
         values.put("codex",new UsageService.Provider("ok",time,new ProviderClient.Window(0,time+5*3600),new ProviderClient.Window(22,time+6*86400)));
         values.put("claude",new UsageService.Provider("ok",time,new ProviderClient.Window(5,time+3*3600),new ProviderClient.Window(14,time+5*86400)));
         return renderer.render(new UsageService.Snapshot(1,time,values),"192.168.1.50",new StatusImage.Look(
-                ThemeIcons.image(new Design.Icon("theme-default",null,null),scheme,Twemoji.SIZE,snapshot::contents).orElse(null),scheme,twemoji.image("⛅",24).orElse(null),"13°",Layout.DEFAULT)).png();
+                icon,scheme,twemoji.image("⛅",24).orElse(null),"13°",Layout.DEFAULT),display).png();
     }
     /**
      * What a display shows now: the current photo of its slideshow while that is active, otherwise the status.

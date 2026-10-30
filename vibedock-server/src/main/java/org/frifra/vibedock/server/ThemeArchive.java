@@ -13,10 +13,22 @@ final class ThemeArchive {
     private ThemeArchive() {}
     static byte[] write(ThemePackage.Contents source,boolean guide) throws IOException {return write(source,guide,null,null);}
     static byte[] write(ThemePackage.Contents source,boolean guide,String copyId,String copyName) throws IOException {
-        var manifest=source.manifest();var files=new TreeMap<String,byte[]>();
+        var files=new TreeMap<String,byte[]>();
+        for(var path:source.paths())files.put(path,source.file(path));
+        return encode(source.manifest(),files,guide,copyId,copyName);
+    }
+    static byte[] edited(ThemePackage.Contents source,ThemePackage.Manifest manifest,byte[] drawing,Map<String,byte[]> artwork,boolean guide) throws IOException {
+        var files=new TreeMap<String,byte[]>();
+        for(var path:source.paths())files.put(path,source.file(path));
+        files.put(manifest.definition(),drawing);files.putAll(artwork);
+        var referenced=new HashSet<String>();manifest.icons().forEach(i->referenced.add(i.file()));referenced.add(manifest.definition());
+        files.keySet().removeIf(path->path.matches("assets/editor-[0-9a-f]{64}\\.(png|svg)")&&!referenced.contains(path));
+        return encode(manifest,files,guide,null,null);
+    }
+    private static byte[] encode(ThemePackage.Manifest manifest,TreeMap<String,byte[]> files,boolean guide,String copyId,String copyName) throws IOException {
         var runtime=new HashSet<String>();runtime.add(manifest.definition());if(manifest.preview()!=null)runtime.add(manifest.preview());
         manifest.icons().forEach(icon->runtime.add(icon.file()));
-        for(var path:source.paths())if(!GUIDES.contains(path)||runtime.contains(path))files.put(path,source.file(path));
+        files.keySet().removeIf(path->GUIDES.contains(path)&&!runtime.contains(path));
         // Only JSON whitespace is removed; images, artwork, attribution and license bytes stay intact.
         files.put(manifest.definition(),JSON.writeValueAsBytes(JSON.readTree(files.get(manifest.definition()))));
         if(guide){

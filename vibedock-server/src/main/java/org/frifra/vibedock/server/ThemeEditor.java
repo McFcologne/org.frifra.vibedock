@@ -1,0 +1,65 @@
+package org.frifra.vibedock.server;
+
+import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+import java.io.IOException;
+import java.util.*;
+
+/** Stateless, validated drafts. Preview/export never install a package or change a device's design. */
+@Component
+final class ThemeEditor {
+    record Icon(String id,String label,String file,String data) {}
+    record Draft(String sourceId,String sourceDigest,String id,String name,String version,String author,String license,
+                 String defaultIcon,JsonNode drawing,List<Icon> icons) {}
+    record State(Draft draft,boolean builtin,List<String> presets,List<DisplayType> displays) {}
+    private static final JsonMapper JSON=new JsonMapper();
+    private final ThemeLibrary library;
+    ThemeEditor(ThemeLibrary library){this.library=library;}
+    State open(String id,boolean copy) throws IOException {
+        var item=library.snapshot().item(id).orElseThrow(()->new ThemeLibrary.Conflict("Theme not found"));
+        var source=item.contents();var m=source.manifest();boolean duplicate=item.builtin()||copy;
+        String nextId=duplicate?id.substring(0,Math.min(60,id.length()))+".copy-"+UUID.randomUUID().toString().substring(0,8):id;
+        String nextName=duplicate?m.name().substring(0,Math.min(70,m.name().length()))+" (copy)":m.name();
+        String nextVersion=duplicate?"1.0.0":patch(m.version());
+        var draft=new Draft(id,digest(source),nextId,nextName,nextVersion,m.author(),m.license(),m.defaultIcon(),
+                JSON.readTree(source.file(m.definition())),m.icons().stream().map(i->new Icon(i.id(),i.label(),i.file(),null)).toList());
+        return new State(draft,item.builtin(),Arrays.stream(Scheme.Style.values()).map(s->s.name().toLowerCase(Locale.ROOT)).toList(),DisplayType.INVENTORY);
+    }
+    private static String patch(String version){
+        var parts=version.split("\\.");String next=parts[0]+"."+parts[1]+"."+new java.math.BigInteger(parts[2]).add(java.math.BigInteger.ONE);
+        return next.length()<=40?next:version;
+    }
+    private static String digest(ThemePackage.Contents source) throws IOException {return ThemePackage.sha256(ThemeArchive.write(source,false));}
+    byte[] archive(Draft draft,boolean guide) throws IOException {
+        if(draft==null||draft.sourceId()==null||draft.drawing()==null||draft.icons()==null||draft.icons().isEmpty()||draft.icons().size()>32)
+            throw new IllegalArgumentException("Complete the theme and choose 1 to 32 icons");
+        var item=library.snapshot().item(draft.sourceId()).orElseThrow(()->new ThemeLibrary.Conflict("The source theme was removed; reopen the editor"));
+        var source=item.contents();var m=source.manifest();
+        if(!Objects.equals(draft.sourceDigest(),digest(source)))throw new ThemeLibrary.Conflict("The source theme changed; keep this draft open and reopen the theme in another tab to compare");
+        var icons=new ArrayList<ThemePackage.Icon>();var artwork=new HashMap<String,byte[]>();
+        for(var icon:draft.icons()){
+            if(icon==null)throw new IllegalArgumentException("Choose a theme icon");
+            String file=icon.file();
+            if(icon.data()!=null){
+                if(file==null||!(file.endsWith(".png")||file.endsWith(".svg"))||icon.data().length()>2_800_000)
+                    throw new IllegalArgumentException("Choose a PNG or safe SVG of at most 2 MiB");
+                byte[] bytes;try{bytes=Base64.getDecoder().decode(icon.data());}catch(IllegalArgumentException e){throw new IllegalArgumentException("Invalid icon data");}
+                if(bytes.length>ThemePackage.MAX_FILE)throw new IllegalArgumentException("Choose an icon of at most 2 MiB");
+                file="assets/editor-"+ThemePackage.sha256(bytes)+(file.endsWith(".svg")?".svg":".png");artwork.put(file,bytes);
+            }else if(m.icons().stream().noneMatch(i->i.file().equals(icon.file())))throw new IllegalArgumentException("Choose an existing icon file or upload an image");
+            icons.add(new ThemePackage.Icon(icon.id(),icon.label(),file));
+        }
+        var manifest=new ThemePackage.Manifest(draft.id(),draft.version(),draft.name(),draft.author(),draft.license(),m.renderer(),m.definition(),draft.defaultIcon(),icons,null,m.files());
+        byte[] result=ThemeArchive.edited(source,manifest,JSON.writeValueAsBytes(draft.drawing()),artwork,guide);
+        // Reuse the full import validator, including every graphic and all format/size/integrity limits.
+        library.inspect(result);return result;
+    }
+    ThemeLibrary.Item save(Draft draft) throws IOException {
+        // The revision check and installation share the import lock: another editor cannot silently overwrite a save.
+        synchronized(library){
+            byte[] bytes=archive(draft,false);
+            return library.install(bytes,draft.id().equals(draft.sourceId())?"update":"add",null,null);
+        }
+    }
+}
