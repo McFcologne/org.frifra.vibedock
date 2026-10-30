@@ -23,7 +23,7 @@ import java.util.*;
 @Service
 public class ClientRegistry {
     private static final Logger log=LoggerFactory.getLogger(ClientRegistry.class);
-    static final int MIN_POLL=10,MAX_POLL=3600,DEFAULT_POLL=30,VERSION=3;
+    static final int MIN_POLL=10,MAX_POLL=3600,DEFAULT_POLL=30,VERSION=3,THEME_ICONS_VERSION=4;
     /** Addresses announced to devices (empty: derive the internal one, no external one) and the poll interval. */
     record Server(String internalUrl,String externalUrl,int pollSeconds) {
         Server { internalUrl=internalUrl==null?"":internalUrl.trim();externalUrl=externalUrl==null?"":externalUrl.trim(); }
@@ -395,10 +395,27 @@ public class ClientRegistry {
                 d.web()==null&&d.boardType().batteryPowerSaving()&&d.powerSaving());
     }
     private void save(State next) throws IOException {
+        // Do not migrate old files on read or on an ordinary emoji edit. Mark the new shape only when opted into.
+        if(hasThemeIcons(next))next=new State(THEME_ICONS_VERSION,next.server(),next.defaultDesign(),next.devices());
         Path temp=Files.createTempFile(file.getParent(),"clients-",".tmp");
         try{Files.setPosixFilePermissions(temp,PosixFilePermissions.fromString("rw-------"));json.writeValue(temp.toFile(),next);
+            backupBeforeThemeIcons(next);
             Files.move(temp,file,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);state=next;
         }finally{Files.deleteIfExists(temp);}
+    }
+    /** The optional icon field is additive; keep a private pre-feature snapshot before first opting into it. */
+    private void backupBeforeThemeIcons(State next) throws IOException {
+        var backup=file.resolveSibling("clients.json.before-theme-icons.bak");
+        if(!hasThemeIcons(next)||hasThemeIcons(state)||!Files.exists(file)||Files.exists(backup))return;
+        var temporary=Files.createTempFile(file.getParent(),"clients-icons-backup-",".tmp");
+        try{
+            Files.copy(file,temporary,StandardCopyOption.REPLACE_EXISTING);
+            Files.setPosixFilePermissions(temporary,PosixFilePermissions.fromString("rw-------"));
+            Files.move(temporary,backup,StandardCopyOption.ATOMIC_MOVE);
+        }finally{Files.deleteIfExists(temporary);}
+    }
+    private static boolean hasThemeIcons(State state){
+        return state.defaultDesign().icon()!=null||state.devices().stream().anyMatch(d->d.design()!=null&&d.design().icon()!=null);
     }
     static String hash(String key){
         try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(key.getBytes(StandardCharsets.US_ASCII)));}

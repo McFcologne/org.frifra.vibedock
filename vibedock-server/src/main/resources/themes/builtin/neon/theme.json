@@ -2,7 +2,7 @@
   "format": "org.frifra.vibedock.theme",
   "schemaVersion": 1,
   "id": "neon",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Neon",
   "author": "VibeDock contributors; Twemoji contributors (icon)",
   "license": "Apache-2.0 AND CC-BY-4.0",
@@ -11,17 +11,23 @@
     "version": 1
   },
   "definition": "style.json",
-  "defaultIcon": "legacy",
+  "defaultIcon": "theme",
   "icons": [
     {
       "id": "legacy",
       "label": "Existing theme illustration",
       "file": "assets/default.svg"
+    },
+    {
+      "id": "theme",
+      "label": "Neon glasses",
+      "file": "assets/theme.svg"
     }
   ],
   "files": {
     "assets/default.svg": "16fe38d79db66e96ba3f4d5b1c6e7d0a8bf95a92264d0528c6d42b7e99a8014d",
-    "license.txt": "b03a3cb168b4e571773a37b2b2e8da0ea6d25b29efc2fc42466d7fb64098a67e",
-    "style.json": "0ee01b01eb463c92d13905feb42fa0e9eeff9e0758fad4436f02157eab15651e"
+    "license.txt": "d3de0e049f052b0dc83a425e047c38229be878801f2960a305f3956fe05a7963",
+    "style.json": "0ee01b01eb463c92d13905feb42fa0e9eeff9e0758fad4436f02157eab15651e",
+    "assets/theme.svg": "b5adf12f6887eb68e4851f7300f5f15563a339be350999b5b0d01fe20372632e"
   }
 }

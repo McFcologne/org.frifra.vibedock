@@ -2,7 +2,7 @@
   "format": "org.frifra.vibedock.theme",
   "schemaVersion": 1,
   "id": "hi_fi",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Hi-Fi",
   "author": "VibeDock contributors; Twemoji contributors (icon)",
   "license": "Apache-2.0 AND CC-BY-4.0",
@@ -11,17 +11,23 @@
     "version": 1
   },
   "definition": "style.json",
-  "defaultIcon": "legacy",
+  "defaultIcon": "theme",
   "icons": [
     {
       "id": "legacy",
       "label": "Existing theme illustration",
       "file": "assets/default.svg"
+    },
+    {
+      "id": "theme",
+      "label": "Hi-Fi speaker",
+      "file": "assets/theme.svg"
     }
   ],
   "files": {
     "assets/default.svg": "d32bd9f51b2a54f620f9693e833935c5e2cb2304cbf89aab75fd10f054711ce5",
-    "license.txt": "e66889aec2db95d895e3dd9ff7498b20aeb9278f30951cffabc1222fd5725f7b",
-    "style.json": "dfa7ce4b2885aa7299bfa247f35c055ba44049571eb23482ddb80d4bc6b4de5b"
+    "license.txt": "8c301a734b12bde1081d42ca166e4b8649f968554aa7b3cda7fa48e47f06e03d",
+    "style.json": "dfa7ce4b2885aa7299bfa247f35c055ba44049571eb23482ddb80d4bc6b4de5b",
+    "assets/theme.svg": "985ccdad6dae3fa7151fbaa3b40a44e3876c165add83a861e82234fcc3d0f9d4"
   }
 }

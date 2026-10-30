@@ -2,7 +2,7 @@
   "format": "org.frifra.vibedock.theme",
   "schemaVersion": 1,
   "id": "sunset",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Sunset",
   "author": "VibeDock contributors; Twemoji contributors (icon)",
   "license": "Apache-2.0 AND CC-BY-4.0",
@@ -11,17 +11,23 @@
     "version": 1
   },
   "definition": "style.json",
-  "defaultIcon": "legacy",
+  "defaultIcon": "theme",
   "icons": [
     {
       "id": "legacy",
       "label": "Existing theme illustration",
       "file": "assets/default.svg"
+    },
+    {
+      "id": "theme",
+      "label": "Setting sun",
+      "file": "assets/theme.svg"
     }
   ],
   "files": {
     "assets/default.svg": "4fa646a4dbc10513ddeb70561789483638faf456e15186f4eb7291c5c455cbb6",
-    "license.txt": "8c39ebeb7d9f4bc6b69a8455ce4ed50da521f4e6793dda686f2bbd9ad3ebe7c9",
-    "style.json": "85af081fb816af22bd4854a9760b4c40f50002aadcba4f89d00407052f57c227"
+    "license.txt": "3a01c4ab72782e80168e477d0a2714cc32fbb31b44f1e815315b8db550cb828d",
+    "style.json": "85af081fb816af22bd4854a9760b4c40f50002aadcba4f89d00407052f57c227",
+    "assets/theme.svg": "8fa969663fa03e83d9f3bdd1a67245476cdb71adbbc32b502da21a96c3953998"
   }
 }

@@ -18,7 +18,7 @@
   const sourceIds = () => catalog.providers.map(p => p.id);
   const inputFor = design => ({mood: design.mood || '', scheme: design.scheme,
     weatherLocation: design.weather ? design.weather.name : '', layout: copy(design.layout), inherit: false,
-    photos: design.photos ? copy(design.photos) : null});
+    photos: design.photos ? copy(design.photos) : null, icon: design.icon ? copy(design.icon) : null});
   let library = [];  // the photo library (/admin/photos), oldest first
   const error = message => { $('#design-error').textContent = message; $('#design-error').hidden = !message; };
   function controls() {
@@ -242,6 +242,7 @@
     $('#layout-emoji').value = draft.mood || '-';
     const emojiButton = root.querySelector('[data-emoji-open]'); emojiButton.dataset.file = '';
     emojiButton.dispatchEvent(new Event('vibedock-emoji-render'));
+    renderIconControls();
     $('#design-align').value = draft.layout.alignTop ? 'top' : 'spread';
     renderPhotos(); renderBands(); displayNote(); controls();
   }
@@ -251,6 +252,29 @@
     }));
     if(draft)$('#design-scheme').value=draft.scheme;
   }
+  function renderIconControls(){
+    const mode=draft.icon?.mode||'emoji', entries=catalog.icons||[];
+    $('#design-icon-mode').value=mode;
+    $('#design-emoji-choice').hidden=mode!=='emoji';$('#design-catalog-choice').hidden=mode!=='theme-catalog';
+    const select=$('#design-catalog-icon'), groups=new Map();
+    for(const entry of entries){
+      if(!groups.has(entry.theme)){const group=document.createElement('optgroup');group.label=entry.themeLabel;groups.set(entry.theme,group);}
+      const option=element('option','',entry.label+(entry.themeDefault?' · default':''));option.value=entry.theme+'/'+entry.id;groups.get(entry.theme).append(option);
+    }
+    select.replaceChildren(...groups.values());
+    let entry;
+    if(mode==='theme-catalog'){
+      const value=draft.icon.theme+'/'+draft.icon.id;
+      entry=entries.find(e=>e.theme===draft.icon.theme&&e.id===draft.icon.id);
+      if(!entry){const missing=element('option','','Unavailable · '+value);missing.value=value;select.append(missing);}
+      select.value=value;
+    }else if(mode==='theme-default')entry=entries.find(e=>e.theme===draft.scheme&&e.themeDefault);
+    const image=$('#design-theme-icon');image.hidden=!entry;
+    if(entry){image.src=entry.image;image.alt=entry.label+' · '+entry.themeLabel;}
+    else image.removeAttribute('src');
+    $('#design-icon-hint').textContent=mode==='emoji'?'Choose an emoji or None.':!entry?'Icon unavailable; the saved emoticon is used.':
+      mode==='theme-default'?'Follows the theme, including when you swipe.':'This icon stays selected when the theme changes.';
+  }
   function themeGallery(){
     $('#theme-count').textContent=catalog.schemes.filter(s=>s.enabled).length+' / '+catalog.schemes.length+' enabled';
     const cards=catalog.schemes.map(s=>{
@@ -258,7 +282,7 @@
       const heading=element('h4','',s.label), image=document.createElement('img');
       image.src='/admin/themes/'+encodeURIComponent(s.id)+'/preview.png';image.alt=s.label+' theme with sample usage';image.width=240;image.height=240;image.loading='lazy';
       const choose=element('button','secondary','Use theme');choose.type='button';choose.dataset.themeChoose=s.id;
-      choose.addEventListener('click',()=>{draft.scheme=s.id;$('#design-scheme').value=s.id;changed();controls();});
+      choose.addEventListener('click',()=>{draft.scheme=s.id;$('#design-scheme').value=s.id;renderIconControls();changed();controls();});
       const label=element('label','theme-availability'),toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=s.enabled;toggle.setAttribute('aria-label',s.label+' enabled');label.title='Enable or disable '+s.label;
       label.append(toggle);
       toggle.addEventListener('change',async()=>{
@@ -400,7 +424,19 @@
     $('#inheritance-description').textContent = inherit ? 'This device follows the default design, including future changes.' : 'Editing a complete device-specific copy of the design.';
     render(); changed();
   });
-  $('#design-scheme').addEventListener('change', event => { draft.scheme = event.target.value; changed(); });
+  $('#design-scheme').addEventListener('change', event => { draft.scheme = event.target.value; renderIconControls(); changed(); });
+  $('#design-icon-mode').addEventListener('change', event => {
+    const mode=event.target.value;
+    if(mode==='emoji')draft.icon=null;
+    else if(mode==='theme-default')draft.icon={mode};
+    else{const entry=(catalog.icons||[]).find(e=>e.theme===draft.scheme&&e.themeDefault)||(catalog.icons||[])[0];
+      if(!entry){event.target.value=draft.icon?.mode||'emoji';return;}
+      draft.icon={mode,theme:entry.theme,id:entry.id};}
+    renderIconControls();changed();
+  });
+  $('#design-catalog-icon').addEventListener('change', event => {
+    const [theme,id]=event.target.value.split('/');draft.icon={mode:'theme-catalog',theme,id};renderIconControls();changed();
+  });
   $('#design-display').addEventListener('change', event => { draft.display = event.target.value; fitCase(); renderBands(); changed(); });
   $('#design-weather').addEventListener('change', event => { draft.weatherLocation = event.target.value.trim(); changed(); });
   $('#design-weather').addEventListener('input', event => {

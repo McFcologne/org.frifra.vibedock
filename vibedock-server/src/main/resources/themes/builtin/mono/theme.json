@@ -2,7 +2,7 @@
   "format": "org.frifra.vibedock.theme",
   "schemaVersion": 1,
   "id": "mono",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Mono",
   "author": "VibeDock contributors; Twemoji contributors (icon)",
   "license": "Apache-2.0 AND CC-BY-4.0",
@@ -11,17 +11,23 @@
     "version": 1
   },
   "definition": "style.json",
-  "defaultIcon": "legacy",
+  "defaultIcon": "theme",
   "icons": [
     {
       "id": "legacy",
       "label": "Existing theme illustration",
       "file": "assets/default.svg"
+    },
+    {
+      "id": "theme",
+      "label": "Robot",
+      "file": "assets/theme.svg"
     }
   ],
   "files": {
     "assets/default.svg": "c42f819447dd37c4e596f14d0090e3479e7dfd28f78c510c887baa1ae779b00c",
-    "license.txt": "d74770eab23c4ce0a914b3c6a6e17c7ebd069b961f7bde827039120c01b972d3",
-    "style.json": "6677d2bf26c89064fc34e3ce1e00cdcfbee1cc7643bb9cdb917fa39eea38eb3d"
+    "license.txt": "8b41ff939e7d39f03f9a74b773632ba949cd1dc40376741076f232972ea68433",
+    "style.json": "6677d2bf26c89064fc34e3ce1e00cdcfbee1cc7643bb9cdb917fa39eea38eb3d",
+    "assets/theme.svg": "ba6d3371106bc47f804d33d72a3eec1de42a01592143b92a373508c053a11985"
   }
 }

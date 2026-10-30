@@ -48,7 +48,7 @@ this first implementation. Author attribution and redistribution rights remain p
 
 ## Icon selection contract
 
-The package supplies the theme's default and catalog icons. A design will choose between:
+The package supplies the theme's default and catalog icons. The design editor now chooses between:
 
 - **Emoticon:** its existing emoji selection (including the existing no-icon choice).
 - **Theme default:** resolves the default icon of the currently selected theme, including after a swipe.
@@ -56,8 +56,34 @@ The package supplies the theme's default and catalog icons. A design will choose
 
 Existing designs are not automatically switched to a theme icon. All 35 existing themes must retain their current
 rendering, including their existing emoji style and position, until the user explicitly selects a new icon.
-The Debugger icon will use a restrained, recognisable IDE bug silhouette without a face; every proposed icon must be
-reviewed in its actual rendered theme at the supported display sizes, not accepted from the contact sheet alone.
+The new Debugger icon uses a technical IDE bug silhouette without a face. All 35 new vector icons have been checked
+inside their rendered themes on square and narrow panels, including the Handheld and Blueprint contour filters.
+The original illustrations remain available as the `legacy` catalog entries; `theme` is the new opt-in default.
+
+Design JSON keeps the existing `mood` string. An absent/null `icon` retains the original emoticon/no-icon behaviour;
+`{"mode":"theme-default"}` follows the current theme, while
+`{"mode":"theme-catalog","theme":"blueprint","id":"theme"}` fixes one package icon. The old `mood` value remains
+stored when switching modes. Missing fixed references are retained and fall back to that emoticon, with an editor
+message; newly choosing an unavailable reference is rejected. Disabling a theme for selection/swipes does not remove
+its icons from the catalog or break an existing fixed reference.
+
+The first opt-in write over an existing configuration creates the private, one-time
+`clients.json.before-theme-icons.bak`. Reading legacy settings never rewrites them. To downgrade to a server that
+does not understand `icon`, stop the server and restore that snapshot as `clients.json` (keep a copy of the current
+file first). This restores the configuration at first opt-in, not subsequent changes. A fresh configuration with no
+older file has no pre-feature snapshot. Prefer switching designs back to Emoticon before a downgrade if retaining
+later configuration changes; this removes the optional field on the next save.
+
+The file is marked as configuration version 4 while any default or device design selects a theme icon. Ordinary
+emoticon-only edits retain version 3; switching every design back to Emoticon writes version 3 again. This server
+reads both shapes without rewriting them on load.
+
+Only PNG rasters of catalog assets are served by the authenticated administration endpoint. Icons are limited to
+128 KiB and rasterized to at most 512×512. PNG sources are at most 1024×1024. SVG uses a small namespace-aware shape
+subset (paths, rectangles, ellipses/circles, lines, polygons/polylines and groups), at most 2048 XML nodes and bounded
+numeric coordinates. Scripts, CSS, text/fonts, external references, entities/DOCTYPE and nested SVG are rejected.
+The SVG loader also denies resource access. These are deliberate limits for shareable theme artwork, not support
+for arbitrary SVG documents.
 
 ## Example archive
 

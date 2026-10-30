@@ -661,8 +661,8 @@ Up to five usage bands fit a tall screen (e.g. a phone as a web display); smalle
 fit. **On tall screens** chooses where spare height goes: *Spread the bands evenly* (the default) or *Bands at the
 top*, where the bands stay together and a weather and mood band at the end keeps to the bottom edge.
 
-The **Weather & mood** band holds the weather (icon and temperature for the **Weather location**) and the **Mood**
-emoji; **Swap weather & mood** exchanges the two slots. The update time and the IP address move with this band.
+The **Weather & mood** band holds the weather (icon and temperature for the **Weather location**) and the selected
+**Icon**; **Swap weather & mood** exchanges the two slots. The update time and the IP address move with this band.
 
 Change the order with the grip (drag) or with ↑ and ↓, remove a band with ×, add one with **+ Add usage band**. A
 data source that is paused or unavailable is shown as such on the display.
@@ -718,7 +718,23 @@ the aspect ratio:
 
 <img src="themes.png" width="100%" alt="The thirty-five display themes with example data">
 
-The mood button opens the emoji picker with quick picks, search and all emoji; *None* leaves the slot empty.
+**Icon** chooses between **Emoticon**, **Theme default** and **Theme catalog icon**. Existing designs stay on
+Emoticon, including a previous None choice. In that mode the mood button opens the emoji picker with quick picks,
+search and all emoji; *None* leaves the slot empty. Theme default follows the selected theme, including swipes.
+Theme catalog icon fixes an icon from any theme and keeps it when the theme changes. The theme overview previews
+the new defaults; choosing a theme alone does not switch an existing design's icon mode.
+
+Changing modes retains the saved emoticon. If a fixed theme icon is missing, the editor reports it and the display
+uses that emoticon as a fallback; the fixed reference is kept. Disabling a theme does not remove its catalog icons.
+Each theme supplies its own default artwork and the previous illustration remains a catalog choice.
+
+Before the first Theme default/catalog save over an existing configuration, the server creates
+`clients.json.before-theme-icons.bak` with private file permissions. Keep this snapshot for a downgrade to a server
+that cannot read the new optional `icon` field: stop the server, preserve the current file, then restore the snapshot
+as `clients.json`. This restores the device/design configuration at first opt-in. Alternatively, switch the default
+and every device override back to Emoticon and save before downgrading. No firmware update is needed for icon modes.
+Configuration version 4 marks an active theme-icon choice; Emoticon-only configurations retain version 3.
+
 Handheld LCD uses a dark contour around emoji; Blueprint uses a light contour with darker facial details, so
 smileys stay recognisable against their backgrounds, also on scaled web displays.
 

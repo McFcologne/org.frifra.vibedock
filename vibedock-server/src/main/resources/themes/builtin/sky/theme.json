@@ -2,7 +2,7 @@
   "format": "org.frifra.vibedock.theme",
   "schemaVersion": 1,
   "id": "sky",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Sky (light)",
   "author": "VibeDock contributors; Twemoji contributors (icon)",
   "license": "Apache-2.0 AND CC-BY-4.0",
@@ -11,17 +11,23 @@
     "version": 1
   },
   "definition": "style.json",
-  "defaultIcon": "legacy",
+  "defaultIcon": "theme",
   "icons": [
     {
       "id": "legacy",
       "label": "Existing theme illustration",
       "file": "assets/default.svg"
+    },
+    {
+      "id": "theme",
+      "label": "Hot-air balloon",
+      "file": "assets/theme.svg"
     }
   ],
   "files": {
     "assets/default.svg": "68dc119e054a8660c1d0e7ee999b649be22309e050a7f68ba9458f36eb2db489",
-    "license.txt": "f6386f05a3a675d510a399984ca54bcbe1c748e4a9fb5101f8796e5a506ef4b6",
-    "style.json": "62adc077a3dc71efed768574d9357571a68b4f115d9c6dd406a504bfd2d2d208"
+    "license.txt": "f070502bcf901dee8270e7d494db9c0c2d03e778d0173ca7d1716700cec10ea3",
+    "style.json": "62adc077a3dc71efed768574d9357571a68b4f115d9c6dd406a504bfd2d2d208",
+    "assets/theme.svg": "b95f722b3313e0ab38bc05e2579a7dcd8dcbaa9121d4da71132cc4e05bf101a4"
   }
 }

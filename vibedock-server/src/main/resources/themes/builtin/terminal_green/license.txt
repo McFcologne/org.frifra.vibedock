@@ -1,4 +1,4 @@
-Theme definition: VibeDock contributors, Apache-2.0.
+Theme definition and original theme.svg artwork: VibeDock contributors, Apache-2.0.
 
 
                                  Apache License

@@ -65,9 +65,9 @@ checksum and drawing recipe at startup. Corrupt built-in resources fail initiali
 an existing design. `catalog.json` lists their original order, checked against the current catalog by tests.
 
 The `legacy` icon asset in each package is an unmodified copy of its existing Twemoji illustration, with source,
-attribution and full license texts in `license.txt`. This does not change a design's emoji selection. The separate
-theme-default/catalog selection and newly proposed icons are stage 4. No generated `.vibetheme` archive or firmware
-binary is checked in.
+attribution and full license texts in `license.txt`. The additional `theme` asset is original VibeDock vector artwork
+under Apache-2.0, explicitly chosen through the stage-4 theme-default/catalog modes. Existing designs retain their
+emoticons. No generated `.vibetheme` archive or firmware binary is checked in.
 
 The frozen 0.3.x renderer remains independent of these files. Its 1,750 pixel comparisons cover the original 35
 themes on eight display sizes, six representative states/layouts and two browser scales. An additional test repacks

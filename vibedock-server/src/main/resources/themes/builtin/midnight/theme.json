@@ -2,7 +2,7 @@
   "format": "org.frifra.vibedock.theme",
   "schemaVersion": 1,
   "id": "midnight",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Midnight",
   "author": "VibeDock contributors; Twemoji contributors (icon)",
   "license": "Apache-2.0 AND CC-BY-4.0",
@@ -11,17 +11,23 @@
     "version": 1
   },
   "definition": "style.json",
-  "defaultIcon": "legacy",
+  "defaultIcon": "theme",
   "icons": [
     {
       "id": "legacy",
       "label": "Existing theme illustration",
       "file": "assets/default.svg"
+    },
+    {
+      "id": "theme",
+      "label": "Crescent moon",
+      "file": "assets/theme.svg"
     }
   ],
   "files": {
     "assets/default.svg": "20e5f9466f9c909d9cdf67a83af252df198ba686c57cfc0271afab9d48cee699",
-    "license.txt": "4d1c79691a7e6f620ed7cb5611a5e12e8ef8e66cf81fca559c444d3332d71c03",
-    "style.json": "1c29b78724ca2aac4172b9067d3e208ce0dfa395dfd5033017947e9ba3b23ff7"
+    "license.txt": "426b238cd3e2b301ed65370c8dc7ef8c45a9f92a9474d702c929c9ff8bb4d3aa",
+    "style.json": "1c29b78724ca2aac4172b9067d3e208ce0dfa395dfd5033017947e9ba3b23ff7",
+    "assets/theme.svg": "743ab63cd8dc443a806904045c4a3050b91becb61987c46972b692945f815124"
   }
 }
