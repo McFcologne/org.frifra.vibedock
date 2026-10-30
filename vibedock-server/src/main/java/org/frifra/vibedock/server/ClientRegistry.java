@@ -342,6 +342,8 @@ public class ClientRegistry {
         }
         boolean persist=learnOrigin||learnNetwork||c.lastPullAt()==null || now-c.lastPullAt()>=60 || !Objects.equals(peer,c.lastPullIp()) || serverFooter!=c.serverFooter()
                 || !Objects.equals(firmware,c.firmware());
+        // Another firmware than before (over Wi-Fi or USB, e.g. after an update that timed out): an old update error is over.
+        if(firmware!=null&&c.firmware()!=null&&!firmware.equals(c.firmware()))updateErrors.remove(id);
         if(c.lastPullAt()==null)log.info("Device {} ({}) pulled its first image from {}",c.name(),id,peer);
         else if(!Objects.equals(peer,c.lastPullIp()))log.info("Device {} ({}) now pulls from {} (was {})",c.name(),id,peer,c.lastPullIp());
         var updated=c.pulled(now,peer,serverFooter,firmware);
