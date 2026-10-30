@@ -179,7 +179,7 @@ Single-color PNGs with transparency support an optional main-color override in t
 remain unchanged; indexed PNGs are converted to RGBA before recoloring. Multicolor, opaque or empty PNGs are not recolored.
 Unchecking the override restores the original bytes within that editing session; saved/exported PNGs contain the chosen color.
 
-Downloaded packages include `preview.html` and a small PNG snapshot from the real sample renderer. The offline page
+Downloaded packages include `preview.html` and a small PNG snapshot from the real sample renderer. The page carries the bundled VibeDock icon in its header and as its favicon; the shared PNG asset is included in the archive. The offline page
 uses relative package assets and has no JavaScript or external resources. Only the root `preview.html` is allowed;
 it is validated as bounded static XHTML with fixed styles, constrained tags/attributes and a restrictive resource
 policy. Arbitrary HTML is rejected. The page is regenerated when package metadata changes. Existing packages without

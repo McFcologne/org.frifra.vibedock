@@ -12,6 +12,8 @@ class ThemePreviewPageTest {
         assertArrayEquals(png,contents.file(contents.manifest().preview()));
         String html=new String(contents.file("preview.html"),StandardCharsets.UTF_8);
         assertTrue(html.contains(contents.manifest().preview()));
+        assertTrue(html.contains("alt=\"VibeDock\""));assertTrue(html.contains("rel=\"icon\""));
+        assertArrayEquals(ThemePreviewPage.logo(),contents.file(ThemePreviewPage.LOGO));
         for(var icon:contents.manifest().icons())assertTrue(html.contains(icon.file()));
         assertFalse(html.contains("<script"));
         assertArrayEquals(archive,ThemeArchive.preview(source,png,false),"offline previews remain deterministic");

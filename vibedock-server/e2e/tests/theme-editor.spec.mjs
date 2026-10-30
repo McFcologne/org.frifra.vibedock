@@ -111,6 +111,7 @@ test('unpacked preview.html opens offline with local artwork and an actual displ
   try{
     await page.goto(new URL('../../target/theme-preview-offline/preview.html',import.meta.url).href);
     await expect(page.getByRole('heading',{name:'Midnight',exact:true})).toBeVisible();
+    await expect(page.getByRole('img',{name:'VibeDock',exact:true})).toBeVisible();await expect(page.locator('link[rel=icon]')).toHaveAttribute('href',/preview\/vibedock-.*\.png/);
     await expect.poll(()=>page.locator('img').evaluateAll(images=>images.length>=3&&images.every(i=>i.complete&&i.naturalWidth>0))).toBe(true);
     expect(requests.every(url=>url.startsWith('file:'))).toBe(true);
     await expect(page.locator('script')).toHaveCount(0);

@@ -38,6 +38,11 @@ final class ThemeArchive {
     private static byte[] encode(ThemePackage.Manifest manifest,TreeMap<String,byte[]> files,boolean guide,String copyId,String copyName) throws IOException {
         var runtime=new HashSet<String>();runtime.add(manifest.definition());if(manifest.preview()!=null)runtime.add(manifest.preview());
         manifest.icons().forEach(icon->runtime.add(icon.file()));
+        if(files.containsKey(ThemePreviewPage.FILE)){
+            byte[] logo=ThemePreviewPage.logo();
+            if(files.containsKey(ThemePreviewPage.LOGO)&&!Arrays.equals(files.get(ThemePreviewPage.LOGO),logo))throw new IllegalArgumentException("Rename the conflicting preview branding asset");
+            files.put(ThemePreviewPage.LOGO,logo);runtime.add(ThemePreviewPage.LOGO);
+        }
         files.keySet().removeIf(path->!runtime.contains(path)&&(GUIDES.contains(path)||path.endsWith(".png")||path.endsWith(".svg")));
         if(files.containsKey(ThemePreviewPage.FILE))files.put(ThemePreviewPage.FILE,ThemePreviewPage.page(manifest));
         // Only JSON whitespace is removed; images, artwork, attribution and license bytes stay intact.
