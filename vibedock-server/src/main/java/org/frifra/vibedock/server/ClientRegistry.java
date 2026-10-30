@@ -105,11 +105,13 @@ public class ClientRegistry {
                        boolean ota,boolean otaNeedsPairing,boolean updating,String updateError,DisplayType display,Web web,Board board,boolean flipped,int rotation,boolean powerSaving) {}
     private final Path file;
     private final ObjectMapper json;
+    private final ThemeLibrary themeLibrary;
     private final Clock clock;
     private State state;
 
-    public ClientRegistry(@Value("${vibedock.data-dir}") String directory,ObjectMapper json,Clock clock) throws IOException {
-        this.json=json;this.clock=clock;Path dir=Path.of(directory);Files.createDirectories(dir);file=dir.resolve("clients.json");
+    @org.springframework.beans.factory.annotation.Autowired
+    public ClientRegistry(@Value("${vibedock.data-dir}") String directory,ObjectMapper json,Clock clock,ThemeLibrary themeLibrary) throws IOException {
+        this.themeLibrary=themeLibrary;this.json=json;this.clock=clock;Path dir=Path.of(directory);Files.createDirectories(dir);file=dir.resolve("clients.json");
         state=new State(VERSION,null,null,List.of());
         if(Files.exists(file)){
             JsonNode node=json.readTree(file.toFile());
@@ -133,6 +135,7 @@ public class ClientRegistry {
     // ---- server settings ----
     public synchronized String internalUrl(){return state.server().internalUrl();}
     public synchronized String externalUrl(){return state.server().externalUrl();}
+    public ClientRegistry(String directory,ObjectMapper json,Clock clock) throws IOException {this(directory,json,clock,null);}
     public synchronized int pollSeconds(){return state.server().pollSeconds();}
     public synchronized void configure(String internalUrl,String externalUrl,int pollSeconds) throws IOException {
         validateSettings(internalUrl,externalUrl,pollSeconds);
@@ -142,12 +145,14 @@ public class ClientRegistry {
     // ---- designs ----
     public synchronized Design defaultDesign(){return state.defaultDesign();}
     public synchronized void configureDesign(Design design) throws IOException {
+        validateThemeReferences(design,state.defaultDesign());
         save(new State(VERSION,state.server(),Objects.requireNonNull(design),state.devices()));
     }
     /** What a device shows: its own design, otherwise the default. */
     public synchronized Design designFor(String id){return design(find(id));}
     /** A complete override; null makes the device follow the default design again. */
     public synchronized void setDesign(String id,Design design) throws IOException {
+        if(design!=null)validateThemeReferences(design,design(find(id)));
         var updated=find(id).withDesign(design);List<Device> next=new ArrayList<>(state.devices());
         next.replaceAll(d->d.identifier().equals(id)?updated:d);save(state.withDevices(next));
     }
@@ -413,7 +418,17 @@ public class ClientRegistry {
         }finally{Files.deleteIfExists(temporary);}
     }
     private static boolean hasThemeIcons(State state){
-        return state.defaultDesign().icon()!=null||state.devices().stream().anyMatch(d->d.design()!=null&&d.design().icon()!=null);
+        return extendedTheme(state.defaultDesign())||state.devices().stream().anyMatch(d->d.design()!=null&&extendedTheme(d.design()));
+    }
+    private static boolean extendedTheme(Design design){return design.icon()!=null||!Scheme.known(design.scheme().id());}
+    private void validateThemeReferences(Design design,Design previous){
+        if(themeLibrary==null)return;
+        var snapshot=themeLibrary.snapshot();
+        if(snapshot.catalog().find(design.scheme().id()).isEmpty()&&!design.scheme().id().equals(previous.scheme().id()))
+            throw new IllegalArgumentException("This theme is no longer available");
+        if(design.icon()!=null&&!Objects.equals(design.icon(),previous.icon())
+                &&!ThemeIcons.image(design.icon(),snapshot.effective(design.scheme()),Twemoji.SIZE,snapshot::contents).isPresent())
+            throw new IllegalArgumentException("This theme icon is no longer available");
     }
     static String hash(String key){
         try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(key.getBytes(StandardCharsets.US_ASCII)));}

@@ -91,9 +91,14 @@ public final class Scheme {
     public Scheme shifted(int step){return ThemeCatalog.builtins().shifted(this,step);}
     static boolean known(String id){return ThemeCatalog.builtins().find(id).isPresent();}
     /** Stored and submitted ids; also accepts the enum names of older files. Unknown ids are rejected. */
-    @JsonCreator static Scheme parse(String id){
+    static Scheme parse(String id){
         String key=id==null?"":id.strip().toLowerCase(Locale.ROOT);
         return ThemeCatalog.builtins().find(key).orElseThrow(()->new IllegalArgumentException("Unknown colour scheme: "+id));
+    }
+    /** Missing installed packages retain their ID on disk; rendering resolves it against the instance catalog. */
+    @JsonCreator static Scheme stored(String id){
+        String key=id==null?"":id.strip().toLowerCase(Locale.ROOT);
+        return ThemeCatalog.builtins().find(key).orElseGet(()->new Scheme(key,key,MIDNIGHT.drawing));
     }
     /** Unknown or empty ids fall back to Midnight, as before. */
     static Scheme of(String id){return ThemeCatalog.builtins().find(id).orElse(MIDNIGHT);}

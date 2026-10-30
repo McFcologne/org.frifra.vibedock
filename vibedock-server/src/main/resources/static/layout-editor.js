@@ -31,6 +31,9 @@
       button.setAttribute('aria-pressed',String(draft?.scheme===theme?.id));
       button.textContent=draft?.scheme===theme?.id?'Selected':'Use theme';
     }
+    for(const button of root.querySelectorAll('[data-theme-remove]')){
+      const used=themeInUse(button.dataset.themeRemove);button.disabled=used;button.textContent=used?'In use':'Remove';
+    }
   }
   function changed(delay = 250) {
     dirty = true; edits++; error(''); schedulePreview(delay); controls();
@@ -52,7 +55,7 @@
         $('#design-message').textContent = savedTarget === 'default' ? 'Default design saved. Devices that follow it use it with their next image pull.'
           : savedInherit ? 'The device follows the default design again.' : 'Device design saved. It applies with the next image pull.';
       } catch (failure) { error(failure.message); $('#design-message').textContent = 'Not saved.'; }
-      finally { busy = false; }
+      finally { busy = false; controls(); }
     });
     return saving;
   }
@@ -248,8 +251,9 @@
   }
   function themeOptions(){
     $('#design-scheme').replaceChildren(...catalog.schemes.map(s=>{
-      const option=element('option','',s.label+(s.enabled?'':' · disabled'));option.value=s.id;option.disabled=!s.enabled;return option;
+      const option=element('option','',s.label+(s.enabled||s.missing?'':' · disabled'));option.value=s.id;option.disabled=!s.enabled;return option;
     }));
+    if(draft&&!catalog.schemes.some(s=>s.id===draft.scheme)){const missing=element('option','',draft.scheme+' · unavailable');missing.value=draft.scheme;missing.disabled=true;$('#design-scheme').append(missing);}
     if(draft)$('#design-scheme').value=draft.scheme;
   }
   function renderIconControls(){
@@ -276,14 +280,15 @@
       mode==='theme-default'?'Follows the theme, including when you swipe.':'This icon stays selected when the theme changes.';
   }
   function themeGallery(){
-    $('#theme-count').textContent=catalog.schemes.filter(s=>s.enabled).length+' / '+catalog.schemes.length+' enabled';
+    $('#theme-count').textContent=catalog.schemes.filter(s=>s.enabled).length+' / '+catalog.schemes.filter(s=>!s.missing).length+' enabled';
     const cards=catalog.schemes.map(s=>{
       const card=element('article','theme-card');card.dataset.theme=s.id;card.classList.toggle('theme-disabled',!s.enabled);
       const heading=element('h4','',s.label), image=document.createElement('img');
       image.src='/admin/themes/'+encodeURIComponent(s.id)+'/preview.png';image.alt=s.label+' theme with sample usage';image.width=240;image.height=240;image.loading='lazy';
+      if(s.missing){image.removeAttribute('src');image.hidden=true;}
       const choose=element('button','secondary','Use theme');choose.type='button';choose.dataset.themeChoose=s.id;
       choose.addEventListener('click',()=>{draft.scheme=s.id;$('#design-scheme').value=s.id;renderIconControls();changed();controls();});
-      const label=element('label','theme-availability'),toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=s.enabled;toggle.setAttribute('aria-label',s.label+' enabled');label.title='Enable or disable '+s.label;
+      const label=element('label','theme-availability'),toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=s.enabled;toggle.disabled=!!s.missing;toggle.setAttribute('aria-label',s.label+' enabled');label.title='Enable or disable '+s.label;
       label.append(toggle);
       toggle.addEventListener('change',async()=>{
         root.querySelectorAll('.theme-card input').forEach(input=>input.disabled=true);
@@ -293,15 +298,80 @@
           catalog.schemes=await response.json();themeOptions();
           // Update in place so keyboard focus stays on the switch just used.
           for(const item of catalog.schemes){const tile=$('#theme-grid').querySelector('[data-theme="'+item.id+'"]');tile.classList.toggle('theme-disabled',!item.enabled);tile.querySelector('input').checked=item.enabled;}
-          $('#theme-count').textContent=catalog.schemes.filter(t=>t.enabled).length+' / '+catalog.schemes.length+' enabled';
+          $('#theme-count').textContent=catalog.schemes.filter(t=>t.enabled).length+' / '+catalog.schemes.filter(t=>!t.missing).length+' enabled';
           $('#theme-message').textContent=s.label+(toggle.checked?' enabled.':' disabled. Existing designs keep this theme.');controls();
         }catch(e){toggle.checked=!toggle.checked;error(e.message);$('#theme-message').textContent=e.message;}
-        finally{root.querySelectorAll('.theme-card input').forEach(input=>input.disabled=false);}
+        finally{root.querySelectorAll('.theme-card input').forEach(input=>input.disabled=!!catalog.schemes.find(s=>s.id===input.closest('[data-theme]').dataset.theme)?.missing);}
       });
-      const title=element('div','theme-card-heading');title.append(heading,label);card.append(title,image,choose);return card;
+      const title=element('div','theme-card-heading');title.append(heading,label);card.append(title,image,choose);
+      const tools=element('div','theme-card-tools');
+      if(!s.missing){
+        const download=element('a','button secondary','Export');download.href='/admin/themes/'+encodeURIComponent(s.id)+'/export';
+        download.addEventListener('click',async event=>{
+          event.preventDefault();await save();if(dirty)return;
+          try{
+            const response=await fetch(download.href+'?agent='+$('#theme-export-agent').checked,{credentials:'same-origin'});
+            if(!response.ok){const details=await response.json().catch(()=>({}));throw new Error(details.error||'Could not export theme.');}
+            const url=URL.createObjectURL(await response.blob()),link=document.createElement('a');link.href=url;link.download=s.id+'.vibetheme';
+            link.addEventListener('click',e=>e.stopPropagation());document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+          }catch(e){error(e.message);}
+        });tools.append(download);
+        if(!s.builtin){
+          const used=themeInUse(s.id);
+          const remove=element('button','secondary',used?'In use':'Remove');remove.type='button';remove.disabled=used;remove.dataset.themeRemove=s.id;remove.title=used?'Change the design or fixed icon selection before removing this theme':'Remove '+s.label;
+          remove.addEventListener('click',async()=>{
+            try{await save();if(dirty)return;remove.disabled=true;
+              await themeRequest('/admin/themes/'+encodeURIComponent(s.id)+'/delete');await reloadThemes();$('#theme-message').textContent=s.label+' removed.';
+            }catch(e){error(e.message);controls();}
+          });tools.append(remove);
+        }
+        card.append(element('small','meta',(s.builtin?'Built-in':'Installed')+' · '+s.version));
+      }else card.append(element('p','meta','Package missing. The saved choice is kept; Midnight is shown until it returns.'));
+      card.append(tools);return card;
     });
     $('#theme-grid').replaceChildren(...cards);controls();
   }
+  let themeUpload=null,themeTransferBusy=false;
+  function themeInUse(id){return !!catalog&&[catalog.defaults,...catalog.devices.map(d=>d.design)].some(d=>d.scheme===id||d.icon?.mode==='theme-catalog'&&d.icon.theme===id);}
+  async function themeRequest(url,body){
+    const response=await fetch(url,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/octet-stream',[csrfHeader]:csrf},body});
+    if(!response.ok){const details=await response.json().catch(()=>({}));throw new Error(details.error||details.message||'Theme action failed.');}
+    return response.json();
+  }
+  async function reloadThemes(){
+    const response=await fetch('/admin/designs',{credentials:'same-origin'});if(!response.ok)throw new Error('Could not reload themes.');
+    catalog=await response.json();if(target!=='default'&&!catalog.devices.some(d=>d.identifier===target))target='default';
+    $('#design-target').value=target;themeOptions();themeGallery();
+    // Importing a package must not replace a draft edited while its request was in flight.
+    if(dirty||busy){renderIconControls();controls();schedulePreview();}else loadTarget();
+  }
+  $('#theme-import-file').addEventListener('change',async event=>{
+    const file=event.target.files[0];if(!file||themeTransferBusy)return;
+    themeTransferBusy=true;event.target.disabled=true;$('#theme-import-review').hidden=true;error('');
+    try{
+      if(file.size>8*1024*1024)throw new Error('Choose a theme archive of at most 8 MiB.');
+      themeUpload=await file.arrayBuffer();const info=await themeRequest('/admin/themes/inspect',themeUpload);
+      $('#theme-import-name').textContent=info.name;
+      $('#theme-import-details').textContent=info.id+' · v'+info.version+' · '+info.author+' · '+info.license+
+        (info.builtin?' · Built-in: install a copy.':info.exists?' · Installed v'+info.currentVersion+(info.canUpdate?'; update or install a copy.':'; increase its version to update, or install a copy.'):' · Ready to install.');
+      $('#theme-copy-id').value=info.copyId;$('#theme-copy-name').value=Array.from(info.name+' (copy)').slice(0,80).join('');
+      $('#theme-install').hidden=info.exists;$('#theme-update').hidden=!info.canUpdate;$('#theme-import-review').hidden=false;
+    }catch(e){themeUpload=null;error(e.message);}
+    finally{themeTransferBusy=false;event.target.disabled=false;event.target.value='';}
+  });
+  async function installTheme(mode){
+    if(!themeUpload||themeTransferBusy)return;
+    await save();if(dirty)return;themeTransferBusy=true;
+    const buttons=$('#theme-import-review').querySelectorAll('button');buttons.forEach(b=>b.disabled=true);$('#theme-import-file').disabled=true;
+    try{
+      const parameters=new URLSearchParams({mode});if(mode==='copy'){parameters.set('copyId',$('#theme-copy-id').value.trim());parameters.set('copyName',$('#theme-copy-name').value.trim());}
+      const result=await themeRequest('/admin/themes/import?'+parameters,themeUpload);
+      await reloadThemes();themeUpload=null;$('#theme-import-review').hidden=true;$('#theme-message').textContent=result.name+' v'+result.version+' installed. Available now.';
+    }catch(e){error(e.message);}
+    finally{themeTransferBusy=false;buttons.forEach(b=>b.disabled=false);$('#theme-import-file').disabled=false;}
+  }
+  $('#theme-install').addEventListener('click',()=>installTheme('add'));$('#theme-update').addEventListener('click',()=>installTheme('update'));$('#theme-copy').addEventListener('click',()=>installTheme('copy'));
+  $('#theme-import-cancel').addEventListener('click',()=>{if(!themeTransferBusy){themeUpload=null;$('#theme-import-review').hidden=true;}});
   $('#design-align').addEventListener('change', event => { draft.layout.alignTop = event.target.value === 'top'; changed(); });
   // ---- content: usage monitor or photos (a paused selection is kept for switching back) ----
   const photoDefaults = () => ({images: [], seconds: 30, shuffle: false, from: null, to: null, paused: false});

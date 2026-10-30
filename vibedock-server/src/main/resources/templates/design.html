@@ -60,6 +60,14 @@
 </form>
 <section class="card theme-catalog" id="design-themes" aria-labelledby="theme-catalog-title">
   <div class="card-head"><h3 class="grow" id="theme-catalog-title">Themes</h3><span class="badge" id="theme-count"></span></div>
+  <div class="theme-transfer-actions"><label class="button secondary">Import theme<input id="theme-import-file" type="file" accept=".vibetheme,.zip" hidden></label>
+    <label class="check"><input id="theme-export-agent" type="checkbox" checked> Include agent guide in exports</label></div>
+  <div id="theme-import-review" class="notice" hidden>
+    <strong id="theme-import-name"></strong><p id="theme-import-details" class="meta"></p>
+    <div class="theme-copy-fields"><label>Copy ID<input id="theme-copy-id" maxlength="80" autocomplete="off"></label><label>Copy name<input id="theme-copy-name" maxlength="80" autocomplete="off"></label></div>
+    <div class="theme-transfer-actions"><button id="theme-install" type="button">Install theme</button><button id="theme-update" type="button">Update existing</button>
+      <button id="theme-copy" type="button" class="secondary">Install independent copy</button><button id="theme-import-cancel" type="button" class="secondary">Cancel</button></div>
+  </div>
   <p class="meta">Choose a look for the design above. Enable or disable themes for this entire instance, including swipes on displays.
     Existing designs keep their theme when it is disabled. Keep at least one theme enabled.</p>
   <p id="theme-message" role="status" aria-live="polite" class="meta"></p>
