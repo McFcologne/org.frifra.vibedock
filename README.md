@@ -43,7 +43,7 @@ server; a display only receives its image.
 - **Up to ten usage widgets on sufficiently large displays.** Stack up to five usage bands and the weather/mood band in any order, spread evenly or aligned to the top. Each usage band holds one full-width source, two half-width sources or one compact row; the VibeTV M1 fits two full bands, one full and two compact ones or four compact ones.
 - **Display types.** Designs adapt to the display of each device: VibeTV M1 (240×240) by default, other common SPI panels from 128×160 to 320×240 per device.
 - **Weather and mood.** Show an emoji and weather icon/temperature; swap their slots, including the slot sizes. The update time and device IP stay with their band and cannot be hidden. The weather location is never drawn.
-- **Thirty-five display themes.** Modern dark and light themes, classic computers, terminals, instruments and print-inspired looks. The gallery previews every theme and controls its availability for the whole instance. Previews and devices use the same server renderer.
+- **Thirty-five built-in display themes.** Modern dark and light themes, classic computers, terminals, instruments and print-inspired looks. The gallery previews every theme and controls its availability for the whole instance. Previews and devices use the same server renderer.
 - **Photos and slideshows.** Instead of the status a display can show uploaded photos, one after the other, optionally only at certain times of day (e.g. at night). The server keeps only reduced copies and cuts them to each display.
 - **Encrypted account transfer.** Export data sources with their saved sign-ins and restore selected sources by adding them or replacing the current collection.
 - **Device management.** Pair using the IP and six-digit code on a trusted home network (HTTP pairing is unencrypted), inspect status and previews, rename, reorder by dragging, force a redraw, update, or remove a device.
@@ -118,6 +118,12 @@ theme for the default or a device override, or disable it for the whole instance
 display swipes and cannot be newly selected; existing designs keep their saved look. At least one theme stays enabled.
 The fifteen additional looks are Mission Control, Departure Board, Nordic, Hi-Fi, Solarized, Pixel Quest, Bauhaus,
 E-Ink, Industrial, Porcelain, GitHub Dark, VS Code, Terminal, Git Diff and Debugger. These are server-rendered; no firmware update is needed.
+
+**Customize** opens a built-in theme as an independent copy; **Edit theme** changes an installed package. The visual
+theme editor previews colors, fonts, styles, decorations and package icons on different panel sizes. It saves only
+when you choose **Save theme**. **Export draft** shares a compact `.vibetheme` file without installing it; files can
+also be imported from the gallery, with an optional agent-development guide on export. See the
+[theme editor and sharing instructions](docs/manual/MANUAL.md#creating-and-editing-a-theme).
 
 The default layout remains available unchanged: two full-width usage bands followed by weather/mood, update time and IP. Half-width widgets and a different band order are optional. Current firmware supports moving the entire weather/mood band; the editor warns when older firmware needs it at the bottom.
 

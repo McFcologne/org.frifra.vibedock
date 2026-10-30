@@ -22,7 +22,7 @@ class ThemeTransferTest {
     @DynamicPropertySource static void directory(DynamicPropertyRegistry properties) throws Exception {
         var directory=Files.createTempDirectory("vibedock-transfer-");properties.add("vibedock.data-dir",directory::toString);
     }
-    @Autowired MockMvc mvc;@Autowired ThemeLibrary library;@Autowired ClientRegistry registry;@Autowired DesignService designs;
+    @Autowired ThemeEditor editor;@Autowired MockMvc mvc;@Autowired ThemeLibrary library;@Autowired ClientRegistry registry;@Autowired DesignService designs;
     @MockitoBean DevicePoke poke;@MockitoBean ProviderClient providers;@MockitoBean BrowserLogin login;
     private MockHttpServletRequestBuilder admin(MockHttpServletRequestBuilder request){return request.with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;});}
     @Test void authenticatedImportIsLiveUpdatesExistingImagesAndGuardsUsedThemes() throws Exception {
@@ -53,6 +53,74 @@ class ThemeTransferTest {
                 .andExpect(header().string("Content-Disposition","attachment; filename=\"midnight.vibetheme\""))
                 .andReturn().getResponse().getContentAsByteArray();
         assertTrue(ThemePackage.read(exported).paths().contains("authoring/agent.txt"));
+        assertTrue(ThemePackage.read(exported).paths().contains("preview.html"));
+        // A real server-rendered export for the offline file:// browser check after Maven verify.
+        var offline=java.nio.file.Path.of("target/theme-preview-offline").toAbsolutePath();Files.createDirectories(offline);
+        for(var entry:ThemeLibraryTest.unzip(exported).entrySet()){
+            var target=offline.resolve(entry.getKey()).normalize();assertTrue(target.startsWith(offline));
+            Files.createDirectories(target.getParent());Files.write(target,entry.getValue());
+        }
         mvc.perform(get("/admin/themes/midnight/export").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10002);return r;})).andExpect(status().isNotFound());
+    }
+
+    @Test void editorDraftsPreviewExactBuiltInsAndSaveOnlyOnExplicitRequest() throws Exception {
+        var json=new tools.jackson.databind.json.JsonMapper();
+        for(var scheme:ThemeCatalog.builtins().all()){
+            var draft=editor.open(scheme.id(),false).draft();
+            var preview=mvc.perform(admin(post("/admin/theme-editor/preview.png")).with(csrf()).content(json.writeValueAsBytes(draft)))
+                    .andExpect(status().isOk()).andExpect(content().contentType("image/png")).andReturn().getResponse().getContentAsByteArray();
+            assertArrayEquals(designs.themePreview(scheme),preview,scheme.id()+" unchanged draft uses identical rendering");
+        }
+        var draft=ThemeEditorTest.edit(editor.open("midnight",false).draft(),Map.of("id","http.editor","name","Editor theme"));
+        byte[] body=json.writeValueAsBytes(draft);
+        mvc.perform(admin(get("/admin/themes/midnight/edit"))).andExpect(status().isOk()).andExpect(view().name("theme-editor"));
+        mvc.perform(admin(get("/admin/themes/midnight/editor"))).andExpect(status().isOk()).andExpect(jsonPath("$.builtin").value(true));
+        byte[] png=mvc.perform(admin(post("/admin/theme-editor/preview.png")).with(csrf()).param("display","135x240").content(body))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+        assertEquals(135,javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(png)).getWidth());
+        byte[] exported=mvc.perform(admin(post("/admin/theme-editor/export")).with(csrf()).content(body))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+        assertEquals("http.editor",ThemePackage.read(exported).manifest().id());assertTrue(library.snapshot().item("http.editor").isEmpty());
+        try{
+            mvc.perform(admin(post("/admin/theme-editor/save")).with(csrf()).content(body)).andExpect(status().isOk());
+            assertTrue(library.snapshot().item("http.editor").isPresent());
+            mvc.perform(admin(post("/admin/theme-editor/save")).with(csrf()).content(body)).andExpect(status().isOk());
+        }finally{if(library.snapshot().item("http.editor").isPresent())library.remove("http.editor");}
+    }
+    @Test void editorRejectsInvalidDraftsAndUsesTheSameAdminSecurityBoundary() throws Exception {
+        var json=new tools.jackson.databind.json.JsonMapper();byte[] body=json.writeValueAsBytes(editor.open("midnight",false).draft());
+        mvc.perform(admin(post("/admin/theme-editor/save")).content(body)).andExpect(status().isForbidden());
+        mvc.perform(post("/admin/theme-editor/save").with(user("admin").roles("ADMIN")).with(csrf()).content(body).with(r->{r.setLocalPort(10002);return r;})).andExpect(status().isNotFound());
+        mvc.perform(get("/admin/themes/midnight/editor").header("Accept","application/json").with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isUnauthorized());
+        mvc.perform(admin(post("/admin/theme-editor/preview.png")).with(csrf()).content("{}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").exists());
+        mvc.perform(admin(post("/admin/theme-editor/save")).with(csrf()).content("{bad"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(admin(post("/admin/theme-editor/preview.png")).with(csrf()).param("display","huge-unknown").content(body)).andExpect(status().isBadRequest());
+    }
+
+    @Test void editorUploadKeepsSafeVectorsAndRequiresCsrf() throws Exception {
+        byte[] svg="<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\"><script>alert(1)</script><rect width=\"48\" height=\"48\" fill=\"#ff0000\"/></svg>".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] body=mvc.perform(admin(post("/admin/theme-editor/icon")).param("format","svg").with(csrf()).content(svg))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.file").value("icon.svg"))
+                .andExpect(jsonPath("$.removed").value(1)).andReturn().getResponse().getContentAsByteArray();
+        var json=new tools.jackson.databind.json.JsonMapper();byte[] svgBytes=Base64.getDecoder().decode(json.readTree(body).get("data").textValue());
+        assertFalse(new String(svgBytes,java.nio.charset.StandardCharsets.UTF_8).contains("<script"));
+        assertEquals(0xff0000,ThemeIconAsset.draw("icon.svg",svgBytes,48).getRGB(24,24)&0xffffff);
+        mvc.perform(admin(post("/admin/theme-editor/icon")).param("format","svg").content(svg)).andExpect(status().isForbidden());
+        mvc.perform(admin(post("/admin/theme-editor/icon")).param("format","svg").with(csrf()).content(new byte[ThemeIconAsset.MAX_BYTES+1])).andExpect(status().isBadRequest());
+        mvc.perform(post("/admin/theme-editor/icon").param("format","svg").with(user("admin").roles("ADMIN")).with(csrf()).content(svg).with(r->{r.setLocalPort(10002);return r;})).andExpect(status().isNotFound());
+    }
+
+    @Test void contributorPreferenceIsOptionalAndStaysBehindAdminAndCsrf() throws Exception {
+        try{
+            mvc.perform(admin(get("/admin/theme-editor/contributor"))).andExpect(status().isOk()).andExpect(jsonPath("$.name").value(""));
+            mvc.perform(admin(post("/admin/theme-editor/contributor")).with(csrf()).contentType("application/json").content("{\"name\":\"Alex Artist\"}"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.name").value("Alex Artist"));
+            mvc.perform(admin(get("/admin/theme-editor/contributor"))).andExpect(jsonPath("$.name").value("Alex Artist"));
+            mvc.perform(admin(post("/admin/theme-editor/contributor")).contentType("application/json").content("{\"name\":\"Other\"}")).andExpect(status().isForbidden());
+            mvc.perform(get("/admin/theme-editor/contributor").header("Accept","application/json").with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isUnauthorized());
+            mvc.perform(get("/admin/theme-editor/contributor").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10002);return r;})).andExpect(status().isNotFound());
+        }finally{mvc.perform(admin(post("/admin/theme-editor/contributor")).with(csrf()).contentType("application/json").content("{\"name\":\"\"}")).andExpect(status().isOk());}
     }
 }

@@ -1,0 +1,1 @@
+- Brand the offline theme preview with the bundled VibeDock icon in its header and as its favicon; retain all required artwork inside the archive for offline viewing.

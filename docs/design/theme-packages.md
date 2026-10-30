@@ -108,5 +108,19 @@ two minified schemas help a human-authorized agent develop the theme; they are i
 never executed. Installation drops those generated references, and export regenerates current ones. The complete
 format, endpoints, limits, data-directory layout and rollback are in the [package reference](../../vibedock-server/themes/README.md).
 
-The visual editor remains stage 6. Custom theme selection uses configuration version 4 and the same pre-theme-feature
+The visual editor is covered in stage 6 below. Custom theme selection uses configuration version 4 and the same pre-theme-feature
 backup introduced in stage 4. Returning all designs to built-in themes with Emoticon restores the version-3 shape.
+
+
+## Stage 6 — visual theme editor
+
+The gallery opens protected built-ins as copies and installed themes as versioned edits (or independent copies).
+A page-local draft carries editable metadata, the original drawing JSON and icon references/uploads. Typed color,
+font, style and decoration controls preserve untouched definitions; no browser-side substitute renderer is used.
+The normal sample renderer previews validated draft contents at supported panel sizes without installation.
+The compact archive writer recomputes integrity and preserves inherited artwork/licenses; generated obsolete
+upload files are pruned. Explicit save reuses the atomic installer. A canonical source digest is checked under
+its lock to reject concurrent overwrites; preview/export do not poke devices or persist state. Leaving unsaved
+work warns, validation errors retain the draft, and the gallery refreshes on focus without replacing a pending design.
+Stage 6 introduces no firmware, dependency or format/schema change. It edits existing preset-based layouts with
+bounded drawing layers; the next collection remains a separate stage.
