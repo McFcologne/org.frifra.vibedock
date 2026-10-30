@@ -40,6 +40,8 @@ RUN mvn -B dependency:go-offline
 COPY --from=twemoji / /third-party/twemoji
 # The usage API contract; a test checks real answers against it.
 COPY usage.schema.json ./
+# The theme tests read the schemas and the example package from themes/ (the server itself does not).
+COPY themes ./themes
 COPY src ./src
 COPY --from=version /version /version
 RUN mvn -B verify -Drevision="$(cat /version)"
