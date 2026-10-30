@@ -199,3 +199,11 @@ included artwork, even when a custom default icon is selected. Once the last Twe
 VibeDock/Twemoji notice section and combined-license marker are removed. Unknown imported license/credit texts are
 preserved. Export snapshots use the package's own icons and omit the extra weather emoji to avoid adding a separate
 Twemoji graphic implicitly. General application notices remain unchanged: the app itself still bundles Twemoji.
+
+
+If an uploaded icon lacks a creator, save/export opens a creator dialog. Optional remembering stores a contributor
+suggestion in `DATA_DIR/themes.json`, independently of package metadata; it survives restarts and other theme-setting
+writes. No file is written merely by reading the preference. A remembered name is proposed for new icons and only
+applied after confirmation. Cancellation leaves the icon credits unchanged. An inline remember button and a forget
+action are available. The preference itself is never included in a theme export; confirmed per-icon credits are.
+The admin-only `GET` / CSRF-protected `POST /admin/theme-editor/contributor` API reads/updates the optional preference.

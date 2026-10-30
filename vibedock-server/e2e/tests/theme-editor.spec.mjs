@@ -117,3 +117,23 @@ test('unpacked preview.html opens offline with local artwork and an actual displ
     await expect(page.locator('script')).toHaveCount(0);
   }finally{await context.close();}
 });
+
+
+test('export asks for a missing creator and can remember an editable suggestion on the server',async({page,app})=>{
+  await open(page,app);await page.locator('#te-id').fill('browser.contributor');
+  const svg=Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect width="40" height="40" fill="#123456"/></svg>');
+  await page.locator('#te-icon-add').setInputFiles({name:'art.svg',mimeType:'image/svg+xml',buffer:svg});
+  await expect(page.locator('#te-upload-status')).toContainText('vector format retained');
+  await page.locator('#te-export').click();const dialog=page.locator('#te-contributor-dialog');await expect(dialog).toBeVisible();
+  await page.locator('#te-contributor-fields input').fill('Alex Artist');await page.locator('#te-contributor-remember').check();
+  const download=page.waitForEvent('download');await page.locator('#te-contributor-continue').click();await download;await expect(dialog).not.toBeVisible();
+  const prefs=JSON.parse(await readFile(app.dir+'/themes.json','utf8'));expect(prefs.contributor).toBe('Alex Artist');
+  expect(await installed(page,'browser.contributor')).toBeUndefined();
+  page.once('dialog',d=>d.accept());await page.reload();await expect(page.locator('#te-controls')).toBeEnabled();
+  await page.locator('#te-icon-add').setInputFiles({name:'other.svg',mimeType:'image/svg+xml',buffer:svg});
+  await expect(page.locator('#te-upload-status')).toContainText('vector format retained');await page.locator('#te-export').click();
+  await expect(page.locator('#te-contributor-fields input')).toHaveValue('Alex Artist');await page.locator('#te-contributor-cancel').click();
+  await expect(dialog).not.toBeVisible();await expect(page.locator('.te-icon').filter({has:page.getByRole('img',{name:'other.svg',exact:true})}).getByLabel('Creator',{exact:true})).toHaveValue('');
+  await page.locator('#te-forget-contributor').click();await expect(page.locator('#te-contributor-note')).toBeHidden();
+  expect(JSON.parse(await readFile(app.dir+'/themes.json','utf8')).contributor).toBeUndefined();
+});

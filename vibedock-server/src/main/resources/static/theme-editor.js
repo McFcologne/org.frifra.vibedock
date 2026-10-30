@@ -4,6 +4,7 @@
   const $=id=>root.querySelector('#'+id), form=$('te-form'),controls=$('te-controls');
   const csrf=document.querySelector('meta[name="csrf-token"]').content,csrfHeader=document.querySelector('meta[name="csrf-header"]').content;
   const pngSources=new WeakMap(),tints=new WeakMap();
+  let rememberedContributor='',contributorEntries=[];
   let draft,originalIcons=new Map(),dirty=false,timer,revision=0,previewRequest,previewURL,busy=false;
   const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text)n.textContent=text;if(cls)n.className=cls;return n;};
   const label=(text,input)=>{const l=el('label',text);l.append(input);return l;};
@@ -146,7 +147,8 @@
       const use=document.createElement('input');use.type='radio';use.name='default-icon';use.checked=draft.defaultIcon===icon.id;
       use.addEventListener('change',()=>{draft.defaultIcon=icon.id;icons();changed();});fields.append(label('Icon ID',id),label('Label',name));row.append(label('Theme default',use));
       row.prepend(el('h4',icon===chosen?'Default theme icon':'Catalog alternative'));row.append(el('p',icon.label));
-      const creator=input(icon.author||'',value=>icon.author=value);creator.maxLength=160;creator.required=true;creator.readOnly=!icon.data&&['Twemoji contributors','VibeDock contributors'].includes(icon.author);creator.title=creator.readOnly?'Source attribution stays with this artwork. Replace the file to enter a new creator.':'';row.append(label('Creator',creator));
+      const creator=input(icon.author||'',value=>icon.author=value);creator.maxLength=160;creator.readOnly=!icon.data&&['Twemoji contributors','VibeDock contributors'].includes(icon.author);creator.title=creator.readOnly?'Source attribution stays with this artwork. Replace the file to enter a new creator.':'';row.append(label('Creator',creator));
+      if(!creator.readOnly){const remember=button('Remember creator',async()=>{try{await rememberContributor(creator.value);$('te-upload-status').textContent='Contributor remembered for future uploads.';}catch(e){fail(e.message);}});row.append(remember);}
       const license=input(icon.license||'',value=>icon.license=value);license.maxLength=160;license.readOnly=creator.readOnly;fields.append(label('Icon license (optional)',license));
       const original=originalIcons.get(icon.file);
       if(!icon.data&&original){const image=document.createElement('img');image.src='/admin/themes/'+encodeURIComponent(draft.sourceId)+'/icons/'+encodeURIComponent(original)+'.png';image.alt=icon.label;image.width=56;image.height=56;row.append(image);}
@@ -160,7 +162,7 @@
     extra.open=draft.icons.some(i=>i!==chosen&&i.data);list.append(extra);
   }
   async function open(id,copy=false){
-    controls.disabled=true;const state=await(await response('/admin/themes/'+encodeURIComponent(id)+'/editor?copy='+copy)).json();draft=state.draft;originalIcons=new Map(draft.icons.map(i=>[i.file,i.id]));
+    controls.disabled=true;const [state,preference]=await Promise.all([response('/admin/themes/'+encodeURIComponent(id)+'/editor?copy='+copy).then(r=>r.json()),response('/admin/theme-editor/contributor').then(r=>r.json())]);rememberedContributor=preference.name;contributorNote();draft=state.draft;originalIcons=new Map(draft.icons.map(i=>[i.file,i.id]));
     for(const key of ['name','id','version','author','license'])$('te-'+key).value=draft[key];
     $('te-preset').replaceChildren(...state.presets.map(v=>option(v,names[v]||v)));$('te-preset').value=draft.drawing.preset;
     $('te-font').value=draft.drawing.font;
@@ -185,8 +187,47 @@
   }
   $('te-display').addEventListener('change',()=>{revision++;schedule();});
   $('te-icon-add').addEventListener('change',async()=>{await upload($('te-icon-add').files[0]);$('te-icon-add').value='';});
+  function contributorNote(){
+    $('te-contributor-note').hidden=!rememberedContributor;$('te-forget-contributor').hidden=!rememberedContributor;
+    $('te-contributor-note').textContent=rememberedContributor?'Saved contributor suggestion: '+rememberedContributor:'';
+  }
+  async function rememberContributor(name){
+    if(!name.trim())throw new Error('Enter a contributor name first.');
+    const saved=await(await response('/admin/theme-editor/contributor',{name})).json();rememberedContributor=saved.name;contributorNote();
+  }
+  $('te-forget-contributor').addEventListener('click',async()=>{
+    try{await response('/admin/theme-editor/contributor',{name:''});rememberedContributor='';contributorNote();}catch(e){fail(e.message);}
+  });
+  async function resolveContributors(){
+    const missing=draft.icons.filter(icon=>!icon.author?.trim());if(!missing.length)return true;
+    const dialog=$('te-contributor-dialog');if(dialog.open)return false;
+    contributorEntries=missing.map(icon=>{
+      const field=document.createElement('input');field.maxLength=160;field.required=true;field.value=rememberedContributor;
+      return {icon,field};
+    });
+    $('te-contributor-fields').replaceChildren(...contributorEntries.map(({icon,field})=>label(icon.label+' · creator',field)));
+    $('te-contributor-remember').checked=false;$('te-contributor-default-label').hidden=true;$('te-contributor-default').required=false;
+    $('te-contributor-default').value=rememberedContributor;$('te-contributor-error').hidden=true;
+    const result=new Promise(resolve=>dialog.addEventListener('close',()=>resolve(dialog.returnValue==='continue'),{once:true}));
+    dialog.returnValue='';dialog.showModal();contributorEntries[0].field.focus();return result;
+  }
+  $('te-contributor-remember').addEventListener('change',()=>{
+    const enabled=$('te-contributor-remember').checked;$('te-contributor-default-label').hidden=!enabled;$('te-contributor-default').required=enabled;
+    if(enabled)$('te-contributor-default').value=contributorEntries[0]?.field.value||rememberedContributor;
+  });
+  $('te-contributor-dialog').addEventListener('cancel',event=>{if($('te-contributor-continue').disabled)event.preventDefault();});
+  $('te-contributor-cancel').addEventListener('click',()=>$('te-contributor-dialog').close('cancel'));
+  $('te-contributor-form').addEventListener('submit',async event=>{
+    event.preventDefault();if(!$('te-contributor-form').reportValidity())return;
+    const submit=$('te-contributor-continue');if(submit.disabled)return;submit.disabled=true;$('te-contributor-cancel').disabled=true;
+    try{
+      if($('te-contributor-remember').checked)await rememberContributor($('te-contributor-default').value);
+      for(const {icon,field} of contributorEntries)icon.author=field.value.trim();
+      icons();changed();$('te-contributor-dialog').close('continue');
+    }catch(e){$('te-contributor-error').textContent=e.message;$('te-contributor-error').hidden=false;}finally{submit.disabled=false;$('te-contributor-cancel').disabled=false;}
+  });
   async function perform(save){
-    if(busy||!form.reportValidity())return;busy=true;clearTimeout(timer);previewRequest?.abort();revision++;controls.disabled=true;fail('');
+    if(busy||!form.reportValidity()||!await resolveContributors())return;busy=true;clearTimeout(timer);previewRequest?.abort();revision++;controls.disabled=true;fail('');
     try{
       const result=await response('/admin/theme-editor/'+(save?'save':'export?agent='+$('te-agent').checked),draft);
       if(save){

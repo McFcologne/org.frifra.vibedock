@@ -14,11 +14,18 @@ import java.util.*;
 final class ThemeEditorController {
     private static final JsonMapper JSON=JsonMapper.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
             .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();
-    private final ThemeEditor editor;private final DesignService designs;private final DevicePoke poke;private final ClientRegistry registry;
-    ThemeEditorController(ThemeEditor editor,DesignService designs,DevicePoke poke,ClientRegistry registry){this.editor=editor;this.designs=designs;this.poke=poke;this.registry=registry;}
+    private final ThemeSettings settings;private final ThemeEditor editor;private final DesignService designs;private final DevicePoke poke;private final ClientRegistry registry;
+    ThemeEditorController(ThemeEditor editor,DesignService designs,DevicePoke poke,ClientRegistry registry,ThemeSettings settings){this.settings=settings;this.editor=editor;this.designs=designs;this.poke=poke;this.registry=registry;}
     @ExceptionHandler(IllegalArgumentException.class) @ResponseBody ResponseEntity<Map<String,String>> invalid(IllegalArgumentException e){
         return ResponseEntity.status(e instanceof ThemeLibrary.Conflict?HttpStatus.CONFLICT:HttpStatus.BAD_REQUEST)
                 .body(Map.of("error",e.getMessage()==null?"Invalid theme draft":e.getMessage()));
+    }
+    record Contributor(String name) {}
+    @GetMapping("/admin/theme-editor/contributor") @ResponseBody ResponseEntity<Map<String,String>> contributor(){
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(Map.of("name",settings.contributor()));
+    }
+    @PostMapping("/admin/theme-editor/contributor") @ResponseBody Map<String,String> contributor(@RequestBody Contributor input) throws IOException {
+        if(input==null)throw new IllegalArgumentException("Enter a contributor name");settings.setContributor(input.name());return Map.of("name",settings.contributor());
     }
     @GetMapping("/admin/themes/{id}/edit") String page(){return "theme-editor";}
     @GetMapping("/admin/themes/{id}/editor") @ResponseBody ResponseEntity<ThemeEditor.State> open(@PathVariable String id,@RequestParam(defaultValue="false") boolean copy) throws IOException {

@@ -27,6 +27,7 @@
 <section class="card"><h3>Decorations and borders</h3><p class="meta">Layers sit beneath the content. Position and size combine a percentage of the area with an optional pixel offset.</p>
 <div id="te-layers"></div></section>
 <section class="card"><h3>Theme icons</h3><p class="meta">Only the default icon is shown when a design uses Theme default. Additional catalog icons are optional alternatives. Upload PNG or SVG (up to 128 KiB): SVGs are cleaned and remain SVGs; check the preview. Single-color transparent PNGs offer an optional main-color override.</p>
+<p id="te-contributor-note" class="meta" hidden></p><button id="te-forget-contributor" type="button" class="secondary" hidden>Forget saved contributor</button>
 <p id="te-upload-status" class="meta" role="status" aria-live="polite"></p><div id="te-icons"></div><label class="button secondary">Add icon<input id="te-icon-add" type="file" accept="image/png,image/svg+xml,.svg" hidden></label>
 </section>
 </div><aside class="te-preview"><section class="card"><h3>Preview</h3>
@@ -39,6 +40,16 @@
 <p id="te-saved" role="status" aria-live="polite"></p>
 </section></aside></div>
 </fieldset></form>
+<dialog id="te-contributor-dialog" aria-labelledby="te-contributor-heading">
+<form id="te-contributor-form" method="dialog">
+<h3 id="te-contributor-heading">Who created the uploaded artwork?</h3>
+<p>Enter the actual creator for each icon. These credits are included in the package.</p>
+<p id="te-contributor-error" class="notice error" role="alert" hidden></p>
+<div id="te-contributor-fields"></div>
+<label class="check"><input id="te-contributor-remember" type="checkbox"> Remember a contributor on this server for future uploads</label>
+<label id="te-contributor-default-label" hidden>Saved contributor<input id="te-contributor-default" maxlength="160"></label>
+<div class="te-actions"><button id="te-contributor-continue" type="submit">Continue</button><button id="te-contributor-cancel" type="button" class="secondary">Cancel</button></div>
+</form></dialog>
 </main>
 <script defer src="/theme-editor.js"></script>
 </body></html>

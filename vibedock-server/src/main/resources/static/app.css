@@ -495,3 +495,5 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 @media(max-width:800px){.te-preview .card{max-height:none;overflow:visible}}
 /* Transparent artwork stays visible whether its strokes are light or dark. */
 .te-icon > img{box-sizing:content-box;padding:8px;border:1px solid var(--line);border-radius:8px;background:repeating-conic-gradient(#687385 0% 25%,#a5adba 0% 50%) 50% / 12px 12px}
+
+#te-contributor-dialog{max-width:560px;width:calc(100% - 32px)}#te-contributor-fields label{display:block;margin:12px 0}

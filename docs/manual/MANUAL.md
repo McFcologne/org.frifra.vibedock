@@ -781,6 +781,8 @@ unchanged. For an installed theme, **Edit theme** prepares a newer version; **Cr
 
 <img src="images/36-theme-editor.png" width="100%" alt="Visual theme editor with palette controls and a device-rendered preview">
 
+When an uploaded icon has no creator yet, **Save theme** / **Export draft** asks for it in a dialog. **Remember a contributor on this server** optionally stores an editable suggestion for future uploads; each new icon still needs confirmation. The inline **Remember creator** button does the same for a name already entered. **Forget saved contributor** clears the suggestion. A saved theme retains its own icon credits independently of this preference.
+
 The theme editor does **not** save automatically. **Export draft** downloads your current work without installing it;
 its optional agent guide is the same as on gallery exports. Leaving an edited page warns before discarding changes.
 If another editor updated or removed the source, saving is rejected and your controls stay intact: keep that tab open,

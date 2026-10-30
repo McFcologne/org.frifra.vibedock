@@ -111,4 +111,16 @@ class ThemeTransferTest {
         mvc.perform(admin(post("/admin/theme-editor/icon")).param("format","svg").with(csrf()).content(new byte[ThemeIconAsset.MAX_BYTES+1])).andExpect(status().isBadRequest());
         mvc.perform(post("/admin/theme-editor/icon").param("format","svg").with(user("admin").roles("ADMIN")).with(csrf()).content(svg).with(r->{r.setLocalPort(10002);return r;})).andExpect(status().isNotFound());
     }
+
+    @Test void contributorPreferenceIsOptionalAndStaysBehindAdminAndCsrf() throws Exception {
+        try{
+            mvc.perform(admin(get("/admin/theme-editor/contributor"))).andExpect(status().isOk()).andExpect(jsonPath("$.name").value(""));
+            mvc.perform(admin(post("/admin/theme-editor/contributor")).with(csrf()).contentType("application/json").content("{\"name\":\"Alex Artist\"}"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.name").value("Alex Artist"));
+            mvc.perform(admin(get("/admin/theme-editor/contributor"))).andExpect(jsonPath("$.name").value("Alex Artist"));
+            mvc.perform(admin(post("/admin/theme-editor/contributor")).contentType("application/json").content("{\"name\":\"Other\"}")).andExpect(status().isForbidden());
+            mvc.perform(get("/admin/theme-editor/contributor").header("Accept","application/json").with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isUnauthorized());
+            mvc.perform(get("/admin/theme-editor/contributor").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10002);return r;})).andExpect(status().isNotFound());
+        }finally{mvc.perform(admin(post("/admin/theme-editor/contributor")).with(csrf()).contentType("application/json").content("{\"name\":\"\"}")).andExpect(status().isOk());}
+    }
 }
