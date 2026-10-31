@@ -545,9 +545,9 @@ public class StatusImage {
         g.setColor(shadow(chrome));g.fillRoundRect(x+1,y+2,width,height,2*chrome.radius(),2*chrome.radius());
         g.setColor(new Color(chrome.surface()));g.fillRoundRect(x,y,width,height,2*chrome.radius(),2*chrome.radius());
         g.setColor(new Color(chrome.border()));g.drawRoundRect(x,y,width-1,height-1,2*chrome.radius(),2*chrome.radius());
+        windowTitleBackground(g,chrome,x,y,width,height,bar);
         int[] lights={0xff5f57,0xfebc2e,0x28c840};
         for(int i=0;i<3;i++){g.setColor(new Color(lights[i]));g.fillOval(x+8+i*13,y+bar/2-4,9,9);}
-        windowTitleBackground(g,chrome,x,y,width,height,bar);
         g.setFont(new Font(scheme.font(),Font.BOLD,11));var metrics=g.getFontMetrics();int tw=metrics.stringWidth(title);
         // Centred; left beside the lights with a status, or when the battery icon leaves no room for the centred title.
         // A narrow window moves title and icon a little apart, nearer to the lights and the edge.

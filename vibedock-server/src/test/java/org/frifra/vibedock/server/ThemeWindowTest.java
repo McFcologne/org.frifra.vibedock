@@ -32,4 +32,16 @@ class ThemeWindowTest {
             assertThrows(IllegalArgumentException.class,()->ThemeDefinition.read(json.writeValueAsBytes(root)));
         }
     }
+    private static boolean near(int c,int rgb){return Math.abs((c>>16&255)-(rgb>>16&255))<=8&&Math.abs((c>>8&255)-(rgb>>8&255))<=4&&Math.abs((c&255)-(rgb&255))<=8;}
+    @Test void macTrafficLightsStayVisibleOnACustomTitleBar() throws Exception {
+        var json=new JsonMapper();var root=json.readValue(BuiltinThemes.get("macos").contents().file("style.json"),LinkedHashMap.class);
+        root.put("window",Map.of("surface","#ffffff","titleBar","#3060a0","titleText","#ffffff"));
+        var scheme=new Scheme("window.lights","Lights",ThemeDefinition.read(json.writeValueAsBytes(root)));
+        var image=ImageIO.read(new ByteArrayInputStream(new StatusImage("Europe/Berlin").render(LayoutTest.snapshot(0),"",new StatusImage.Look(null,scheme,null,null)).png()));
+        // The PNG is the RGB565 view of the screen, so compare with a tolerance of one 565 step.
+        int red=0,yellow=0,green=0;
+        for(int y=0;y<image.getHeight();y++)for(int x=0;x<image.getWidth();x++){int c=image.getRGB(x,y);
+            if(near(c,0xff5f57))red++;else if(near(c,0xfebc2e))yellow++;else if(near(c,0x28c840))green++;}
+        assertTrue(red>10&&yellow>10&&green>10,"the three lights are drawn above a custom title bar");
+    }
 }

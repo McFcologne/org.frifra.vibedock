@@ -78,8 +78,10 @@ class ThemePackageTest {
     }
     @Test void rejectsDuplicateJsonKeysTrailingDocumentsAndUnsupportedFiles() throws Exception {
         String root=json.writeValueAsString(manifest());
-        assertThrows(Exception.class,()->ThemePackage.manifest((root+" {}").getBytes(StandardCharsets.UTF_8)));
-        assertThrows(Exception.class,()->ThemePackage.manifest(root.replace("\"schemaVersion\":1","\"schemaVersion\":1,\"schemaVersion\":1").getBytes(StandardCharsets.UTF_8)));
+        assertThrows(IllegalArgumentException.class,()->ThemePackage.manifest((root+" {}").getBytes(StandardCharsets.UTF_8)));
+        assertThrows(IllegalArgumentException.class,()->ThemePackage.manifest(root.replace("\"schemaVersion\":1","\"schemaVersion\":1,\"schemaVersion\":1").getBytes(StandardCharsets.UTF_8)));
+        for(String broken:new String[]{root.substring(0,root.length()/2),"[[[[[[[[[["+"]".repeat(10),"{\"format\":1e999999999}"})
+            assertThrows(IllegalArgumentException.class,()->ThemePackage.manifest(broken.getBytes(StandardCharsets.UTF_8)),broken);
         var script=manifest();script.put("files",Map.of("run.js",ThemePackage.sha256(ICON)));
         assertThrows(IllegalArgumentException.class,()->ThemePackage.read(archive(script,Map.of("run.js",ICON))));
     }

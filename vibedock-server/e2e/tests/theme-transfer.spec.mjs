@@ -58,3 +58,17 @@ test('an import finishing during a pending design save does not replace that dra
     releaseSave();await expect.poll(async()=>page.evaluate(async()=>(await(await fetch('/admin/designs')).json()).defaults.scheme)).toBe('ocean');
   }finally{releaseImport();releaseSave();}
 });
+
+test('theme card tools wrap instead of overflowing at phone width',async({page,app})=>{
+  await editor(page,app);const archive=await exported(page,false);
+  await page.locator('#theme-import-file').setInputFiles({name:'midnight.vibetheme',mimeType:'application/zip',buffer:archive});
+  await page.locator('#theme-copy-id').fill('browser.narrow');await page.locator('#theme-copy-name').fill('Browser Narrow');
+  await page.locator('#theme-copy').click();await expect(page.locator('[data-theme="browser.narrow"]')).toBeVisible();
+  await page.setViewportSize({width:390,height:844});
+  // A custom theme has three tools (Edit theme, Create copy, Export); they must not push the card wider than its column.
+  await expect(page.locator('[data-theme="browser.narrow"] .theme-card-tools a')).toHaveCount(3);
+  const overflowing=await page.$$eval('.theme-card',cards=>cards.filter(c=>c.scrollWidth>c.clientWidth).map(c=>c.dataset.theme));
+  expect(overflowing).toEqual([]);
+  await page.locator('[data-theme="browser.narrow"] [data-theme-remove]').click();
+  await expect(page.locator('[data-theme="browser.narrow"]')).toHaveCount(0);
+});

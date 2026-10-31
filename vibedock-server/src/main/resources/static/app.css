@@ -477,7 +477,7 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 .route-chip.external{border-color:color-mix(in srgb,var(--warn) 35%,transparent);background:var(--warn-soft);color:var(--warn)}
 /* Theme icons are transparent; a neutral checker keeps light and dark artwork visible in the picker. */
 .theme-icon-sample{display:block;margin:8px 0;border-radius:7px;border:1px solid var(--line);padding:4px;box-sizing:content-box;background:conic-gradient(#72777e 25%,#525961 0 50%,#72777e 0 75%,#525961 0) 0 0/16px 16px}
-.theme-transfer-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 0}.theme-transfer-actions .check{margin:0}.theme-copy-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}.theme-card-tools{display:flex;gap:8px;margin:8px 0}.theme-card-tools .button,.theme-card-tools button{flex:1;margin:0;padding:6px 8px;font-size:12px}.theme-card>small{display:block}@media(max-width:480px){.theme-copy-fields{grid-template-columns:1fr}}
+.theme-transfer-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 0}.theme-transfer-actions .check{margin:0}.theme-copy-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}.theme-card-tools{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}.theme-card-tools .button,.theme-card-tools button{flex:1;margin:0;padding:6px 8px;font-size:12px}.theme-card>small{display:block}@media(max-width:480px){.theme-copy-fields{grid-template-columns:1fr}}
 #theme-import-review,.theme-card h4,.theme-card>small{overflow-wrap:anywhere}.theme-copy-fields label{min-width:0}
 
 /* Theme authoring uses the device renderer; controls edit only the draft. */
