@@ -86,9 +86,13 @@ class DeviceApiController {
         // Explicit hardware capability only: status-page image copies and web displays stay at full color.
         var mapping=imageColors.get();
         boolean canPalette="1".equals(request.getHeader("X-VibeDock-Palette"))&&!"1".equals(request.getHeader("X-VibeDock-Preview"))&&registry.get(identifier).web()==null;
-        int colors=canPalette?mapping.colors(display.width(),display.height()):0;
-        var quality=colors!=0&&mapping.adaptive()?imageQuality.policy(registry.designFor(identifier).scheme(),colors):new ImageQuality.Policy(colors,50);
-        var selection=canPalette?paletteCache.select(pixels,display.width(),display.height(),colors,rendered.accents(),rendered.bars(),mapping.adaptive(),quality.target(),quality.preferred(),rendered.primary()):new ImagePalette.Selection(null,0,0);
+        // A slideshow photo has no theme paints to protect and 32 or 64 colors band its gradients: it always gets the
+        // largest palette (exact when it uses at most 256 colors, otherwise reduced to 256), whatever the size rule says.
+        boolean photo=canPalette&&designs.currentPhoto(registry.designFor(identifier),identifier).isPresent();
+        boolean adaptive=mapping.adaptive()&&!photo;
+        int colors=photo?256:canPalette?mapping.colors(display.width(),display.height()):0;
+        var quality=colors!=0&&adaptive?imageQuality.policy(registry.designFor(identifier).scheme(),colors):new ImageQuality.Policy(colors,50);
+        var selection=canPalette?paletteCache.select(pixels,display.width(),display.height(),colors,rendered.accents(),rendered.bars(),adaptive,quality.target(),quality.preferred(),rendered.primary()):new ImagePalette.Selection(null,0,0);
         ImagePalette.Encoded indexed=selection.image();colors=selection.colors();
         if(indexed!=null)pixels=indexed.pixels();
         String tag="\""+HexFormat.of().formatHex(Arrays.copyOf(sha256(pixels),12))+"\"";

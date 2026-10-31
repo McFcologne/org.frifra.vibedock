@@ -25,11 +25,18 @@ class ImageColorSettings {
         }
         int colors(int width,int height){return rules.stream().filter(r->width<=r.maxWidth()&&height<=r.maxHeight()).mapToInt(Rule::colors).findFirst().orElse(0);}
     }
+    private static final org.slf4j.Logger LOG=org.slf4j.LoggerFactory.getLogger(ImageColorSettings.class);
     static final Mapping DEFAULT=new Mapping(List.of(new Rule(420,420,32),new Rule(640,640,256)));
     private final Path file;private final ObjectMapper json;private volatile Mapping mapping;
     ImageColorSettings(@Value("${vibedock.data-dir}") String directory,ObjectMapper json) throws IOException {
         this.json=json;file=Path.of(directory).resolve("image-colors.json");
-        mapping=Files.exists(file)?json.readValue(file.toFile(),Mapping.class):DEFAULT;
+        mapping=load();
+    }
+    /** A damaged or hand-edited file must not keep the server from starting: warn and use the defaults. */
+    private Mapping load(){
+        if(!Files.exists(file))return DEFAULT;
+        try{var read=json.readValue(file.toFile(),Mapping.class);return read==null?DEFAULT:read;}
+        catch(RuntimeException e){LOG.warn("Ignoring {}: {}. Using the default color rules.",file,e.getMessage());return DEFAULT;}
     }
     Mapping get(){return mapping;}
     synchronized void save(Mapping next) throws IOException {

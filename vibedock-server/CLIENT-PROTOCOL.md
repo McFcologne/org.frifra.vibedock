@@ -486,6 +486,10 @@ Hardware firmware opts in with `X-VibeDock-Palette: 1`. Older firmware keeps RGB
 (`X-VibeDock-Preview: 1`) and web displays always bypass lossy reduction. Their PNGs may use an exact indexed
 palette when it reduces size without changing any pixel. Photos follow the same lossless PNG rule.
 
+On hardware, a slideshow photo ignores the size rules: it always gets a palette of at most 256 colors. A photo
+with fewer colors keeps exactly its own colors and needs only as many bits per pixel as they require; a photo
+with more is reduced to 256. Quality metrics and the adaptive levels do not apply to photos.
+
 **Settings → Hardware display colors** stores ordered rules in `DATA_DIR/image-colors.json`: maximum width,
 maximum height and 32, 64, 256 or full colors. Both dimensions must fit; first match wins. Default rules are
 420×420 → 32 and 640×640 → 256, otherwise full colors. Empty rules disable lossy reduction. These rules do not

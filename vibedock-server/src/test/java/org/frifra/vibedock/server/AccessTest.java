@@ -35,6 +35,8 @@ class AccessTest {
     @Autowired UsageService usage;
     @Autowired ThemeSettings themes;
     @Autowired ImageColorSettings imageColors;
+    @Autowired PhotoLibrary photoLibrary;
+    @Autowired ClientRegistry registry;
     @Autowired ClientRegistry clients;
     @Autowired OtaSigning otaSigning;
     @Autowired DeviceLogs deviceLogs;
@@ -70,6 +72,36 @@ class AccessTest {
         mvc.perform(get("/admin/server").with(r->{r.setLocalPort(10001);return r;}).with(user("admin").roles("ADMIN")))
                 .andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("Hardware display colors")));
         clients.remove(id);
+    }
+    @Test void photosGetTheLargestPaletteWhateverTheSizeRuleSaysAndWebDisplaysStayFullColor() throws Exception {
+        String key="f0".repeat(32),id="vibedock-photo-palette",path="/api/v1/clients/"+id+"/image";
+        clients.paired(id,"Photo",key,"192.168.1.21",80);
+        var noise=new java.awt.image.BufferedImage(600,600,java.awt.image.BufferedImage.TYPE_INT_RGB);var random=new java.util.Random(7);
+        for(int y=0;y<600;y++)for(int x=0;x<600;x++)noise.setRGB(x,y,random.nextInt(0x1000000));
+        var png=new java.io.ByteArrayOutputStream();javax.imageio.ImageIO.write(noise,"png",png);
+        var photo=photoLibrary.add(png.toByteArray());var old=clients.defaultDesign();
+        try{
+            imageColors.save(new ImageColorSettings.Mapping(List.of(new ImageColorSettings.Rule(420,420,32)),false));
+            var view=mvc.perform(get(path).header("Authorization","Bearer "+key).header("X-VibeDock-Palette","1").with(r->{r.setLocalPort(8080);return r;}))
+                    .andExpect(status().isOk()).andReturn().getResponse();
+            Assertions.assertEquals("indexed5-rgb565-be-240x240",view.getHeader("X-VibeDock-Image-Format"),"usage monitor follows the 32 color rule");
+            clients.configureDesign(new Design(old.scheme(),old.mood(),null,old.layout(),new Design.Photos(List.of(photo.id()),60,false,null,null)));
+            var shown=mvc.perform(get(path).header("Authorization","Bearer "+key).header("X-VibeDock-Palette","1").with(r->{r.setLocalPort(8080);return r;}))
+                    .andExpect(status().isOk()).andReturn().getResponse();
+            Assertions.assertEquals("indexed8-rgb565-be-240x240",shown.getHeader("X-VibeDock-Image-Format"),"a photo uses up to 256 colors");
+            // A photo with few colors keeps exactly those colors and needs only as many bits as they require.
+            var flat=new java.awt.image.BufferedImage(600,600,java.awt.image.BufferedImage.TYPE_INT_RGB);
+            for(int y=0;y<600;y++)for(int x=0;x<600;x++)flat.setRGB(x,y,x<200?0xff0000:x<400?0x00ff00:0x0000ff);
+            var flatPng=new java.io.ByteArrayOutputStream();javax.imageio.ImageIO.write(flat,"png",flatPng);var simple=photoLibrary.add(flatPng.toByteArray());
+            try{
+                clients.configureDesign(new Design(old.scheme(),old.mood(),null,old.layout(),new Design.Photos(List.of(simple.id()),60,false,null,null)));
+                mvc.perform(get(path).header("Authorization","Bearer "+key).header("X-VibeDock-Palette","1").with(r->{r.setLocalPort(8080);return r;}))
+                        .andExpect(header().string("X-VibeDock-Image-Format",org.hamcrest.Matchers.matchesPattern("indexed[1-4]-rgb565-be-240x240")));
+            }finally{photoLibrary.delete(simple.id());}
+            var legacy=mvc.perform(get(path).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(8080);return r;}))
+                    .andExpect(status().isOk()).andExpect(header().string("X-VibeDock-Image-Format","rgb565-be-240x240")).andReturn().getResponse();
+            Assertions.assertTrue(shown.getContentAsByteArray().length<legacy.getContentAsByteArray().length);
+        }finally{clients.configureDesign(old);photoLibrary.delete(photo.id());clients.remove(id);}
     }
     @Test void liveColorComparisonUsesTheActualCodecAndRemainsAdminOnly() throws Exception {
         mvc.perform(get("/admin/color-preview").with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isUnauthorized());

@@ -27,7 +27,13 @@
   and partial-image coding are exact relative to the selected image. Protected theme paints, icon paints and meter
   segments retain priority. New server plus compatible firmware enables indexed hardware bodies; legacy firmware
   remains supported and web previews/displays retain their original pixels through lossless PNG optimization.
-- **Reproducible technical disclosure:** [image-pipeline reference](https://github.com/McFcologne/org.frifra.vibedock/blob/feat/adaptive-image-palettes/docs/design/image-color-pipeline.md) describes
+- **Reproducible technical disclosure:** [image-pipeline reference](https://github.com/McFcologne/org.frifra.vibedock/blob/main/docs/design/image-color-pipeline.md) describes
   algorithms, semantic color protection, calibration, cache boundaries, packet layout, byte formulas and extension
-  tests. The [manual](https://github.com/McFcologne/org.frifra.vibedock/blob/feat/adaptive-image-palettes/docs/manual/MANUAL.md#much-smaller-full-images-and-partial-updates) explains the controls and
+  tests. The [manual](https://github.com/McFcologne/org.frifra.vibedock/blob/main/docs/manual/MANUAL.md#much-smaller-full-images-and-partial-updates) explains the controls and
   how to distinguish full-image savings from actual partial transfers.
+
+### Display colors
+
+- **Explicit LCD footer colors:** a custom footer background survives the Handheld LCD color reduction; the
+  original four-shade appearance remains the default.
+- **Starship theme icon:** a stylized Starfleet-inspired insignia replaces the hand as the theme default.
