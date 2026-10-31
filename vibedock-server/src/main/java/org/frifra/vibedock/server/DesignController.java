@@ -15,7 +15,7 @@ class DesignController {
     record DisplayOption(String id,String label,int width,int height,int bandRoom,boolean halfWidth) {}
     /** A data source the usage bands can show: id as stored in layouts, label as shown on the display. */
     record SourceOption(String id,String label) {}
-    record SchemeOption(String id,String label,boolean enabled) {}
+    record SchemeOption(String id,String label,boolean enabled,boolean builtin,String version,boolean missing) {}
     private final ClientRegistry registry;private final DesignService designs;private final UsageService usage;private final DevicePoke poke;
     private final ApplicationInfo info;private final ThemeSettings themes;
     DesignController(ClientRegistry registry,DesignService designs,UsageService usage,DevicePoke poke,ApplicationInfo info,ThemeSettings themes){
@@ -30,19 +30,27 @@ class DesignController {
                 .map(v->new Target(v.identifier(),v.name(),v.ip(),v.overridden(),v.design(),v.serverFooter(),v.display().id(),v.board().previewCase(),v.web()!=null)).toList(),
                 usage.snapshot().providers().keySet().stream().map(id->new SourceOption(id,usage.snapshot().label(id))).toList(),
                 schemeOptions(),
-                DisplayType.WEB.stream().map(t->new DisplayOption(t.id(),t.label(),t.width(),t.height(),t.bandRoom(),t.halfWidth())).toList(),ThemeIcons.catalog());
+                DisplayType.WEB.stream().map(t->new DisplayOption(t.id(),t.label(),t.width(),t.height(),t.bandRoom(),t.halfWidth())).toList(),designs.themeSnapshot().icons());
     }
-    private List<SchemeOption> schemeOptions(){return ThemeCatalog.builtins().all().stream().map(s->new SchemeOption(s.id(),s.label,themes.enabled(s))).toList();}
+    private List<SchemeOption> schemeOptions(){
+        var snapshot=designs.themeSnapshot();var options=new LinkedHashMap<String,SchemeOption>();
+        snapshot.items().forEach((id,item)->options.put(id,new SchemeOption(id,item.scheme().label,themes.enabled(item.scheme()),item.builtin(),item.contents().manifest().version(),false)));
+        var referenced=new ArrayList<Design>();referenced.add(registry.defaultDesign());registry.views().forEach(v->referenced.add(v.design()));
+        for(var design:referenced){String id=design.scheme().id();options.putIfAbsent(id,new SchemeOption(id,id+" · unavailable",false,false,"",true));}
+        return List.copyOf(options.values());
+    }
     record Availability(boolean enabled) {}
     @PostMapping("/admin/themes/{id}") @ResponseBody List<SchemeOption> availability(@PathVariable String id,@RequestBody Availability input) throws IOException {
-        themes.setEnabled(Scheme.parse(id),input.enabled());return schemeOptions();
+        themes.setEnabled(designs.themeSnapshot().catalog().find(id).orElseThrow(()->new IllegalArgumentException("Theme not found")),input.enabled());return schemeOptions();
     }
-    @GetMapping(value="/admin/themes/{id}/preview.png",produces="image/png") @ResponseBody byte[] themePreview(@PathVariable String id) throws IOException {
-        return designs.themePreview(Scheme.parse(id));
+    @GetMapping(value="/admin/themes/{id}/preview.png",produces="image/png") @ResponseBody org.springframework.http.ResponseEntity<byte[]> themePreview(@PathVariable String id) throws IOException {
+        return org.springframework.http.ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore())
+                .body(designs.themePreview(designs.themeSnapshot().catalog().find(id).orElseThrow(()->new IllegalArgumentException("Theme not found"))));
     }
     @GetMapping(value="/admin/themes/{theme}/icons/{icon}.png",produces="image/png")
     org.springframework.http.ResponseEntity<byte[]> icon(@PathVariable String theme,@PathVariable String icon){
-        return ThemeIcons.png(theme,icon).map(bytes->org.springframework.http.ResponseEntity.ok()
+        var image=designs.themeSnapshot().contents(theme).flatMap(contents->ThemeIcons.image(contents,icon,Twemoji.PICKER_SIZE));
+        return ThemeIcons.png(image).map(bytes->org.springframework.http.ResponseEntity.ok()
                 .cacheControl(org.springframework.http.CacheControl.noCache().cachePrivate()).eTag(ThemePackage.sha256(bytes)).body(bytes))
                 .orElseGet(()->org.springframework.http.ResponseEntity.notFound().build());
     }

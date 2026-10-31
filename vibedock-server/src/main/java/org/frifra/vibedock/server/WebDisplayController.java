@@ -72,7 +72,7 @@ class WebDisplayController {
     static String base(ClientRegistry.View view,ServerAddresses addresses,HttpServletRequest request){
         return view.web().external()&&!addresses.external().isBlank()?addresses.external().replaceFirst("/$",""):addresses.internal(request).replaceFirst("/$","");
     }
-    private static String background(ClientRegistry.View view){return "#%06x".formatted(view.design().scheme().background);}
+    private String background(ClientRegistry.View view){return "#%06x".formatted(designs.effectiveScheme(view.design().scheme()).background);}
     private static org.springframework.web.server.ResponseStatusException notFound(){
         return new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND);
     }

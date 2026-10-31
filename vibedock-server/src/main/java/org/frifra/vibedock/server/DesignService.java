@@ -30,15 +30,18 @@ class DesignService {
         this(usage,renderer,twemoji,weather,photos,clock,themes,new DevicePower());
     }
     DesignService(UsageService usage,StatusImage renderer,Twemoji twemoji,WeatherService weather,PhotoLibrary photos,java.time.Clock clock){this(usage,renderer,twemoji,weather,photos,clock,null);}
+    ThemeLibrary.Snapshot themeSnapshot(){return themes==null?ThemeLibrary.builtins():themes.snapshot();}
+    Scheme effectiveScheme(Scheme scheme){return themeSnapshot().effective(scheme);}
     Scheme nextScheme(Scheme current,int step){return themes==null?current.shifted(step):themes.shifted(current,step);}
     /** Stable sample readings, rendered by the same code as devices; no provider or weather network calls. */
     byte[] themePreview(Scheme scheme) throws IOException {
+        var snapshot=themeSnapshot();scheme=snapshot.effective(scheme);
         long time=java.time.Instant.parse("2026-10-14T05:12:00Z").getEpochSecond();
         var values=new java.util.LinkedHashMap<String,UsageService.Provider>();
         values.put("codex",new UsageService.Provider("ok",time,new ProviderClient.Window(0,time+5*3600),new ProviderClient.Window(22,time+6*86400)));
         values.put("claude",new UsageService.Provider("ok",time,new ProviderClient.Window(5,time+3*3600),new ProviderClient.Window(14,time+5*86400)));
         return renderer.render(new UsageService.Snapshot(1,time,values),"192.168.1.50",new StatusImage.Look(
-                ThemeIcons.image(new Design.Icon("theme-default",null,null),scheme,Twemoji.SIZE).orElse(null),scheme,twemoji.image("⛅",24).orElse(null),"13°",Layout.DEFAULT)).png();
+                ThemeIcons.image(new Design.Icon("theme-default",null,null),scheme,Twemoji.SIZE,snapshot::contents).orElse(null),scheme,twemoji.image("⛅",24).orElse(null),"13°",Layout.DEFAULT)).png();
     }
     /**
      * What a display shows now: the current photo of its slideshow while that is active, otherwise the status.
@@ -115,9 +118,10 @@ class DesignService {
     /** battery: the display runs on its battery (a small icon at the top right), null otherwise. */
     StatusImage.Image render(Design design,String ip,DisplayType type,double scale,StatusImage.Battery battery) throws IOException {
         var current=weather.current(design.weather());
+        var snapshot=themeSnapshot();var scheme=snapshot.effective(design.scheme());
         int iconSize=(int)Math.round(Twemoji.SIZE*scale);
-        var icon=ThemeIcons.image(design.icon(),design.scheme(),iconSize).or(()->twemoji.image(design.mood(),iconSize));
-        var look=new StatusImage.Look(icon.orElse(null),design.scheme(),
+        var icon=ThemeIcons.image(design.icon(),scheme,iconSize,snapshot::contents).or(()->twemoji.image(design.mood(),iconSize));
+        var look=new StatusImage.Look(icon.orElse(null),scheme,
                 current.flatMap(c->twemoji.image(WeatherService.emoji(c.code(),c.day()),(int)Math.round(24*scale))).orElse(null),
                 current.map(c->WeatherService.temperature(c.temperature())).orElse(null),design.layout(),battery);
         return renderer.render(usage.snapshot(),ip,look,type,scale);
@@ -134,11 +138,16 @@ class DesignService {
     Design resolve(Input input,Design previous){
         if(input==null||input.layout()==null||input.mood()==null||input.scheme()==null||input.weatherLocation()==null)
             throw new IllegalArgumentException("Complete the design before saving");
-        var scheme=Scheme.parse(input.scheme());
+        String schemeId=Scheme.stored(input.scheme()).id();
+        var found=themeSnapshot().catalog().find(schemeId);
+        var scheme=found.orElseGet(()->{
+            if(previous.scheme().id().equals(schemeId))return previous.scheme();
+            throw new IllegalArgumentException("This theme is unavailable");
+        });
         if(themes!=null&&!themes.enabled(scheme)&&!scheme.id().equals(previous.scheme().id()))throw new IllegalArgumentException("This theme is disabled for this instance");
         input.layout().validateSources(usage.snapshot().providers().keySet());
         if(!Objects.equals(input.mood(),previous.mood()))twemoji.validate(input.mood());
-        if(input.icon()!=null&&!Objects.equals(input.icon(),previous.icon())&&!ThemeIcons.available(input.icon(),scheme))
+        if(input.icon()!=null&&!Objects.equals(input.icon(),previous.icon())&&!ThemeIcons.image(input.icon(),scheme,Twemoji.SIZE,themeSnapshot()::contents).isPresent())
             throw new IllegalArgumentException("This theme icon is unavailable");
         String place=input.weatherLocation().strip();
         var resolved=previous.weather()!=null&&place.equals(previous.weather().name())?previous.weather():weather.locate(place);

@@ -732,13 +732,30 @@ Before the first Theme default/catalog save over an existing configuration, the 
 `clients.json.before-theme-icons.bak` with private file permissions. Keep this snapshot for a downgrade to a server
 that cannot read the new optional `icon` field: stop the server, preserve the current file, then restore the snapshot
 as `clients.json`. This restores the device/design configuration at first opt-in. Alternatively, switch the default
-and every device override back to Emoticon and save before downgrading. No firmware update is needed for icon modes.
-Configuration version 4 marks an active theme-icon choice; Emoticon-only configurations retain version 3.
+and every device override back to Emoticon with a built-in theme and save before downgrading. No firmware update is needed.
+Configuration version 4 marks a theme-icon or installed-theme choice; built-in themes with Emoticon retain version 3.
 
 Handheld LCD uses a dark contour around emoji; Blueprint uses a light contour with darker facial details, so
 smileys stay recognisable against their backgrounds, also on scaled web displays.
 
 <img src="images/34-emoji-picker.png" width="100%" alt="Emoji picker">
+
+## Importing and sharing themes
+
+Under **Display › Themes**, **Export** downloads a small compressed `.vibetheme` ZIP with the theme definition, its
+icons and licenses. **Include agent guide in exports** adds a short reference prompt and format schemas for developing
+the theme with a coding agent. Uncheck it for the smallest file. The server never executes that text or invokes an
+agent; no accounts, device settings or firmware are added to the export.
+
+**Import theme** checks a package before installing it. A new ID can be installed directly. For an existing installed
+ID, use **Update existing** with a newer version, or **Install independent copy** with another ID/name. Built-in themes
+can only be copied. The live catalog changes immediately; **Use theme** selects it for the current design. Updating a
+selected theme affects its next image without a server restart or firmware update.
+
+**Remove** is available only for installed themes that no design or fixed icon uses. Change those selections first;
+keep at least one theme enabled. An invalid import leaves the working package intact. If a package file is missing
+or damaged at startup, its saved selection is kept and Midnight shows temporarily; restoring the same ID recovers it.
+Packages persist in the data directory under `themes/`; keep that folder with your configuration backups.
 
 ## What the displays show
 

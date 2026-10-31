@@ -14,21 +14,31 @@ class ThemeSettings {
         State(Set<String> disabled){this(disabled,false);}
         State {
             // Old enum spellings were accepted on read; keep the same canonical IDs and JSON shape.
-            disabled=disabled==null?Set.of():disabled.stream().map(id->Scheme.parse(id).id()).collect(java.util.stream.Collectors.toUnmodifiableSet());
-            if(disabled.size()==ThemeCatalog.builtins().all().size())throw new IllegalArgumentException("Keep at least one theme enabled");
+            disabled=disabled==null?Set.of():disabled.stream().map(id->Scheme.stored(id).id()).collect(java.util.stream.Collectors.toUnmodifiableSet());
         }
     }
-    private final Path file;private final ObjectMapper json;
+    private final Path file;private final ObjectMapper json;private final ThemeLibrary library;
     private volatile State state=new State(Set.of());
-    ThemeSettings(@Value("${vibedock.data-dir}") String directory,ObjectMapper json) throws IOException {
-        this.json=json;file=Path.of(directory).resolve("themes.json");
+    @org.springframework.beans.factory.annotation.Autowired
+    ThemeSettings(@Value("${vibedock.data-dir}") String directory,ObjectMapper json,ThemeLibrary library) throws IOException {
+        this.library=library;this.json=json;file=Path.of(directory).resolve("themes.json");
         if(Files.exists(file))state=json.readValue(file.toFile(),State.class);
+    }
+    ThemeSettings(String directory,ObjectMapper json) throws IOException {this(directory,json,null);}
+    ThemeLibrary.Snapshot snapshot(){return library==null?ThemeLibrary.builtins():library.snapshot();}
+    private Set<String> effectiveDisabled(){
+        var disabled=state.disabled();
+        if(snapshot().catalog().all().stream().noneMatch(s->!disabled.contains(s.id()))){
+            var fallback=new HashSet<>(disabled);fallback.remove(Scheme.MIDNIGHT.id());return fallback;
+        }
+        return disabled;
     }
     boolean dark(){return state.dark();}
     synchronized void setDark(boolean dark) throws IOException { save(new State(state.disabled(),dark)); }
-    boolean enabled(Scheme scheme){return !state.disabled().contains(scheme.id());}
+    boolean enabled(Scheme scheme){return !effectiveDisabled().contains(scheme.id());}
     synchronized void setEnabled(Scheme scheme,boolean enabled) throws IOException {
         var disabled=new HashSet<>(state.disabled());if(enabled)disabled.remove(scheme.id());else disabled.add(scheme.id());
+        if(snapshot().catalog().all().stream().noneMatch(s->!disabled.contains(s.id())))throw new IllegalArgumentException("Keep at least one theme enabled");
         save(new State(disabled,state.dark()));
     }
     private void save(State next) throws IOException {
@@ -38,6 +48,9 @@ class ThemeSettings {
         finally{Files.deleteIfExists(temporary);}
     }
     Scheme shifted(Scheme current,int step){
-        return ThemeCatalog.builtins().nextEnabled(current,step,state.disabled());
+        if(step==0)return current;
+        var catalog=snapshot().catalog();
+        var start=catalog.find(current.id()).orElse(step>0?catalog.all().getLast():catalog.all().getFirst());
+        return catalog.nextEnabled(start,step,effectiveDisabled());
     }
 }
