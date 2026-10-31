@@ -1,0 +1,14 @@
+{
+  "format": "vibedock-2d",
+  "version": 1,
+  "preset": "quest",
+  "palette": {
+    "background": "#16182c",
+    "title": "#f0ce80",
+    "text": "#f1eacb",
+    "muted": "#a2a2c2",
+    "track": "#30354e",
+    "warning": "#f7a276"
+  },
+  "font": "DejaVu Sans Mono"
+}

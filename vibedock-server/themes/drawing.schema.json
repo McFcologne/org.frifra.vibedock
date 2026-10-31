@@ -1,0 +1,399 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:org.frifra.vibedock:drawing:1",
+  "title": "VibeDock 2D drawing recipe v1 (draft for 0.4)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "version",
+    "preset",
+    "palette",
+    "font"
+  ],
+  "properties": {
+    "format": {
+      "const": "vibedock-2d"
+    },
+    "version": {
+      "const": 1
+    },
+    "preset": {
+      "enum": [
+        "modern",
+        "terminal",
+        "mac",
+        "windows",
+        "fluent",
+        "macos",
+        "console",
+        "lcd",
+        "blueprint",
+        "neon",
+        "print",
+        "mission",
+        "departure",
+        "nordic",
+        "hifi",
+        "solarized",
+        "quest",
+        "bauhaus",
+        "ink",
+        "industrial",
+        "porcelain",
+        "github",
+        "code",
+        "shell",
+        "diff",
+        "debug"
+      ]
+    },
+    "palette": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "background",
+        "title",
+        "text",
+        "muted",
+        "track",
+        "warning"
+      ],
+      "properties": {
+        "background": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "title": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "text": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "muted": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "track": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "warning": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        }
+      }
+    },
+    "font": {
+      "enum": [
+        "DejaVu Sans",
+        "DejaVu Sans Mono",
+        "DejaVu Serif"
+      ]
+    },
+    "footerBackground": {
+      "type": "string",
+      "pattern": "^(#[0-9a-fA-F]{6}|@(background|title|text|muted|track|warning))$"
+    },
+    "barColor": {
+      "type": "string",
+      "pattern": "^(#[0-9a-fA-F]{6}|@(background|title|text|muted|track|warning))$"
+    },
+    "layers": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "background": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/shape"
+          }
+        },
+        "band": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/shape"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "length": {
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": -4096,
+          "maximum": 4096
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "relative",
+            "pixels"
+          ],
+          "properties": {
+            "relative": {
+              "type": "number",
+              "minimum": -4,
+              "maximum": 4
+            },
+            "pixels": {
+              "type": "number",
+              "minimum": -4096,
+              "maximum": 4096
+            }
+          }
+        }
+      ]
+    },
+    "shape": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "x",
+            "y",
+            "width",
+            "height",
+            "color"
+          ],
+          "properties": {
+            "op": {
+              "const": "rect"
+            },
+            "x": {
+              "$ref": "#/$defs/length"
+            },
+            "y": {
+              "$ref": "#/$defs/length"
+            },
+            "width": {
+              "$ref": "#/$defs/length"
+            },
+            "height": {
+              "$ref": "#/$defs/length"
+            },
+            "color": {
+              "type": "string",
+              "pattern": "^(#[0-9a-fA-F]{6}|@(background|title|text|muted|track|warning))$"
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "fill": {
+              "type": "boolean"
+            },
+            "radius": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 128
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "x",
+            "y",
+            "width",
+            "height",
+            "color"
+          ],
+          "properties": {
+            "op": {
+              "const": "ellipse"
+            },
+            "x": {
+              "$ref": "#/$defs/length"
+            },
+            "y": {
+              "$ref": "#/$defs/length"
+            },
+            "width": {
+              "$ref": "#/$defs/length"
+            },
+            "height": {
+              "$ref": "#/$defs/length"
+            },
+            "color": {
+              "type": "string",
+              "pattern": "^(#[0-9a-fA-F]{6}|@(background|title|text|muted|track|warning))$"
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "fill": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "x",
+            "y",
+            "width",
+            "height",
+            "color"
+          ],
+          "properties": {
+            "op": {
+              "const": "line"
+            },
+            "x": {
+              "$ref": "#/$defs/length"
+            },
+            "y": {
+              "$ref": "#/$defs/length"
+            },
+            "width": {
+              "$ref": "#/$defs/length"
+            },
+            "height": {
+              "$ref": "#/$defs/length"
+            },
+            "color": {
+              "type": "string",
+              "pattern": "^(#[0-9a-fA-F]{6}|@(background|title|text|muted|track|warning))$"
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "x",
+            "y",
+            "width",
+            "height",
+            "color",
+            "to"
+          ],
+          "properties": {
+            "op": {
+              "const": "gradient"
+            },
+            "x": {
+              "$ref": "#/$defs/length"
+            },
+            "y": {
+              "$ref": "#/$defs/length"
+            },
+            "width": {
+              "$ref": "#/$defs/length"
+            },
+            "height": {
+              "$ref": "#/$defs/length"
+            },
+            "color": {
+              "type": "string",
+              "pattern": "^(#[0-9a-fA-F]{6}|@(background|title|text|muted|track|warning))$"
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "to": {
+              "type": "string",
+              "pattern": "^(#[0-9a-fA-F]{6}|@(background|title|text|muted|track|warning))$"
+            },
+            "vertical": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "x",
+            "y",
+            "width",
+            "height",
+            "color"
+          ],
+          "properties": {
+            "op": {
+              "const": "grid"
+            },
+            "x": {
+              "$ref": "#/$defs/length"
+            },
+            "y": {
+              "$ref": "#/$defs/length"
+            },
+            "width": {
+              "$ref": "#/$defs/length"
+            },
+            "height": {
+              "$ref": "#/$defs/length"
+            },
+            "color": {
+              "type": "string",
+              "pattern": "^(#[0-9a-fA-F]{6}|@(background|title|text|muted|track|warning))$"
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "step": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 128
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "barColor"
+        ]
+      },
+      "then": {
+        "properties": {
+          "preset": {
+            "not": {
+              "enum": [
+                "terminal",
+                "mac",
+                "windows",
+                "lcd",
+                "blueprint",
+                "print"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

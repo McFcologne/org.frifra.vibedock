@@ -1,0 +1,27 @@
+{
+  "format": "org.frifra.vibedock.theme",
+  "schemaVersion": 1,
+  "id": "terminal_green",
+  "version": "1.0.0",
+  "name": "Classic green",
+  "author": "VibeDock contributors; Twemoji contributors (icon)",
+  "license": "Apache-2.0 AND CC-BY-4.0",
+  "renderer": {
+    "id": "vibedock-2d",
+    "version": 1
+  },
+  "definition": "style.json",
+  "defaultIcon": "legacy",
+  "icons": [
+    {
+      "id": "legacy",
+      "label": "Existing theme illustration",
+      "file": "assets/default.svg"
+    }
+  ],
+  "files": {
+    "assets/default.svg": "b79279a24d62e351b54ac16c2318fb317c75797dc4c896faa04c760b69571f11",
+    "license.txt": "b6724586789bdc6b702c1c5604987372553805b132a9c124a415f66666c760b6",
+    "style.json": "e970744f9146f5c40d3bd2184e3032d239771831e2b9a456846a500370c97f55"
+  }
+}

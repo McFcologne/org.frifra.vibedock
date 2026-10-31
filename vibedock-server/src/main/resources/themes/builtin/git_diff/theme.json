@@ -1,0 +1,27 @@
+{
+  "format": "org.frifra.vibedock.theme",
+  "schemaVersion": 1,
+  "id": "git_diff",
+  "version": "1.0.0",
+  "name": "Git Diff",
+  "author": "VibeDock contributors; Twemoji contributors (icon)",
+  "license": "Apache-2.0 AND CC-BY-4.0",
+  "renderer": {
+    "id": "vibedock-2d",
+    "version": 1
+  },
+  "definition": "style.json",
+  "defaultIcon": "legacy",
+  "icons": [
+    {
+      "id": "legacy",
+      "label": "Existing theme illustration",
+      "file": "assets/default.svg"
+    }
+  ],
+  "files": {
+    "assets/default.svg": "d32bd9f51b2a54f620f9693e833935c5e2cb2304cbf89aab75fd10f054711ce5",
+    "license.txt": "e66889aec2db95d895e3dd9ff7498b20aeb9278f30951cffabc1222fd5725f7b",
+    "style.json": "c71e4e3b45cdc8bc09ebb2dcba4da965ac086f24417ebdaf6a0981f88fea238e"
+  }
+}

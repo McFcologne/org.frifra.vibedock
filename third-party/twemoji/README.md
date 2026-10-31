@@ -21,6 +21,13 @@ asks for an indication of changes.
 
 ## Where they are used
 
+The built-in theme package directories under `vibedock-server/src/main/resources/themes/builtin/` also contain a small
+selection of these unmodified SVGs as `assets/default.svg`. Each package pins the source version/path and includes
+the full attribution and graphics license in `license.txt`; its manifest records the file checksum. These are the
+existing theme illustrations, not a change to saved emoji selections. When updating a packaged copy, update its
+source attribution and manifest checksum together. The package's pinned copy does not change just by updating this
+Twemoji directory.
+
 - Running from the sources (`mvn spring-boot:run`, the tests, `scripts/docs.sh`): found here automatically.
 - Docker image: copied to `/app/twemoji/svg` and `/app/twemoji/LICENSE-GRAPHICS` (build context `twemoji`, see
   `vibedock-server/compose.yaml`); the license inventory lists them as *Twemoji artwork* with this version.

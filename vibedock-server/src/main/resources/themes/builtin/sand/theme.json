@@ -1,0 +1,27 @@
+{
+  "format": "org.frifra.vibedock.theme",
+  "schemaVersion": 1,
+  "id": "sand",
+  "version": "1.0.0",
+  "name": "Sand (light)",
+  "author": "VibeDock contributors; Twemoji contributors (icon)",
+  "license": "Apache-2.0 AND CC-BY-4.0",
+  "renderer": {
+    "id": "vibedock-2d",
+    "version": 1
+  },
+  "definition": "style.json",
+  "defaultIcon": "legacy",
+  "icons": [
+    {
+      "id": "legacy",
+      "label": "Existing theme illustration",
+      "file": "assets/default.svg"
+    }
+  ],
+  "files": {
+    "assets/default.svg": "762a21a73ce5607534f037e439debaf601dc84f319a5c318d1a71c855c3bb0fc",
+    "license.txt": "99bcb885dbd9669858acfe29ec1f35d319d07e048ed8807f503cf95420ecf2b1",
+    "style.json": "9ebe6724a1214c392291c8a77ca7e1d4a99e252e35f46701c4f35ce7d4b4818a"
+  }
+}

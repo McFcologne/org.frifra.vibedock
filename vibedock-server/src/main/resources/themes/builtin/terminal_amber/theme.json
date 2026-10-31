@@ -1,0 +1,27 @@
+{
+  "format": "org.frifra.vibedock.theme",
+  "schemaVersion": 1,
+  "id": "terminal_amber",
+  "version": "1.0.0",
+  "name": "Classic amber",
+  "author": "VibeDock contributors; Twemoji contributors (icon)",
+  "license": "Apache-2.0 AND CC-BY-4.0",
+  "renderer": {
+    "id": "vibedock-2d",
+    "version": 1
+  },
+  "definition": "style.json",
+  "defaultIcon": "legacy",
+  "icons": [
+    {
+      "id": "legacy",
+      "label": "Existing theme illustration",
+      "file": "assets/default.svg"
+    }
+  ],
+  "files": {
+    "assets/default.svg": "87401b5ac6a1b2e38aef0680fdd5abf151a96cb1250c537bb340ac130172a590",
+    "license.txt": "d00928deb153983302c5fd7792c12d60f9212d9f078a97479077a41d5ff05839",
+    "style.json": "8270d0706c31fdc96ab6b19867b841129bdb843534b859158b68603de9a9bff0"
+  }
+}

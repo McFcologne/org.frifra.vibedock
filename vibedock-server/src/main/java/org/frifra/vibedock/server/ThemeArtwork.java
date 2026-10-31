@@ -12,6 +12,10 @@ final class ThemeArtwork {
         case DIFF->"diff --git a/"+title.toLowerCase(java.util.Locale.ROOT);
         case DEBUG->"> "+title.toLowerCase(java.util.Locale.ROOT)+".quota";default->title;};}
     static void band(Graphics2D g,Scheme s,int x,int y,int width,int height){
+        bandPreset(g,s,x,y,width,height);
+        s.drawing.layers().drawBand(g,x,y,width,height);
+    }
+    private static void bandPreset(Graphics2D g,Scheme s,int x,int y,int width,int height){
         if(!s.illustrated())return;
         var ink=(Graphics2D)g.create();
         try{
@@ -59,7 +63,7 @@ final class ThemeArtwork {
         }
         g.setColor(new Color(s.title));g.drawString(title,x,baseline);return true;
     }
-    static int footerBackground(Scheme s){return s.style==Scheme.Style.CODE?0x173e56:s.background;}
+    static int footerBackground(Scheme s){return s.drawing.footerBackground()!=null?s.drawing.footerBackground():s.style==Scheme.Style.CODE?0x173e56:s.background;}
     static String reset(Scheme s,String value){
         if(!value.startsWith("Reset "))return value;
         return switch(s.style){case DEBUG->"reset: "+value.substring(6);case DIFF->"@@ "+value.substring(6)+" @@";default->value;};
@@ -68,6 +72,7 @@ final class ThemeArtwork {
         int fill=left<0?0:(int)Math.round(width*left/100);
         g.setColor(new Color(s.track));g.fillRect(x,y,width,height);
         int colour=switch(s.style){case MISSION->0x6ecab8;case DEPARTURE->s.title;case NORDIC->0x54877d;case HIFI->0xa7ca6b;case SOLARIZED->0x859900;case QUEST->0x73be91;case BAUHAUS->0x2f6088;case INK->s.text;case INDUSTRIAL->0xeca24a;case PORCELAIN->0x416ba4;case GITHUB->0x39d353;case CODE->0x4ec9b0;case SHELL->0xb4e88c;case DIFF->0x56d364;case DEBUG->0xb095ef;default->s.title;};
+        if(s.drawing.barColor()!=null)colour=s.drawing.barColor();
         // Numeric quota values remain unchanged. Low remaining quota gets the existing warning colour where coloured.
         if(left>=0&&left<20&&s.style!=Scheme.Style.INK)colour=StatusImage.barColor(left);
         g.setColor(new Color(colour));

@@ -1,0 +1,27 @@
+{
+  "format": "org.frifra.vibedock.theme",
+  "schemaVersion": 1,
+  "id": "blueprint",
+  "version": "1.0.0",
+  "name": "Blueprint",
+  "author": "VibeDock contributors; Twemoji contributors (icon)",
+  "license": "Apache-2.0 AND CC-BY-4.0",
+  "renderer": {
+    "id": "vibedock-2d",
+    "version": 1
+  },
+  "definition": "style.json",
+  "defaultIcon": "legacy",
+  "icons": [
+    {
+      "id": "legacy",
+      "label": "Existing theme illustration",
+      "file": "assets/default.svg"
+    }
+  ],
+  "files": {
+    "assets/default.svg": "19465c86b21ef41109f66ce89051da87c220c29d5f8c8c876ee0e933873f1f65",
+    "license.txt": "d25f99c9b99099a056521e6b50d307eb2c3baddc484d9df0a0107201f2e8184c",
+    "style.json": "3a69a4dd9bd0938447d7382ed83e99f74a41b2b9275750237176950bfb463490"
+  }
+}

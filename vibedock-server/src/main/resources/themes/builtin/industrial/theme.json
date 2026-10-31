@@ -1,0 +1,27 @@
+{
+  "format": "org.frifra.vibedock.theme",
+  "schemaVersion": 1,
+  "id": "industrial",
+  "version": "1.0.0",
+  "name": "Industrial",
+  "author": "VibeDock contributors; Twemoji contributors (icon)",
+  "license": "Apache-2.0 AND CC-BY-4.0",
+  "renderer": {
+    "id": "vibedock-2d",
+    "version": 1
+  },
+  "definition": "style.json",
+  "defaultIcon": "legacy",
+  "icons": [
+    {
+      "id": "legacy",
+      "label": "Existing theme illustration",
+      "file": "assets/default.svg"
+    }
+  ],
+  "files": {
+    "assets/default.svg": "d32bd9f51b2a54f620f9693e833935c5e2cb2304cbf89aab75fd10f054711ce5",
+    "license.txt": "e66889aec2db95d895e3dd9ff7498b20aeb9278f30951cffabc1222fd5725f7b",
+    "style.json": "fb7866899b5c49492cec9d5f58008a89ba9530e88b29c16b59528e7f299f6d72"
+  }
+}

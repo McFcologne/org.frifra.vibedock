@@ -1,0 +1,14 @@
+{
+  "format": "vibedock-2d",
+  "version": 1,
+  "preset": "terminal",
+  "palette": {
+    "background": "#0d0800",
+    "title": "#ffc23d",
+    "text": "#ffb000",
+    "muted": "#9a6a00",
+    "track": "#2e1f00",
+    "warning": "#ffd98a"
+  },
+  "font": "DejaVu Sans Mono"
+}

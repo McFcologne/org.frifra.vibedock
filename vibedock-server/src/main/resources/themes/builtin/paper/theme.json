@@ -1,0 +1,27 @@
+{
+  "format": "org.frifra.vibedock.theme",
+  "schemaVersion": 1,
+  "id": "paper",
+  "version": "1.0.0",
+  "name": "Paper (light)",
+  "author": "VibeDock contributors; Twemoji contributors (icon)",
+  "license": "Apache-2.0 AND CC-BY-4.0",
+  "renderer": {
+    "id": "vibedock-2d",
+    "version": 1
+  },
+  "definition": "style.json",
+  "defaultIcon": "legacy",
+  "icons": [
+    {
+      "id": "legacy",
+      "label": "Existing theme illustration",
+      "file": "assets/default.svg"
+    }
+  ],
+  "files": {
+    "assets/default.svg": "8b8afd8f60833ca51907899d4a3279cdfd355282858ba8a73cd1034d2a1e31ff",
+    "license.txt": "2e682faa1c8721a53eb632aed392b1564e7ae24666d6bed7f081d1d728fd0968",
+    "style.json": "44b2a935a1152632a42fa284b33cee8ce97424adf03bdbd34b84c859169cb7aa"
+  }
+}
