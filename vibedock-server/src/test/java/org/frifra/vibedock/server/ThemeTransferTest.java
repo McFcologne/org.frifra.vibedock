@@ -43,6 +43,18 @@ class ThemeTransferTest {
             mvc.perform(admin(post("/admin/themes/"+id+"/delete")).with(csrf())).andExpect(status().isOk());
         }finally{registry.configureDesign(old);if(library.snapshot().catalog().find(id).isPresent())library.remove(id);}
     }
+    @Test void installedPackagesWithoutIconCreatorsStillExport() throws Exception {
+        String id="http.nocredit";var files=ThemeLibraryTest.unzip(ThemeLibraryTest.theme(id,"1.0.0","#123456"));
+        var manifest=ThemeLibraryTest.JSON.readValue(files.get("theme.json"),LinkedHashMap.class);
+        var icon=(Map)((List)manifest.get("icons")).get(0);String path=(String)icon.get("file");icon.remove("author");icon.remove("license");
+        files.put(path,(new String(files.get(path),java.nio.charset.StandardCharsets.UTF_8)+"<!-- own -->").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        ((Map)manifest.get("files")).put(path,ThemePackage.sha256(files.get(path)));files.put("theme.json",ThemeLibraryTest.JSON.writeValueAsBytes(manifest));
+        try{
+            mvc.perform(admin(post("/admin/themes/import")).with(csrf()).content(ThemeLibraryTest.zip(files))).andExpect(status().isOk());
+            byte[] exported=mvc.perform(admin(get("/admin/themes/"+id+"/export"))).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+            assertTrue(new String(ThemeLibraryTest.unzip(exported).get("credits.txt"),java.nio.charset.StandardCharsets.UTF_8).contains("Creator: Not specified"));
+        }finally{if(library.snapshot().catalog().find(id).isPresent())library.remove(id);}
+    }
     @Test void transfersStayOnTheAdminListenerAndWritesNeedCsrf() throws Exception {
         byte[] archive=ThemeLibraryTest.theme("http.boundary","1.0.0","#123456");
         mvc.perform(post("/admin/themes/inspect").with(csrf()).content(archive).header("Accept","application/json").with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isUnauthorized());
