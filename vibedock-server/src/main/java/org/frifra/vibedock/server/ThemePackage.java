@@ -1,5 +1,6 @@
 package org.frifra.vibedock.server;
 
+import tools.jackson.core.JacksonException;
 import tools.jackson.core.StreamReadFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.DeserializationFeature;
@@ -68,7 +69,8 @@ final class ThemePackage {
 
     static Manifest manifest(byte[] bytes) throws IOException {
         if(bytes==null||bytes.length==0||bytes.length>MAX_MANIFEST)throw invalid("Manifest exceeds 64 KiB or is empty");
-        JsonNode root=JSON.readTree(bytes);
+        JsonNode root;
+        try{root=JSON.readTree(bytes);}catch(JacksonException e){throw invalid("Malformed theme.json");}
         fields(root,Set.of("format","schemaVersion","id","version","name","author","license","renderer","definition","defaultIcon","icons","preview","files"));
         if(!FORMAT.equals(text(root,"format",80))||integer(root,"schemaVersion")!=VERSION)throw invalid("Unsupported theme package format or schema version");
         String id=identifier(text(root,"id",80)),version=text(root,"version",40);
