@@ -11,7 +11,7 @@
     "version": 1
   },
   "definition": "style.json",
-  "defaultIcon": "theme",
+  "defaultIcon": "legacy",
   "icons": [
     {
       "id": "legacy",
