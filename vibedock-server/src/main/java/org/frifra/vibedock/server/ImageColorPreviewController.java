@@ -33,7 +33,7 @@ class ImageColorPreviewController {
             var root=clients.defaultDesign();
             var design=new Design(theme,root.mood(),root.weather(),root.layout(),null,new Design.Icon("theme-default",null,null));
             var rendered=source.equals("live")?designs.render(design,"192.168.1.50",panel,scale):renderer.render(ImageQuality.reference(state),"192.168.1.50",
-                    new StatusImage.Look(ThemeIcons.image(snapshot.item(theme.id()).orElseThrow().contents(),snapshot.item(theme.id()).orElseThrow().contents().manifest().defaultIcon(),44*scale).orElse(null),theme,emoji.image(state==2?"🌧":"⛅",24*scale).orElse(null),state==2?"-2°":"13°",Layout.DEFAULT),panel,scale);byte[] png=rendered.png();
+                    new StatusImage.Look(ThemeIcons.image(snapshot.item(theme.id()).orElseThrow().contents(),snapshot.item(theme.id()).orElseThrow().contents().manifest().defaultIcon(),44*scale).orElse(null),theme,emoji.image("⛅",24*scale).orElse(null),"13°",Layout.DEFAULT),panel,scale);byte[] png=rendered.png();
             var original=ImageIO.read(new ByteArrayInputStream(png));var raw=new BufferedImage(w,h,BufferedImage.TYPE_INT_RGB);raw.setRGB(0,0,w,h,original.getRGB(0,0,w,h,null,0,w),0,w);var rawPng=new ByteArrayOutputStream();ImageIO.write(raw,"png",rawPng);
             int base=settings.get().colors(panel.width(),panel.height()),budget=0,used=0,bits=0,payload=web?png.length:rendered.rgb565().length;double changed=0;
             if(!web&&!mode.equals("original")){

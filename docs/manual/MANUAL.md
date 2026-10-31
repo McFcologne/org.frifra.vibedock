@@ -951,8 +951,10 @@ height and 32, 64, 256 or full colors. Both dimensions must fit; the first match
 remove one with ×, then save. **Restore defaults** restores 420×420 → 32 and 640×640 → 256. Unmatched sizes use
 full colors; removing every rule disables lossy reduction. Rules are stored in `DATA_DIR/image-colors.json`.
 
-**Allow quality fallback** is the only automatic-quality switch. The server compares reference scenes for all installed
-themes across small display sizes and derives a quality target internally; no percentage must be adjusted by hand.
+**Allow quality fallback** is the only automatic-quality switch. The server compares every installed theme across
+small display sizes at low (5%), average (50%) and high (95%) remaining quota, then derives a quality target
+internally; no percentage must be adjusted by hand. Normal quota changes are therefore already represented by the
+reference palette.
 It can move one palette level down or at most one up. A 32-color rule can therefore use 16, 32 or 64 colors. It
 checks changed weather/icon pixels again; the target is a visual-quality heuristic, not a guarantee of identical
 appearance. During initial calibration one conservative higher level is used without blocking device pulls.
@@ -971,7 +973,8 @@ Image fingerprints cache the palette, metric and encoded frame until pixels or p
 bounded to 64 entries and 8 MiB of image payloads; eviction or restart requires a new calculation.
 
 **Live color comparison** opens `/admin/color-preview`: inspect all themes using current server data or clearly
-labelled reference scenes. Switch resolution, fixed/native size, palette or automatic quality for all cards together.
+labelled reference scenes. Switch resolution, palette or automatic quality for all cards together. Images always
+use the selected native pixel dimensions (1:1); columns adapt without scaling the images.
 The ↑ / ↓ icons show a larger/smaller palette; tooltips explain them. Each card shows actual colors, bits and bytes.
 The Web option defaults to lossless. Reference scenes never query providers or change device settings.
 

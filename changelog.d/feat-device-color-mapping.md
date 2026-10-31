@@ -1,11 +1,12 @@
 - **Automatic hardware palettes:** ordered width/height rules select 32, 64, 256 or full colors. Defaults use 32
-  through 420×420 and 256 through 640×640. One quality switch calibrates all themes across small displays,
+  through 420×420 and 256 through 640×640. One quality switch calibrates all themes across small displays and low,
+  average and high quota reference states,
   allowing one lower or at most one higher level. Present theme base/window paints, bar contrast and weather/mood hues receive priority.
 - **Only transmit used colors:** unused entries are removed losslessly in every selected palette. Full images and
   exact delta spans use minimum bit widths; compatible firmware streams them with one shared 512-byte palette.
   Legacy firmware keeps RGB565. Web images keep every pixel and use smaller exact PNG palettes where possible.
 - **Cached analysis and live comparison:** image fingerprints reuse quality metrics and encoded frames. Changed
-  icons or policy are recalculated. The admin live comparison shows all themes at native/fixed sizes, actual color
+  icons or policy are recalculated. The admin live comparison shows all themes at exact native pixel sizes, actual color
   counts, bytes, metrics and compact ↑/↓ indicators; references are labelled separately from live data.
 
 ### Smaller full images and exact partial updates

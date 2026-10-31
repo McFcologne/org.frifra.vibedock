@@ -3,12 +3,13 @@
  let mode='auto',cards=[],generation=0;
  const fmt=n=>new Intl.NumberFormat().format(n),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  function draw(){
-  const native=$('color-size').value==='native';grid.classList.toggle('native',native);if(cards.length)grid.style.setProperty('--color-card-width',(native?cards[0].width+24:240)+'px');
+  if(cards.length)grid.style.setProperty('--color-card-width',(cards[0].width+26)+'px');
   grid.innerHTML=cards.map(c=>{
    const lossless=c.changed===0,dir=c.used&&c.base&&c.used!==c.base?(c.used>c.base?'↑':'↓'):c.base&&c.budget&&c.budget!==c.base?(c.budget>c.base?'↑':'↓'):'';
-   const tooltip=dir==='↑'?'Quality fallback: one higher palette':dir==='↓'?(lossless?'Fewer colors, pixel-identical':'Automatic smaller palette'):'';
-   const label=c.used?c.used+' colors · '+c.bits+' bit':'Full colors';
-   return `<article class="card" data-theme="${esc(c.id)}"><h3>${esc(c.name)} <span class="color-level" title="${esc(tooltip)}" aria-label="${esc(tooltip)}">${dir}</span></h3><img src="${c.image}" width="${c.width}" height="${c.height}" alt="${esc(c.name)}" style="width:${native?c.width+'px':'100%'};max-width:${native?'none':'100%'}"><small>${label} · ${c.width}×${c.height}<br>${c.changed.toFixed(2)}% pixels changed${lossless?' · lossless':''}<br>PNG ${fmt(c.pngBytes)} B · ${$('color-display').value==='web'?'PNG transfer':'device payload'} ${fmt(c.payloadBytes)} B<br>${(100*(1-c.payloadBytes/c.originalPayload)).toFixed(1)}% fewer payload bytes</small></article>`;
+   const tooltip=dir==='↑'?'Quality fallback: one higher palette':dir==='↓'?(lossless?'Fewer colors, pixel-identical':'Automatic smaller palette'):'Configured palette';
+   const badge=c.used?`${c.used}${dir?' '+dir:''}`:'RGB';
+   const label=c.used?c.bits+' bit':'Full RGB565';
+   return `<article class="card" data-theme="${esc(c.id)}"><h3><span class="color-title">${esc(c.name)}</span><span class="color-palette" title="${esc(tooltip)}" aria-label="${esc(tooltip)}">${badge}</span></h3><div class="color-test-image"><img src="${c.image}" width="${c.width}" height="${c.height}" alt="${esc(c.name)}" style="width:${c.width}px;height:${c.height}px"></div><small>${label} · ${c.width}×${c.height}<br>${c.changed.toFixed(2)}% pixels changed${lossless?' · lossless':''}<br>PNG ${fmt(c.pngBytes)} B · ${$('color-display').value==='web'?'PNG transfer':'device payload'} ${fmt(c.payloadBytes)} B<br>${(100*(1-c.payloadBytes/c.originalPayload)).toFixed(1)}% fewer payload bytes</small></article>`;
   }).join('');
  }
  async function load(){
@@ -18,7 +19,7 @@
  }
  async function waitForCalibration(own){setTimeout(async()=>{if(own!==generation||document.hidden)return;try{const s=await(await fetch('/admin/color-preview/quality')).json();if(s.calibrating)waitForCalibration(own);else load()}catch{}},1500)}
  $('color-source').onchange=load;
- $('color-display').onchange=()=>{mode=$('color-display').value==='web'?'lossless':'auto';buttons();load()};$('color-size').onchange=draw;$('color-fallback').onchange=load;$('color-refresh').onclick=load;
+ $('color-display').onchange=()=>{mode=$('color-display').value==='web'?'lossless':'auto';buttons();load()};$('color-fallback').onchange=load;$('color-refresh').onclick=load;
  function buttons(){$('color-fallback').disabled=$('color-display').value==='web';for(const b of $('color-modes').querySelectorAll('button')){b.classList.toggle('secondary',b.dataset.colorMode!==mode);b.disabled=$('color-display').value==='web'&&['32','64','256'].includes(b.dataset.colorMode)}}
  const initial=new URLSearchParams(location.search),source=initial.get('source');if(['live','reference0','reference1','reference2'].includes(source))$('color-source').value=source;
  $('color-modes').onclick=e=>{const b=e.target.closest('[data-color-mode]');if(b){mode=b.dataset.colorMode;buttons();load()}};load();

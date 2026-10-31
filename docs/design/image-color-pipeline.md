@@ -77,9 +77,10 @@ promise that every protected paint fits every configured limit. Antialiasing sha
 ## Automatic calibration and bounded adaptation
 
 The only user switch is **Allow quality fallback**. Internally, `ImageQuality` renders each installed theme's default
-artwork in three reference usage states (normal, low/rate-limited and sign-in-required), at the inventory's small
-resolutions whose width and height are each at most 420. It measures 16/32/64/128/256-color candidates. Missing
-protected colors make a reference candidate unacceptable (recorded as 100% change).
+artwork at three remaining-quota reference points: **5% (low), 50% (average) and 95% (high)**, at the inventory's
+small resolutions whose width and height are each at most 420. It measures 16/32/64/128/256-color candidates.
+This makes normal quota movement part of the calibration rather than a reason to change the reference palette.
+Missing protected colors make a reference candidate unacceptable (recorded as 100% change).
 
 For each theme and level, retain the worst changed-pixel percentage across reference scenes and sizes. A shared
 target is the ceiling of the collection's worst next-higher-level error, clamped to the internal 40–50% corridor.
@@ -95,7 +96,8 @@ setting. Reference scenes and corridor changes must be evaluated on the whole th
 Reference results choose a preferred level. A lower preferred candidate must also pass the current frame's metric
 and protected-paint checks. The normal candidate can rise once when it fails. A reference-preferred higher level
 is used directly. No recursive escalation is allowed; the one-increase cap wins over the target. A changed weather
-icon or custom artwork changes pixels/metadata and requires evaluation again.
+icon or custom artwork changes pixels/metadata and requires evaluation again; quota-only updates are already covered
+by the three reference points.
 
 Calibration runs on one daemon worker. A new theme-library snapshot invalidates the reference and cancels obsolete
 work. Until a reference is ready, requests use one conservative higher level instead of waiting. Worker shutdown
