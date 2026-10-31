@@ -2,7 +2,7 @@
   "format": "org.frifra.vibedock.theme",
   "schemaVersion": 1,
   "id": "starship",
-  "version": "1.2.0",
+  "version": "1.1.0",
   "name": "Starship console",
   "author": "VibeDock contributors; Twemoji contributors (icon)",
   "license": "Apache-2.0 AND CC-BY-4.0",
@@ -28,6 +28,6 @@
     "assets/default.svg": "83d1f70bde27d2a1321c1b755bb68508cb29360011d7935fd9e19bfef2fd86c0",
     "license.txt": "92892a5059f0ff30e8f7bb6a7c1c32d644ea7d9656e2a44d4ef203d619cd59a4",
     "style.json": "69e42b2b5ffb334b2fb127952be742bf7cda31786302d29c101fd31c66ea11e3",
-    "assets/theme.svg": "7374dd3a49b450bd75652ddd491444ffd35f9627edaf8907607e9d5af36c5193"
+    "assets/theme.svg": "9603576ac4bf7d36f8dc519ebb20677a835dbc81843330ca31b2ee00cf1236d5"
   }
 }

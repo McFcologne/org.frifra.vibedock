@@ -36,4 +36,3 @@
 
 - **Explicit LCD footer colors:** a custom footer background survives the Handheld LCD color reduction; the
   original four-shade appearance remains the default.
-- **Starship theme icon:** a new original drawing of the Vulcan salute replaces the earlier hand as the theme default.
