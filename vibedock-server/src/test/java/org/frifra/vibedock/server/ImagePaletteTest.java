@@ -75,7 +75,8 @@ class ImagePaletteTest {
     @Test void hifiVuMeterKeepsItsYellowAndRedEndSegments() throws Exception {
         var theme=Scheme.HI_FI;var icon=ThemeIcons.image(new Design.Icon("theme-default",null,null),theme,44).orElseThrow();
         var weather=new Twemoji(Twemoji.locate(null).toString()).image("⛅",24).orElseThrow();
-        var rendered=new StatusImage("Europe/Berlin").render(ImageQuality.reference(0),"192.168.1.50",new StatusImage.Look(icon,theme,weather,"13°"));
+        // The red VU end segment is present at the high-quota calibration scene (95% remaining).
+        var rendered=new StatusImage("Europe/Berlin").render(ImageQuality.reference(2),"192.168.1.50",new StatusImage.Look(icon,theme,weather,"13°"));
         int red=StatusImage.rgb565(0xd47c5c);assertTrue(rendered.primary().contains(red),"Rare red VU segment is a protected index paint");
         var selected=ImagePalette.select(rendered.rgb565(),240,240,32,rendered.accents(),rendered.bars(),true,50,16,rendered.primary());
         int found=0;
