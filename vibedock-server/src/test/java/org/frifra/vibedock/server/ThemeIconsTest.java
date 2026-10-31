@@ -100,4 +100,35 @@ class ThemeIconsTest {
         assertThrows(Exception.class,()->ThemeIconAsset.draw("icon.png",PhotoTest.png(1025,1,0),44));
         assertThrows(Exception.class,()->ThemeIconAsset.draw("icon.png","not an image".getBytes(StandardCharsets.UTF_8),44));
     }
+
+    @Test void literalPresentationStylesCurrentColorAndEmptyDefsRender() throws Exception {
+        String svg="<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" color=\"#ffffff\"><defs/><path d=\"M4 4 L44 4 L44 44 L4 44 Z\" fill=\"none\" stroke=\"currentColor\" style=\"stroke-width: 2px;\"/></svg>";
+        var image=ThemeIconAsset.draw("icon.svg",svg.getBytes(StandardCharsets.UTF_8),48);
+        assertEquals(0xffffff,image.getRGB(4,24)&0xffffff);assertTrue((image.getRGB(4,24)>>>24)>0);
+        assertThrows(Exception.class,()->ThemeIconAsset.draw("icon.svg",svg.replace("stroke-width: 2px;","fill: url(https://example.com/x);").getBytes(StandardCharsets.UTF_8),48));
+    }
+    @Test void editorSvgCleanupKeepsStaticShapesAndDropsActiveAndExternalContent() throws Exception {
+        String svg="<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\"><defs/><script>alert(1)</script><image href=\"https://example.com/x\"/><rect x=\"4\" y=\"4\" width=\"40\" height=\"40\" onclick=\"alert(2)\" style=\"fill:#ff0000;stroke-width:2px;filter:url(https://example.com/y)\"/></svg>";
+        var result=ThemeIconAsset.staticSvg(svg.getBytes(StandardCharsets.UTF_8));assertTrue(result.removed()>=5);
+        assertEquals(0xff0000,ThemeIconAsset.draw("icon.svg",result.svg(),48).getRGB(24,24)&0xffffff);
+        assertTrue(result.svg().length<ThemeIconAsset.MAX_BYTES);
+        String deep="<svg xmlns=\"http://www.w3.org/2000/svg\">"+"<g>".repeat(70)+"<rect width=\"48\" height=\"48\"/>"+"</g>".repeat(70)+"</svg>";
+        assertThrows(Exception.class,()->ThemeIconAsset.staticSvg(deep.getBytes(StandardCharsets.UTF_8)));
+        assertThrows(Exception.class,()->ThemeIconAsset.staticSvg("<svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>".getBytes(StandardCharsets.UTF_8)));
+        assertThrows(Exception.class,()->ThemeIconAsset.staticSvg("<!DOCTYPE svg [<!ENTITY x SYSTEM 'file:///etc/hosts'>]><svg xmlns=\"http://www.w3.org/2000/svg\">&x;</svg>".getBytes(StandardCharsets.UTF_8)));
+    }
+
+    @Test void pngColorOverridePreservesAlphaAndRejectsMulticolorOrOpaqueImages() throws Exception {
+        var image=new java.awt.image.BufferedImage(4,4,java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        image.setRGB(1,1,0xffff0000);image.setRGB(2,1,0x80ff0000);
+        var source=new java.io.ByteArrayOutputStream();javax.imageio.ImageIO.write(image,"png",source);
+        assertTrue(ThemeIconAsset.pngInfo(source.toByteArray()).supported());
+        byte[] recolored=ThemeIconAsset.recolorPng(source.toByteArray(),"#00ff00");
+        var result=javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(recolored));
+        assertEquals(0xff00ff00,result.getRGB(1,1));assertEquals(0x8000ff00,result.getRGB(2,1));assertEquals(0,result.getRGB(0,0)>>>24);
+        image.setRGB(2,1,0xff0000ff);source.reset();javax.imageio.ImageIO.write(image,"png",source);
+        assertFalse(ThemeIconAsset.pngInfo(source.toByteArray()).supported());
+        byte[] multi=source.toByteArray();assertThrows(IllegalArgumentException.class,()->ThemeIconAsset.recolorPng(multi,"#00ff00"));
+        assertFalse(ThemeIconAsset.pngInfo(PhotoTest.png(2,2,0xffff0000)).supported());
+    }
 }

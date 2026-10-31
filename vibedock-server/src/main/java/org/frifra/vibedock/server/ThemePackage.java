@@ -25,7 +25,10 @@ final class ThemePackage {
     private static final Pattern ID=Pattern.compile("[a-z][a-z0-9._-]{0,79}");
     private static final Pattern SEMVER=Pattern.compile("(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)");
     record Renderer(String id,int version) {}
-    record Icon(String id,String label,String file) {}
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    record Icon(String id,String label,String file,String author,String license) {
+        Icon(String id,String label,String file){this(id,label,file,null,null);}
+    }
     record Manifest(String id,String version,String name,String author,String license,Renderer renderer,
                     String definition,String defaultIcon,List<Icon> icons,String preview,Map<String,String> files) {
         Manifest {icons=List.copyOf(icons);files=Map.copyOf(files);}
@@ -64,6 +67,7 @@ final class ThemePackage {
         if(!entries.keySet().equals(manifest.files().keySet()))throw invalid("ZIP files must match the manifest exactly");
         for(var entry:entries.entrySet())
             if(!sha256(entry.getValue()).equals(manifest.files().get(entry.getKey())))throw invalid("Checksum mismatch: "+entry.getKey());
+        if(entries.containsKey(ThemePreviewPage.FILE))ThemePreviewPage.validate(entries.get(ThemePreviewPage.FILE),manifest);
         return new Contents(manifest,entries,total);
     }
 
@@ -86,10 +90,10 @@ final class ThemePackage {
         if(list==null||!list.isArray()||list.isEmpty()||list.size()>32)throw invalid("A theme needs 1 to 32 icons");
         var icons=new ArrayList<Icon>();Set<String> iconIds=new HashSet<>();
         for(var item:list){
-            fields(item,Set.of("id","label","file"));
+            fields(item,Set.of("id","label","file","author","license"));
             String iconId=identifier(text(item,"id",80)),file=image(text(item,"file",160));
             if(!iconIds.add(iconId))throw invalid("Duplicate icon id: "+iconId);
-            icons.add(new Icon(iconId,text(item,"label",80),file));
+            icons.add(new Icon(iconId,text(item,"label",80),file,item.has("author")?text(item,"author",160):null,item.has("license")?text(item,"license",160):null));
         }
         if(!iconIds.contains(defaultIcon))throw invalid("Default icon must name an icon in this theme");
         String preview=root.has("preview")?image(text(root,"preview",160)):null;
@@ -98,7 +102,7 @@ final class ThemePackage {
         Map<String,String> files=new LinkedHashMap<>();
         for(var file:fileMap.properties()){
             String path=path(file.getKey());
-            if(path.equals("theme.json")||!path.matches(".*\\.(json|png|svg|txt)"))throw invalid("Unsupported package file: "+path);
+            if(path.equals("theme.json")||!path.equals(ThemePreviewPage.FILE)&&!path.matches(".*\\.(json|png|svg|txt)"))throw invalid("Unsupported package file: "+path);
             if(!file.getValue().isTextual()||!file.getValue().textValue().matches("[0-9a-f]{64}"))throw invalid("Expected a SHA-256 checksum for "+path);
             files.put(path,file.getValue().textValue());
         }

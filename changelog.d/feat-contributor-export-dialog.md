@@ -1,0 +1,1 @@
+- Ask for missing uploaded-artwork creators before save/export. Optionally remember an editable contributor suggestion on the server across restarts, with explicit confirmation per new icon and a forget action; keep this preference separate from exported icon credits.

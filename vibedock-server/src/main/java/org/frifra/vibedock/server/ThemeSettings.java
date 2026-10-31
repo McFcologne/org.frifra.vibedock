@@ -10,9 +10,12 @@ import java.util.*;
 /** Instance-wide theme availability. Existing designs keep their theme; selections and swipes use enabled ones. */
 @Component
 class ThemeSettings {
-    record State(Set<String> disabled,boolean dark) {
-        State(Set<String> disabled){this(disabled,false);}
+    record State(Set<String> disabled,boolean dark,@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) String contributor) {
+        State(Set<String> disabled){this(disabled,false,null);}
+        State(Set<String> disabled,boolean dark){this(disabled,dark,null);}
         State {
+            if(contributor!=null){contributor=contributor.strip();if(contributor.isEmpty())contributor=null;
+                else if(contributor.codePointCount(0,contributor.length())>160||contributor.codePoints().anyMatch(Character::isISOControl))throw new IllegalArgumentException("Enter a contributor name of at most 160 characters");}
             // Old enum spellings were accepted on read; keep the same canonical IDs and JSON shape.
             disabled=disabled==null?Set.of():disabled.stream().map(id->Scheme.stored(id).id()).collect(java.util.stream.Collectors.toUnmodifiableSet());
         }
@@ -34,12 +37,14 @@ class ThemeSettings {
         return disabled;
     }
     boolean dark(){return state.dark();}
-    synchronized void setDark(boolean dark) throws IOException { save(new State(state.disabled(),dark)); }
+    String contributor(){return state.contributor()==null?"":state.contributor();}
+    synchronized void setContributor(String name) throws IOException {save(new State(state.disabled(),state.dark(),name));}
+    synchronized void setDark(boolean dark) throws IOException { save(new State(state.disabled(),dark,state.contributor())); }
     boolean enabled(Scheme scheme){return !effectiveDisabled().contains(scheme.id());}
     synchronized void setEnabled(Scheme scheme,boolean enabled) throws IOException {
         var disabled=new HashSet<>(state.disabled());if(enabled)disabled.remove(scheme.id());else disabled.add(scheme.id());
         if(snapshot().catalog().all().stream().noneMatch(s->!disabled.contains(s.id())))throw new IllegalArgumentException("Keep at least one theme enabled");
-        save(new State(disabled,state.dark()));
+        save(new State(disabled,state.dark(),state.contributor()));
     }
     private void save(State next) throws IOException {
         if(next.equals(state))return;

@@ -16,8 +16,9 @@ class ThemeTransferController {
     @ExceptionHandler(ThemeLibrary.Conflict.class) @ResponseBody ResponseEntity<Map<String,String>> conflict(ThemeLibrary.Conflict error){
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error",error.getMessage()));
     }
-    private final ThemeLibrary library;private final ClientRegistry registry;private final ThemeSettings settings;private final DevicePoke poke;
-    ThemeTransferController(ThemeLibrary library,ClientRegistry registry,ThemeSettings settings,DevicePoke poke){
+    private final DesignService designs;private final ThemeLibrary library;private final ClientRegistry registry;private final ThemeSettings settings;private final DevicePoke poke;
+    ThemeTransferController(ThemeLibrary library,ClientRegistry registry,ThemeSettings settings,DevicePoke poke,DesignService designs){
+        this.designs=designs;
         this.library=library;this.registry=registry;this.settings=settings;this.poke=poke;
     }
     private byte[] upload(HttpServletRequest request) throws IOException {
@@ -35,7 +36,7 @@ class ThemeTransferController {
         return Map.of("id",installed.scheme().id(),"name",installed.scheme().label,"version",installed.contents().manifest().version());
     }
     @GetMapping("/admin/themes/{id}/export") ResponseEntity<byte[]> export(@PathVariable String id,@RequestParam(defaultValue="true") boolean agent) throws IOException {
-        byte[] bytes=library.export(id,agent);
+        var contents=ThemeCredits.prepare(ThemePackage.read(library.export(id,agent)),false);byte[] bytes=ThemeArchive.preview(contents,designs.themeExportPreview(contents,DisplayType.M1),agent);
         return ResponseEntity.ok().contentType(MediaType.parseMediaType("application/zip"))
                 .cacheControl(CacheControl.noStore()).header(HttpHeaders.CONTENT_DISPOSITION,ContentDisposition.attachment().filename(id+".vibetheme").build().toString()).body(bytes);
     }

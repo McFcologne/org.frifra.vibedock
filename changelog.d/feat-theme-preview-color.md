@@ -1,0 +1,2 @@
+- Keep cleaned SVG uploads as vectors and allow optional main-color overrides for single-color PNGs with transparency, preserving alpha and dimensions.
+- Include a small validated script-free preview.html with a real rendered snapshot and package icon previews for offline inspection after extraction.

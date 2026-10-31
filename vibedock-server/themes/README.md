@@ -5,7 +5,7 @@ not an instance backup: it contains no accounts, device identifiers, credentials
 
 The archive reader checks the **archive and manifest**. The drawing reader validates the recipe and the server loads
 all 35 built-in themes from package directories. Administration can import, export, copy, update and remove installed
-themes without restarting. The visual theme editor remains a later stage. Installation validates the manifest,
+themes without restarting. The visual theme editor is available through **Customize** / **Edit theme** on each gallery card. Installation validates the manifest,
 renderer/recipe and every graphic; an extension or checksum alone does not make a file safe. No package code or
 guide is executed, and no external resources are fetched.
 
@@ -81,7 +81,7 @@ reads both shapes without rewriting them on load.
 Only PNG rasters of catalog assets are served by the authenticated administration endpoint. Icons are limited to
 128 KiB and rasterized to at most 512×512. PNG sources are at most 1024×1024. SVG uses a small namespace-aware shape
 subset (paths, rectangles, ellipses/circles, lines, polygons/polylines and groups), at most 2048 XML nodes and bounded
-numeric coordinates. Scripts, CSS, text/fonts, external references, entities/DOCTYPE and nested SVG are rejected.
+numeric coordinates. Scripts, stylesheets, text/fonts, external references, entities/DOCTYPE and nested SVG are rejected. Literal inline presentation styles (fill, stroke, color and opacity), currentColor and empty definitions are supported.
 The SVG loader also denies resource access. These are deliberate limits for shareable theme artwork, not support
 for arbitrary SVG documents.
 
@@ -140,3 +140,70 @@ PY
 
 Editing an asset also requires updating its entry in `theme.json.files`. The archive has no enclosing `minimal/`
 directory: `theme.json` is at its root. This example can now be imported through administration.
+
+
+## Visual theme editor
+
+**Customize** opens a built-in theme as an independent draft in another tab; **Edit theme** updates an installed
+package, and **Create copy** starts another independent ID. The design tab refreshes its catalog when focused again.
+The editor changes palette colors, preset, font, optional bar/footer colors, bounded background/band decorations,
+icon labels/IDs, default icon and uploaded PNG/safe SVG artwork. Existing definitions and original license files
+remain intact until edited; removing an icon does not remove inherited attribution. Unreferenced graphics, including replaced inherited illustrations, are omitted on saves and exports so repeated
+replacements do not accumulate in the archive. Declared catalog icons and license notices remain included.
+
+Previews use the actual device renderer and selectable supported panel sizes with stable sample readings.
+Drafts are page-local: no autosave, installation, device action or provider request during preview/export.
+**Save theme** explicitly installs a new ID or updates an installed theme with a newer version, through the same
+validated atomic importer. It does not select a theme in any design. **Export draft** produces the same compact
+`.vibetheme` archive, optionally with the agent guide/schemas, without installing it. Leaving an edited page warns
+about unsaved changes; closing it discards the draft. A source package revision digest prevents a stale editor from
+overwriting an intervening update, even if it submits a larger version; the page retains its controls on error.
+If the source was updated or removed, reopen a current editor in another tab to compare and reapply your changes.
+This first editor uses preset-based layouts and visual controls, not arbitrary scripts or draggable text layouts.
+
+The admin-only editor endpoints are `GET /admin/themes/{id}/edit`, `GET /admin/themes/{id}/editor?copy=true`,
+`POST /admin/theme-editor/preview.png?display=<panel-id>`, `POST /admin/theme-editor/export?agent=true|false`
+and `POST /admin/theme-editor/save`. Writes require the existing CSRF token. JSON drafts are bounded to 12 MiB
+before binding (including base64 artwork); all existing package/graphic/renderer limits also apply.
+
+
+Editor SVG uploads are explicitly cleaned and retain their vector format before entering a draft. Unsupported elements,
+attributes and style declarations are removed; literal presentation styles are flattened. Scripts, animation, fonts,
+references and external resources never reach the rasterizer. The UI reports removed items and asks for preview
+review because details can change. XML with entities/DOCTYPE, oversized files and graphics with no visible static
+shapes are rejected. This cleanup does not silently modify imported theme archives: package import stays strict.
+The default icon is shown first in the editor; optional alternatives sit under **Additional catalog icons**.
+
+
+Single-color PNGs with transparency support an optional main-color override in the editor. Alpha and source dimensions
+remain unchanged; indexed PNGs are converted to RGBA before recoloring. Multicolor, opaque or empty PNGs are not recolored.
+Unchecking the override restores the original bytes within that editing session; saved/exported PNGs contain the chosen color.
+
+Downloaded packages include `preview.html` and a small PNG snapshot from the real sample renderer. The page carries the bundled VibeDock icon in its header and as its favicon; the shared PNG asset is included in the archive. The offline page
+uses relative package assets and has no JavaScript or external resources. Only the root `preview.html` is allowed;
+it is validated as bounded static XHTML with fixed styles, constrained tags/attributes and a restrictive resource
+policy. Arbitrary HTML is rejected. The page is regenerated when package metadata changes. Existing packages without
+HTML remain valid. Older staged readers without this additive preview support cannot import these extended exports.
+
+
+## Icon creators and attribution
+
+Icons optionally declare `author` and `license` alongside `id`, `label` and `file`; older three-field packages remain
+readable. The editor resolves known built-in assets by their exact bytes. New custom uploads need a real creator
+before save/export; the server does not infer a creator from a file name or assign Twemoji to custom artwork.
+Recognized source contributions remain attributed when recoloring an inherited asset. Replacing artwork starts
+with an empty creator field so the uploader can enter the actual artist.
+
+Generated `credits.txt` and the offline page name each icon creator. A Twemoji catalog alternative still counts as
+included artwork, even when a custom default icon is selected. Once the last Twemoji asset is removed, its generated
+VibeDock/Twemoji notice section and combined-license marker are removed. Unknown imported license/credit texts are
+preserved. Export snapshots use the package's own icons and omit the extra weather emoji to avoid adding a separate
+Twemoji graphic implicitly. General application notices remain unchanged: the app itself still bundles Twemoji.
+
+
+If an uploaded icon lacks a creator, save/export opens a creator dialog. Optional remembering stores a contributor
+suggestion in `DATA_DIR/themes.json`, independently of package metadata; it survives restarts and other theme-setting
+writes. No file is written merely by reading the preference. A remembered name is proposed for new icons and only
+applied after confirmation. Cancellation leaves the icon credits unchanged. An inline remember button and a forget
+action are available. The preference itself is never included in a theme export; confirmed per-icon credits are.
+The admin-only `GET` / CSRF-protected `POST /admin/theme-editor/contributor` API reads/updates the optional preference.

@@ -1,0 +1,2 @@
+- Clean editor SVG uploads while retaining vector SVGs, report removed content and accept literal SVG presentation styles/currentColor. Reject XML entities and empty results, and align icon size hints with the 128 KiB limit.
+- Show the default theme icon first and collapse optional catalog alternatives; report the concrete reason when package graphic validation fails.
