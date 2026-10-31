@@ -1,1 +1,35 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M18 60L7 39Q4 33 9 31Q12 30 18 39L9 11Q8 6 13 5Q17 5 19 11L26 31L22 5Q22 0 27 0Q31 0 32 6L35 29L43 8Q45 3 49 6Q53 8 50 14L43 38L53 30Q59 26 61 30Q63 33 58 39L46 55Q40 63 30 62Z" fill="#edbb87" stroke="none" stroke-width="2"/><path d="M18 60L29 44L45 42L52 56L43 62Z" fill="#b59cda" stroke="none" stroke-width="2"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 82" stroke-linejoin="round">
+<ellipse cx="32" cy="49" rx="31.4" ry="21.8" fill="#8b633d" stroke="#795334" stroke-width="0.65"/>
+<ellipse cx="32" cy="48.8" rx="30.7" ry="21.1" fill="#c6a371" stroke="#d7b98b" stroke-width="0.35"/>
+<ellipse cx="32.00" cy="49.00" rx="30.20" ry="20.50" fill="#b78c55"/>
+<ellipse cx="31.78" cy="48.74" rx="29.94" ry="20.31" fill="#b88e58"/>
+<ellipse cx="31.56" cy="48.48" rx="29.68" ry="20.13" fill="#ba905a"/>
+<ellipse cx="31.33" cy="48.22" rx="29.42" ry="19.94" fill="#bb925d"/>
+<ellipse cx="31.11" cy="47.96" rx="29.16" ry="19.76" fill="#bd9560"/>
+<ellipse cx="30.89" cy="47.70" rx="28.90" ry="19.57" fill="#be9762"/>
+<ellipse cx="30.67" cy="47.44" rx="28.64" ry="19.39" fill="#c09965"/>
+<ellipse cx="30.44" cy="47.19" rx="28.39" ry="19.20" fill="#c19b67"/>
+<ellipse cx="30.22" cy="46.93" rx="28.13" ry="19.02" fill="#c39d6a"/>
+<ellipse cx="30.00" cy="46.67" rx="27.87" ry="18.83" fill="#c49f6d"/>
+<ellipse cx="29.78" cy="46.41" rx="27.61" ry="18.65" fill="#c6a16f"/>
+<ellipse cx="29.56" cy="46.15" rx="27.35" ry="18.46" fill="#c7a472"/>
+<ellipse cx="29.33" cy="45.89" rx="27.09" ry="18.28" fill="#c9a675"/>
+<ellipse cx="29.11" cy="45.63" rx="26.83" ry="18.09" fill="#caa877"/>
+<ellipse cx="28.89" cy="45.37" rx="26.57" ry="17.91" fill="#ccaa7a"/>
+<ellipse cx="28.67" cy="45.11" rx="26.31" ry="17.72" fill="#cdac7c"/>
+<ellipse cx="28.44" cy="44.85" rx="26.05" ry="17.54" fill="#cfae7f"/>
+<ellipse cx="28.22" cy="44.59" rx="25.79" ry="17.35" fill="#d0b182"/>
+<ellipse cx="28.00" cy="44.33" rx="25.53" ry="17.17" fill="#d2b384"/>
+<ellipse cx="27.78" cy="44.07" rx="25.27" ry="16.98" fill="#d3b587"/>
+<ellipse cx="27.56" cy="43.81" rx="25.01" ry="16.80" fill="#d5b78a"/>
+<ellipse cx="27.33" cy="43.56" rx="24.76" ry="16.61" fill="#d6b98c"/>
+<ellipse cx="27.11" cy="43.30" rx="24.50" ry="16.43" fill="#d8bb8f"/>
+<ellipse cx="26.89" cy="43.04" rx="24.24" ry="16.24" fill="#d9bd91"/>
+<ellipse cx="26.67" cy="42.78" rx="23.98" ry="16.06" fill="#dbc094"/>
+<ellipse cx="26.44" cy="42.52" rx="23.72" ry="15.87" fill="#dcc297"/>
+<ellipse cx="26.22" cy="42.26" rx="23.46" ry="15.69" fill="#dec499"/>
+<ellipse cx="26.00" cy="42.00" rx="23.20" ry="15.50" fill="#dfc69c"/>
+<path d="M32.7 0.8C32.3 0.2 32 0.5 31.5 1.4C20.3 23.2 11.8 53.5 7.9 81C15.5 67.4 22.7 56.3 28.5 50C32.4 45.5 36.7 46 40 50.1C45.3 58.1 50.8 70.3 56.6 81C51.1 53.1 42.5 20.6 32.7 0.8Z" fill="#c5c5c4" stroke="#292a28" stroke-width="0.65"/>
+<path d="M32.4 2.3C22.8 21.6 14.2 50.8 9.5 76C16.1 64.5 22.4 55 27.7 49.4C32 44.5 37.1 44.7 40.7 49.6C45.3 56.7 49.9 66.5 54.6 75.9C48.6 47.4 40.7 20.3 32.4 2.3Z" fill="#d1d1cf"/>
+<path d="M32.5 3.1C23.4 22 15.2 49.2 10.9 72.3" fill="none" stroke="#e4e4e1" stroke-width="0.55"/>
+</svg>

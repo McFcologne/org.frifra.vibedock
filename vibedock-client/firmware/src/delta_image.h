@@ -1,5 +1,6 @@
 #pragma once
 #include "client_policy.h"
+#include "palette_image.h"
 
 namespace client_policy {
 inline uint32_t hashByte(uint32_t h, uint8_t b) { return (h ^ b) * 16777619u; }
@@ -32,7 +33,7 @@ inline bool deltaLength(const char *text,uint32_t limit,uint32_t &out) {
 // Sections are disjoint, ascending groups of rows, at most height groups. No framebuffer or allocation.
 template<typename Read,typename Draw>
 bool readDelta(ImageSize size,uint32_t length,uint32_t expectedPayload,uint32_t expectedRows,
-               uint32_t *rows,uint8_t *scratch,Read read,Draw draw) {
+               uint32_t *rows,uint8_t *scratch,Read read,Draw draw,uint8_t paletteBits=0,uint8_t *palette=nullptr) {
   if(size.width<16||size.height<16||size.width>maxImageSide||size.height>maxImageSide||length<2||length>=size.bytes())return false;
   uint32_t remaining=length,hash=2166136261u;
   auto take=[&](uint8_t *data,size_t n){
@@ -41,6 +42,9 @@ bool readDelta(ImageSize size,uint32_t length,uint32_t expectedPayload,uint32_t 
     remaining-=n;return true;
   };
   auto u16=[](const uint8_t *p){return uint16_t(uint16_t(p[0])<<8|p[1]);};
+  uint16_t paletteCount=0;
+  if(paletteBits){uint8_t count[2];if(!palette||paletteBits>8||!take(count,2))return false;paletteCount=u16(count);
+    if(!paletteCount||paletteCount>(1u<<paletteBits)||!take(palette,2u*paletteCount))return false;}
   uint16_t next=0;
   for(uint16_t sections=0;sections<=size.height;sections++) {
     uint8_t header[8];if(!take(header,2))return false;
@@ -49,7 +53,8 @@ bool readDelta(ImageSize size,uint32_t length,uint32_t expectedPayload,uint32_t 
     if(!take(header+2,6))return false;
     uint16_t n=u16(header+2),x=u16(header+4),w=u16(header+6);
     if(y<next||y>=size.height||!n||n>size.height-y||x>=size.width||!w||w>size.width-x)return false;
-    if(uint32_t(n)*(4u+2u*w)+2u>remaining)return false;
+    uint32_t rowBytes=paletteBits?(uint32_t(w)*paletteBits+7)/8:2u*w;
+    if(uint32_t(n)*(4u+rowBytes)+2u>remaining)return false;
     next=y+n;
     // A section's hashes come before its pixels: rows not drawn when it breaks off get hash 0 (unknown), so the
     // row state stays true to the screen for a resumed transfer.
@@ -61,7 +66,7 @@ bool readDelta(ImageSize size,uint32_t length,uint32_t expectedPayload,uint32_t 
       rows[row]=h;
     }
     for(uint16_t row=y;row<next;row++) {
-      if(!take(scratch,2u*w)||!draw(row,x,w,scratch))return unknown(row,next);
+      if(!take(scratch,rowBytes)||(paletteBits&&!expandPaletteRow(scratch,w,paletteBits,palette,paletteCount))||!draw(row,x,w,scratch))return unknown(row,next);
     }
   }
   return false;

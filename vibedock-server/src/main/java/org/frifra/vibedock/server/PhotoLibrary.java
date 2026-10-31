@@ -90,8 +90,7 @@ class PhotoLibrary {
             pixels[offset++]=(byte)(value>>8);pixels[offset++]=(byte)value;
             canvas.setRGB(x,y,((r*255/31)<<16)|((green*255/63)<<8)|(b*255/31));
         }
-        var png=new ByteArrayOutputStream();ImageIO.write(canvas,"png",png);
-        var image=new StatusImage.Image(png.toByteArray(),pixels);rendered.put(key,image);
+        var image=new StatusImage.Image(LosslessPng.encode(canvas),pixels);rendered.put(key,image);
         return Optional.of(image);
     }
 

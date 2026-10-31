@@ -21,6 +21,9 @@ class DeviceApiController {
     private final ImageDelta delta;
     private final PullSchedule schedule;
     private final ThemeSettings themes;private final DevicePoke poke;
+    @org.springframework.beans.factory.annotation.Autowired private ImageColorSettings imageColors;
+    @org.springframework.beans.factory.annotation.Autowired private ImageQuality imageQuality;
+    @org.springframework.beans.factory.annotation.Autowired private ImagePalette.Cache paletteCache;
     DeviceApiController(ClientRegistry registry,DesignService designs,ServerAddresses addresses,TlsTrust trust,Firmware firmware,OtaSigning signing,DeviceLogs logs,AdminEvents events,
                         DeviceDiagnostics diagnostics,DevicePower power,ImageDelta delta,PullSchedule schedule,ThemeSettings themes,DevicePoke poke){
         this.poke=poke;
@@ -77,8 +80,17 @@ class DeviceApiController {
         else if("turn-clockwise".equals(gesture)||"turn-counterclockwise".equals(gesture))turn(registry,events,identifier,"turn-clockwise".equals(gesture)?1:-1);
         else swipe(registry,designs,events,identifier,"scheme-next".equals(gesture)?1:"scheme-previous".equals(gesture)?-1:0);
         var display=registry.displayType(identifier);
-        byte[] pixels=designs.render(DesignService.forDevice(registry.designFor(identifier),serverFooter),peer,display,identifier).rgb565();
+        var rendered=designs.render(DesignService.forDevice(registry.designFor(identifier),serverFooter),peer,display,identifier);
+        byte[] pixels=rendered.rgb565();
         int fullBytes=pixels.length;
+        // Explicit hardware capability only: status-page image copies and web displays stay at full color.
+        var mapping=imageColors.get();
+        boolean canPalette="1".equals(request.getHeader("X-VibeDock-Palette"))&&!"1".equals(request.getHeader("X-VibeDock-Preview"))&&registry.get(identifier).web()==null;
+        int colors=canPalette?mapping.colors(display.width(),display.height()):0;
+        var quality=colors!=0&&mapping.adaptive()?imageQuality.policy(registry.designFor(identifier).scheme(),colors):new ImageQuality.Policy(colors,50);
+        var selection=canPalette?paletteCache.select(pixels,display.width(),display.height(),colors,rendered.accents(),rendered.bars(),mapping.adaptive(),quality.target(),quality.preferred(),rendered.primary()):new ImagePalette.Selection(null,0,0);
+        ImagePalette.Encoded indexed=selection.image();colors=selection.colors();
+        if(indexed!=null)pixels=indexed.pixels();
         String tag="\""+HexFormat.of().formatHex(Arrays.copyOf(sha256(pixels),12))+"\"";
         var headers=new HttpHeaders();
         if("1".equals(request.getHeader("X-VibeDock-UI"))){
@@ -130,15 +142,24 @@ class DeviceApiController {
             var basis=forced?null:resumed!=null?resumed:ImageDelta.Basis.complete(etag,display.height());
             var patch=delta.exchange(identifier,basis,tag,display.width(),display.height(),pixels,System.currentTimeMillis());
             if(!forced&&patch.isPresent()){
-                var p=patch.get();pixels=p.bytes();
-                headers.set("X-VibeDock-Image-Format","rgb565-delta-be-"+display.width()+"x"+display.height());
+                var p=patch.get();int bits=0;
+                if(indexed!=null){var packed=ImagePalette.delta(p,colors);if(packed.patch().bytes().length<p.bytes().length){p=packed.patch();bits=packed.bits();}}
+                if(p.bytes().length<(indexed==null?fullBytes:indexed.body().length)){
+                pixels=p.bytes();
+                headers.set("X-VibeDock-Image-Format",(bits==0?"":"indexed"+bits+"-")+"rgb565-delta-be-"+display.width()+"x"+display.height());
                 headers.set("X-VibeDock-Base",resumed!=null?resume:etag);headers.set("X-VibeDock-Check",p.check());
                 headers.set("X-VibeDock-Payload",p.payload());headers.set("X-VibeDock-Length",String.valueOf(pixels.length));
+                }
             }
+        }
+        if(indexed!=null&&!headers.containsHeader("X-VibeDock-Base")&&indexed.body().length<pixels.length){
+            pixels=indexed.body();headers.set("X-VibeDock-Image-Format","indexed"+indexed.bits()+"-rgb565-be-"+display.width()+"x"+display.height());
+            headers.set("X-VibeDock-Length",String.valueOf(pixels.length));
         }
         String mode=preview?"preview full":!headers.containsHeader("X-VibeDock-Base")?"full"
                 :headers.getFirst("X-VibeDock-Base").equals(etag)?"delta":"delta resumed";
-        logTransfer(identifier,mode,fullBytes,pixels.length,next);
+        String wireFormat=headers.getFirst("X-VibeDock-Image-Format");
+        logTransfer(identifier,mode+(wireFormat.startsWith("indexed")?" palette-"+(((pixels[0]&255)<<8)|(pixels[1]&255)):""),fullBytes,pixels.length,next);
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
         return new ResponseEntity<>(pixels,headers,HttpStatus.OK);
     }

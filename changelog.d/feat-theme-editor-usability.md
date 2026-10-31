@@ -4,3 +4,6 @@
   and profile-specific shadow/corner settings. Window recipes use renderer version 2; v1 imports retain their look.
 - **Compact theme gallery:** five columns, a selection marker, a pencil shortcut and an accessible package-action
   menu replace the stacked action buttons. Instance availability and protected/used-theme handling stay intact.
+- **Explicit LCD footer colors:** a custom footer background survives the Handheld LCD color reduction; the
+  original four-shade appearance remains the default.
+- **Starship theme icon:** a stylized Starfleet-inspired insignia replaces the hand as the theme default.

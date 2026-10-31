@@ -408,3 +408,15 @@ authenticated image response (including HTTP 304). Reachable devices also receiv
 over the existing `/pull` callback, independently of image updates. Open pages apply changes within five seconds and reload their preview only after a new
 complete image; hidden tabs pause polling. Preview updates stream a full image only while the page is open.
 The last choice persists across restarts; an unpaired device defaults to dark. The image colour scheme is separate.
+
+### Hardware image palettes
+
+Firmware advertises palette v1 and accepts packed images with 1–256 actual colors, plus exact indexed deltas.
+The configured manual limits remain 32/64/256/full colors. **Allow quality fallback** can select one lower level
+or at most one higher level automatically. Unused palette entries are always removed without changing pixels.
+Defaults are 32 colors through 420×420 and 256 through 640×640, with both dimensions matching in rule order.
+Web/status previews remain lossless and older firmware continues using RGB565.
+
+The decoder adds one 512-byte shared palette, reuses its RGB565 row buffer and allocates no image. It validates
+the palette count, body length and every index before drawing a row. Run its native regression with
+`c++ -std=c++17 tests/palette_test.cpp -o /tmp/vibedock-palette-test && /tmp/vibedock-palette-test`.

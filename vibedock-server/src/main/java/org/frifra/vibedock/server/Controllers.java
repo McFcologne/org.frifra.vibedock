@@ -34,6 +34,7 @@ class Controllers {
         this.storage=storage;this.firmware=firmware;this.info=info;this.admin=admin;this.dataDir=dataDir;this.logDir=logDir;
     }
     @org.springframework.beans.factory.annotation.Autowired private DesignService designs;
+    @org.springframework.beans.factory.annotation.Autowired private ImageColorSettings imageColors;
     @org.springframework.beans.factory.annotation.Autowired(required=false) private DeviceDiagnostics diagnostics;
     @org.springframework.beans.factory.annotation.Value("${vibedock.admin-auth:password}") private String auth;
     @org.springframework.beans.factory.annotation.Value("${vibedock.demo-usage:false}") private boolean demo;
@@ -228,6 +229,8 @@ class Controllers {
         return "redirect:/admin/sources?saved";
     }
     @GetMapping("/admin/server") String server(Model model,HttpServletRequest request) {
+        model.addAttribute("imageColorRules",imageColors.get().rules());
+        model.addAttribute("imageColorMapping",imageColors.get());
         var settings=store.get();
         model.addAttribute("internalUrl",clients.internalUrl());
         model.addAttribute("externalUrl",clients.externalUrl());
@@ -239,6 +242,24 @@ class Controllers {
         model.addAttribute("dataDir",dataDir);model.addAttribute("logDir",logDir);
         model.addAttribute("adminUser",admin.name());model.addAttribute("ownPassword",admin.overridden());
         return "server";
+    }
+    @PostMapping("/admin/server/image-colors") String imageColors(@RequestParam(required=false) List<Integer> maxWidth,
+            @RequestParam(required=false) List<Integer> maxHeight,@RequestParam(required=false) List<Integer> colors,
+            @RequestParam(defaultValue="false") boolean adaptive,
+            @RequestParam(defaultValue="false") boolean reset,RedirectAttributes flash) throws Exception {
+        try{
+            if(reset)imageColors.save(ImageColorSettings.DEFAULT);
+            else{
+                var widths=maxWidth==null?List.<Integer>of():maxWidth;
+                if((maxHeight==null?0:maxHeight.size())!=widths.size()||(colors==null?0:colors.size())!=widths.size())throw new IllegalArgumentException("Incomplete color rule");
+                if(widths.stream().anyMatch(Objects::isNull)||(maxHeight!=null&&maxHeight.stream().anyMatch(Objects::isNull))||(colors!=null&&colors.stream().anyMatch(Objects::isNull)))throw new IllegalArgumentException("Complete every color rule");
+                var rules=new ArrayList<ImageColorSettings.Rule>();
+                for(int i=0;i<widths.size();i++)rules.add(new ImageColorSettings.Rule(widths.get(i),maxHeight.get(i),colors.get(i)));
+                imageColors.save(new ImageColorSettings.Mapping(rules,adaptive));
+            }
+            flash.addFlashAttribute("imageColorMessage","Saved. Compatible hardware displays use these rules on their next image pull.");
+        }catch(IllegalArgumentException e){flash.addFlashAttribute("imageColorError",e.getMessage());}
+        return "redirect:/admin/server#image-colors";
     }
     /**
      * Saves the provider credentials (Data sources) or the API access and legacy devices (Server). Fields that the

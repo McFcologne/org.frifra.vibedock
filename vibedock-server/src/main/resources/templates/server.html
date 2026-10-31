@@ -56,6 +56,25 @@
     <div class="form-actions"><button th:if="${ownPassword}" type="submit" name="reset" value="1" class="secondary" formnovalidate>Back to ADMIN_PASSWORD</button><button>Change password</button></div>
   </form>
 </section>
+<section class="card" id="image-colors">
+  <div class="card-head"><h2 class="grow">Hardware display colors</h2><a class="button secondary" th:href="@{/admin/color-preview}">Live color comparison</a></div>
+  <p>The first matching size rule applies. Both dimensions must fit. Displays without a matching rule use full colors. Web displays and browser previews always keep full colors.</p>
+  <p class="meta">32 and 64 colors reduce transfer size most. Important weather and theme-icon colors share the palette budget; gradients may lose some shades. Requires compatible firmware; older firmware keeps RGB565.</p>
+  <form th:action="@{/admin/server/image-colors}" method="post" data-dirty-form>
+    <div class="image-color-scroll"><table class="image-color-table"><thead><tr><th>Maximum width</th><th>Maximum height</th><th>Colors</th><th>Order</th></tr></thead>
+      <tbody id="image-color-rules"><tr th:each="rule : ${imageColorRules}">
+        <td><input aria-label="Maximum width" name="maxWidth" type="number" min="16" max="4096" required th:value="${rule.maxWidth}"></td>
+        <td><input aria-label="Maximum height" name="maxHeight" type="number" min="16" max="4096" required th:value="${rule.maxHeight}"></td>
+        <td><select aria-label="Colors" name="colors"><option value="32" th:selected="${rule.colors == 32}">32</option><option value="64" th:selected="${rule.colors == 64}">64</option><option value="256" th:selected="${rule.colors == 256}">256</option><option value="0" th:selected="${rule.colors == 0}">Full colors</option></select></td>
+        <td><button type="button" class="secondary" data-color-up aria-label="Move rule up">↑</button> <button type="button" class="secondary" data-color-down aria-label="Move rule down">↓</button> <button type="button" class="secondary" data-color-remove aria-label="Remove rule">×</button></td>
+      </tr></tbody></table></div>
+    <label class="check"><input type="checkbox" name="adaptive" value="true" th:checked="${imageColorMapping.adaptive}"> Allow quality fallback</label>
+    <small>Automatically calibrate the installed themes across all small display sizes. With a 32-color rule, choose 16, 32 or 64 colors; increase by at most one level. Weather/icon changes are checked again. During initial calibration, use one conservative increase. Web displays always keep lossless full colors.</small>
+    <p class="notice" th:if="${imageColorMessage}" th:text="${imageColorMessage}"></p>
+    <p class="notice error" th:if="${imageColorError}" th:text="${imageColorError}"></p>
+    <div class="form-actions"><button type="button" class="secondary" id="image-color-add">Add rule</button><button class="secondary" name="reset" value="true" formnovalidate>Restore defaults</button><button>Save color rules</button></div>
+  </form>
+</section>
 <section class="card" id="storage">
   <div class="card-head"><h2 class="grow">Storage</h2><span class="badge" th:classappend="${storageProblem == null} ? 'ok'" th:text="${storageProblem == null ? 'Writable' : 'Not writable'}"></span></div>
   <p class="meta">Data directory: <code th:text="${dataDir}"></code> · logs in <code th:text="${logDir}"></code></p>
@@ -63,4 +82,5 @@
 </main>
 <footer th:replace="~{fragments :: footer}"></footer>
 <script src="../static/admin-state.js" th:src="@{/admin-state.js}"></script>
+<script src="../static/image-color-settings.js" th:src="@{/image-color-settings.js}"></script>
 </body></html>

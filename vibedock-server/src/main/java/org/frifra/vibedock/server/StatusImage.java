@@ -13,7 +13,10 @@ import java.util.List;
 
 @Component
 public class StatusImage {
-    public record Image(byte[] png,byte[] rgb565) {}
+    public record Image(byte[] png,byte[] rgb565,List<Rectangle> accents,List<Rectangle> bars,List<Integer> primary) {
+        public Image(byte[] png,byte[] rgb565){this(png,rgb565,List.of(),List.of(),List.of());}
+        public Image { accents=List.copyOf(accents);bars=List.copyOf(bars);primary=List.copyOf(primary); }
+    }
     /** Optional parts of a device's image: emoji bottom right, colour scheme, weather icon and temperature bottom left. */
     /** battery: the display runs on its battery (null: on USB, or it does not tell); a small icon at the top right. */
     public record Look(BufferedImage emoji,Scheme scheme,BufferedImage weatherIcon,String weatherText,Layout layout,Battery battery) {
@@ -52,17 +55,39 @@ public class StatusImage {
         var fitted=new Look(look.emoji(),look.scheme(),look.weatherIcon(),look.weatherText(),look.layout().fit(type),look.battery());
         return new Frame(type.width(),type.height(),type.corner(),scale).draw(snapshot,ip,fitted);
     }
+    /** Opaque flat foreground paints, not background pixels or transparent antialias fringes. */
+    static Set<Integer> iconIndexColors(BufferedImage icon){
+        var counts=new HashMap<Integer,Integer>();int flat=0,w=icon.getWidth(),h=icon.getHeight();
+        for(int y=1;y<h-1;y++)for(int x=1;x<w-1;x++){
+            int c=icon.getRGB(x,y);if((c>>>24)!=255)continue;
+            int rgb=rgb565(c);
+            if(!opaqueSame(icon,x-1,y,rgb)||!opaqueSame(icon,x+1,y,rgb)||(!opaqueSame(icon,x,y-1,rgb)&&!opaqueSame(icon,x,y+1,rgb)))continue;
+            counts.merge(rgb,1,Integer::sum);flat++;
+        }
+        int minimum=Math.max(2,flat/100);var result=new LinkedHashSet<Integer>();
+        counts.entrySet().stream().filter(e->e.getValue()>=minimum).sorted(Map.Entry.<Integer,Integer>comparingByValue().reversed().thenComparingInt(Map.Entry::getKey)).limit(16).forEach(e->result.add(e.getKey()));
+        return result;
+    }
+    private static boolean opaqueSame(BufferedImage image,int x,int y,int rgb){int c=image.getRGB(x,y);return (c>>>24)==255&&rgb565(c)==rgb;}
+    static int rgb565(int rgb){return ((rgb>>19)&31)<<11|((rgb>>10)&63)<<5|((rgb>>3)&31);}
     static final double MAX_SCALE=8;
     /** One rendering at a given size; the drawing code below works for any width and height. */
     private final class Frame {
     final int w,h,corner;final double scale;
     /** The battery icon until the first usage band has drawn it at its top right. */
     Battery battery;
+    final Set<Rectangle> accentAreas=new LinkedHashSet<>();
+    final Set<Rectangle> barAreas=new LinkedHashSet<>();
+    final Set<Integer> iconPaints=new LinkedHashSet<>();
     Frame(int w,int h,int corner,double scale){this.w=w;this.h=h;this.corner=corner;this.scale=scale;}
     /** Width and height of an icon in the frame's pixels (icons come at scale times their size). */
     int iw(BufferedImage icon){return (int)Math.round(icon.getWidth()/scale);}
     int ih(BufferedImage icon){return (int)Math.round(icon.getHeight()/scale);}
     void put(Graphics2D g,BufferedImage icon,int x,int y){
+        put(g,icon,x,y,true);
+    }
+    void put(Graphics2D g,BufferedImage icon,int x,int y,boolean accent){
+        if(accent){accentAreas.add(new Rectangle(x,y,iw(icon),ih(icon)));iconPaints.addAll(iconIndexColors(icon));}
         if(scale==1)g.drawImage(icon,x,y,null);else g.drawImage(icon,x,y,iw(icon),ih(icon),null);
     }
     /** The scheme's icon look; the Mac's dithering keeps its pixel size on scaled images. */
@@ -242,7 +267,7 @@ public class StatusImage {
     private void icon(Graphics2D g,Scheme scheme,BufferedImage icon,int x,int y){
         if(scheme.light()&&(scheme.style==Scheme.Style.MODERN||scheme.illustrated()&&scheme.style!=Scheme.Style.INK)){
             var mask=mask(icon,0x9aa0a6);
-            for(int dy=-1;dy<=1;dy++)for(int dx=-1;dx<=1;dx++)if(dx!=0||dy!=0)put(g,mask,x+dx,y+dy);
+            for(int dy=-1;dy<=1;dy++)for(int dx=-1;dx<=1;dx++)if(dx!=0||dy!=0)put(g,mask,x+dx,y+dy,false);
         }
         put(g,icon,x,y);
     }
@@ -251,8 +276,11 @@ public class StatusImage {
         byte[] pixels=new byte[scale==1?pw*ph*2:0];int offset=0;
         for(int y=0;y<ph;y++)for(int x=0;x<pw;x++){
             int rgb=image.getRGB(x,y);
-            // LCD: every colour (emoji, the IP corner) becomes one of the four shades.
-            if(scheme.style==Scheme.Style.LCD){rgb=lcdShade(rgb);image.setRGB(x,y,rgb);}
+            // LCD: reduce artwork to four shades, but retain an explicitly chosen footer paint.
+            if(scheme.style==Scheme.Style.LCD){
+                if(scheme.drawing.footerBackground()==null||(rgb&0xffffff)!=scheme.drawing.footerBackground())rgb=lcdShade(rgb);
+                image.setRGB(x,y,rgb);
+            }
             // Terminal schemes: every other row darker, like the scan lines of an old monitor (rows of the display).
             if(scheme.style==Scheme.Style.TERMINAL&&(((int)(y/scale))&1)==1)rgb=(((rgb>>16&255)*7/10)<<16)|(((rgb>>8&255)*7/10)<<8)|((rgb&255)*7/10);
             // Scaled (web displays): full colour; devices: RGB565, and the PNG shows what they show.
@@ -262,8 +290,19 @@ public class StatusImage {
             pixels[offset++]=(byte)(value>>8);pixels[offset++]=(byte)value;
             image.setRGB(x,y,((r*255/31)<<16)|((green*255/63)<<8)|(b*255/31));
         }
-        var bytes=new ByteArrayOutputStream();ImageIO.write(image,"png",bytes);return new Image(bytes.toByteArray(),pixels);
+        var primary=new LinkedHashSet<Integer>();
+        for(int rgb:new int[]{scheme.background,scheme.title,scheme.text,scheme.muted,scheme.track,scheme.warning})primary.add(to565(rgb));
+        var window=scheme.drawing.window();
+        if(window!=null)for(int rgb:new int[]{window.surface(),window.titleBar(),window.titleText(),window.border(),window.highlight(),window.edgeLight(),window.edgeDark(),window.controls()})primary.add(to565(rgb));
+        for(var area:barAreas){var bounds=area.intersection(new Rectangle(0,0,pw,ph));
+            if(bounds.width>0&&bounds.height>0)primary.addAll(iconIndexColors(image.getSubimage(bounds.x,bounds.y,bounds.width,bounds.height)));
+        }
+        primary.addAll(iconPaints);
+        if(scheme.drawing.footerBackground()!=null)primary.add(to565(scheme.drawing.footerBackground()));
+        if(scheme.drawing.barColor()!=null)primary.add(to565(scheme.drawing.barColor()));
+        return new Image(LosslessPng.encode(image),pixels,new ArrayList<>(accentAreas),new ArrayList<>(barAreas),new ArrayList<>(primary));
     }
+    private static int to565(int rgb){return ((rgb>>19)&31)<<11|((rgb>>10)&63)<<5|((rgb>>3)&31);}
     /** The LCD shade of a colour: its own when it is one, otherwise by brightness. */
     static int lcdShade(int rgb){
         rgb&=0xffffff;for(int shade:Scheme.LCD_SHADES)if(shade==rgb)return rgb;
@@ -363,6 +402,7 @@ public class StatusImage {
         g.setFont(new Font(scheme.font(),Font.PLAIN,12));
         width=Math.min(width,right-g.getFontMetrics().stringWidth("100 %")-4-x);
         if(scheme.style==Scheme.Style.TERMINAL||scheme.style==Scheme.Style.WINDOWS||scheme.style==Scheme.Style.MAC){
+            if(q!=null)barAreas.add(g.getTransform().createTransformedShape(new Rectangle(x,top,width,height)).getBounds());
             if(q!=null){
                 double left=Math.max(0,Math.min(100,100-q.usedPercent()));
                 if(scheme.style==Scheme.Style.TERMINAL){
@@ -397,6 +437,7 @@ public class StatusImage {
      * coloured dot in the newspaper.
      */
     private void bar(Graphics2D g,Scheme scheme,int x,int top,int width,int height,double left){
+        barAreas.add(g.getTransform().createTransformedShape(new Rectangle(x,top,width,height)).getBounds());
         if(scheme.illustrated()){ThemeArtwork.bar(g,scheme,x,top,width,height,left);return;}
         int fill=left<0?0:(int)Math.round(width*left/100);
         switch(scheme.style){

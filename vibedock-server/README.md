@@ -406,3 +406,22 @@ device stays dark until it first receives a server preference. Older firmware co
 preview only after a complete new image. Preview refreshes stream a full image from the server only while the
 page is open; the device keeps no extra image buffer. This changes web-page appearance only, not the display
 image's colour scheme.
+
+### Hardware color mapping and live comparison
+
+Settings → Hardware display colors defines ordered maximum-width/height rules: 32, 64, 256 or full colors.
+Both dimensions must fit; first match wins, otherwise full colors. Defaults: 420×420 → 32, 640×640 → 256.
+`DATA_DIR/image-colors.json` stores the rules. **Allow quality fallback** calibrates the installed themes across
+small display sizes at 5%, 50% and 95% remaining quota automatically; no manual threshold is needed. It may choose
+one lower level or at most one higher level. Unused colors are always removed losslessly; a four-color LCD frame uses four palette entries and
+two bits, regardless of its configured limit. Present theme base/window colors are fixed palette entries; weather/mood hues and quota-bar contrast receive priority.
+
+Compatible firmware is required for packed transfers. Legacy devices keep RGB565. Browser previews and web
+displays keep all pixels; an exact indexed PNG is used only if smaller. Palette/metric/body results are cached by
+pixel fingerprint and policy (64 entries, 8 MiB of image payloads). Changed weather/icons or settings are recalculated.
+
+The protected `/admin/color-preview` page compares all themes with current data or labelled reference scenes,
+using the actual codec. It shows actual palette entries, bit widths, byte counts and changed pixels, with exact native
+pixel sizes, adaptive columns and compact ↑/↓ indicators. See [CLIENT-PROTOCOL.md](CLIENT-PROTOCOL.md#optional-indexed-images-and-deltas-palette-v1).
+
+Implementation, byte formulas and extension rules: [adaptive image pipeline](../docs/design/image-color-pipeline.md).
