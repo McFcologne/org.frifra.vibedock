@@ -2,13 +2,13 @@
   "format": "org.frifra.vibedock.theme",
   "schemaVersion": 1,
   "id": "macos",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "name": "macOS",
   "author": "VibeDock contributors; Twemoji contributors (icon)",
   "license": "Apache-2.0 AND CC-BY-4.0",
   "renderer": {
     "id": "vibedock-2d",
-    "version": 1
+    "version": 2
   },
   "definition": "style.json",
   "defaultIcon": "theme",
@@ -27,7 +27,7 @@
   "files": {
     "assets/default.svg": "fea750638167f4696e81e1649a12ac03d74e8a7fecd82857222a7121ea6be85b",
     "license.txt": "3bb5fa6d7fcda3c91c78e1d58eabd393dacbb3c1a56f9258efd0cc4c2bb126dd",
-    "style.json": "ba0515d8a2f3bef474c90b7dbc461b13e4081c692d12489c4801fdc1e5f6f4ea",
+    "style.json": "f1ba248c617e187d526769de095cfa7ad08521850f6fd92c62b1e81a5bd476be",
     "assets/theme.svg": "1656ec62aafe76aab042f7acd5c6dc1284c774230124f24ae9ba7ed319aebb45"
   }
 }

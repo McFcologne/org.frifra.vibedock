@@ -311,8 +311,8 @@ public class StatusImage {
         if(q==null){right(g,scheme,"--",right,y,9,scheme.muted);return false;}
         double left=Math.max(0,Math.min(100,100-q.usedPercent()));int fill=(int)Math.round(width*left/100);
         if(scheme.style==Scheme.Style.TERMINAL){int n=(int)Math.round(5*left/100);text(g,scheme,"["+"#".repeat(n)+".".repeat(5-n)+"]",x-2,y,9,scheme.text,false);}
-        else if(scheme.style==Scheme.Style.WINDOWS){bevel(g,x,y-7,width,9,false);g.setColor(new Color(0x000080));for(int b=0;b<(int)Math.round((width-6)/7*left/100);b++)g.fillRect(x+3+b*7,y-5,5,4);}
-        else if(scheme.style==Scheme.Style.MAC){g.setColor(Color.BLACK);g.drawRect(x,y-6,width,6);if(fill>0)g.fillRect(x+1,y-5,Math.min(width-2,fill),5);}
+        else if(scheme.style==Scheme.Style.WINDOWS){bevel(g,x,y-7,width,9,false);g.setColor(new Color(classicBarColor(scheme,left,0x000080)));for(int b=0;b<(int)Math.round((width-6)/7*left/100);b++)g.fillRect(x+3+b*7,y-5,5,4);}
+        else if(scheme.style==Scheme.Style.MAC){g.setColor(Color.BLACK);g.drawRect(x,y-6,width,6);if(fill>0){g.setColor(new Color(classicBarColor(scheme,left,0x000000)));g.fillRect(x+1,y-5,Math.min(width-2,fill),5);}}
         else bar(g,scheme,x,y-6,width,6,left);
         right(g,scheme,String.format(Locale.ROOT,"%.0f%%",left),right,y,9,scheme.text);
         return true;
@@ -372,12 +372,12 @@ public class StatusImage {
                     // Sunken field with navy blocks, like a Windows 95 progress bar.
                     bevel(g,x,top-1,width,height+2,false);
                     int blocks=(int)Math.round((width-4)/8*left/100);
-                    g.setColor(new Color(0x000080));
+                    g.setColor(new Color(classicBarColor(scheme,left,0x000080)));
                     for(int b=0;b<blocks;b++)g.fillRect(x+3+b*8,top+2,6,height-3);
                 }else{
                     g.setColor(Color.BLACK);g.drawRect(x,top,width,height);
                     int fill=(int)Math.round((width-3)*left/100);
-                    if(fill>0)g.fillRect(x+2,top+2,fill,height-3);
+                    if(fill>0){g.setColor(new Color(classicBarColor(scheme,left,0x000000)));g.fillRect(x+2,top+2,fill,height-3);}
                 }
                 right(g,scheme,String.format(Locale.ROOT,"%.0f %%",left),right,y,12,scheme.text);
                 text(g,scheme,ThemeArtwork.reset(scheme,reset(q)),x,y+13,10,scheme.muted,false);
@@ -478,40 +478,44 @@ public class StatusImage {
     private static String fitStatus(Graphics2D g,Scheme scheme,String status,int room){return status==null?null:fit(g,scheme,status,9,room);}
     /** Windows 11: light rounded window with a soft shadow, the title left and the three caption buttons right. */
     private static void fluentWindow(Graphics2D g,Scheme scheme,String title,String status,int top,int x,int width,int height,Battery icon){
+        var chrome=scheme.drawing.window();
         int y=top-19,bar=19;
-        g.setColor(new Color(0,0,0,60));g.fillRoundRect(x+1,y+2,width,height,12,12);
-        g.setColor(new Color(0xf3f3f3));g.fillRoundRect(x,y,width,height,12,12);
-        g.setColor(new Color(0xd0d0d0));g.drawRoundRect(x,y,width-1,height-1,12,12);
-        g.setFont(new Font(scheme.font(),Font.BOLD,11));g.setColor(new Color(scheme.title));g.drawString(title,x+9,y+bar-5);
+        g.setColor(shadow(chrome));g.fillRoundRect(x+1,y+2,width,height,2*chrome.radius(),2*chrome.radius());
+        g.setColor(new Color(chrome.surface()));g.fillRoundRect(x,y,width,height,2*chrome.radius(),2*chrome.radius());
+        g.setColor(new Color(chrome.border()));g.drawRoundRect(x,y,width-1,height-1,2*chrome.radius(),2*chrome.radius());
+        windowTitleBackground(g,chrome,x,y,width,height,bar);
+        g.setFont(new Font(scheme.font(),Font.BOLD,11));g.setColor(new Color(chrome.titleText()));g.drawString(title,x+9,y+bar-5);
         int titleEnd=x+9+g.getFontMetrics().stringWidth(title);
         // Minimise, maximise, close. A narrow window with the battery icon leaves out minimise and maximise for it.
-        int cy=y+bar/2-1,cx=x+width-12;g.setColor(new Color(0x5c5c5c));
+        int cy=y+bar/2-1,cx=x+width-12;g.setColor(new Color(chrome.controls()));
         g.drawLine(cx-3,cy-3,cx+3,cy+3);g.drawLine(cx+3,cy-3,cx-3,cy+3);
         boolean tight=icon!=null&&titleEnd+6>cx-40-BATTERY_WIDTH;
         if(!tight){g.drawRect(cx-19,cy-3,6,6);g.drawLine(cx-34,cy,cx-28,cy);}
         int reserve=icon==null?0:BATTERY_ROOM;
-        if(icon!=null)batteryIcon(g,icon,tight?cx-10:cx-40,cy,0x5c5c5c,scheme.warning);
+        if(icon!=null)batteryIcon(g,icon,tight?cx-10:cx-40,cy,chrome.controls(),scheme.warning);
         status=fitStatus(g,scheme,status,cx-38-titleEnd-8-reserve);
         if(status!=null){g.setFont(new Font(scheme.font(),Font.PLAIN,9));g.setColor(new Color(scheme.warning));
             g.drawString(status,cx-40-reserve-g.getFontMetrics().stringWidth(status),y+bar-6);}
     }
     /** macOS: rounded window with the red, yellow and green buttons, the title in the middle (left of the status). */
     private static void macosWindow(Graphics2D g,Scheme scheme,String title,String status,int top,int x,int width,int height,Battery icon){
+        var chrome=scheme.drawing.window();
         int y=top-19,bar=19;
-        g.setColor(new Color(0,0,0,70));g.fillRoundRect(x+1,y+2,width,height,14,14);
-        g.setColor(new Color(0xececec));g.fillRoundRect(x,y,width,height,14,14);
-        g.setColor(new Color(0xbdbdbd));g.drawRoundRect(x,y,width-1,height-1,14,14);
+        g.setColor(shadow(chrome));g.fillRoundRect(x+1,y+2,width,height,2*chrome.radius(),2*chrome.radius());
+        g.setColor(new Color(chrome.surface()));g.fillRoundRect(x,y,width,height,2*chrome.radius(),2*chrome.radius());
+        g.setColor(new Color(chrome.border()));g.drawRoundRect(x,y,width-1,height-1,2*chrome.radius(),2*chrome.radius());
         int[] lights={0xff5f57,0xfebc2e,0x28c840};
         for(int i=0;i<3;i++){g.setColor(new Color(lights[i]));g.fillOval(x+8+i*13,y+bar/2-4,9,9);}
+        windowTitleBackground(g,chrome,x,y,width,height,bar);
         g.setFont(new Font(scheme.font(),Font.BOLD,11));var metrics=g.getFontMetrics();int tw=metrics.stringWidth(title);
         // Centred; left beside the lights with a status, or when the battery icon leaves no room for the centred title.
         // A narrow window moves title and icon a little apart, nearer to the lights and the edge.
         int centre=Math.max(x+50,x+(width-tw)/2);
         boolean tight=icon!=null&&status==null&&x+50+tw+4>x+width-8-BATTERY_WIDTH;
         int tx=tight?x+46:status==null&&(icon==null||centre+tw+6<=x+width-8-BATTERY_WIDTH)?centre:x+50;
-        g.setColor(new Color(scheme.title));g.drawString(title,tx,y+bar-5);
+        g.setColor(new Color(chrome.titleText()));g.drawString(title,tx,y+bar-5);
         int reserve=icon==null?0:BATTERY_ROOM;
-        if(icon!=null)batteryIcon(g,icon,x+width-(tight?5:8),y+bar/2,0x4a4a4a,scheme.warning);
+        if(icon!=null)batteryIcon(g,icon,x+width-(tight?5:8),y+bar/2,chrome.controls(),scheme.warning);
         status=fitStatus(g,scheme,status,x+width-8-reserve-(tx+tw+8));
         if(status!=null){g.setFont(new Font(scheme.font(),Font.PLAIN,9));g.setColor(new Color(scheme.warning));
             g.drawString(status,x+width-8-reserve-g.getFontMetrics().stringWidth(status),y+bar-6);}
@@ -545,46 +549,60 @@ public class StatusImage {
     }
     /** A classic Mac window per provider: frame with drop shadow and a pinstriped title bar with the name in the middle. */
     private static void macWindow(Graphics2D g,Scheme scheme,String title,String status,int top,int x,int width,int height,Battery icon){
+        var chrome=scheme.drawing.window();
         int y=top-19,bar=16;
-        g.setColor(Color.BLACK);g.fillRect(x+2,y+2,width,height);
-        g.setColor(Color.WHITE);g.fillRect(x,y,width,height);
-        g.setColor(Color.BLACK);g.drawRect(x,y,width,height);g.drawLine(x,y+bar,x+width,y+bar);
+        g.setColor(shadow(chrome));g.fillRect(x+2,y+2,width,height);
+        g.setColor(new Color(chrome.surface()));g.fillRect(x,y,width,height);
+        g.setColor(new Color(chrome.titleBar()));g.fillRect(x+1,y+1,width-2,bar);
+        g.setColor(new Color(chrome.border()));g.drawRect(x,y,width,height);g.drawLine(x,y+bar,x+width,y+bar);
         for(int line=y+3;line<y+bar-1;line+=2)g.drawLine(x+3,line,x+width-3,line);
         g.setFont(new Font(scheme.font(),Font.BOLD,12));
         // Centred like a Mac window title; with a status on the right the title moves to the left.
         int w=g.getFontMetrics().stringWidth(title),tx=status==null?x+(width-w)/2:x+14;
-        g.setColor(Color.WHITE);g.fillRect(tx-6,y+1,w+12,bar-1);
-        g.setColor(Color.BLACK);g.drawString(title,tx,y+bar-4);
+        g.setColor(new Color(chrome.titleBar()));g.fillRect(tx-6,y+1,w+12,bar-1);
+        g.setColor(new Color(chrome.titleText()));g.drawString(title,tx,y+bar-4);
         // Narrow screens: the status is shortened to the room right of the title.
         int reserve=icon==null?0:BATTERY_ROOM;
-        if(icon!=null){g.setColor(Color.WHITE);g.fillRect(x+width-6-BATTERY_WIDTH-4,y+1,BATTERY_WIDTH+8,bar-1);batteryIcon(g,icon,x+width-6,y+bar/2,0x000000,0x000000);}
+        if(icon!=null){g.setColor(new Color(chrome.titleBar()));g.fillRect(x+width-6-BATTERY_WIDTH-4,y+1,BATTERY_WIDTH+8,bar-1);batteryIcon(g,icon,x+width-6,y+bar/2,chrome.controls(),chrome.controls());}
         if(status!=null)status=fit(g,scheme,status,9,x+width-6-4-(tx+w+6)-4-reserve);
         if(status!=null){
             g.setFont(new Font(scheme.font(),Font.PLAIN,9));
             int sw=g.getFontMetrics().stringWidth(status),sx=x+width-sw-6-reserve;
-            g.setColor(Color.WHITE);g.fillRect(sx-4,y+1,sw+8,bar-1);
-            g.setColor(Color.BLACK);g.drawString(status,sx,y+bar-5);
+            g.setColor(new Color(chrome.titleBar()));g.fillRect(sx-4,y+1,sw+8,bar-1);
+            g.setColor(new Color(chrome.titleText()));g.drawString(status,sx,y+bar-5);
         }
     }
     /** A Windows 95 style window: grey bevelled frame, navy title bar with white bold title and a close button. */
     private static void windowsWindow(Graphics2D g,Scheme scheme,String title,String status,int top,int x,int width,int height,Battery icon){
+        var chrome=scheme.drawing.window();
         int y=top-19,bar=16;
-        g.setColor(new Color(0xc0c0c0));g.fillRect(x,y,width,height);
-        bevel(g,x,y,width,height,true);
-        g.setColor(new Color(0x000080));g.fillRect(x+3,y+3,width-6,bar-1);
-        g.setFont(new Font(scheme.font(),Font.BOLD,11));g.setColor(Color.WHITE);g.drawString(title,x+7,y+bar-2);
+        g.setColor(new Color(chrome.surface()));g.fillRect(x,y,width,height);
+        windowBevel(g,chrome,x,y,width,height);
+        g.setColor(new Color(chrome.titleBar()));g.fillRect(x+3,y+3,width-6,bar-1);
+        g.setFont(new Font(scheme.font(),Font.BOLD,11));g.setColor(new Color(chrome.titleText()));g.drawString(title,x+7,y+bar-2);
         int titleEnd=x+7+g.getFontMetrics().stringWidth(title);
         int bx=x+width-3-15,by=y+5;
         // Narrow screens: the status is shortened to the room between title and close box.
         int reserve=icon==null?0:BATTERY_ROOM;
-        if(icon!=null)batteryIcon(g,icon,bx-5,y+3+(bar-1)/2,0xffffff,0xffffff);
+        if(icon!=null)batteryIcon(g,icon,bx-5,y+3+(bar-1)/2,chrome.titleText(),chrome.titleText());
         if(status!=null)status=fit(g,scheme,status,9,bx-6-titleEnd-6-reserve);
-        g.setColor(new Color(0xc0c0c0));g.fillRect(bx,by,13,11);bevel(g,bx,by,13,11,true);
-        g.setColor(Color.BLACK);g.drawLine(bx+4,by+3,bx+8,by+7);g.drawLine(bx+8,by+3,bx+4,by+7);
+        g.setColor(new Color(chrome.surface()));g.fillRect(bx,by,13,11);windowBevel(g,chrome,bx,by,13,11);
+        g.setColor(new Color(chrome.controls()));g.drawLine(bx+4,by+3,bx+8,by+7);g.drawLine(bx+8,by+3,bx+4,by+7);
         if(status!=null){
             g.setFont(new Font(scheme.font(),Font.PLAIN,9));
-            g.setColor(Color.WHITE);g.drawString(status,bx-6-reserve-g.getFontMetrics().stringWidth(status),y+bar-3);
+            g.setColor(new Color(chrome.titleText()));g.drawString(status,bx-6-reserve-g.getFontMetrics().stringWidth(status),y+bar-3);
         }
+    }
+    private static Color shadow(ThemeWindow window){int c=window.shadow();return new Color(c>>16&255,c>>8&255,c&255,window.shadowAlpha());}
+    private static void windowTitleBackground(Graphics2D g,ThemeWindow c,int x,int y,int width,int height,int bar){
+        if(c.titleBar()==c.surface())return;var layer=(Graphics2D)g.create();
+        try{layer.clip(new java.awt.geom.RoundRectangle2D.Double(x+1,y+1,width-2,height-2,2*c.radius(),2*c.radius()));layer.setColor(new Color(c.titleBar()));layer.fillRect(x+1,y+1,width-2,bar-1);}finally{layer.dispose();}
+    }
+    private static void windowBevel(Graphics2D g,ThemeWindow c,int x,int y,int w,int h){
+        g.setColor(new Color(c.edgeLight()));g.drawLine(x,y,x+w-1,y);g.drawLine(x,y,x,y+h-1);
+        g.setColor(new Color(c.border()));g.drawLine(x,y+h-1,x+w-1,y+h-1);g.drawLine(x+w-1,y,x+w-1,y+h-1);
+        g.setColor(new Color(c.highlight()));g.drawLine(x+1,y+1,x+w-2,y+1);g.drawLine(x+1,y+1,x+1,y+h-2);
+        g.setColor(new Color(c.edgeDark()));g.drawLine(x+1,y+h-2,x+w-2,y+h-2);g.drawLine(x+w-2,y+1,x+w-2,y+h-2);
     }
     /** The battery icon: 16 × 8 px, the room it takes beside a status (icon and gap). */
     static final int BATTERY_WIDTH=16,BATTERY_ROOM=BATTERY_WIDTH+5;
@@ -674,6 +692,7 @@ public class StatusImage {
     /** Remaining share and colour: green from 60 % up, then smoothly over yellow-green, yellow and orange to red at 8 %. */
     private static final double[] BAR_STOPS={60,45,32,20,8};
     private static final int[] BAR_COLOURS={0x34c759,0xa3d13b,0xffcc00,0xff9f0a,0xff453a};
+    private static int classicBarColor(Scheme scheme,double left,int fallback){return scheme.drawing.barColor()==null?fallback:left<20?barColor(left):scheme.drawing.barColor();}
     static int barColor(double left){
         if(!(left<BAR_STOPS[0]))return BAR_COLOURS[0];
         for(int i=1;i<BAR_STOPS.length;i++){

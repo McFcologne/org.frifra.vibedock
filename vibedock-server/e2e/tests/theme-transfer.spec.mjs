@@ -4,7 +4,9 @@ import {readFile} from 'node:fs/promises';
 async function exported(page,agent){
   await page.locator('#theme-export-agent').setChecked(agent);
   const download=page.waitForEvent('download');
-  await page.locator('[data-theme="midnight"]').getByRole('link',{name:'Export',exact:true}).click();
+  const card=page.locator('[data-theme="midnight"]');
+  if(!await card.locator('.theme-card-menu').evaluate(el=>el.open))await card.locator('summary').click();
+  await card.getByRole('link',{name:'Export',exact:true}).click();
   return readFile(await (await download).path());
 }
 
@@ -24,6 +26,7 @@ test('compressed theme exports can be copied, used and removed without restartin
   await expect(page.locator('#design-theme-icon')).toHaveAttribute('src','/admin/themes/browser.space/icons/theme.png');
   await page.locator('#design-scheme').selectOption('midnight');
   await expect(page.locator('[data-theme="browser.space"] [data-theme-remove]')).toBeEnabled();
+  await page.locator('[data-theme="browser.space"] summary').click();
   await page.locator('[data-theme="browser.space"] [data-theme-remove]').click();
   await expect(page.locator('[data-theme="browser.space"]')).toHaveCount(0);
 });

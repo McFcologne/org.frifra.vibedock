@@ -49,17 +49,17 @@ final class ThemeEditorController {
                 .header(HttpHeaders.CONTENT_DISPOSITION,ContentDisposition.attachment().filename(input.id()+".vibetheme").build().toString()).body(bytes);
     }
     @GetMapping("/admin/themes/{id}/editor-icons/{icon}") @ResponseBody ResponseEntity<Map<String,Object>> originalIcon(@PathVariable String id,@PathVariable String icon) throws IOException {
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(editor.pngSource(id,icon));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(editor.iconSource(id,icon));
     }
     @PostMapping("/admin/theme-editor/icon") @ResponseBody Map<String,Object> icon(HttpServletRequest request,@RequestParam String format,@RequestParam(required=false) String color) throws IOException {
         byte[] bytes;try(var in=request.getInputStream()){bytes=in.readNBytes(ThemeIconAsset.MAX_BYTES+1);}
         if(bytes.length==0||bytes.length>ThemeIconAsset.MAX_BYTES)throw new IllegalArgumentException("Choose an icon of at most 128 KiB");
         try{
             int removed=0;
-            if("svg".equals(format)){var converted=ThemeIconAsset.staticSvg(bytes);bytes=converted.svg();removed=converted.removed();}
+            if("svg".equals(format)){var converted=ThemeIconAsset.staticSvg(bytes);bytes=converted.svg();removed=converted.removed();if(color!=null)bytes=ThemeIconAsset.recolorSvg(bytes,color);}
             else if("png".equals(format)){ThemeIconAsset.draw("icon.png",bytes,Twemoji.SIZE);if(color!=null)bytes=ThemeIconAsset.recolorPng(bytes,color);}
             else throw new IllegalArgumentException("Choose PNG or SVG artwork");
-            var info="png".equals(format)?ThemeIconAsset.pngInfo(bytes):new ThemeIconAsset.PngInfo(false,"#000000");
+            var info="png".equals(format)?ThemeIconAsset.pngInfo(bytes):ThemeIconAsset.svgInfo(bytes);
             return Map.of("file","icon."+format,"data",Base64.getEncoder().encodeToString(bytes),"removed",removed,"converted",false,
                     "vector","svg".equals(format),"canRecolor",info.supported(),"color",info.color());
         }catch(IllegalArgumentException e){throw e;}catch(Exception e){throw new IllegalArgumentException("Could not read a static SVG or PNG image");}

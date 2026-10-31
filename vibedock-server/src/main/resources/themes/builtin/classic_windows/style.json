@@ -1,6 +1,6 @@
 {
   "format": "vibedock-2d",
-  "version": 1,
+  "version": 2,
   "preset": "windows",
   "palette": {
     "background": "#008080",
@@ -10,5 +10,18 @@
     "track": "#c0c0c0",
     "warning": "#ffffff"
   },
-  "font": "DejaVu Sans"
+  "font": "DejaVu Sans",
+  "window": {
+    "surface": "#c0c0c0",
+    "titleBar": "#000080",
+    "titleText": "@title",
+    "border": "#000000",
+    "highlight": "#ffffff",
+    "edgeLight": "#dfdfdf",
+    "edgeDark": "#808080",
+    "controls": "#000000",
+    "shadow": "#000000",
+    "shadowAlpha": 0,
+    "radius": 0
+  }
 }

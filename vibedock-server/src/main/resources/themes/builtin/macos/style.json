@@ -1,6 +1,6 @@
 {
   "format": "vibedock-2d",
-  "version": 1,
+  "version": 2,
   "preset": "macos",
   "palette": {
     "background": "#4a3a7a",
@@ -10,5 +10,18 @@
     "track": "#d2d2d2",
     "warning": "#d9480f"
   },
-  "font": "DejaVu Sans"
+  "font": "DejaVu Sans",
+  "window": {
+    "surface": "#ececec",
+    "titleBar": "#ececec",
+    "titleText": "@title",
+    "border": "#bdbdbd",
+    "highlight": "#ffffff",
+    "edgeLight": "#dfdfdf",
+    "edgeDark": "#808080",
+    "controls": "#4a4a4a",
+    "shadow": "#000000",
+    "shadowAlpha": 70,
+    "radius": 7
+  }
 }

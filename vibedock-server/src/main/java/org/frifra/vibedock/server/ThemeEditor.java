@@ -14,7 +14,8 @@ final class ThemeEditor {
     }
     record Draft(String sourceId,String sourceDigest,String id,String name,String version,String author,String license,
                  String defaultIcon,JsonNode drawing,List<Icon> icons) {}
-    record State(Draft draft,boolean builtin,List<String> presets,List<DisplayType> displays) {}
+    record Template(String id,String name) {}
+    record State(Draft draft,boolean builtin,List<String> presets,List<DisplayType> displays,List<Template> templates,Map<String,Map<String,Object>> windows) {}
     private static final JsonMapper JSON=new JsonMapper();
     private final ThemeLibrary library;
     ThemeEditor(ThemeLibrary library){this.library=library;}
@@ -26,15 +27,14 @@ final class ThemeEditor {
         String nextVersion=duplicate?"1.0.0":patch(m.version());
         var draft=new Draft(id,digest(item.contents()),nextId,nextName,nextVersion,m.author(),m.license(),m.defaultIcon(),
                 JSON.readTree(source.file(m.definition())),m.icons().stream().map(i->new Icon(i.id(),i.label(),i.file(),null,i.author(),i.license())).toList());
-        return new State(draft,item.builtin(),Arrays.stream(Scheme.Style.values()).map(s->s.name().toLowerCase(Locale.ROOT)).toList(),DisplayType.INVENTORY);
+        return new State(draft,item.builtin(),Arrays.stream(Scheme.Style.values()).map(s->s.name().toLowerCase(Locale.ROOT)).toList(),DisplayType.INVENTORY,ThemeCatalog.builtins().all().stream().map(t->new Template(t.id(),t.label)).toList(),Map.of("windows",ThemeWindow.defaults(Scheme.Style.WINDOWS),"mac",ThemeWindow.defaults(Scheme.Style.MAC),"fluent",ThemeWindow.defaults(Scheme.Style.FLUENT),"macos",ThemeWindow.defaults(Scheme.Style.MACOS)));
     }
-    Map<String,Object> pngSource(String id,String icon) throws IOException {
+    Map<String,Object> iconSource(String id,String icon) throws IOException {
         var item=library.snapshot().item(id).orElseThrow(()->new ThemeLibrary.Conflict("Theme not found"));
         var contents=item.contents();var selected=contents.manifest().icons().stream().filter(i->i.id().equals(icon)).findFirst().orElseThrow(()->new IllegalArgumentException("Icon not found"));
-        if(!selected.file().endsWith(".png"))throw new IllegalArgumentException("Choose a PNG icon");
         byte[] bytes=contents.file(selected.file());
-        try{var info=ThemeIconAsset.pngInfo(bytes);return Map.of("data",Base64.getEncoder().encodeToString(bytes),"canRecolor",info.supported(),"color",info.color());}
-        catch(Exception e){throw new IllegalArgumentException("Could not read PNG artwork");}
+        try{var info=selected.file().endsWith(".svg")?ThemeIconAsset.svgInfo(bytes):ThemeIconAsset.pngInfo(bytes);return Map.of("data",Base64.getEncoder().encodeToString(bytes),"canRecolor",info.supported(),"color",info.color());}
+        catch(Exception e){throw new IllegalArgumentException("Could not read icon artwork");}
     }
     private static String optional(String value){return value==null||value.isBlank()?null:value.strip();}
     private static String patch(String version){
@@ -67,7 +67,7 @@ final class ThemeEditor {
             }
             icons.add(new ThemePackage.Icon(icon.id(),icon.label(),file,creator,license));
         }
-        var manifest=new ThemePackage.Manifest(draft.id(),draft.version(),draft.name(),draft.author(),draft.license(),m.renderer(),m.definition(),draft.defaultIcon(),icons,null,m.files());
+        var manifest=new ThemePackage.Manifest(draft.id(),draft.version(),draft.name(),draft.author(),draft.license(),new ThemePackage.Renderer(ThemeDefinition.RENDERER,draft.drawing().path("version").intValue()),m.definition(),draft.defaultIcon(),icons,null,m.files());
         byte[] result=ThemeArchive.edited(source,manifest,JSON.writeValueAsBytes(draft.drawing()),artwork,guide);
         // Reuse the full import validator, including every graphic and all format/size/integrity limits.
         result=ThemeArchive.write(ThemeCredits.prepare(ThemePackage.read(result),false),guide);library.inspect(result);return result;

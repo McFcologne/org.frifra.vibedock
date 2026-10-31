@@ -114,25 +114,60 @@ final class ThemeIconAsset {
             }
             var children=node.getChildNodes();for(int n=0;n<children.getLength();n++)queue.add(children.item(n));
         }
+        byte[] output=svgBytes(root);
+        var image=draw("icon.svg",output,Twemoji.MAX_SIZE);boolean visible=false;
+        for(int y=0;y<image.getHeight()&&!visible;y++)for(int x=0;x<image.getWidth();x++)if((image.getRGB(x,y)>>>24)!=0){visible=true;break;}
+        if(!visible)throw invalid("No visible static shapes remain after SVG cleanup");
+        return new StaticUpload(output,removed);
+    }
+    private static byte[] svgBytes(Element root) throws Exception {
         // Transform only this in-memory DOM; external DTDs and stylesheets remain prohibited.
         var factory=javax.xml.transform.TransformerFactory.newInstance();factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING,true);
         factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD,"");factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET,"");
         var output=new ByteArrayOutputStream();factory.newTransformer().transform(new javax.xml.transform.dom.DOMSource(root),new javax.xml.transform.stream.StreamResult(output));
-        var image=draw("icon.svg",output.toByteArray(),Twemoji.MAX_SIZE);boolean visible=false;
-        for(int y=0;y<image.getHeight()&&!visible;y++)for(int x=0;x<image.getWidth();x++)if((image.getRGB(x,y)>>>24)!=0){visible=true;break;}
-        if(!visible)throw invalid("No visible static shapes remain after SVG cleanup");
-        return new StaticUpload(output.toByteArray(),removed);
+        if(output.size()>MAX_BYTES)throw invalid("Prepared SVG exceeds 128 KiB");
+        return output.toByteArray();
     }
-    record PngInfo(boolean supported,String color) {}
-    static PngInfo pngInfo(byte[] bytes) throws Exception {
+    /** Explicit uniform tint of the safe vector; preserve unpainted areas and every opacity channel. */
+    static byte[] recolorSvg(byte[] bytes,String color) throws Exception {
+        if(color==null||!color.matches("#[0-9a-fA-F]{6}"))throw invalid("Choose an RGB color");
+        var root=parseSvg(staticSvg(bytes).svg()).getDocumentElement();
+        recolor(root,"#000000",color);
+        if(!root.hasAttribute("fill"))root.setAttribute("fill",color); // SVG's implicit fill is black.
+        byte[] result=svgBytes(root);draw("icon.svg",result,Twemoji.SIZE);return result;
+    }
+    private static void recolor(Element element,String inherited,String target){
+        String current=element.getAttribute("color");
+        if(current.isEmpty()||current.equals("currentColor")||current.equals("none"))current=inherited;
+        for(String name:java.util.List.of("fill","stroke","color")){
+            String paint=element.getAttribute(name);
+            if(!paint.isEmpty()&&!paint.equals("none"))element.setAttribute(name,tinted(paint.equals("currentColor")?current:paint,target));
+        }
+        var children=element.getChildNodes();
+        for(int n=0;n<children.getLength();n++)if(children.item(n) instanceof Element child)recolor(child,current,target);
+    }
+    private static String tinted(String paint,String target){
+        // SVG #rgba and #rrggbbaa carry opacity in the paint itself, independently of fill-/stroke-opacity.
+        return target+(paint.length()==5?""+paint.charAt(4)+paint.charAt(4):paint.length()==9?paint.substring(7):"");
+    }
+    record ColorInfo(boolean supported,String color) {}
+    static ColorInfo svgInfo(byte[] bytes) throws Exception {
+        var image=draw("icon.svg",bytes,Twemoji.SIZE);int best=0,alpha=0;
+        for(int y=0;y<image.getHeight();y++)for(int x=0;x<image.getWidth();x++){
+            int pixel=image.getRGB(x,y),a=pixel>>>24;
+            if(a>alpha){alpha=a;best=pixel;if(a==255)return new ColorInfo(true,String.format("#%06x",best&0xffffff));}
+        }
+        return new ColorInfo(alpha>0,String.format("#%06x",best&0xffffff));
+    }
+    static ColorInfo pngInfo(byte[] bytes) throws Exception {
         draw("icon.png",bytes,Twemoji.SIZE);var image=ImageIO.read(new ByteArrayInputStream(bytes));
         Integer rgb=null;boolean transparent=false,visible=false;
         for(int y=0;y<image.getHeight();y++)for(int x=0;x<image.getWidth();x++){
             int pixel=image.getRGB(x,y),alpha=pixel>>>24;if(alpha<255)transparent=true;if(alpha==0)continue;
             visible=true;int color=pixel&0xffffff;
-            if(rgb==null)rgb=color;else if(rgb!=color)return new PngInfo(false,"#000000");
+            if(rgb==null)rgb=color;else if(rgb!=color)return new ColorInfo(false,"#000000");
         }
-        return new PngInfo(visible&&transparent,String.format("#%06x",rgb==null?0:rgb));
+        return new ColorInfo(visible&&transparent,String.format("#%06x",rgb==null?0:rgb));
     }
     static byte[] recolorPng(byte[] bytes,String color) throws Exception {
         if(color==null||!color.matches("#[0-9a-fA-F]{6}"))throw invalid("Choose an RGB color");

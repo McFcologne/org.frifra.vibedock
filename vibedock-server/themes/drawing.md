@@ -1,6 +1,6 @@
-# VibeDock 2D drawing recipes (draft v1)
+# VibeDock 2D drawing recipes (draft v1/v2)
 
-The manifest names renderer `vibedock-2d`, version `1`. Its definition is a UTF-8 JSON file, at most 64 KiB, validated
+The manifest names renderer `vibedock-2d`, version `1` or `2`, matching the recipe version. Its definition is a UTF-8 JSON file, at most 64 KiB, validated
 by `ThemeDefinition` before drawing. [`drawing.schema.json`](drawing.schema.json) describes the same language for
 authoring tools. Duplicate keys, trailing documents, unknown fields, unsupported versions, colours and operations are
 rejected. Schema checks do not replace the renderer's validation.
@@ -73,3 +73,15 @@ The frozen 0.3.x renderer remains independent of these files. Its 1,750 pixel co
 themes on eight display sizes, six representative states/layouts and two browser scales. An additional test repacks
 every built-in directory, reads it through the package API and renders it under an unrelated theme ID. This confirms
 that its appearance comes from the recipe rather than a Java branch on that ID.
+
+## Editable window recipes (drawing/renderer version 2)
+
+The `window` object defines surface, titleBar, titleText, border, controls, highlight, edgeLight, edgeDark,
+shadow, shadowAlpha (0–255) and radius (0–24) for `mac`, `windows`, `fluent` and `macos`. Paints are literal RGB
+or palette references. Pixel-window styles keep square corners; rounded profiles expose their radius. The four
+bundled window themes explicitly include these values and use renderer/drawing version 2. Their original images
+remain pixel-identical. Existing version-1 recipes still load, including the historically fixed title colors of
+Classic Mac/Windows. Their explicit barColor override requires version 2; absent overrides preserve legacy bars.
+The manifest renderer version must match the recipe version. Older readers reject version-2 recipes rather than
+silently ignoring editable window settings. Other style profiles keep their existing renderer behavior and bounded
+layer controls; this is not an arbitrary positioned text/canvas editor.

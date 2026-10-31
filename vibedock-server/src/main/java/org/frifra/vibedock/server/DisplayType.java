@@ -11,7 +11,7 @@ import java.util.*;
 public record DisplayType(String id,String label,int width,int height,int corner) {
     /** corner: radius of the panel's rounded corners in pixels (0 = square); the image keeps its text clear of them. */
     public DisplayType(String id,String label,int width,int height){this(id,label,width,height,0);}
-    public static final DisplayType M1=new DisplayType("vibedock-m1","VibeTV M1 · 240×240 ST7789",240,240);
+    public static final DisplayType M1=new DisplayType("vibedock-m1","VibeTV M1 / Waveshare 1.54\" · 240×240 ST7789",240,240);
     public static final List<DisplayType> INVENTORY=List.of(M1,
             new DisplayType("240x280","240×280 · 1.69\" ST7789",240,280,36),
             new DisplayType("240x320","240×320 portrait · 2.0–2.8\" ST7789 / ILI9341",240,320),

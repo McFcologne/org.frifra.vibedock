@@ -497,3 +497,29 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 .te-icon > img{box-sizing:content-box;padding:8px;border:1px solid var(--line);border-radius:8px;background:repeating-conic-gradient(#687385 0% 25%,#a5adba 0% 50%) 50% / 12px 12px}
 
 #te-contributor-dialog{max-width:560px;width:calc(100% - 32px)}#te-contributor-fields label{display:block;margin:12px 0}
+
+/* Artwork color remains legible beside the native picker, including when using the saved source. */
+.te-color-choice{display:flex;align-items:center;gap:10px;margin:8px 0}.te-color-choice[hidden]{display:none}
+.te-color-choice input[type=color]{width:64px;height:38px;padding:3px;flex:none;cursor:pointer}
+.te-color-choice input[type=color]:disabled{cursor:default}.te-color-choice code{font-variant-numeric:tabular-nums}
+
+/* Compact gallery: the design is primary, package actions live in an accessible details menu. */
+.theme-card{position:relative;border:1px solid var(--line);border-radius:14px;background:var(--card);box-shadow:0 2px 5px #10203006}
+.theme-card.theme-selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.theme-card-heading{padding:12px;margin:0;height:46px;min-height:46px}.theme-card-heading h4{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal;line-height:20px}.theme-card img{border:0;border-radius:0;aspect-ratio:1}
+.theme-disabled img{opacity:1}.theme-card-footer{display:flex;align-items:center;gap:4px;padding:9px 10px;min-height:50px}
+.theme-card-footer>[data-theme-choose]{flex:1;min-width:0;text-align:left;background:none;box-shadow:none;border:0;color:var(--accent);font-size:12px;padding:4px 0;margin:0}
+.theme-card-edit,.theme-card-menu>summary{display:grid;place-items:center;width:27px;height:30px;flex:none;border-radius:7px;color:var(--muted);cursor:pointer;margin:0;text-decoration:none}
+.theme-card-edit:hover,.theme-card-menu>summary:hover{background:var(--accent-soft);color:var(--accent)}
+.theme-card-edit svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.theme-action-label{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.theme-card-menu{position:relative;flex:none}.theme-card-menu>summary{list-style:none;font-size:22px}.theme-card-menu>summary::-webkit-details-marker{display:none}
+.theme-card-menu[open]{z-index:4}.theme-card-menu .theme-card-tools{position:absolute;z-index:6;right:0;top:29px;display:flex;flex-direction:column;min-width:185px;padding:7px;margin:0;border:1px solid var(--line);border-radius:10px;background:var(--card);box-shadow:0 8px 24px #10203025}
+.theme-card-menu .theme-card-tools .button,.theme-card-menu .theme-card-tools button{flex:auto;text-align:left;background:none;padding:8px 10px;border:0}
+.theme-card-menu .theme-card-tools .button:hover{background:var(--accent-soft)}.theme-card-menu small{padding:7px 10px;border-top:1px solid var(--line)}
+.theme-card-edit:focus-visible,.theme-card-menu>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.theme-grid{gap:18px 14px}.te-reset-template{margin:12px 0}#te-reset{margin-top:14px}#te-details>summary,#te-decoration-details>summary{margin:0;font-size:16px;color:var(--text)}
+
+.te-icon>img{float:right;margin:0 0 12px 12px}.te-icon::after{content:"";display:block;clear:both}.te-icon h4{margin-top:4px}.te-icon .te-actions{clear:both}
+@media(max-width:480px){.theme-card-menu .theme-card-tools{position:fixed;left:16px;right:16px;top:auto;bottom:16px;min-width:0}.theme-card-menu .theme-card-tools .button,.theme-card-menu .theme-card-tools button{padding:12px 10px}}

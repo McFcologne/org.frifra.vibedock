@@ -626,7 +626,9 @@ on the right is rendered by the server exactly as the display will show it. Ever
 ## Themes
 
 **Appearance → Browse all themes** jumps to the gallery below the editor. It shows the forty-five built-in themes and installed themes in five
-columns on a desktop, with identical example data rendered by the same code as the displays. **Use theme** applies
+columns on a desktop, with identical example data rendered by the same code as the displays. The active card has a compact selection marker. The pencil opens **Customize** / **Edit theme**; the **⋯** menu contains Export, package version and installed-theme copy/remove actions. Menus close with Escape.
+
+**Use theme** applies
 the theme to the design selected under **Design for**, and saves it right away. For an inherited device design,
 enable **Custom design** first, or change the default design instead.
 
@@ -744,6 +746,19 @@ smileys stay recognisable against their backgrounds, also on scaled web displays
 
 <img src="images/34-emoji-picker.png" width="100%" alt="Emoji picker">
 
+### Recovering a theme in the editor
+
+**Discard unsaved changes** returns the whole draft to the state at opening or the last save, including an invalid
+name, color or decoration edit. It does not change the installed package.
+
+**Restore a built-in appearance** lets you choose a protected built-in template and restore its drawing, window,
+bar and decoration settings. The draft's name, version and icons stay in place. This also repairs the appearance
+of an already saved custom theme. Choose **Save theme** only when the preview is right; restoration itself does
+not install or change a package.
+
+**Sharing and version details** contains the technical ID, version, author/license and optional authoring-guide
+setting. Low-level drawing operations live under **Advanced: decorations and borders**.
+
 ## Importing and sharing themes
 
 Under **Display › Themes**, **Export** downloads a small compressed `.vibetheme` ZIP with the theme definition, its
@@ -766,18 +781,22 @@ Packages persist in the data directory under `themes/`; keep that folder with yo
 In the theme gallery, **Customize** opens a built-in theme as an independent copy in a new tab. Its original stays
 unchanged. For an installed theme, **Edit theme** prepares a newer version; **Create copy** gives it an independent ID.
 
-1. Set a name and unique theme ID. Keep author attribution and license notices for artwork you reuse.
-2. Change palette colors, font and layout style under **Appearance**. Bar/footer colors can follow the style or be
+1. Set a theme name. Copies get a new ID automatically. **Sharing and version details** contains the ID, version and theme author/license. Keep attribution and license notices for artwork you reuse.
+2. Change the design style, font and main colors under **Design**. Window styles have a separate **Windows** section for the surface, title bar, title text, border and controls. Bar/footer colors can follow the style or be
    customized where supported. Styles with text or palette-based bars use those colors instead of a bar override.
-3. Add borders, shapes, grids or gradients under **Decorations and borders**. Each layer is behind the content;
+3. Add borders, shapes, grids or gradients under **Advanced: decorations and borders**. Each layer is behind the content;
    positions/sizes combine percentages of the image or usage band with pixel offsets. Order, opacity and corner
    radius are adjustable. Existing decorations stay unchanged unless you edit them.
 4. Enter the actual **Creator** for your own uploaded artwork; its optional icon license is separate from the theme author. Twemoji attribution stays only for retained Twemoji artwork, including catalog alternatives.
    The **Default theme icon** is the one shown by Theme default. **Additional catalog icons** contains optional
    alternatives, including a preserved legacy illustration. **Replace artwork** changes an icon; **Add icon** extends
    its catalog. Upload PNG / SVG up to 128 KiB. SVGs are cleaned and retain their vector format; a removal notice means
-   details may have changed, so check the preview. XML entities and graphics with no static shapes are rejected. Selecting the radio button previews that icon as the theme default. Existing
-   For single-color PNGs with transparency, **Override main color** changes the color while preserving alpha. Multicolor or opaque images keep their colors.
+   details may have changed, so check the preview. XML entities and graphics with no static shapes are rejected. Selecting the radio button previews that icon as the theme default.
+   **Use a uniform SVG color** optionally replaces every painted fill and stroke with the chosen color. The visible
+   color picker starts with a sampled source color. Vector format, opacity and unpainted areas stay intact. Uncheck
+   to restore the source colors from this editing session; after saving/reloading, the saved SVG is the new source.
+   Source credits remain attached when recoloring inherited artwork.
+   For single-color PNGs with transparency, **Override main color** changes the color while preserving alpha. Multicolor or opaque PNGs keep their colors.
    Emoticon selections on devices are unaffected; users can select Theme default or a fixed Theme catalog icon.
 5. Check **Preview** for the desired panel size. It uses sample readings and the actual device renderer.
 6. **Save theme** installs the new theme or updates an installed one. It does not select it for a device; return to

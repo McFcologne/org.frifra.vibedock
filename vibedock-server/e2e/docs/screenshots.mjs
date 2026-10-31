@@ -214,6 +214,15 @@ try {
     await page.locator('#design-mood-button').click(); await page.waitForTimeout(400); await shot('34-emoji-picker');
     await page.keyboard.press('Escape');
 
+    // Authoring: design controls first; metadata and raw drawing operations start collapsed.
+    const editorViewport = page.viewportSize();
+    await page.setViewportSize({width: editorViewport.width, height: 1100});
+    await go('/admin/themes/classic_windows/edit');
+    await expect(page.locator('#te-status')).toHaveText('Current draft · device renderer');
+    await page.evaluate(() => scrollTo({top: 0, behavior: 'instant'}));
+    await shot('36-theme-editor', page, {fullPage: false});
+    await page.setViewportSize(editorViewport);
+
     // Data sources
     await go('/admin/sources'); await shot('40-sources', page, {fullPage: true});
     await page.locator(`[data-dialog-open="manage-${id(1)}"]`).click(); await page.waitForTimeout(300);
