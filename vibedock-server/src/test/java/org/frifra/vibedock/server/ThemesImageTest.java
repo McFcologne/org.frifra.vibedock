@@ -40,7 +40,7 @@ class ThemesImageTest {
         var emoji=Twemoji.locate(System.getenv("VIBEDOCK_TWEMOJI"));
         Assertions.assertTrue(Files.isDirectory(emoji),"No Twemoji graphics in "+emoji.toAbsolutePath().normalize()
                 +": third-party/twemoji/svg of the repository, or the folder VIBEDOCK_TWEMOJI names");
-        Assertions.assertEquals(Scheme.values().length,EXAMPLES.size(),"every scheme has an example");
+        Assertions.assertEquals(ThemeCatalog.builtins().all().size(),EXAMPLES.size(),"every scheme has an example");
         var twemoji=new Twemoji(emoji.toString());var renderer=new StatusImage("Europe/Berlin");
         long updated=LocalDateTime.of(2026,10,14,7,12).atZone(ZoneId.of("Europe/Berlin")).toEpochSecond();
         var snapshot=new UsageService.Snapshot(1,updated,new LinkedHashMap<>(Map.of(

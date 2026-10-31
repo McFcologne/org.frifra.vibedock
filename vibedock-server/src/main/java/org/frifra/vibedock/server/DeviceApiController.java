@@ -200,7 +200,7 @@ class DeviceApiController {
         if(step==0)return;
         if(designs.skip(registry.designFor(identifier),identifier,step)){log.info("Display {} skipped to another photo by a swipe",identifier);return;}
         var current=registry.designFor(identifier);var scheme=designs.nextScheme(current.scheme(),step);
-        if(scheme==current.scheme())return;
+        if(scheme.id().equals(current.scheme().id()))return;
         try{registry.setDesign(identifier,current.withScheme(scheme));log.info("Display {} switched to the scheme {} by a swipe",identifier,scheme.id());events.devicesChanged();}
         catch(IOException e){log.warn("Could not store the scheme of {}: {}",identifier,e.toString());}
     }

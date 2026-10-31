@@ -10,9 +10,13 @@ import java.util.*;
 /** Instance-wide theme availability. Existing designs keep their theme; selections and swipes use enabled ones. */
 @Component
 class ThemeSettings {
-    record State(Set<Scheme> disabled,boolean dark) {
-        State(Set<Scheme> disabled){this(disabled,false);}
-        State { disabled=disabled==null?Set.of():Set.copyOf(disabled);if(disabled.size()==Scheme.values().length)throw new IllegalArgumentException("Keep at least one theme enabled"); }
+    record State(Set<String> disabled,boolean dark) {
+        State(Set<String> disabled){this(disabled,false);}
+        State {
+            // Old enum spellings were accepted on read; keep the same canonical IDs and JSON shape.
+            disabled=disabled==null?Set.of():disabled.stream().map(id->Scheme.parse(id).id()).collect(java.util.stream.Collectors.toUnmodifiableSet());
+            if(disabled.size()==ThemeCatalog.builtins().all().size())throw new IllegalArgumentException("Keep at least one theme enabled");
+        }
     }
     private final Path file;private final ObjectMapper json;
     private volatile State state=new State(Set.of());
@@ -22,9 +26,9 @@ class ThemeSettings {
     }
     boolean dark(){return state.dark();}
     synchronized void setDark(boolean dark) throws IOException { save(new State(state.disabled(),dark)); }
-    boolean enabled(Scheme scheme){return !state.disabled().contains(scheme);}
+    boolean enabled(Scheme scheme){return !state.disabled().contains(scheme.id());}
     synchronized void setEnabled(Scheme scheme,boolean enabled) throws IOException {
-        var disabled=new HashSet<>(state.disabled());if(enabled)disabled.remove(scheme);else disabled.add(scheme);
+        var disabled=new HashSet<>(state.disabled());if(enabled)disabled.remove(scheme.id());else disabled.add(scheme.id());
         save(new State(disabled,state.dark()));
     }
     private void save(State next) throws IOException {
@@ -34,8 +38,6 @@ class ThemeSettings {
         finally{Files.deleteIfExists(temporary);}
     }
     Scheme shifted(Scheme current,int step){
-        var snapshot=state;var all=Scheme.values();int direction=Integer.signum(step);if(direction==0)return current;
-        for(int n=1;n<=all.length;n++){var candidate=all[Math.floorMod(current.ordinal()+direction*n,all.length)];if(!snapshot.disabled().contains(candidate))return candidate;}
-        return current;
+        return ThemeCatalog.builtins().nextEnabled(current,step,state.disabled());
     }
 }

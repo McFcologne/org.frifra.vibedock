@@ -32,7 +32,7 @@ class DesignController {
                 schemeOptions(),
                 DisplayType.WEB.stream().map(t->new DisplayOption(t.id(),t.label(),t.width(),t.height(),t.bandRoom(),t.halfWidth())).toList());
     }
-    private List<SchemeOption> schemeOptions(){return Arrays.stream(Scheme.values()).map(s->new SchemeOption(s.id(),s.label,themes.enabled(s))).toList();}
+    private List<SchemeOption> schemeOptions(){return ThemeCatalog.builtins().all().stream().map(s->new SchemeOption(s.id(),s.label,themes.enabled(s))).toList();}
     record Availability(boolean enabled) {}
     @PostMapping("/admin/themes/{id}") @ResponseBody List<SchemeOption> availability(@PathVariable String id,@RequestBody Availability input) throws IOException {
         themes.setEnabled(Scheme.parse(id),input.enabled());return schemeOptions();

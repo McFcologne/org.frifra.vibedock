@@ -41,7 +41,7 @@ class AccessTest {
     @MockitoBean BrowserLogin login;
     @BeforeEach void resetSettings() throws Exception {
         themes.setDark(false);
-        for(var scheme:Scheme.values())themes.setEnabled(scheme,true);
+        for(var scheme:ThemeCatalog.builtins().all())themes.setEnabled(scheme,true);
         store.save(new SettingsStore.Settings(List.of("127.0.0.1/32"),new SettingsStore.Credential("",""),new SettingsStore.Credential("",""),List.of()));
         usage.forgetPacing();usage.configurationChanged();
     }
@@ -671,7 +671,7 @@ class AccessTest {
             mvc.perform(get(image).header("Authorization","Bearer "+key).header("X-VibeDock-Gesture","scheme-previous")
                     .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk());
             Assertions.assertEquals(start,clients.designFor(id).scheme());
-            Assertions.assertEquals(Scheme.values()[Scheme.values().length-1],Scheme.values()[0].shifted(-1));
+            Assertions.assertEquals(ThemeCatalog.builtins().all().getLast(),ThemeCatalog.builtins().all().getFirst().shifted(-1));
             mvc.perform(get(image).header("Authorization","Bearer "+key).header("X-VibeDock-Gesture","reboot")
                     .with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isOk());
             Assertions.assertEquals(start,clients.designFor(id).scheme());
@@ -985,7 +985,7 @@ class AccessTest {
         mvc.perform(get("/admin/design").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
                 .andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("layout-editor.js")));
         mvc.perform(get("/admin/designs").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.schemes.length()").value(Scheme.values().length))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.schemes.length()").value(ThemeCatalog.builtins().all().size()))
                 .andExpect(jsonPath("$.defaults.layout.bands[2].type").value("context"));
         mvc.perform(post("/admin/design-preview.png").contentType("application/json").content(body).with(user("admin").roles("ADMIN")).with(csrf())
                 .with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isOk()).andExpect(content().contentType("image/png"));
@@ -1054,7 +1054,7 @@ class AccessTest {
         var view=clients.addWeb("Theme background test","240x320",30);
         String page="/web/"+view.web().secret();
         try{
-            for(var scheme:Scheme.values()){
+            for(var scheme:ThemeCatalog.builtins().all()){
                 clients.setDesign(view.identifier(),clients.designFor(view.identifier()).withScheme(scheme));
                 String colour="#%06x".formatted(scheme.background);
                 mvc.perform(get(page).with(r->{r.setLocalPort(8080);return r;}))
