@@ -2,7 +2,7 @@
   "format": "org.frifra.vibedock.theme",
   "schemaVersion": 1,
   "id": "macos",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "macOS",
   "author": "VibeDock contributors; Twemoji contributors (icon)",
   "license": "Apache-2.0 AND CC-BY-4.0",
@@ -11,17 +11,23 @@
     "version": 1
   },
   "definition": "style.json",
-  "defaultIcon": "legacy",
+  "defaultIcon": "theme",
   "icons": [
     {
       "id": "legacy",
       "label": "Existing theme illustration",
       "file": "assets/default.svg"
+    },
+    {
+      "id": "theme",
+      "label": "Split smile",
+      "file": "assets/theme.svg"
     }
   ],
   "files": {
     "assets/default.svg": "fea750638167f4696e81e1649a12ac03d74e8a7fecd82857222a7121ea6be85b",
-    "license.txt": "51dd9880ffac85530a9c750c32eb8c094d8f75a923d132a4bb5a1303db846fc8",
-    "style.json": "ba0515d8a2f3bef474c90b7dbc461b13e4081c692d12489c4801fdc1e5f6f4ea"
+    "license.txt": "3bb5fa6d7fcda3c91c78e1d58eabd393dacbb3c1a56f9258efd0cc4c2bb126dd",
+    "style.json": "ba0515d8a2f3bef474c90b7dbc461b13e4081c692d12489c4801fdc1e5f6f4ea",
+    "assets/theme.svg": "1656ec62aafe76aab042f7acd5c6dc1284c774230124f24ae9ba7ed319aebb45"
   }
 }

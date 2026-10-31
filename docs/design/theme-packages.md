@@ -73,3 +73,18 @@ The stage-2 frozen renderer is unchanged. Its same-runtime comparison remains th
 themes. Further tests pack/read each built-in theme and render it under a different ID, exercise the custom example,
 check schema conformance and reject unsupported engines and unbounded drawing instructions. Theme import/export UI,
 live catalog replacement, asset validation for imported graphics and theme-icon selection remain later stages.
+
+## Theme icon selection (stage 4)
+
+The editor now exposes Emoticon, Theme default and Theme catalog icon. `Design.icon` is optional; missing/null keeps
+the original `mood` rendering and is omitted from saved JSON. Existing defaults and device overrides therefore keep
+their exact appearance. Design copies, source renames and firmware layout adaptation retain a selected package icon.
+Fixed references survive theme changes; missing references remain stored and use the saved emoticon as a visible
+fallback. New missing selections are rejected. See the [package reference](../../vibedock-server/themes/README.md)
+for the data shape, graphic subset and rollback snapshot.
+
+Each built-in theme includes an original Apache-2.0 vector default and its previous CC-BY-4.0 illustration as a catalog
+choice. The theme overview shows the new defaults as samples, without changing existing designs. The Debugger is a
+faceless IDE-style bug with six legs and a breakpoint. `ThemeIconImageTest` renders all defaults inside their actual
+themes on square and narrow panels into `target/theme-icons-*.png` for visual review. The frozen legacy pixel
+comparison remains unchanged. Firmware and the device protocol still receive rendered pixels only.

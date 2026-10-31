@@ -2,7 +2,7 @@
   "format": "org.frifra.vibedock.theme",
   "schemaVersion": 1,
   "id": "terminal_amber",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Classic amber",
   "author": "VibeDock contributors; Twemoji contributors (icon)",
   "license": "Apache-2.0 AND CC-BY-4.0",
@@ -11,17 +11,23 @@
     "version": 1
   },
   "definition": "style.json",
-  "defaultIcon": "legacy",
+  "defaultIcon": "theme",
   "icons": [
     {
       "id": "legacy",
       "label": "Existing theme illustration",
       "file": "assets/default.svg"
+    },
+    {
+      "id": "theme",
+      "label": "Pixel rocket",
+      "file": "assets/theme.svg"
     }
   ],
   "files": {
     "assets/default.svg": "87401b5ac6a1b2e38aef0680fdd5abf151a96cb1250c537bb340ac130172a590",
-    "license.txt": "d00928deb153983302c5fd7792c12d60f9212d9f078a97479077a41d5ff05839",
-    "style.json": "8270d0706c31fdc96ab6b19867b841129bdb843534b859158b68603de9a9bff0"
+    "license.txt": "1c8090e57922462e5b55460409af8f3673859463a438c7469a585002a40b971f",
+    "style.json": "8270d0706c31fdc96ab6b19867b841129bdb843534b859158b68603de9a9bff0",
+    "assets/theme.svg": "0fe267b18c972f7aa8f134484c83e6baaae85ba52d835e16ac3f73454840e34a"
   }
 }

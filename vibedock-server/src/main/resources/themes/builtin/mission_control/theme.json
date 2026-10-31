@@ -2,7 +2,7 @@
   "format": "org.frifra.vibedock.theme",
   "schemaVersion": 1,
   "id": "mission_control",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Mission Control",
   "author": "VibeDock contributors; Twemoji contributors (icon)",
   "license": "Apache-2.0 AND CC-BY-4.0",
@@ -11,17 +11,23 @@
     "version": 1
   },
   "definition": "style.json",
-  "defaultIcon": "legacy",
+  "defaultIcon": "theme",
   "icons": [
     {
       "id": "legacy",
       "label": "Existing theme illustration",
       "file": "assets/default.svg"
+    },
+    {
+      "id": "theme",
+      "label": "Satellite",
+      "file": "assets/theme.svg"
     }
   ],
   "files": {
     "assets/default.svg": "d32bd9f51b2a54f620f9693e833935c5e2cb2304cbf89aab75fd10f054711ce5",
-    "license.txt": "e66889aec2db95d895e3dd9ff7498b20aeb9278f30951cffabc1222fd5725f7b",
-    "style.json": "5d5b46afcbf0041ff7845d57e378487597e3fe6dd6e9162c5a15e82168227b39"
+    "license.txt": "8c301a734b12bde1081d42ca166e4b8649f968554aa7b3cda7fa48e47f06e03d",
+    "style.json": "5d5b46afcbf0041ff7845d57e378487597e3fe6dd6e9162c5a15e82168227b39",
+    "assets/theme.svg": "f6b4586aeb5261a41332c9e439b6bf08f28c1add48345004fe36d8b716ef20c1"
   }
 }

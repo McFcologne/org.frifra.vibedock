@@ -37,7 +37,12 @@
   <label class="align-choice">On tall screens<select id="design-align"><option value="spread">Spread the bands evenly</option><option value="top">Bands at the top</option></select></label></div>
 <div id="design-bands"></div>
 <div id="design-status-settings" hidden>
-<div id="design-mood-settings"><label for="design-mood-button">Mood</label><input id="layout-emoji" type="hidden"><button id="design-mood-button" type="button" class="emoji-button" data-emoji-open="layout-emoji" aria-label="Choose mood emoji" title="Choose mood emoji"></button><small>Choose an emoji or None.</small></div>
+<div id="design-mood-settings">
+<label for="design-icon-mode">Icon</label><select id="design-icon-mode"><option value="emoji">Emoticon</option><option value="theme-default">Theme default</option><option value="theme-catalog">Theme catalog icon</option></select>
+<div id="design-emoji-choice"><input id="layout-emoji" type="hidden"><button id="design-mood-button" type="button" class="emoji-button" data-emoji-open="layout-emoji" aria-label="Choose mood emoji" title="Choose mood emoji"></button></div>
+<div id="design-catalog-choice" hidden><label for="design-catalog-icon">Icon from theme</label><select id="design-catalog-icon"></select></div>
+<img id="design-theme-icon" class="theme-icon-sample" width="56" height="56" alt="" hidden>
+<small id="design-icon-hint" aria-live="polite">Choose an emoji or None.</small></div>
 <div id="design-weather-settings"><label for="design-weather">Weather location</label><input id="design-weather" maxlength="80" placeholder="City or latitude, longitude" aria-describedby="design-weather-help"><small id="design-weather-help">Used for the forecast, never shown on the display. Leave empty to disable weather.</small></div>
 </div>
 <p class="meta">Each usage band holds one full-width widget, two half-width widgets or one compact row (half the height, no reset times). The VibeTV M1 shows two full bands, one full and two compact ones, or four compact ones. Data sources are provided by the server.</p>

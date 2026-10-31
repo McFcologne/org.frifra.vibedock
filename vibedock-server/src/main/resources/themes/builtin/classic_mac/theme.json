@@ -2,7 +2,7 @@
   "format": "org.frifra.vibedock.theme",
   "schemaVersion": 1,
   "id": "classic_mac",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Classic Mac",
   "author": "VibeDock contributors; Twemoji contributors (icon)",
   "license": "Apache-2.0 AND CC-BY-4.0",
@@ -11,17 +11,23 @@
     "version": 1
   },
   "definition": "style.json",
-  "defaultIcon": "legacy",
+  "defaultIcon": "theme",
   "icons": [
     {
       "id": "legacy",
       "label": "Existing theme illustration",
       "file": "assets/default.svg"
+    },
+    {
+      "id": "theme",
+      "label": "Classic computer",
+      "file": "assets/theme.svg"
     }
   ],
   "files": {
     "assets/default.svg": "b55a6ab3403f37e8404dab174ed26b5997f48a67df2ac317c442b86916343d3e",
-    "license.txt": "b65f5f7df6b4e151500f49e95b5a80ca4429bfa7924fdecfda2852ef3a0d1633",
-    "style.json": "e0f0713924ec58168d95153adc6a79bcc464f264181c8c078ebc5266fb34c8d1"
+    "license.txt": "97da4a11e9127450d549e080b692491f70bf8795af40e585ff524a8f9c739975",
+    "style.json": "e0f0713924ec58168d95153adc6a79bcc464f264181c8c078ebc5266fb34c8d1",
+    "assets/theme.svg": "761f1a519b8c4fb13498083a5c7c54f4971414eaa10c1a860e4015a52e339ad9"
   }
 }

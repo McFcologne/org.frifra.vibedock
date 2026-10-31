@@ -10,7 +10,7 @@ import java.util.*;
 class DesignController {
     /** serverFooter: the device's firmware can show the weather/mood band anywhere; older firmware keeps it at the bottom. */
     record Target(String identifier,String name,String ip,boolean overridden,Design design,boolean serverFooter,String display,String previewCase,boolean web) {}
-    record Catalog(Design defaults,List<Target> devices,List<SourceOption> providers,List<SchemeOption> schemes,List<DisplayOption> displays) {}
+    record Catalog(Design defaults,List<Target> devices,List<SourceOption> providers,List<SchemeOption> schemes,List<DisplayOption> displays,List<ThemeIcons.Entry> icons) {}
     /** A display type: bandRoom (px for usage bands) and halfWidth tell the editor what the type shows of a design. */
     record DisplayOption(String id,String label,int width,int height,int bandRoom,boolean halfWidth) {}
     /** A data source the usage bands can show: id as stored in layouts, label as shown on the display. */
@@ -30,7 +30,7 @@ class DesignController {
                 .map(v->new Target(v.identifier(),v.name(),v.ip(),v.overridden(),v.design(),v.serverFooter(),v.display().id(),v.board().previewCase(),v.web()!=null)).toList(),
                 usage.snapshot().providers().keySet().stream().map(id->new SourceOption(id,usage.snapshot().label(id))).toList(),
                 schemeOptions(),
-                DisplayType.WEB.stream().map(t->new DisplayOption(t.id(),t.label(),t.width(),t.height(),t.bandRoom(),t.halfWidth())).toList());
+                DisplayType.WEB.stream().map(t->new DisplayOption(t.id(),t.label(),t.width(),t.height(),t.bandRoom(),t.halfWidth())).toList(),ThemeIcons.catalog());
     }
     private List<SchemeOption> schemeOptions(){return ThemeCatalog.builtins().all().stream().map(s->new SchemeOption(s.id(),s.label,themes.enabled(s))).toList();}
     record Availability(boolean enabled) {}
@@ -39,6 +39,12 @@ class DesignController {
     }
     @GetMapping(value="/admin/themes/{id}/preview.png",produces="image/png") @ResponseBody byte[] themePreview(@PathVariable String id) throws IOException {
         return designs.themePreview(Scheme.parse(id));
+    }
+    @GetMapping(value="/admin/themes/{theme}/icons/{icon}.png",produces="image/png")
+    org.springframework.http.ResponseEntity<byte[]> icon(@PathVariable String theme,@PathVariable String icon){
+        return ThemeIcons.png(theme,icon).map(bytes->org.springframework.http.ResponseEntity.ok()
+                .cacheControl(org.springframework.http.CacheControl.noCache().cachePrivate()).eTag(ThemePackage.sha256(bytes)).body(bytes))
+                .orElseGet(()->org.springframework.http.ResponseEntity.notFound().build());
     }
     @PostMapping("/admin/designs/default") @ResponseBody Design saveDefault(@RequestBody DesignService.Input input) throws IOException {
         if(input.inherit())throw new IllegalArgumentException("The default design cannot inherit");
