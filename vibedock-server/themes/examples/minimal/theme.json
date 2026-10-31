@@ -1,0 +1,26 @@
+{
+  "format": "org.frifra.vibedock.theme",
+  "schemaVersion": 1,
+  "id": "example.minimal",
+  "version": "1.0.0",
+  "name": "Minimal envelope example",
+  "author": "VibeDock contributors",
+  "license": "Apache-2.0",
+  "renderer": {
+    "id": "vibedock-2d",
+    "version": 1
+  },
+  "definition": "style.json",
+  "defaultIcon": "robot",
+  "icons": [
+    {
+      "id": "robot",
+      "label": "Example robot",
+      "file": "assets/robot.svg"
+    }
+  ],
+  "files": {
+    "assets/robot.svg": "42b8e1da624805872e12f98904b9336c7d9f44f18a0e37d0dccd7327bbfa944e",
+    "style.json": "e1b205622e9f084030da36667833ffb32ce4245dd101b9324d9b23181a89d0ca"
+  }
+}
