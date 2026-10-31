@@ -150,3 +150,25 @@ cp target/theme-collection-vibedock-m1.png ../docs/manual/theme-collection.png
 The matching narrow-panel review sheet is `target/theme-collection-135x240.png`.
 
 ![The ten new themes with their original default icons](../manual/theme-collection.png)
+
+## Explicit SVG color
+
+The editor's safe vector upload route also accepts an optional literal RGB `color`. Uniform tinting keeps vector
+geometry, holes, inherited currentColor alpha and opacity while applying the color to painted fills/strokes. The
+original editing-session source is cached for reset; saved packages store the resulting SVG. Existing source assets
+and theme defaults are unchanged without opt-in. The existing original-artwork endpoint supports both PNG and SVG
+so saved vector icons can be recolored again. `SvgColorTest`, the HTTP export/reload test and the browser SVG test
+cover this path together with the existing PNG-color behavior.
+
+## Editor recovery and actual gallery
+
+The compact five-column gallery is implemented in administration, including keyboard-accessible package menus and
+visible edit shortcuts. The editor starts with design controls and a persistent preview. Sharing metadata and
+low-level layer operations are collapsed. Discard restores the opened/saved draft snapshot even after invalid edits;
+built-in appearance restoration replaces drawing only and stays unsaved until an explicit save.
+
+Classic Mac, Classic Windows, Windows 11 and macOS now declare their common window paints in recipe version 2;
+version-1 imports remain readable. The source files of these four packages therefore change, while all 1,750
+original appearance comparisons remain the compatibility gate. Earlier byte-identical-file claims describe the
+collection-only stage, before this window-data migration. Other non-window presets still use their style profiles
+and advanced decorative layers. A fully freeform component/canvas authoring system remains outside this editor.

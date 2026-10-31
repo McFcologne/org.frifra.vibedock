@@ -9,34 +9,35 @@
 <form id="te-form" autocomplete="off">
 <fieldset id="te-controls" disabled>
 <div class="te-layout"><div>
-<section class="card"><h3>Theme details</h3><p class="meta">Save an independent copy of a built-in theme, or update your own theme with a newer version. Device designs stay selected as they are.</p>
+<section class="card"><h3>Design</h3><label>Theme name<input id="te-name" maxlength="80" required></label>
+<div class="te-fields"><label>Design style<select id="te-preset"></select></label>
+<label>Font<select id="te-font"><option>DejaVu Sans</option><option>DejaVu Sans Mono</option><option>DejaVu Serif</option></select></label></div>
+<div id="te-palette" class="te-fields"></div><details><summary>Secondary colors</summary><div id="te-secondary-palette" class="te-fields"></div></details>
+<div class="te-fields"><label>Footer background<select id="te-footer-mode"><option value="auto">Style default</option><option value="custom">Custom color</option></select><input id="te-footer" type="color" aria-label="Footer color" hidden></label>
+<label>Usage bar<select id="te-bar-mode"><option value="auto">Quota colors / style default</option><option value="custom">Custom color</option></select><input id="te-bar" type="color" aria-label="Usage bar color" hidden><small id="te-bar-note"></small></label></div>
+</section>
+<section class="card" id="te-window-section" hidden><h3>Windows</h3><p class="meta">One window design repeats for each usage band. These colors and corners belong to the theme, not to individual accounts.</p><div id="te-window-fields" class="te-fields"></div><details><summary>Window edges and shadow</summary><div id="te-window-extra" class="te-fields"></div></details></section>
+<details class="card" id="te-decoration-details"><summary>Advanced: decorations and borders</summary><p class="meta">Layers sit beneath the content. Position and size combine a percentage of the area with an optional pixel offset.</p>
+<div id="te-layers"></div></details>
+<section class="card"><h3>Theme icons</h3><p class="meta">Only the default icon is shown when a design uses Theme default. Additional catalog icons are optional alternatives. Upload PNG or SVG (up to 128 KiB): SVGs are cleaned and remain SVGs; check the preview. SVGs offer an explicit uniform color; single-color transparent PNGs offer a main-color override.</p>
+<p id="te-contributor-note" class="meta" hidden></p><button id="te-forget-contributor" type="button" class="secondary" hidden>Forget saved contributor</button>
+<p id="te-upload-status" class="meta" role="status" aria-live="polite"></p><div id="te-icons"></div><label class="button secondary">Add icon<input id="te-icon-add" type="file" accept="image/png,image/svg+xml,.svg" hidden></label>
+</section>
+<details class="card" id="te-details"><summary>Sharing and version details</summary><p class="meta">Built-in originals are protected. Save a copy, or update your installed theme with a newer version.</p>
 <div class="te-fields">
-<label>Name<input id="te-name" maxlength="80" required></label>
 <label>Theme ID<input id="te-id" pattern="[a-z][a-z0-9._\-]{0,79}" maxlength="80" required></label>
 <label>Version<input id="te-version" pattern="(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)" maxlength="40" required></label>
 <label>Theme author<input id="te-author" maxlength="160" required></label>
 <label>License<input id="te-license" maxlength="160" required></label>
-</div><p class="meta">Keep attribution and license notices for inherited artwork. Original license files stay in the package.</p></section>
-<section class="card"><h3>Appearance</h3>
-<div class="te-fields"><label>Layout style<select id="te-preset"></select></label>
-<label>Font<select id="te-font"><option>DejaVu Sans</option><option>DejaVu Sans Mono</option><option>DejaVu Serif</option></select></label></div>
-<div id="te-palette" class="te-fields"></div>
-<div class="te-fields"><label>Footer background<select id="te-footer-mode"><option value="auto">Style default</option><option value="custom">Custom color</option></select><input id="te-footer" type="color" aria-label="Footer color" hidden></label>
-<label>Usage bar<select id="te-bar-mode"><option value="auto">Quota colors / style default</option><option value="custom">Custom color</option></select><input id="te-bar" type="color" aria-label="Usage bar color" hidden><small id="te-bar-note"></small></label></div>
-</section>
-<section class="card"><h3>Decorations and borders</h3><p class="meta">Layers sit beneath the content. Position and size combine a percentage of the area with an optional pixel offset.</p>
-<div id="te-layers"></div></section>
-<section class="card"><h3>Theme icons</h3><p class="meta">Only the default icon is shown when a design uses Theme default. Additional catalog icons are optional alternatives. Upload PNG or SVG (up to 128 KiB): SVGs are cleaned and remain SVGs; check the preview. Single-color transparent PNGs offer an optional main-color override.</p>
-<p id="te-contributor-note" class="meta" hidden></p><button id="te-forget-contributor" type="button" class="secondary" hidden>Forget saved contributor</button>
-<p id="te-upload-status" class="meta" role="status" aria-live="polite"></p><div id="te-icons"></div><label class="button secondary">Add icon<input id="te-icon-add" type="file" accept="image/png,image/svg+xml,.svg" hidden></label>
-</section>
+</div><p class="meta">Keep attribution and license notices for inherited artwork. Original license files stay in the package.</p><label class="check"><input id="te-agent" type="checkbox" checked> Include agent guide in export</label></details>
 </div><aside class="te-preview"><section class="card"><h3>Preview</h3>
 <label>Display<select id="te-display"></select></label>
 <img id="te-image" alt="Unsaved theme with sample usage, rendered as on the device" hidden>
 <p id="te-status" class="meta" role="status" aria-live="polite">Loading…</p>
 <p class="meta">Sample values · same renderer as the displays. Preview and export do not change your installation.</p>
 <div class="te-actions"><button id="te-save" type="submit">Save theme</button><button id="te-export" type="button" class="secondary">Export draft</button></div>
-<label class="check"><input id="te-agent" type="checkbox" checked> Include agent guide in export</label>
+<details class="te-reset-template"><summary>Restore a built-in appearance</summary><p class="meta">Restore colors, windows, bars and decorations from a built-in template. Your name and icons are kept. Nothing is saved until you choose Save theme.</p><label>Built-in template<select id="te-reset-template"></select></label><button id="te-restore-template" type="button" class="secondary" disabled>Restore appearance</button></details>
+<button id="te-reset" type="button" class="secondary" disabled>Discard unsaved changes</button>
 <p id="te-saved" role="status" aria-live="polite"></p>
 </section></aside></div>
 </fieldset></form>

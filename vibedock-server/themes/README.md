@@ -179,6 +179,12 @@ Single-color PNGs with transparency support an optional main-color override in t
 remain unchanged; indexed PNGs are converted to RGBA before recoloring. Multicolor, opaque or empty PNGs are not recolored.
 Unchecking the override restores the original bytes within that editing session; saved/exported PNGs contain the chosen color.
 
+SVG icons have an explicit **Use a uniform SVG color** option. It replaces painted fills and strokes with one chosen
+RGB color, including inherited/currentColor paints and literal presentation styles. The SVG remains a vector;
+`none`, geometry, paint alpha and fill/stroke/group opacity stay intact. The picker initially shows a sampled source
+color and stays visible while the override is off. Disabling the override restores this editing session's source
+bytes; saving and reloading makes the saved colored SVG the new source. Creator metadata is preserved.
+
 Downloaded packages include `preview.html` and a small PNG snapshot from the real sample renderer. The page carries the bundled VibeDock icon in its header and as its favicon; the shared PNG asset is included in the archive. The offline page
 uses relative package assets and has no JavaScript or external resources. Only the root `preview.html` is allowed;
 it is validated as bounded static XHTML with fixed styles, constrained tags/attributes and a restrictive resource

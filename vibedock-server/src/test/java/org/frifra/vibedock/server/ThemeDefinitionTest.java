@@ -62,7 +62,7 @@ class ThemeDefinitionTest {
         Files.createDirectories(Path.of("target"));Files.write(Path.of("target/theme-package-example.png"),image.png());
     }
     @Test void rejectsUnknownFieldsRecipesFontsColoursVersionsAndResourceRequests() throws Exception {
-        for(var invalid:Map.<String,Object>of("version",2,"format","unknown","preset","unknown","font","https://example.com/font.ttf",
+        for(var invalid:Map.<String,Object>of("version",3,"format","unknown","preset","unknown","font","https://example.com/font.ttf",
                 "script","alert(1)","footerBackground","@missing","barColor","#gg0000").entrySet()){
             var root=definition();root.put(invalid.getKey(),invalid.getValue());
             assertThrows(IllegalArgumentException.class,()->ThemeDefinition.read(json.writeValueAsBytes(root)),invalid.getKey());
@@ -120,7 +120,7 @@ class ThemeDefinitionTest {
         var a=javax.imageio.ImageIO.read(new ByteArrayInputStream(normal.png()));var b=javax.imageio.ImageIO.read(new ByteArrayInputStream(low.png()));
         assertEquals(0xffff00ff,a.getRGB(65*2,40*2));assertNotEquals(0xffff00ff,b.getRGB(65*2,40*2));
         assertEquals(0xff123456,a.getRGB(220*2,230*2));
-        for(String preset:List.of("terminal","mac","windows","lcd","blueprint","print")){
+        for(String preset:List.of("terminal","lcd","blueprint","print")){
             root.put("preset",preset);assertThrows(IllegalArgumentException.class,()->ThemeDefinition.read(json.writeValueAsBytes(root)));
         }
     }

@@ -29,7 +29,8 @@
       const theme=catalog?.schemes.find(s=>s.id===button.dataset.themeChoose);
       button.disabled=inherit||!theme?.enabled;
       button.setAttribute('aria-pressed',String(draft?.scheme===theme?.id));
-      button.textContent=draft?.scheme===theme?.id?'Selected':'Use theme';
+      button.textContent=draft?.scheme===theme?.id?'✓ Selected':'Use theme';
+      button.closest('.theme-card')?.classList.toggle('theme-selected',draft?.scheme===theme?.id);
     }
     for(const button of root.querySelectorAll('[data-theme-remove]')){
       const used=themeInUse(button.dataset.themeRemove);button.disabled=used;button.textContent=used?'In use':'Remove';
@@ -303,10 +304,17 @@
         }catch(e){toggle.checked=!toggle.checked;error(e.message);$('#theme-message').textContent=e.message;}
         finally{root.querySelectorAll('.theme-card input').forEach(input=>input.disabled=!!catalog.schemes.find(s=>s.id===input.closest('[data-theme]').dataset.theme)?.missing);}
       });
-      const title=element('div','theme-card-heading');title.append(heading,label);card.append(title,image,choose);
+      const title=element('div','theme-card-heading');title.append(heading,label);card.append(title,image);
+      const footer=element('div','theme-card-footer');footer.append(choose);
+      const menu=document.createElement('details');menu.className='theme-card-menu';
+      const more=document.createElement('summary');more.textContent='⋯';more.setAttribute('aria-label','More actions for '+s.label);menu.append(more);
+      more.addEventListener('click',()=>root.querySelectorAll('.theme-card-menu[open]').forEach(other=>{if(other!==menu)other.open=false;}));
       const tools=element('div','theme-card-tools');
       if(!s.missing){
-        const edit=element('a','button secondary',s.builtin?'Customize':'Edit theme');edit.href='/admin/themes/'+encodeURIComponent(s.id)+'/edit';edit.target='_blank';edit.rel='noopener';tools.append(edit);
+        const edit=element('a','button secondary',s.builtin?'Customize':'Edit theme');edit.href='/admin/themes/'+encodeURIComponent(s.id)+'/edit';edit.target='_blank';edit.rel='noopener';edit.title=(s.builtin?'Customize ':'Edit ')+s.label;edit.className='theme-card-edit';
+        const editText=element('span','theme-action-label',edit.textContent);edit.replaceChildren(editText);
+        const pen=document.createElementNS('http://www.w3.org/2000/svg','svg');pen.setAttribute('viewBox','0 0 24 24');pen.setAttribute('aria-hidden','true');
+        const path=document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d','M15 5l4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15z');pen.append(path);edit.append(pen);footer.append(edit);
         if(!s.builtin){const copy=element('a','button secondary','Create copy');copy.href=edit.href+'?copy=true';copy.target='_blank';copy.rel='noopener';tools.append(copy);}
         const download=element('a','button secondary','Export');download.href='/admin/themes/'+encodeURIComponent(s.id)+'/export';
         download.addEventListener('click',async event=>{
@@ -327,12 +335,14 @@
             }catch(e){error(e.message);controls();}
           });tools.append(remove);
         }
-        card.append(element('small','meta',(s.builtin?'Built-in':'Installed')+' · '+s.version));
+        tools.append(element('small','meta',(s.builtin?'Built-in':'Installed')+' · '+s.version));
       }else card.append(element('p','meta','Package missing. The saved choice is kept; Midnight is shown until it returns.'));
-      card.append(tools);return card;
+      menu.append(tools);footer.append(menu);card.append(footer);return card;
     });
     $('#theme-grid').replaceChildren(...cards);controls();
   }
+  root.addEventListener('keydown',event=>{if(event.key==='Escape'){const menu=event.target.closest('.theme-card-menu[open]');if(menu){menu.open=false;menu.querySelector('summary').focus();}}});
+  document.addEventListener('click',event=>root.querySelectorAll('.theme-card-menu[open]').forEach(menu=>{if(!menu.contains(event.target))menu.open=false;}));
   let themeUpload=null,themeTransferBusy=false;
   function themeInUse(id){return !!catalog&&[catalog.defaults,...catalog.devices.map(d=>d.design)].some(d=>d.scheme===id||d.icon?.mode==='theme-catalog'&&d.icon.theme===id);}
   async function themeRequest(url,body){
