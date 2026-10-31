@@ -506,7 +506,7 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 /* Compact gallery: the design is primary, package actions live in an accessible details menu. */
 .theme-card{position:relative;border:1px solid var(--line);border-radius:14px;background:var(--card);box-shadow:0 2px 5px #10203006}
 .theme-card.theme-selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
-.theme-card-heading{padding:12px;margin:0;min-height:44px}.theme-card img{border:0;border-radius:0;aspect-ratio:1}
+.theme-card-heading{padding:12px;margin:0;height:46px;min-height:46px}.theme-card-heading h4{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal;line-height:20px}.theme-card img{border:0;border-radius:0;aspect-ratio:1}
 .theme-disabled img{opacity:1}.theme-card-footer{display:flex;align-items:center;gap:4px;padding:9px 10px;min-height:50px}
 .theme-card-footer>[data-theme-choose]{flex:1;min-width:0;text-align:left;background:none;box-shadow:none;border:0;color:var(--accent);font-size:12px;padding:4px 0;margin:0}
 .theme-card-edit,.theme-card-menu>summary{display:grid;place-items:center;width:27px;height:30px;flex:none;border-radius:7px;color:var(--muted);cursor:pointer;margin:0;text-decoration:none}

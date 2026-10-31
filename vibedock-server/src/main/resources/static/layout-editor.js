@@ -284,7 +284,7 @@
     $('#theme-count').textContent=catalog.schemes.filter(s=>s.enabled).length+' / '+catalog.schemes.filter(s=>!s.missing).length+' enabled';
     const cards=catalog.schemes.map(s=>{
       const card=element('article','theme-card');card.dataset.theme=s.id;card.classList.toggle('theme-disabled',!s.enabled);
-      const heading=element('h4','',s.label), image=document.createElement('img');
+      const heading=element('h4','',s.label), image=document.createElement('img');heading.title=s.label;
       image.src='/admin/themes/'+encodeURIComponent(s.id)+'/preview.png';image.alt=s.label+' theme with sample usage';image.width=240;image.height=240;image.loading='lazy';
       if(s.missing){image.removeAttribute('src');image.hidden=true;}
       const choose=element('button','secondary','Use theme');choose.type='button';choose.dataset.themeChoose=s.id;
