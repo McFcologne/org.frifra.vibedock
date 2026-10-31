@@ -160,6 +160,9 @@ Docker Hub (`mcfcologne/vibedock-server`) and on GitHub (`ghcr.io/mcfcologne/vib
 
 Full instructions: [user manual with screenshots](docs/manual/MANUAL.md) · [server setup and administration](vibedock-server/README.md) · [client setup](vibedock-client/README.md).
 
+Technical disclosure: [adaptive image palettes and exact partial-image transport](docs/design/image-color-pipeline.md),
+including packet details, extension rules and [reference pictures/measurements](docs/design/color-examples/README.md).
+
 ## Hardware
 
 VibeDock was developed as independent software for the **VibeTV M1** desk display by Vibe TV ([vibetv.shop](https://vibetv.shop/)),

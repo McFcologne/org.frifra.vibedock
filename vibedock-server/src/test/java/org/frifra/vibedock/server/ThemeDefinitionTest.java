@@ -111,6 +111,19 @@ class ThemeDefinitionTest {
         assertEquals(0xffff0000,image.getRGB(0,0));assertNotEquals(image.getRGB(0,0),image.getRGB(90,0));
         assertEquals(0xffffffff,image.getRGB(50,25));assertEquals(0xff00ff00,image.getRGB(15,35));assertEquals(0xffffffff,image.getRGB(10,55));
     }
+    @Test void lcdFooterKeepsItsExplicitColour() throws Exception {
+        var root=json.readValue(BuiltinThemes.get("handheld").contents().file("style.json"),LinkedHashMap.class);
+        root.put("footerBackground","#ff0000");
+        var scheme=new Scheme("custom.lcd","Custom LCD",ThemeDefinition.read(json.writeValueAsBytes(root)));
+        var renderer=new StatusImage("Europe/Berlin");
+        for(int scale:List.of(1,2)){
+            var result=renderer.render(LayoutTest.snapshot(0),"",new StatusImage.Look(null,scheme,null,null),DisplayType.M1,scale);
+            var image=javax.imageio.ImageIO.read(new ByteArrayInputStream(result.png()));
+            assertEquals(0xffff0000,image.getRGB(220*scale,230*scale));
+            var original=renderer.render(LayoutTest.snapshot(0),"",new StatusImage.Look(null,Scheme.HANDHELD,null,null),DisplayType.M1,scale);
+            assertEquals(javax.imageio.ImageIO.read(new ByteArrayInputStream(original.png())).getRGB(239*scale,0),image.getRGB(239*scale,0));
+        }
+    }
     @Test void explicitColourOverridesReachThePixelsAndKeepLowQuotaWarnings() throws Exception {
         var root=definition();root.remove("layers");root.put("barColor","#ff00ff");root.put("footerBackground","#123456");
         var scheme=new Scheme("custom.colours","Custom colours",ThemeDefinition.read(json.writeValueAsBytes(root)));

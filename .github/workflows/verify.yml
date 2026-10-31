@@ -21,6 +21,12 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: vibedock-server/e2e/package-lock.json
+      - name: Firmware palette and protocol tests
+        run: |
+          c++ -std=c++17 ../vibedock-client/tests/palette_test.cpp -o "$RUNNER_TEMP/vibedock-palette-test"
+          "$RUNNER_TEMP/vibedock-palette-test"
+          c++ -std=c++17 ../vibedock-client/tests/policy_test.cpp -o "$RUNNER_TEMP/vibedock-policy-test"
+          "$RUNNER_TEMP/vibedock-policy-test"
       - name: Server, inventory and browser tests
         run: ./scripts/verify.sh --with-deps
       - name: Preserve browser failure diagnostics

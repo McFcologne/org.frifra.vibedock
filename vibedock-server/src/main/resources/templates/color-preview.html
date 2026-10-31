@@ -1,0 +1,11 @@
+<!doctype html><html lang="en" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{fragments :: head('Live color comparison')}"></head>
+<body><header th:replace="~{fragments :: header('server')}"></header><main class="color-test-page">
+<div class="page-head"><div><h1>Live color comparison</h1><p class="sub">All themes with current server data. Browser images stay lossless; hardware candidates use the actual device encoder.</p></div><a th:href="@{/admin/server#image-colors}">Color settings</a></div>
+<section class="card color-test-controls"><div class="form-grid">
+<label>Display<select id="color-display"><option th:each="display : ${displayTypes}" th:value="${display.id}" th:text="${display.label}"></option><option value="web">Web preview · 480×480 · lossless</option></select></label>
+<label>Data<select id="color-source"><option value="live">Current server data</option><option value="reference0">Reference · normal</option><option value="reference1">Reference · low quota</option><option value="reference2">Reference · sign-in required</option></select></label>
+<label>Image size<select id="color-size"><option value="fixed">Fixed tile size</option><option value="native">Native size (1:1)</option></select></label>
+</div><div class="form-actions" id="color-modes"><button data-color-mode="auto">Automatic</button><button class="secondary" data-color-mode="lossless">Lossless</button><button class="secondary" data-color-mode="original">Original</button><button class="secondary" data-color-mode="32">32 colors</button><button class="secondary" data-color-mode="64">64 colors</button><button class="secondary" data-color-mode="256">256 colors</button></div>
+<label class="check"><input type="checkbox" id="color-fallback" checked> Allow quality fallback</label><div class="form-actions"><small id="color-preview-status" role="status">Loading current images…</small><button type="button" class="secondary" id="color-refresh">Refresh live data</button></div></section>
+<section class="color-test-grid" id="color-preview-grid" aria-label="Theme comparison"></section>
+</main><footer th:replace="~{fragments :: footer}"></footer><script th:src="@{/image-color-preview.js}"></script></body></html>
