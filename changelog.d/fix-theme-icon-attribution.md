@@ -1,1 +1,0 @@
-- Track creators/licenses per theme icon, require a creator for custom uploads, and include per-asset credits in packages and offline previews. Retain Twemoji notices only while its artwork is included, including catalog alternatives; preserve unknown license texts and avoid embedding additional Twemoji weather artwork in exported snapshots.

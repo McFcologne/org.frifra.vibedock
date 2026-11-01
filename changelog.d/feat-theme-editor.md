@@ -1,2 +1,0 @@
-- Add a visual theme editor with palette, font, style, decoration and package-icon controls, plus actual device-rendered previews for different panel sizes.
-- Customize built-ins as independent copies, explicitly save versioned installed-theme updates, or export compact unsaved drafts with an optional agent guide. Preserve inherited artwork/licenses and reject stale concurrent updates without losing the page-local draft.

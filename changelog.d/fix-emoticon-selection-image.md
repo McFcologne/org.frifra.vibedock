@@ -1,1 +1,0 @@
-- Keep selected emoticons consistent with the displays by always showing bundled Twemoji images after save/reload or icon-mode changes. Resolve stored variation-selector sequences to their installed asset; show neutral unavailable text when an image is missing instead of a system emoji.
