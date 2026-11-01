@@ -22,8 +22,9 @@ final class AdminRememberMe extends AbstractRememberMeServices {
     }
     @Override protected void setCookie(String[] values,int maxAge,HttpServletRequest request,HttpServletResponse response){
         var cookie=new Cookie(COOKIE,encodeCookie(values));
+        // Lax, not Strict: a link or shortcut from another app is a cross-site navigation; Strict cookies are then neither sent nor stored.
         cookie.setPath(request.getContextPath().isEmpty()?"/":request.getContextPath());
-        cookie.setMaxAge(maxAge);cookie.setHttpOnly(true);cookie.setAttribute("SameSite","Strict");
+        cookie.setMaxAge(maxAge);cookie.setHttpOnly(true);cookie.setAttribute("SameSite","Lax");
         // A TLS proxy can only strengthen this flag. Forwarded headers still never grant access or select device IPs.
         cookie.setSecure(request.isSecure()||"https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto")));
         response.addCookie(cookie);
