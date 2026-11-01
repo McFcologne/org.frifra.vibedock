@@ -134,7 +134,7 @@ class DeviceApiController {
         boolean forced=!preview&&registry.takeForcedRefresh(identifier);
         if(forced){headers.remove(HttpHeaders.ETAG);headers.set("X-VibeDock-Redraw","1");}
         else if(tag.equals(etag)){
-            logTransfer(identifier,preview?"preview unchanged (304)":"unchanged (304)",fullBytes,0,next);
+            logTransfer(identifier,preview?"preview unchanged (304)":"unchanged (304)",fullBytes,0,0,next);
             return new ResponseEntity<>(headers,HttpStatus.NOT_MODIFIED);
         }
         // Capability and exact panel size are required: deltas cannot be scaled without a framebuffer.
@@ -163,7 +163,8 @@ class DeviceApiController {
         String mode=preview?"preview full":!headers.containsHeader("X-VibeDock-Base")?"full"
                 :headers.getFirst("X-VibeDock-Base").equals(etag)?"delta":"delta resumed";
         String wireFormat=headers.getFirst("X-VibeDock-Image-Format");
-        logTransfer(identifier,mode+(wireFormat.startsWith("indexed")?" palette-"+(((pixels[0]&255)<<8)|(pixels[1]&255)):""),fullBytes,pixels.length,next);
+        logTransfer(identifier,mode+(wireFormat.startsWith("indexed")?" palette-"+(((pixels[0]&255)<<8)|(pixels[1]&255)):""),fullBytes,
+                wireFormat.startsWith("indexed")&&indexed!=null?indexed.body().length:0,pixels.length,next);
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
         return new ResponseEntity<>(pixels,headers,HttpStatus.OK);
     }
@@ -208,13 +209,24 @@ class DeviceApiController {
         int rows=Integer.parseInt(m.group(2));
         return rows>=height?null:new ImageDelta.Basis(m.group(1),rows,m.group(3));
     }
-    /** Response payload selected for transmission; excludes transport overhead and is not a receipt acknowledgement. */
-    private static void logTransfer(String device,String mode,int full,int payload,PullSchedule.Next next){
+    /**
+     * Response payload selected for transmission; excludes transport overhead and is not a receipt acknowledgement.
+     * {@code saved} compares with the raw RGB565 image. When the display receives a palette, a delta also states the saving
+     * against the full palette image ({@code paletteFull} bytes, 0 when none), so the two reductions are not mixed up.
+     */
+    static String transferLine(String device,String mode,int full,int paletteFull,int payload,PullSchedule.Next next){
         String announced=next.seconds()+" s ("+(next.pending()?"pending":"current")+")";
+        String line="Image transfer "+device+": "+mode+", full="+full+" bytes, payload="+payload+" bytes, saved="+(full-payload)+" bytes ("
+                +percent(full,payload)+"%)";
+        if(paletteFull>payload)line+=", palette full="+paletteFull+" bytes, saved against it="+(paletteFull-payload)+" bytes ("
+                +percent(paletteFull,payload)+"%)";
+        return line+", next="+announced;
+    }
+    private static String percent(int whole,int part){return String.format(Locale.ROOT,"%.1f",whole==0?0:100.0*(whole-part)/whole);}
+    private static void logTransfer(String device,String mode,int full,int paletteFull,int payload,PullSchedule.Next next){
         // Unchanged images (304) come with every poll: only at debug level, so the log keeps its other events.
-        if(payload==0){log.debug("Image transfer {}: {}, next={}",device,mode,announced);return;}
-        log.info("Image transfer {}: {}, full={} bytes, payload={} bytes, saved={} bytes ({}%), next={}",device,mode,full,payload,full-payload,
-                String.format(Locale.ROOT,"%.1f",full==0?0:100.0*(full-payload)/full),announced);
+        if(payload==0){log.debug("Image transfer {}: {}, next={}",device,mode,next.seconds()+" s ("+(next.pending()?"pending":"current")+")");return;}
+        log.info(transferLine(device,mode,full,paletteFull,payload,next));
     }
     /**
      * A swipe on a touch display or a web display page: the next (1) or previous (-1) colour scheme. The display keeps

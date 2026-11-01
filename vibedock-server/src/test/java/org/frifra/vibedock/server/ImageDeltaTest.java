@@ -110,4 +110,17 @@ class ImageDeltaTest {
             in.position(in.position()+4*n+2*n*w);
         }
     }
+
+    @Test void transferLogStatesTheSavingAgainstTheRawAndThePaletteImage() {
+        var next=new PullSchedule.Next(59,false);
+        // A palette delta: 168 bytes are 99.9 % below raw RGB565 but only 98.8 % below the full palette image.
+        assertEquals("Image transfer d1: delta palette-4, full=115200 bytes, payload=168 bytes, saved=115032 bytes (99.9%), "
+                +"palette full=14410 bytes, saved against it=14242 bytes (98.8%), next=59 s (current)",
+                DeviceApiController.transferLine("d1","delta palette-4",115200,14410,168,next));
+        // Without a palette, and for a full palette image, the line keeps its form: there is no second baseline.
+        assertEquals("Image transfer d2: delta, full=115200 bytes, payload=638 bytes, saved=114562 bytes (99.4%), next=59 s (current)",
+                DeviceApiController.transferLine("d2","delta",115200,0,638,next));
+        assertEquals("Image transfer d3: full palette-4, full=115200 bytes, payload=14410 bytes, saved=100790 bytes (87.5%), next=59 s (current)",
+                DeviceApiController.transferLine("d3","full palette-4",115200,14410,14410,next));
+    }
 }

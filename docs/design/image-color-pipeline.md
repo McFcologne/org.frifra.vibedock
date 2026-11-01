@@ -163,7 +163,8 @@ A tiny patch may instead cost less as RGB565 because it avoids palette overhead.
 
 For meaningful comparisons record raw full size, optimized full size and actual chosen payload separately.
 `Image transfer` logs report raw RGB565 `full`, actual body `payload`, their byte/percentage difference and mode;
-`palette-K` is the actual transmitted count. The comparison page reports used colors, bit width, body/PNG sizes and
+for a palette delta they add `palette full` (the full palette image) and the saving against it, so the palette and the
+partial update are not counted as one reduction. `palette-K` is the actual transmitted count. The comparison page reports used colors, bit width, body/PNG sizes and
 changed-pixel percentage. PNG bytes and hardware payload bytes are different encodings and must not be conflated.
 
 [Reference pictures and measurements for all 45 bundled themes](color-examples/README.md) accompany this
