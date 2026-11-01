@@ -652,3 +652,21 @@ test('the sign-in page keeps a light/dark choice in this browser; a saved one fo
   await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','dark');  // the installation's choice stays
   await signedOut.close();
 });
+
+test('compact theme cards keep package actions in a keyboard-accessible menu',async({page,app})=>{
+  await editor(page,app);const card=page.locator('[data-theme="midnight"]');
+  await expect(card).toHaveClass(/theme-selected/);await expect(card.getByRole('link',{name:'Export',exact:true})).toBeHidden();
+  const long=page.locator('[data-theme="classic_windows"]');
+  await expect(long.getByRole('heading')).toHaveAttribute('title','Classic Windows');
+  const tops=await Promise.all(['terminal_amber','classic_mac','classic_windows','windows_11','macos'].map(id=>page.locator('[data-theme="'+id+'"] img').evaluate(img=>img.getBoundingClientRect().top)));
+  expect(Math.max(...tops)-Math.min(...tops)).toBeLessThan(1);
+  const trigger=card.locator('.theme-card-menu > summary');await trigger.click();
+  await expect(card.getByRole('link',{name:'Export',exact:true})).toBeVisible();
+  await trigger.focus();await page.keyboard.press('Escape');await expect(card.getByRole('link',{name:'Export',exact:true})).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await expect(card.getByRole('link',{name:'Customize',exact:true})).toBeVisible();
+  await page.setViewportSize({width:360,height:800});await trigger.click();
+  await expect(card.getByRole('link',{name:'Export',exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.keyboard.press('Escape');
+});

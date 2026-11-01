@@ -124,6 +124,30 @@ class ThemeTransferTest {
         mvc.perform(post("/admin/theme-editor/icon").param("format","svg").with(user("admin").roles("ADMIN")).with(csrf()).content(svg).with(r->{r.setLocalPort(10002);return r;})).andExpect(status().isNotFound());
     }
 
+    @Test void svgColorStaysVectorThroughSaveReloadAndExport() throws Exception {
+        var json=new tools.jackson.databind.json.JsonMapper();
+        byte[] svg="<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\"><rect x=\"8\" y=\"8\" width=\"32\" height=\"32\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\"/></svg>".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] response=mvc.perform(admin(post("/admin/theme-editor/icon")).param("format","svg").param("color","#1267ab").with(csrf()).content(svg))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.vector").value(true)).andExpect(jsonPath("$.canRecolor").value(true))
+                .andExpect(jsonPath("$.color").value("#1267ab")).andReturn().getResponse().getContentAsByteArray();
+        var icon=new ThemeEditor.Icon("uploaded","Outline","uploaded.svg",json.readTree(response).get("data").textValue(),"Example artist","Apache-2.0");
+        var draft=ThemeEditorTest.edit(editor.open("midnight",false).draft(),Map.of("id","http.svg.color","icons",List.of(icon),"defaultIcon","uploaded"));
+        try{
+            editor.save(draft);
+            var stored=library.snapshot().item("http.svg.color").orElseThrow().contents();
+            byte[] bytes=stored.file(stored.manifest().icons().getFirst().file());
+            assertTrue(stored.manifest().icons().getFirst().file().endsWith(".svg"));
+            assertEquals("#1267ab",ThemeIconAsset.svgInfo(bytes).color());
+            byte[] loaded=mvc.perform(admin(get("/admin/themes/http.svg.color/editor-icons/uploaded"))).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.color").value("#1267ab")).andReturn().getResponse().getContentAsByteArray();
+            assertArrayEquals(bytes,Base64.getDecoder().decode(json.readTree(loaded).get("data").textValue()));
+            byte[] exported=mvc.perform(admin(get("/admin/themes/http.svg.color/export"))).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+            var archive=ThemePackage.read(exported);assertArrayEquals(bytes,archive.file(archive.manifest().icons().getFirst().file()));
+            assertEquals("Example artist",archive.manifest().icons().getFirst().author());
+            mvc.perform(admin(post("/admin/theme-editor/icon")).param("format","svg").param("color","red").with(csrf()).content(svg)).andExpect(status().isBadRequest());
+        }finally{if(library.snapshot().item("http.svg.color").isPresent())library.remove("http.svg.color");}
+    }
+
     @Test void contributorPreferenceIsOptionalAndStaysBehindAdminAndCsrf() throws Exception {
         try{
             mvc.perform(admin(get("/admin/theme-editor/contributor"))).andExpect(status().isOk()).andExpect(jsonPath("$.name").value(""));

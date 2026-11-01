@@ -2,13 +2,13 @@
   "format": "org.frifra.vibedock.theme",
   "schemaVersion": 1,
   "id": "classic_windows",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "name": "Classic Windows",
   "author": "VibeDock contributors; Twemoji contributors (icon)",
   "license": "Apache-2.0 AND CC-BY-4.0",
   "renderer": {
     "id": "vibedock-2d",
-    "version": 1
+    "version": 2
   },
   "definition": "style.json",
   "defaultIcon": "theme",
@@ -27,7 +27,7 @@
   "files": {
     "assets/default.svg": "7a3a98d89e9998390f1192625541d6528ed7119b96fc14ceb4db88f942f45ead",
     "license.txt": "a2a279e7322b59445edbe6c128bd2bc4afecc66f54364174778929b8353b8eaa",
-    "style.json": "99b0a63df5523fe32a70b0d8c26748574dec114a05f4ee1d0a85af591c0b7d41",
+    "style.json": "85721efb3764f18e4ebe07cf20e1a89581a1c5ba3229eaa08f55c079ecc87d0e",
     "assets/theme.svg": "c204d29c295c0f8703a2a2e9b5d6c2a004ec608db09ede3f3f4a2a4d99bc1a8c"
   }
 }

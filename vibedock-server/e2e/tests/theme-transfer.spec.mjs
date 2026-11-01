@@ -4,7 +4,9 @@ import {readFile} from 'node:fs/promises';
 async function exported(page,agent){
   await page.locator('#theme-export-agent').setChecked(agent);
   const download=page.waitForEvent('download');
-  await page.locator('[data-theme="midnight"]').getByRole('link',{name:'Export',exact:true}).click();
+  const card=page.locator('[data-theme="midnight"]');
+  if(!await card.locator('.theme-card-menu').evaluate(el=>el.open))await card.locator('summary').click();
+  await card.getByRole('link',{name:'Export',exact:true}).click();
   return readFile(await (await download).path());
 }
 
@@ -24,6 +26,7 @@ test('compressed theme exports can be copied, used and removed without restartin
   await expect(page.locator('#design-theme-icon')).toHaveAttribute('src','/admin/themes/browser.space/icons/theme.png');
   await page.locator('#design-scheme').selectOption('midnight');
   await expect(page.locator('[data-theme="browser.space"] [data-theme-remove]')).toBeEnabled();
+  await page.locator('[data-theme="browser.space"] summary').click();
   await page.locator('[data-theme="browser.space"] [data-theme-remove]').click();
   await expect(page.locator('[data-theme="browser.space"]')).toHaveCount(0);
 });
@@ -62,10 +65,11 @@ test('theme card tools wrap instead of overflowing at phone width',async({page,a
   await page.locator('#theme-copy-id').fill('browser.narrow');await page.locator('#theme-copy-name').fill('Browser Narrow');
   await page.locator('#theme-copy').click();await expect(page.locator('[data-theme="browser.narrow"]')).toBeVisible();
   await page.setViewportSize({width:390,height:844});
-  // A custom theme has three tools (Edit theme, Create copy, Export); they must not push the card wider than its column.
-  await expect(page.locator('[data-theme="browser.narrow"] .theme-card-tools a')).toHaveCount(3);
+  // A custom theme has Create copy and Export in its menu next to the edit pencil; the card must not grow wider than its column.
+  await expect(page.locator('[data-theme="browser.narrow"] .theme-card-tools a')).toHaveCount(2);
   const overflowing=await page.$$eval('.theme-card',cards=>cards.filter(c=>c.scrollWidth>c.clientWidth).map(c=>c.dataset.theme));
   expect(overflowing).toEqual([]);
+  await page.locator('[data-theme="browser.narrow"] summary').click();
   await page.locator('[data-theme="browser.narrow"] [data-theme-remove]').click();
   await expect(page.locator('[data-theme="browser.narrow"]')).toHaveCount(0);
 });

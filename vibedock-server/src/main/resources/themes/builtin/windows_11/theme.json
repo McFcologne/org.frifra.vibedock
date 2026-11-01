@@ -2,13 +2,13 @@
   "format": "org.frifra.vibedock.theme",
   "schemaVersion": 1,
   "id": "windows_11",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "name": "Windows 11",
   "author": "VibeDock contributors; Twemoji contributors (icon)",
   "license": "Apache-2.0 AND CC-BY-4.0",
   "renderer": {
     "id": "vibedock-2d",
-    "version": 1
+    "version": 2
   },
   "definition": "style.json",
   "defaultIcon": "theme",
@@ -27,7 +27,7 @@
   "files": {
     "assets/default.svg": "d79848b4a09f0c1ea74b7cef8c3296593d60788a32d0edde3177a492c39b61b3",
     "license.txt": "ee92ab0ba0284ca02480130173f9bd6e1681a384e1c1314ffb5d2a6cf18b291f",
-    "style.json": "576b1a088d023bfb2f92017db352bb0af3f1f9c4395a943a01ed57e4dcbaccb7",
+    "style.json": "c7bcfe2587e65f63fc5861f26db40a0fde0f6b392d48c5133bd9eb8baa4b2e56",
     "assets/theme.svg": "fd95e7f471a4711681a081b6e91ca4d85783acedf8855466892d0c92ad09980b"
   }
 }

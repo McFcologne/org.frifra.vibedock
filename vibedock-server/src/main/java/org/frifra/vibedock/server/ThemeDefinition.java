@@ -8,9 +8,9 @@ import java.io.IOException;
 import java.util.*;
 
 /** Versioned, non-executable drawing recipe. Archive integrity and drawing validation are separate steps. */
-record ThemeDefinition(Scheme.Style preset,Palette palette,String font,Integer footerBackground,Integer barColor,ThemeLayers layers) {
+record ThemeDefinition(Scheme.Style preset,Palette palette,String font,Integer footerBackground,Integer barColor,ThemeLayers layers,ThemeWindow window) {
     static final String RENDERER="vibedock-2d";
-    static final int VERSION=1,MAX_BYTES=64*1024;
+    static final int VERSION=2,MAX_BYTES=64*1024;
     private static final JsonMapper JSON=JsonMapper.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();
     record Palette(int background,int title,int text,int muted,int track,int warning) {
@@ -19,15 +19,18 @@ record ThemeDefinition(Scheme.Style preset,Palette palette,String font,Integer f
     }
     static ThemeDefinition read(ThemePackage.Contents contents) throws IOException {
         var engine=contents.manifest().renderer();
-        if(!RENDERER.equals(engine.id())||engine.version()!=VERSION)throw invalid("Unsupported theme renderer: "+engine.id()+" v"+engine.version());
-        return read(contents.file(contents.manifest().definition()));
+        if(!RENDERER.equals(engine.id())||(engine.version()<1||engine.version()>VERSION))throw invalid("Unsupported theme renderer: "+engine.id()+" v"+engine.version());
+        byte[] bytes=contents.file(contents.manifest().definition());
+        if(JSON.readTree(bytes).path("version").intValue()!=engine.version())throw invalid("Renderer and drawing versions must match");
+        return read(bytes);
     }
     static ThemeDefinition read(byte[] bytes) throws IOException {
         if(bytes==null||bytes.length==0||bytes.length>MAX_BYTES)throw invalid("Drawing definition must be 1–65536 bytes");
         var root=JSON.readTree(bytes);
-        fields(root,Set.of("format","version","preset","palette","font","footerBackground","barColor","layers"));
+        fields(root,Set.of("format","version","preset","palette","font","footerBackground","barColor","layers","window"));
         if(!RENDERER.equals(text(root,"format"))||!root.has("version")||!root.get("version").isNumber()
-                ||root.get("version").decimalValue().compareTo(java.math.BigDecimal.ONE)!=0)throw invalid("Unsupported drawing format or version");
+                ||!Set.of(java.math.BigDecimal.ONE,java.math.BigDecimal.valueOf(2)).contains(root.get("version").decimalValue().stripTrailingZeros()))throw invalid("Unsupported drawing format or version");
+        if(root.has("window")&&root.get("version").intValue()!=2)throw invalid("Editable windows need drawing version 2");
         Scheme.Style preset;
         try{preset=Scheme.Style.valueOf(text(root,"preset").toUpperCase(Locale.ROOT));}
         catch(IllegalArgumentException e){throw invalid("Unknown drawing preset");}
@@ -38,14 +41,15 @@ record ThemeDefinition(Scheme.Style preset,Palette palette,String font,Integer f
         if(!Set.of("DejaVu Sans","DejaVu Sans Mono","DejaVu Serif").contains(font))throw invalid("Unsupported theme font");
         Integer footer=root.has("footerBackground")?colour(text(root,"footerBackground"),palette):null;
         Integer bar=root.has("barColor")?colour(text(root,"barColor"),palette):null;
-        if(bar!=null&&Set.of(Scheme.Style.TERMINAL,Scheme.Style.MAC,Scheme.Style.WINDOWS,Scheme.Style.LCD,Scheme.Style.BLUEPRINT,Scheme.Style.PRINT).contains(preset))
+        if(bar!=null&&Set.of(Scheme.Style.MAC,Scheme.Style.WINDOWS).contains(preset)&&root.get("version").intValue()!=2)throw invalid("Editable window bars need drawing version 2");
+        if(bar!=null&&Set.of(Scheme.Style.TERMINAL,Scheme.Style.LCD,Scheme.Style.BLUEPRINT,Scheme.Style.PRINT).contains(preset))
             throw invalid("This preset uses fixed, palette-based or text bars instead of barColor");
-        return new ThemeDefinition(preset,palette,font,footer,bar,ThemeLayers.read(root.get("layers"),palette));
+        return new ThemeDefinition(preset,palette,font,footer,bar,ThemeLayers.read(root.get("layers"),palette),ThemeWindow.read(root.get("window"),preset,palette));
     }
     static ThemeDefinition basic(Scheme.Style preset,Palette palette){
         String font=switch(preset){case TERMINAL,LCD,MISSION,DEPARTURE,HIFI,SOLARIZED,QUEST,INDUSTRIAL,GITHUB,CODE,SHELL,DIFF,DEBUG->"DejaVu Sans Mono";
             case PRINT,PORCELAIN->"DejaVu Serif";default->"DejaVu Sans";};
-        return new ThemeDefinition(preset,palette,font,null,null,ThemeLayers.EMPTY);
+        return new ThemeDefinition(preset,palette,font,null,null,ThemeLayers.EMPTY,ThemeWindow.read(null,preset,palette));
     }
     static void fields(JsonNode node,Set<String> allowed){
         if(node==null||!node.isObject())throw invalid("Expected a theme object");

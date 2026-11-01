@@ -1,6 +1,6 @@
 {
   "format": "vibedock-2d",
-  "version": 1,
+  "version": 2,
   "preset": "fluent",
   "palette": {
     "background": "#1f5fbf",
@@ -10,5 +10,18 @@
     "track": "#d4d4d4",
     "warning": "#c42b1c"
   },
-  "font": "DejaVu Sans"
+  "font": "DejaVu Sans",
+  "window": {
+    "surface": "#f3f3f3",
+    "titleBar": "#f3f3f3",
+    "titleText": "@title",
+    "border": "#d0d0d0",
+    "highlight": "#ffffff",
+    "edgeLight": "#dfdfdf",
+    "edgeDark": "#808080",
+    "controls": "#5c5c5c",
+    "shadow": "#000000",
+    "shadowAlpha": 60,
+    "radius": 6
+  }
 }

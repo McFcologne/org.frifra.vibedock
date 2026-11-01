@@ -4,6 +4,7 @@ import {readFile} from 'node:fs/promises';
 async function open(page,app,id='midnight'){
   await page.goto(app.baseURL+'/admin/themes/'+id+'/edit');
   await expect(page.locator('#te-controls')).toBeEnabled();
+  await page.locator('#te-details').evaluate(el=>el.open=true);
   await expect(page.locator('#te-status')).toHaveText('Current draft · device renderer');
 }
 async function installed(page,id){return page.evaluate(async id=>(await(await fetch('/admin/designs')).json()).schemes.find(s=>s.id===id),id);}
@@ -15,6 +16,7 @@ test('customize opens a separate editor and an exported draft installs only afte
   await open(page,app);
   await page.locator('#te-name').fill('My night');await page.locator('#te-id').fill('browser.editor');
   await page.locator('#te-color-background').fill('#123456');await page.locator('#te-font').selectOption('DejaVu Sans Mono');
+  await page.locator('#te-decoration-details > summary').click();
   await page.locator('.te-layer').first().getByRole('button',{name:'Add decoration'}).click();
   await expect(page.locator('.te-shape')).toHaveCount(1);await expect(page.locator('#te-status')).toHaveText('Current draft · device renderer');
   expect(await installed(page,'browser.editor')).toBeUndefined();
@@ -136,4 +138,65 @@ test('export asks for a missing creator and can remember an editable suggestion 
   await expect(dialog).not.toBeVisible();await expect(page.locator('.te-icon').filter({has:page.getByRole('img',{name:'other.svg',exact:true})}).getByLabel('Creator',{exact:true})).toHaveValue('');
   await page.locator('#te-forget-contributor').click();await expect(page.locator('#te-contributor-note')).toBeHidden();
   expect(JSON.parse(await readFile(app.dir+'/themes.json','utf8')).contributor).toBeUndefined();
+});
+
+
+test('SVG uniform color stays vector, resets source colors and survives save and reload',async({page,app})=>{
+  await open(page,app);await page.locator('#te-id').fill('browser.svg.color');
+  const inherited=page.locator('.te-icon').first();await inherited.getByLabel('Use a uniform SVG color').check();
+  await expect(page.locator('#te-status')).toHaveText('Current draft · device renderer');
+  await expect(inherited.getByLabel('Creator',{exact:true})).toHaveAttribute('readonly','');
+  await inherited.getByLabel('Use a uniform SVG color').uncheck();
+  await expect(page.locator('#te-status')).toHaveText('Current draft · device renderer');
+  const svg=Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect x="8" y="8" width="32" height="32" fill="none" stroke="#000000" stroke-width="3"/></svg>');
+  await page.locator('#te-icon-add').setInputFiles({name:'outline.svg',mimeType:'image/svg+xml',buffer:svg});
+  const row=page.locator('.te-icon').filter({has:page.getByRole('img',{name:'outline.svg',exact:true})});
+  await row.getByLabel('Creator',{exact:true}).fill('Example artist');await row.getByLabel('Theme default').check();
+  const toggle=row.getByLabel('Use a uniform SVG color'),color=row.getByLabel('SVG color',{exact:true});
+  await expect(color).toBeVisible();await expect(color).toBeDisabled();await expect(color).toHaveValue('#000000');
+  await toggle.check();await expect(color).toBeEnabled();
+  await color.fill('#1267ab');await color.dispatchEvent('change');
+  await expect(page.locator('#te-status')).toHaveText('Current draft · device renderer');
+  expect(await row.locator('img').evaluate(img=>atob(img.src.split(',')[1]))).toContain('#1267ab');
+  await toggle.uncheck();await expect(color).toBeDisabled();await expect(color).toHaveValue('#000000');
+  expect(await row.locator('img').evaluate(img=>atob(img.src.split(',')[1]))).toContain('#000000');
+  await toggle.check();await color.fill('#1267ab');await color.dispatchEvent('change');
+  await expect(page.locator('#te-status')).toHaveText('Current draft · device renderer');
+  await expect(row.getByLabel('Creator',{exact:true})).toHaveValue('Example artist');
+  const download=page.waitForEvent('download');await page.locator('#te-export').click();await download;
+  await page.locator('#te-save').click();await expect(page.locator('#te-saved')).toContainText('v1.0.0 saved');
+  await page.reload();await expect(page.locator('#te-controls')).toBeEnabled();
+  await expect(color).toHaveValue('#1267ab');await expect(color).toBeDisabled();
+  const stored=await page.evaluate(async()=>{
+    const state=await(await fetch('/admin/themes/browser.svg.color/editor')).json();
+    const icon=state.draft.icons.find(i=>i.label==='outline.svg');
+    const data=await(await fetch('/admin/themes/browser.svg.color/editor-icons/'+icon.id)).json();
+    return {file:icon.file,svg:atob(data.data),author:icon.author};
+  });
+  expect(stored.file.endsWith('.svg')).toBe(true);expect(stored.svg).toContain('#1267ab');expect(stored.author).toBe('Example artist');
+  await row.screenshot({path:'test-results/svg-color-controls.png'});
+});
+
+test('window colors are editable and reset can recover invalid drafts and saved appearances',async({page,app})=>{
+  await open(page,app,'classic_windows');
+  await expect(page.locator('#te-window-section')).toBeVisible();
+  await expect(page.locator('#te-window-titleBar')).toHaveValue('#000080');
+  await page.locator('#te-id').fill('browser.window.reset');await page.locator('#te-name').fill('My window');
+  await page.locator('#te-window-surface').fill('#ff00ff');await page.locator('#te-window-surface').dispatchEvent('input');
+  await expect(page.locator('#te-status')).toHaveText('Current draft · device renderer');
+  await page.locator('#te-save').click();await expect(page.locator('#te-saved')).toContainText('v1.0.0 saved');
+  const drawing=()=>page.evaluate(async()=>(await(await fetch('/admin/themes/browser.window.reset/editor')).json()).draft.drawing);
+  expect((await drawing()).window.surface).toBe('#ff00ff');
+  await page.locator('#te-name').fill('');await page.locator('#te-window-surface').fill('#00ff00');await page.locator('#te-window-surface').dispatchEvent('input');
+  await page.locator('#te-reset').click();await expect(page.locator('#te-name')).toHaveValue('My window');
+  await expect(page.locator('#te-window-surface')).toHaveValue('#ff00ff');await expect(page.locator('#te-reset')).toBeDisabled();
+  await page.locator('.te-reset-template > summary').click();await page.locator('#te-reset-template').selectOption('classic_windows');
+  await page.locator('#te-restore-template').click();await expect(page.locator('#te-window-surface')).toHaveValue('#c0c0c0');
+  await expect(page.locator('#te-name')).toHaveValue('My window');expect((await drawing()).window.surface).toBe('#ff00ff');
+  await page.locator('#te-save').click();await expect(page.locator('#te-saved')).toContainText('v1.0.1 saved');
+  expect((await drawing()).window.surface).toBe('#c0c0c0');
+  await page.locator('#te-details').evaluate(el=>el.open=false);
+  await expect(page.locator('#te-status')).toHaveText('Current draft · device renderer');
+  await page.setViewportSize({width:1280,height:1100});await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));
+  await page.screenshot({path:'test-results/editor-windows-reset.png'});
 });

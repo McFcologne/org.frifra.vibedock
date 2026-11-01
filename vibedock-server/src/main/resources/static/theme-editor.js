@@ -3,8 +3,9 @@
   const root=document.querySelector('#theme-editor');if(!root)return;
   const $=id=>root.querySelector('#'+id), form=$('te-form'),controls=$('te-controls');
   const csrf=document.querySelector('meta[name="csrf-token"]').content,csrfHeader=document.querySelector('meta[name="csrf-header"]').content;
-  const pngSources=new WeakMap(),tints=new WeakMap();
+  const artworkSources=new WeakMap(),tints=new WeakMap();
   let rememberedContributor='',contributorEntries=[];
+  let openedState;
   let draft,originalIcons=new Map(),dirty=false,timer,revision=0,previewRequest,previewURL,busy=false;
   const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text)n.textContent=text;if(cls)n.className=cls;return n;};
   const label=(text,input)=>{const l=el('label',text);l.append(input);return l;};
@@ -16,7 +17,7 @@
       headers:body===undefined?{}:{'Content-Type':'application/json',[csrfHeader]:csrf},body:body===undefined?undefined:JSON.stringify(body)});
     if(!r.ok){const info=await r.json().catch(()=>({}));throw new Error(info.error||'Theme action failed ('+r.status+').');}return r;
   }
-  function changed(){if(busy)return;dirty=true;revision++;$('te-saved').textContent='Unsaved changes';schedule();}
+  function changed(){if(busy)return;dirty=true;$('te-reset').disabled=false;revision++;$('te-saved').textContent='Unsaved changes';schedule();}
   function schedule(){
     clearTimeout(timer);previewRequest?.abort();$('te-image').hidden=true;$('te-status').textContent='Updating preview…';
     timer=setTimeout(preview,350);
@@ -37,7 +38,7 @@
     $('te-'+prefix).hidden=!exists;$('te-'+prefix).value=color(draft.drawing[property]);
   }
   function bars(){
-    const fixed=['terminal','mac','windows','lcd','blueprint','print'].includes(draft.drawing.preset);
+    const fixed=['terminal','lcd','blueprint','print'].includes(draft.drawing.preset);
     $('te-bar-mode').disabled=fixed;$('te-bar').disabled=fixed;
     $('te-bar-note').textContent=fixed?'This style draws palette-based or text bars.':'';
   }
@@ -94,41 +95,43 @@
       const converted=await response.json();if(!response.ok)throw new Error(converted.error||'Could not prepare the icon.');
       const data=converted.data;
       $('te-upload-status').textContent=converted.vector?'SVG cleaned; vector format retained'+(converted.removed?' · '+converted.removed+' unsupported items removed. Check the preview; details may have changed.':'. Check the preview.'):'PNG validated.';
-      if(existing){existing.file='uploaded.'+ext.slice(1);existing.data=data;existing.author='';existing.license='';existing.label=file.name.replace(/\.[^.]+$/,'').slice(0,80);pngSources.set(existing,Promise.resolve(converted));tints.delete(existing);}
+      if(existing){existing.file='uploaded.'+ext.slice(1);existing.data=data;existing.author='';existing.license='';existing.label=file.name.replace(/\.[^.]+$/,'').slice(0,80);artworkSources.set(existing,Promise.resolve(converted));tints.delete(existing);}
       else{
         if(draft.icons.length>=32)throw new Error('A theme can have at most 32 icons.');
         let id='icon',n=1;while(draft.icons.some(i=>i.id===id))id='icon-'+n++;
-        const icon={id,label:file.name.slice(0,80),file:'uploaded.'+ext.slice(1),data,author:'',license:''};draft.icons.push(icon);pngSources.set(icon,Promise.resolve(converted));
+        const icon={id,label:file.name.slice(0,80),file:'uploaded.'+ext.slice(1),data,author:'',license:''};draft.icons.push(icon);artworkSources.set(icon,Promise.resolve(converted));
       }
       busy=false;icons();changed();
     }catch(e){fail(e.message||'Could not read icon.');}finally{busy=false;controls.disabled=false;}
   }
-  function pngSource(icon){
-    if(!pngSources.has(icon)){
+  function artworkSource(icon){
+    if(!artworkSources.has(icon)){
       const original=originalIcons.get(icon.file);
-      pngSources.set(icon,(async()=>{
-        if(icon.data){const r=await fetch('/admin/theme-editor/icon?format=png',{method:'POST',credentials:'same-origin',headers:{[csrfHeader]:csrf},body:Uint8Array.from(atob(icon.data),c=>c.charCodeAt(0))});const info=await r.json();if(!r.ok)throw new Error(info.error||'Could not inspect PNG.');return info;}
+      artworkSources.set(icon,(async()=>{
+        if(icon.data){const r=await fetch('/admin/theme-editor/icon?format='+(icon.file.endsWith('.svg')?'svg':'png'),{method:'POST',credentials:'same-origin',headers:{[csrfHeader]:csrf},body:Uint8Array.from(atob(icon.data),c=>c.charCodeAt(0))});const info=await r.json();if(!r.ok)throw new Error(info.error||'Could not inspect artwork.');return info;}
         return (await response('/admin/themes/'+encodeURIComponent(draft.sourceId)+'/editor-icons/'+encodeURIComponent(original))).json();
       })());
     }
-    return pngSources.get(icon);
+    return artworkSources.get(icon);
   }
-  function pngControls(row,icon){
-    const group=el('div'),toggle=document.createElement('input'),picker=document.createElement('input'),note=el('small','Checking PNG colors…');
-    toggle.type='checkbox';toggle.disabled=true;picker.type='color';picker.hidden=true;picker.setAttribute('aria-label','PNG main color');
-    const choice=label('Override main color',toggle);group.append(choice,picker,note);row.append(group);
-    pngSource(icon).then(info=>{
+  function colorControls(row,icon){
+    const vector=icon.file.endsWith('.svg'),format=vector?'svg':'png';
+    const group=el('div'),toggle=document.createElement('input'),picker=document.createElement('input'),note=el('small','Checking artwork colors…');
+    toggle.type='checkbox';toggle.disabled=true;picker.type='color';picker.hidden=!vector;picker.disabled=vector;picker.setAttribute('aria-label',vector?'SVG color':'PNG main color');
+    const choice=label(vector?'Use a uniform SVG color':'Override main color',toggle),colorLine=el('div',null,'te-color-choice'),value=el('code');
+    colorLine.hidden=!vector;colorLine.append(picker,value);group.append(choice,colorLine,note);row.append(group);
+    artworkSource(icon).then(info=>{
       if(!row.isConnected)return;const tint=tints.get(icon);toggle.disabled=!info.canRecolor;toggle.checked=!!tint?.enabled;
-      picker.value=tint?.color||info.color||'#000000';picker.hidden=!toggle.checked;
-      note.textContent=info.canRecolor?'Single-color PNG. Transparency is preserved.':'Only single-color PNGs with transparency support a color override.';
+      picker.value=tint?.enabled?tint.color:info.color||'#000000';picker.hidden=!vector&&!toggle.checked;picker.disabled=vector&&!toggle.checked;colorLine.hidden=picker.hidden;value.textContent=picker.value;
+      note.textContent=vector?'Replaces all painted fills and strokes with one color. Opacity and unpainted areas stay intact. Uncheck to restore this editing session’s source colors.':info.canRecolor?'Single-color PNG. Transparency is preserved.':'Only single-color PNGs with transparency support a color override.';
     }).catch(e=>{note.textContent=e.message;});
     async function apply(){
       if(busy)return;busy=true;controls.disabled=true;
       try{
-        const source=await pngSource(icon);let data=source.data;
+        const source=await artworkSource(icon);let data=source.data;
         if(toggle.checked){
-          const r=await fetch('/admin/theme-editor/icon?format=png&color='+encodeURIComponent(picker.value),{method:'POST',credentials:'same-origin',headers:{[csrfHeader]:csrf},body:Uint8Array.from(atob(source.data),c=>c.charCodeAt(0))});
-          const info=await r.json();if(!r.ok)throw new Error(info.error||'Could not recolor PNG.');data=info.data;
+          const r=await fetch('/admin/theme-editor/icon?format='+format+'&color='+encodeURIComponent(picker.value),{method:'POST',credentials:'same-origin',headers:{[csrfHeader]:csrf},body:Uint8Array.from(atob(source.data),c=>c.charCodeAt(0))});
+          const info=await r.json();if(!r.ok)throw new Error(info.error||'Could not recolor artwork.');data=info.data;
         }
         icon.data=data;tints.set(icon,{enabled:toggle.checked,color:picker.value});busy=false;icons();changed();
       }catch(e){fail(e.message);}finally{busy=false;controls.disabled=false;}
@@ -147,42 +150,80 @@
       const use=document.createElement('input');use.type='radio';use.name='default-icon';use.checked=draft.defaultIcon===icon.id;
       use.addEventListener('change',()=>{draft.defaultIcon=icon.id;icons();changed();});fields.append(label('Icon ID',id),label('Label',name));row.append(label('Theme default',use));
       row.prepend(el('h4',icon===chosen?'Default theme icon':'Catalog alternative'));row.append(el('p',icon.label));
-      const creator=input(icon.author||'',value=>icon.author=value);creator.maxLength=160;creator.readOnly=!icon.data&&['Twemoji contributors','VibeDock contributors'].includes(icon.author);creator.title=creator.readOnly?'Source attribution stays with this artwork. Replace the file to enter a new creator.':'';row.append(label('Creator',creator));
+      const creator=input(icon.author||'',value=>icon.author=value);creator.maxLength=160;creator.readOnly=originalIcons.has(icon.file)&&['Twemoji contributors','VibeDock contributors'].includes(icon.author);creator.title=creator.readOnly?'Source attribution stays with this artwork. Replace the file to enter a new creator.':'';(creator.readOnly?fields:row).append(label('Creator',creator));
       if(!creator.readOnly){const remember=button('Remember creator',async()=>{try{await rememberContributor(creator.value);$('te-upload-status').textContent='Contributor remembered for future uploads.';}catch(e){fail(e.message);}});row.append(remember);}
       const license=input(icon.license||'',value=>icon.license=value);license.maxLength=160;license.readOnly=creator.readOnly;fields.append(label('Icon license (optional)',license));
       const original=originalIcons.get(icon.file);
       if(!icon.data&&original){const image=document.createElement('img');image.src='/admin/themes/'+encodeURIComponent(draft.sourceId)+'/icons/'+encodeURIComponent(original)+'.png';image.alt=icon.label;image.width=56;image.height=56;row.append(image);}
       if(icon.data){const image=document.createElement('img');image.src='data:image/'+(icon.file.endsWith('.svg')?'svg+xml':'png')+';base64,'+icon.data;image.alt=icon.label;image.width=56;image.height=56;row.append(image);}
-      const advanced=el('details');advanced.append(el('summary','Icon name and ID'),fields);row.append(advanced);
-      const tools=el('div',null,'te-actions'),replace=document.createElement('input');replace.type='file';replace.accept='.png,.svg';replace.setAttribute('aria-label','Replace '+icon.label);
+      const advanced=el('details');advanced.append(el('summary','Artwork details and credits'),fields);row.append(advanced);
+      const tools=el('div',null,'te-actions'),replace=document.createElement('input');replace.type='file';replace.accept='.png,.svg';replace.hidden=true;replace.setAttribute('aria-label','Replace '+icon.label);
       replace.addEventListener('change',()=>upload(replace.files[0],icon));
       const remove=button('Remove icon',()=>{draft.icons.splice(draft.icons.indexOf(icon),1);if(draft.defaultIcon===icon.id)draft.defaultIcon=draft.icons[0].id;icons();changed();});remove.disabled=draft.icons.length===1;
-      tools.append(label('Replace artwork',replace),remove);row.append(tools,el('p',icon.data?'New artwork · validated in preview':'Artwork: '+icon.file,'meta'));if(icon.file.endsWith('.png'))pngControls(row,icon);(icon===chosen?list:extraList).append(row);
+      const replaceButton=label('Replace artwork',replace);replaceButton.className='button secondary';tools.append(replaceButton,remove);row.append(tools);advanced.append(el('p',icon.data?'New artwork · validated in preview':'Artwork: '+icon.file,'meta'));
+      const sample=row.querySelector('img');if(sample)row.prepend(sample);colorControls(row,icon);(icon===chosen?list:extraList).append(row);
     }
     extra.open=draft.icons.some(i=>i!==chosen&&i.data);list.append(extra);
   }
+  function windowControls(){
+    const defaults=openedState.windows[draft.drawing.preset],section=$('te-window-section');section.hidden=!defaults;
+    $('te-window-fields').replaceChildren();$('te-window-extra').replaceChildren();if(!defaults)return;
+    const values={...defaults,...draft.drawing.window};
+    if(!draft.drawing.window){if(draft.drawing.preset==='windows')values.titleText='#ffffff';if(draft.drawing.preset==='mac')values.titleText='#000000';}
+    const set=(key,value)=>{draft.drawing.version=2;draft.drawing.window={...values,[key]:value};values[key]=value;};
+    const labels={surface:'Window surface',titleBar:'Title bar',titleText:'Window title text',border:'Window border',controls:'Window controls',highlight:'Edge highlight',edgeLight:'Raised edge',edgeDark:'Recessed edge',shadow:'Shadow color'};
+    for(const [key,title] of Object.entries(labels)){
+      if(['highlight','edgeLight','edgeDark'].includes(key)&&draft.drawing.preset!=='windows')continue;
+      if(key==='shadow'&&draft.drawing.preset==='windows')continue;
+      const field=input(color(values[key]),v=>set(key,v),'color');field.id='te-window-'+key;
+      $( ['surface','titleBar','titleText','border','controls'].includes(key)?'te-window-fields':'te-window-extra').append(label(key==='controls'&&['mac','macos'].includes(draft.drawing.preset)?'Battery indicator':title,field));
+    }
+    if(['fluent','macos'].includes(draft.drawing.preset)){
+      $('te-window-fields').append(label('Corner radius',number(values.radius,0,24,v=>set('radius',v),'1')));
+    }
+    if(draft.drawing.preset!=='windows')$('te-window-extra').append(label('Shadow opacity',number(values.shadowAlpha,0,255,v=>set('shadowAlpha',v),'1')));
+  }
   async function open(id,copy=false){
-    controls.disabled=true;const [state,preference]=await Promise.all([response('/admin/themes/'+encodeURIComponent(id)+'/editor?copy='+copy).then(r=>r.json()),response('/admin/theme-editor/contributor').then(r=>r.json())]);rememberedContributor=preference.name;contributorNote();draft=state.draft;originalIcons=new Map(draft.icons.map(i=>[i.file,i.id]));
+    controls.disabled=true;const [state,preference]=await Promise.all([response('/admin/themes/'+encodeURIComponent(id)+'/editor?copy='+copy).then(r=>r.json()),response('/admin/theme-editor/contributor').then(r=>r.json())]);
+    rememberedContributor=preference.name;contributorNote();openedState=structuredClone(state);showDraft(state);
+  }
+  function showDraft(state,keepIcons=false){
+    const oldIcons=keepIcons?draft.icons:null,oldMap=originalIcons;
+    draft=structuredClone(state.draft);const id=draft.sourceId;
+    if(keepIcons){draft.icons=oldIcons;originalIcons=oldMap;}else originalIcons=new Map(draft.icons.filter(i=>!i.data).map(i=>[i.file,i.id]));
     for(const key of ['name','id','version','author','license'])$('te-'+key).value=draft[key];
     $('te-preset').replaceChildren(...state.presets.map(v=>option(v,names[v]||v)));$('te-preset').value=draft.drawing.preset;
     $('te-font').value=draft.drawing.font;
-    $('te-palette').replaceChildren();for(const [key,value] of Object.entries(draft.drawing.palette)){
-      const control=input(value,v=>draft.drawing.palette[key]=v,'color');control.id='te-color-'+key;$('te-palette').append(label(key[0].toUpperCase()+key.slice(1),control));
+    $('te-palette').replaceChildren();$('te-secondary-palette').replaceChildren();for(const [key,value] of Object.entries(draft.drawing.palette)){
+      const control=input(value,v=>{draft.drawing.palette[key]=v;windowControls();},'color');control.id='te-color-'+key;$( ['background','text'].includes(key)||key==='title'&&!state.windows[draft.drawing.preset]?'te-palette':'te-secondary-palette').append(label(key[0].toUpperCase()+key.slice(1),control));
     }
     $('te-display').replaceChildren(...state.displays.map(d=>option(d.id,d.label)));
-    $('te-source').textContent=state.builtin?'Based on '+id+' · built-in original stays unchanged':'Based on '+id+' · save a newer version or choose a new ID for a copy';
+    $('te-source').textContent=state.builtin?'Customize a protected template. Save creates your own copy.':'Edit your installed theme. Save publishes a new version.';
     for(const [prop,prefix] of [['footerBackground','footer'],['barColor','bar']])optionalColor(prop,prefix);
-    layers();icons();bars();controls.disabled=false;dirty=false;revision++;schedule();
+    $('te-reset-template').replaceChildren(option('','Choose a built-in template'),...state.templates.map(t=>option(t.id,t.name)));$('te-restore-template').disabled=true;
+    layers();icons();bars();windowControls();controls.disabled=false;dirty=false;$('te-reset').disabled=true;revision++;schedule();
   }
+  $('te-reset').addEventListener('click',()=>{if(!openedState||busy)return;clearTimeout(timer);previewRequest?.abort();fail('');showDraft(openedState);$('te-saved').textContent='Unsaved changes discarded.';});
+  $('te-reset-template').addEventListener('change',()=>{$('te-restore-template').disabled=!$('te-reset-template').value;});
+  $('te-restore-template').addEventListener('click',async()=>{
+    if(busy||!$('te-reset-template').value)return;busy=true;controls.disabled=true;
+    try{
+      const template=await response('/admin/themes/'+encodeURIComponent($('te-reset-template').value)+'/editor').then(r=>r.json());
+      const kept=draft;kept.drawing=structuredClone(template.draft.drawing);
+      showDraft({...openedState,draft:kept},true);busy=false;changed();$('te-saved').textContent='Appearance restored from '+template.draft.sourceId+'. Save to apply.';
+    }catch(e){fail(e.message);}finally{busy=false;controls.disabled=false;}
+  });
   for(const key of ['name','id','version','author','license'])$('te-'+key).addEventListener('input',()=>{draft[key]=$('te-'+key).value;changed();});
   $('te-font').addEventListener('change',()=>{draft.drawing.font=$('te-font').value;changed();});
   $('te-preset').addEventListener('change',()=>{
     draft.drawing.preset=$('te-preset').value;
-    if(['terminal','mac','windows','lcd','blueprint','print'].includes(draft.drawing.preset)){delete draft.drawing.barColor;optionalColor('barColor','bar');}
-    bars();changed();
+    if(openedState.windows[draft.drawing.preset]){draft.drawing.version=2;draft.drawing.window=structuredClone(openedState.windows[draft.drawing.preset]);}
+    else{delete draft.drawing.window;draft.drawing.version=1;}
+    if(['terminal','lcd','blueprint','print'].includes(draft.drawing.preset)){delete draft.drawing.barColor;optionalColor('barColor','bar');}
+    bars();windowControls();changed();
   });
   for(const [prop,prefix] of [['footerBackground','footer'],['barColor','bar']]){
-    $('te-'+prefix+'-mode').addEventListener('change',()=>{if($('te-'+prefix+'-mode').value==='auto')delete draft.drawing[prop];else draft.drawing[prop]=$('te-'+prefix).value;optionalColor(prop,prefix);changed();});
+    $('te-'+prefix+'-mode').addEventListener('change',()=>{if($('te-'+prefix+'-mode').value==='auto')delete draft.drawing[prop];else{draft.drawing[prop]=$('te-'+prefix).value;if(prop==='barColor'&&['mac','windows'].includes(draft.drawing.preset))draft.drawing.version=2;}optionalColor(prop,prefix);changed();});
     $('te-'+prefix).addEventListener('input',()=>{draft.drawing[prop]=$('te-'+prefix).value;changed();});
   }
   $('te-display').addEventListener('change',()=>{revision++;schedule();});

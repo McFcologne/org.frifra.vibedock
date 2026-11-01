@@ -11,6 +11,10 @@ or redistribute artwork without permission. Never include accounts, tokens, Wi-F
 
 The included package.schema.json and drawing.schema.json are authoring references. The server validates independently.
 The definition selects a preset plus palette/font and optional layers; it is not JavaScript or a general layout language.
+Window styles (mac/windows/fluent/macos) can declare an editable window object in drawing/renderer version 2:
+surface, titleBar, titleText, border, controls, highlight, edgeLight, edgeDark, shadow, shadowAlpha and radius.
+Manifest renderer and drawing versions must match. Version-1 recipes remain valid without the window object;
+preserve their legacy appearance. Pixel-window profiles require radius 0. The included schema gives the bounds.
 Use existing primitives; do not invent unsupported operations. Coordinates are pixels or {relative: fraction, pixels: offset}.
 Layers (background/band) have at most 32 shapes each: rect, ellipse, line, gradient or grid. Preserve low-quota warnings.
 Icon entries may include author/license. Credit the actual artist for each custom icon; never assign Twemoji merely because the package was copied from a built-in. Keep inherited contributions when modifying/recoloring their artwork. Icons are relative PNG/SVG files; defaultIcon names one of icons[].id. Use small original artwork, with a readable

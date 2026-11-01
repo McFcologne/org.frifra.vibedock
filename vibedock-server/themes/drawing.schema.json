@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:org.frifra.vibedock:drawing:1",
-  "title": "VibeDock 2D drawing recipe v1 (draft for 0.4)",
+  "title": "VibeDock 2D drawing recipe v1/v2",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -16,7 +16,10 @@
       "const": "vibedock-2d"
     },
     "version": {
-      "const": 1
+      "enum": [
+        1,
+        2
+      ]
     },
     "preset": {
       "enum": [
@@ -118,6 +121,58 @@
           "items": {
             "$ref": "#/$defs/shape"
           }
+        }
+      }
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "surface": {
+          "type": "string",
+          "pattern": "^(#[0-9a-fA-F]{6}|@(background|title|text|muted|track|warning))$"
+        },
+        "titleBar": {
+          "type": "string",
+          "pattern": "^(#[0-9a-fA-F]{6}|@(background|title|text|muted|track|warning))$"
+        },
+        "titleText": {
+          "type": "string",
+          "pattern": "^(#[0-9a-fA-F]{6}|@(background|title|text|muted|track|warning))$"
+        },
+        "border": {
+          "type": "string",
+          "pattern": "^(#[0-9a-fA-F]{6}|@(background|title|text|muted|track|warning))$"
+        },
+        "highlight": {
+          "type": "string",
+          "pattern": "^(#[0-9a-fA-F]{6}|@(background|title|text|muted|track|warning))$"
+        },
+        "edgeLight": {
+          "type": "string",
+          "pattern": "^(#[0-9a-fA-F]{6}|@(background|title|text|muted|track|warning))$"
+        },
+        "edgeDark": {
+          "type": "string",
+          "pattern": "^(#[0-9a-fA-F]{6}|@(background|title|text|muted|track|warning))$"
+        },
+        "controls": {
+          "type": "string",
+          "pattern": "^(#[0-9a-fA-F]{6}|@(background|title|text|muted|track|warning))$"
+        },
+        "shadow": {
+          "type": "string",
+          "pattern": "^(#[0-9a-fA-F]{6}|@(background|title|text|muted|track|warning))$"
+        },
+        "shadowAlpha": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "radius": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 24
         }
       }
     }
@@ -375,22 +430,21 @@
     {
       "if": {
         "required": [
-          "barColor"
+          "window"
         ]
       },
       "then": {
         "properties": {
+          "version": {
+            "const": 2
+          },
           "preset": {
-            "not": {
-              "enum": [
-                "terminal",
-                "mac",
-                "windows",
-                "lcd",
-                "blueprint",
-                "print"
-              ]
-            }
+            "enum": [
+              "mac",
+              "windows",
+              "fluent",
+              "macos"
+            ]
           }
         }
       }
