@@ -9,13 +9,15 @@ import static org.junit.jupiter.api.Assertions.*;
 class ThemeCatalogTest {
     @Test void preservesEveryPublishedIdLabelStyleAndSwipePosition() throws Exception {
         var catalog=ThemeCatalog.builtins();var json=JsonCompatibility.mapper();
-        assertEquals(Arrays.stream(BaselineScheme.values()).map(BaselineScheme::id).toList(),catalog.all().stream().map(Scheme::id).toList());
+        assertEquals(Arrays.stream(BaselineScheme.values()).map(BaselineScheme::id).toList(),catalog.all().subList(0,35).stream().map(Scheme::id).toList());
+        assertEquals(45,catalog.all().size());
+        var legacy=new ThemeCatalog(catalog.all().subList(0,35));
         for(var old:BaselineScheme.values()){
             var current=catalog.find(old.id()).orElseThrow();
             assertEquals(old.label,current.label);assertEquals(old.font(),current.font());
             assertEquals(old.light(),current.light());assertEquals(old.windowed(),current.windowed());
             assertEquals(old.developer(),current.developer());assertEquals(old.illustrated(),current.illustrated());
-            for(int step:List.of(-36,-1,0,1,36))assertEquals(old.shifted(step).id(),current.shifted(step).id());
+            for(int step:List.of(-36,-1,0,1,36))assertEquals(old.shifted(step).id(),legacy.shifted(current,step).id());
             assertEquals(json.writeValueAsString(old),json.writeValueAsString(current));
             assertSame(current,json.readValue(json.writeValueAsString(old),Scheme.class));
             assertSame(current,json.readValue("\""+old.name()+"\"",Scheme.class));
@@ -58,6 +60,7 @@ class ThemeCatalogTest {
         assertEquals(Set.of("ocean","classic_mac","forest"),disabled);assertTrue(saved.get("dark").booleanValue());
         var loaded=new ThemeSettings(dir.toString(),JsonCompatibility.mapper());assertFalse(loaded.enabled(Scheme.FOREST));
         assertEquals(Scheme.SUNSET,loaded.shifted(Scheme.MIDNIGHT,1));
-        assertEquals(Scheme.DEBUGGER,loaded.shifted(Scheme.MIDNIGHT,-1));
+        assertEquals(Scheme.OSCILLOSCOPE,loaded.shifted(Scheme.MIDNIGHT,-1));
+        assertEquals(Scheme.WINDOWS_XP,loaded.shifted(Scheme.DEBUGGER,1));
     }
 }

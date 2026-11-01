@@ -93,8 +93,8 @@ class LayoutTest {
         var renderer=new StatusImage("Europe/Berlin");
         var moved=new Layout(List.of(new Layout.Context(false),new Layout.Usage(List.of("codex")),new Layout.Usage(List.of("claude"))));
         for(var scheme:ThemeCatalog.builtins().all())for(int variant=0;variant<3;variant++){
-            // The blueprint grid and the neon horizon belong to the screen, not to a band.
-            if(scheme.style==Scheme.Style.BLUEPRINT||scheme.style==Scheme.Style.NEON)continue;
+            // Screen-anchored grids, horizons and declarative wallpapers do not translate with a band.
+            if(scheme.style==Scheme.Style.BLUEPRINT||scheme.style==Scheme.Style.NEON||!scheme.drawing.layers().background().isEmpty())continue;
             var original=renderer.render(snapshot(variant),"192.168.1.50",new StatusImage.Look(icon(44),scheme,icon(24),"13°")).rgb565();
             var actual=renderer.render(snapshot(variant),"192.168.1.50",new StatusImage.Look(icon(44),scheme,icon(24),"13°",moved)).rgb565();
             // Windows and console bars of the band at the screen edge get a margin below: there only the upper band is identical.

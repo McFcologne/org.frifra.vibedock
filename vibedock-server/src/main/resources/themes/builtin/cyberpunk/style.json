@@ -1,0 +1,418 @@
+{
+  "format": "vibedock-2d",
+  "version": 1,
+  "preset": "neon",
+  "palette": {
+    "background": "#100e20",
+    "title": "#55eef0",
+    "text": "#ede6f7",
+    "muted": "#b0a0c9",
+    "track": "#352643",
+    "warning": "#ffcb67"
+  },
+  "font": "DejaVu Sans Mono",
+  "layers": {
+    "background": [
+      {
+        "op": "gradient",
+        "x": 0,
+        "y": 0,
+        "width": {
+          "relative": 1,
+          "pixels": 0
+        },
+        "height": {
+          "relative": 1,
+          "pixels": 0
+        },
+        "color": "#191027",
+        "to": "#0a1020"
+      },
+      {
+        "op": "line",
+        "x": 0,
+        "y": {
+          "relative": 0.93,
+          "pixels": 0
+        },
+        "width": {
+          "relative": 1,
+          "pixels": 0
+        },
+        "height": 0,
+        "color": "#a24298",
+        "opacity": 0.25
+      },
+      {
+        "op": "rect",
+        "x": {
+          "relative": 0,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.85,
+          "pixels": 0
+        },
+        "width": {
+          "relative": 0.11,
+          "pixels": 0
+        },
+        "height": {
+          "relative": 0.15,
+          "pixels": 0
+        },
+        "color": "#20405a",
+        "opacity": 0.32
+      },
+      {
+        "op": "line",
+        "x": {
+          "relative": 0.0495,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.875,
+          "pixels": 0
+        },
+        "width": 0,
+        "height": {
+          "relative": 0.0825,
+          "pixels": 0
+        },
+        "color": "#40d3db",
+        "opacity": 0.3
+      },
+      {
+        "op": "rect",
+        "x": {
+          "relative": 0.13,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.79,
+          "pixels": 0
+        },
+        "width": {
+          "relative": 0.13,
+          "pixels": 0
+        },
+        "height": {
+          "relative": 0.21,
+          "pixels": 0
+        },
+        "color": "#20405a",
+        "opacity": 0.32
+      },
+      {
+        "op": "line",
+        "x": {
+          "relative": 0.1885,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.8150000000000001,
+          "pixels": 0
+        },
+        "width": 0,
+        "height": {
+          "relative": 0.1155,
+          "pixels": 0
+        },
+        "color": "#eb4ca4",
+        "opacity": 0.3
+      },
+      {
+        "op": "rect",
+        "x": {
+          "relative": 0.29,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.88,
+          "pixels": 0
+        },
+        "width": {
+          "relative": 0.12,
+          "pixels": 0
+        },
+        "height": {
+          "relative": 0.12,
+          "pixels": 0
+        },
+        "color": "#20405a",
+        "opacity": 0.32
+      },
+      {
+        "op": "line",
+        "x": {
+          "relative": 0.344,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.905,
+          "pixels": 0
+        },
+        "width": 0,
+        "height": {
+          "relative": 0.066,
+          "pixels": 0
+        },
+        "color": "#40d3db",
+        "opacity": 0.3
+      },
+      {
+        "op": "rect",
+        "x": {
+          "relative": 0.46,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.75,
+          "pixels": 0
+        },
+        "width": {
+          "relative": 0.14,
+          "pixels": 0
+        },
+        "height": {
+          "relative": 0.25,
+          "pixels": 0
+        },
+        "color": "#20405a",
+        "opacity": 0.32
+      },
+      {
+        "op": "line",
+        "x": {
+          "relative": 0.523,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.775,
+          "pixels": 0
+        },
+        "width": 0,
+        "height": {
+          "relative": 0.1375,
+          "pixels": 0
+        },
+        "color": "#eb4ca4",
+        "opacity": 0.3
+      },
+      {
+        "op": "rect",
+        "x": {
+          "relative": 0.65,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.8200000000000001,
+          "pixels": 0
+        },
+        "width": {
+          "relative": 0.11,
+          "pixels": 0
+        },
+        "height": {
+          "relative": 0.18,
+          "pixels": 0
+        },
+        "color": "#20405a",
+        "opacity": 0.32
+      },
+      {
+        "op": "line",
+        "x": {
+          "relative": 0.6995,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.8450000000000001,
+          "pixels": 0
+        },
+        "width": 0,
+        "height": {
+          "relative": 0.099,
+          "pixels": 0
+        },
+        "color": "#40d3db",
+        "opacity": 0.3
+      },
+      {
+        "op": "rect",
+        "x": {
+          "relative": 0.82,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.77,
+          "pixels": 0
+        },
+        "width": {
+          "relative": 0.15,
+          "pixels": 0
+        },
+        "height": {
+          "relative": 0.23,
+          "pixels": 0
+        },
+        "color": "#20405a",
+        "opacity": 0.32
+      },
+      {
+        "op": "line",
+        "x": {
+          "relative": 0.8875,
+          "pixels": 0
+        },
+        "y": {
+          "relative": 0.795,
+          "pixels": 0
+        },
+        "width": 0,
+        "height": {
+          "relative": 0.12650000000000003,
+          "pixels": 0
+        },
+        "color": "#eb4ca4",
+        "opacity": 0.3
+      }
+    ],
+    "band": [
+      {
+        "op": "rect",
+        "x": 13,
+        "y": 4,
+        "width": {
+          "relative": 1,
+          "pixels": -26
+        },
+        "height": {
+          "relative": 1,
+          "pixels": -8
+        },
+        "color": "#191125",
+        "opacity": 0.9
+      },
+      {
+        "op": "rect",
+        "x": 5,
+        "y": 14,
+        "width": {
+          "relative": 1,
+          "pixels": -10
+        },
+        "height": {
+          "relative": 1,
+          "pixels": -28
+        },
+        "color": "#191125",
+        "opacity": 0.9
+      },
+      {
+        "op": "line",
+        "x": 13,
+        "y": 3,
+        "width": {
+          "relative": 1,
+          "pixels": -29
+        },
+        "height": 0,
+        "color": "#ed4aa0"
+      },
+      {
+        "op": "line",
+        "x": {
+          "relative": 1,
+          "pixels": -16
+        },
+        "y": 3,
+        "width": 12,
+        "height": 12,
+        "color": "#ed4aa0"
+      },
+      {
+        "op": "line",
+        "x": {
+          "relative": 1,
+          "pixels": -4
+        },
+        "y": 15,
+        "width": 0,
+        "height": {
+          "relative": 1,
+          "pixels": -19
+        },
+        "color": "#8c3a83"
+      },
+      {
+        "op": "line",
+        "x": {
+          "relative": 1,
+          "pixels": -4
+        },
+        "y": {
+          "relative": 1,
+          "pixels": -4
+        },
+        "width": -2,
+        "height": 2,
+        "color": "#8c3a83"
+      },
+      {
+        "op": "line",
+        "x": 9,
+        "y": {
+          "relative": 1,
+          "pixels": -2
+        },
+        "width": {
+          "relative": 1,
+          "pixels": -15
+        },
+        "height": 0,
+        "color": "#533351"
+      },
+      {
+        "op": "line",
+        "x": 4,
+        "y": {
+          "relative": 1,
+          "pixels": -7
+        },
+        "width": 5,
+        "height": 5,
+        "color": "#339aa8"
+      },
+      {
+        "op": "line",
+        "x": 4,
+        "y": 14,
+        "width": 0,
+        "height": {
+          "relative": 1,
+          "pixels": -29
+        },
+        "color": "#3dcbd5"
+      },
+      {
+        "op": "line",
+        "x": 4,
+        "y": 14,
+        "width": 10,
+        "height": -11,
+        "color": "#3dcbd5"
+      },
+      {
+        "op": "line",
+        "x": 14,
+        "y": 7,
+        "width": 22,
+        "height": 0,
+        "color": "#7d346d",
+        "opacity": 0.65
+      }
+    ]
+  },
+  "barColor": "#fa53ab"
+}

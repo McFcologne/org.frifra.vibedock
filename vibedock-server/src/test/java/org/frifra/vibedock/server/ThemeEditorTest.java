@@ -26,7 +26,7 @@ class ThemeEditorTest {
             assertTrue(copy.manifest().icons().stream().allMatch(i->i.author()!=null));assertEquals(source.manifest().defaultIcon(),copy.manifest().defaultIcon());
             for(String file:source.paths())if(!file.endsWith(".json"))assertArrayEquals(source.file(file),copy.file(file),file);
         }
-        assertEquals(35,library.snapshot().items().size());assertFalse(Files.exists(directory.resolve("themes")));
+        assertEquals(45,library.snapshot().items().size());assertFalse(Files.exists(directory.resolve("themes")));
     }
     @Test void savingAndExportingReuseThePackageLifecycleAndStaleDraftsCannotOverwrite() throws Exception {
         var library=new ThemeLibrary(directory.toString());var editor=new ThemeEditor(library);

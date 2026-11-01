@@ -625,7 +625,7 @@ on the right is rendered by the server exactly as the display will show it. Ever
 
 ## Themes
 
-**Appearance → Browse all themes** jumps to the gallery below the editor. It shows the thirty-five built-in themes and installed themes in five
+**Appearance → Browse all themes** jumps to the gallery below the editor. It shows the forty-five built-in themes and installed themes in five
 columns on a desktop, with identical example data rendered by the same code as the displays. **Use theme** applies
 the theme to the design selected under **Design for**, and saves it right away. For an inherited device design,
 enable **Custom design** first, or change the default design instead.
@@ -714,9 +714,13 @@ the aspect ratio:
 
 ## Appearance and mood
 
-**Style / theme** sets colours and look of the usage monitor; the thirty-five themes:
+**Style / theme** sets colours and look of the usage monitor; the forty-five themes:
 
-<img src="themes.png" width="100%" alt="The thirty-five display themes with example data">
+<img src="themes.png" width="100%" alt="The forty-five display themes with example data">
+
+The 0.4 collection adds **Windows XP, Windows 7, DOS, Nuclear, Halloween, Christmas, Winter, Cyberpunk, Orbital**
+and **Oscilloscope**, each with its own optional default icon. They are ordinary declarative packages: customize,
+export and share them through the same editor. Existing themes and Emoticon/None selections stay unchanged.
 
 **Icon** chooses between **Emoticon**, **Theme default** and **Theme catalog icon**. Existing designs stay on
 Emoticon, including a previous None choice. In that mode the mood button opens the emoji picker with quick picks,
@@ -726,7 +730,7 @@ the new defaults; choosing a theme alone does not switch an existing design's ic
 
 Changing modes retains the saved emoticon. If a fixed theme icon is missing, the editor reports it and the display
 uses that emoticon as a fallback; the fixed reference is kept. Disabling a theme does not remove its catalog icons.
-Each theme supplies its own default artwork and the previous illustration remains a catalog choice.
+Each theme supplies its own default artwork. The original 35 also keep their previous illustration as a catalog choice.
 
 Before the first Theme default/catalog save over an existing configuration, the server creates
 `clients.json.before-theme-icons.bak` with private file permissions. Keep this snapshot for a downgrade to a server

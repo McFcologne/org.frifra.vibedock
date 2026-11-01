@@ -11,7 +11,9 @@ final class ThemeCatalog {
             Scheme.STARSHIP,Scheme.HANDHELD,Scheme.BLUEPRINT,Scheme.NEON,Scheme.NEWSPRINT,
             Scheme.MISSION_CONTROL,Scheme.DEPARTURE_BOARD,Scheme.NORDIC,Scheme.HI_FI,Scheme.SOLARIZED,
             Scheme.PIXEL_QUEST,Scheme.BAUHAUS,Scheme.E_INK,Scheme.INDUSTRIAL,Scheme.PORCELAIN,
-            Scheme.GITHUB_DARK,Scheme.VS_CODE,Scheme.TERMINAL,Scheme.GIT_DIFF,Scheme.DEBUGGER));
+            Scheme.GITHUB_DARK,Scheme.VS_CODE,Scheme.TERMINAL,Scheme.GIT_DIFF,Scheme.DEBUGGER,
+            Scheme.WINDOWS_XP,Scheme.WINDOWS_7,Scheme.DOS,Scheme.NUCLEAR,Scheme.HALLOWEEN,
+            Scheme.CHRISTMAS,Scheme.WINTER,Scheme.CYBERPUNK,Scheme.ORBITAL,Scheme.OSCILLOSCOPE));
     private final List<Scheme> themes;
     private final Map<String,Scheme> byId;
     ThemeCatalog(Collection<Scheme> definitions){
