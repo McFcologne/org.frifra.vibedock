@@ -12,6 +12,7 @@
 #include <TFT_eSPI.h>
 #include "client_policy.h"
 #include "delta_image.h"
+#include "palette_image.h"
 #include "touch.h"
 #include "battery.h"
 #include "audio.h"
@@ -1007,28 +1008,39 @@ String imageProblem;  // why the last image was not read completely, for the dev
 bool transferCut = false;  // the last image broke off on the way (timeout, connection closed), not on bad data
 uint16_t rowsRead = 0;     // rows of the last image drawn in order before it ended
 static uint8_t imageBytes[2 * client_policy::maxImageSide];  // shared by full and delta transfers
+static uint8_t imagePalette[512];
 static uint16_t imagePixels[TFT_WIDTH > TFT_HEIGHT ? TFT_WIDTH : TFT_HEIGHT];
 // Reads the image row by row. Fails after `timeout` ms without new bytes (not in all: over TLS 1.3 on the M1 the
 // image arrives in records of several kB, each decrypted at once) or when the connection ends early.
-template <typename Row> bool readRows(WiFiClient *stream, const client_policy::ImageSize &size, Row onRow, uint32_t timeout = 8000) {
+template <typename Row> bool readRows(WiFiClient *stream, const client_policy::ImageSize &size, Row onRow, uint32_t timeout = 8000, uint8_t paletteBits = 0, uint32_t wireLength = 0) {
   uint8_t *bytes=imageBytes; const size_t length = 2u * size.width;
   uint32_t began = millis(), progress = began;
   imageProblem = ""; transferCut = false; rowsRead = 0;
-  for (int y = 0; y < size.height; y++) {
-    size_t received = 0;
-    while (received < length) {
-      bool idle = millis() - progress > timeout, closed = !stream->connected() && !stream->available();
-      if (idle || closed) {
-        imageProblem = String(idle ? String(F("no data for ")) + String(timeout / 1000) + " s" : "connection closed") + F(" at row ") + String(y) + "/"
-            + String(size.height) + F(" after ") + String(millis() - began) + " ms";
-        transferCut = true; return false;
+  auto readBytes = [&](uint8_t *target, size_t count, int y) {
+    size_t received=0;
+    while(received<count){
+      bool idle=millis()-progress>timeout,closed=!stream->connected()&&!stream->available();
+      if(idle||closed){
+        imageProblem=String(idle?String(F("no data for "))+String(timeout/1000)+" s":"connection closed")+F(" at row ")+String(y)+"/"+String(size.height)+F(" after ")+String(millis()-began)+" ms";
+        transferCut=true;return false;
       }
-      volumeFeedback();
-      int count = stream->read(bytes + received, length - received);
-      if (count > 0) { received += count; progress = millis(); }
-      if (millis() - lastFooter >= 250) footer();
+      volumeFeedback();int n=stream->read(target+received,count-received);
+      if(n>0){received+=n;progress=millis();}
+      if(millis()-lastFooter>=250)footer();
       yield();
-    }
+    }return true;
+  };
+  // Shared across transfers: at most 512 additional bytes, no framebuffer or heap allocation.
+  uint8_t *palette=imagePalette;
+  uint16_t paletteCount=0;
+  if(paletteBits){uint8_t count[2];if(!readBytes(count,2,0))return false;paletteCount=(uint16_t(count[0])<<8)|count[1];
+    if(!paletteCount||paletteCount>(1u<<paletteBits)||wireLength!=client_policy::paletteLength(size,paletteBits,paletteCount)){imageProblem=F("invalid palette length");return false;}
+    if(!readBytes(palette,2u*paletteCount,0))return false;
+  }
+  for(int y=0;y<size.height;y++){
+    size_t count=paletteBits?(size.width*paletteBits+7u)/8u:length;
+    if(!readBytes(bytes,count,y))return false;
+    if(paletteBits&&!client_policy::expandPaletteRow(bytes,size.width,paletteBits,palette,paletteCount))return false;
     if (!onRow(y, bytes)) return false;
     rowsRead = y + 1;
   }
@@ -1082,7 +1094,7 @@ bool redrawFromShadow() {
   return false;
 #endif
 }
-bool readImageDelta(WiFiClient *stream,const client_policy::ImageSize &size,uint32_t length,uint32_t payload,uint32_t check,uint32_t timeout) {
+bool readImageDelta(WiFiClient *stream,const client_policy::ImageSize &size,uint32_t length,uint32_t payload,uint32_t check,uint32_t timeout,uint8_t paletteBits=0) {
   PhaseScope receiving(Phase::Image);
   uint16_t *pixels=imagePixels;
   uint32_t progress=millis();imageProblem=F("invalid delta, length or checksum");transferCut=false;rowsRead=0;
@@ -1103,11 +1115,11 @@ bool readImageDelta(WiFiClient *stream,const client_policy::ImageSize &size,uint
     shadowSpan(row,x,width,data);
 #endif
     rowsRead=row+1;return true;
-  });
+  },paletteBits,imagePalette);
 }
 // Draws the image straight to the display, scaled to the whole screen (1:1 when the server renders for this
 // display); the server draws the IP into it.
-bool readImage(WiFiClient *stream, const client_policy::ImageSize &size, uint32_t timeout) {
+bool readImage(WiFiClient *stream, const client_policy::ImageSize &size, uint32_t timeout, uint8_t paletteBits = 0, uint32_t wireLength = 0) {
   PhaseScope receiving(Phase::Image);  // rows are read and drawn in turn
   uint16_t *pixels=imagePixels;
   const uint16_t width = panel.width(), height = panel.height();
@@ -1130,7 +1142,7 @@ bool readImage(WiFiClient *stream, const client_policy::ImageSize &size, uint32_
     if (copy) shadowSpan(y, 0, width, bytes);
 #endif
     return true;
-  }, timeout);
+  }, timeout, paletteBits, wireLength);
 }
 // One image request. https uses the simple check first (pinned certificate fingerprint); when that fails, e.g. after
 // the certificate was renewed, a full check against the root from pairing follows, and only such a verified
@@ -1182,6 +1194,7 @@ int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
   if (conditional && !etag.isEmpty() && haveImage && imageOnScreen) r.http.addHeader("If-None-Match", etag);
   if (conditional && !uploadFile && resuming && imageOnScreen) r.http.addHeader("X-VibeDock-Resume", resumeToken());
   if (conditional && !uploadFile) r.http.addHeader("X-VibeDock-Delta", "1");
+  if (conditional && !uploadFile) r.http.addHeader("X-VibeDock-Palette", "1");
   if (conditional && !uploadFile) r.http.addHeader("X-VibeDock-Schedule", "1");  // follows X-VibeDock-Next-Pull
   if (conditional && !pendingGesture.isEmpty()) r.http.addHeader("X-VibeDock-Gesture", pendingGesture);
   if (uploadFile) {  // the log, straight from flash: no copy on the heap the TLS handshake needs
@@ -1455,8 +1468,11 @@ void pull() {
 #endif
   client_policy::ImageSize size;
   if (code == 200) {
-    bool delta=client_policy::parseImageFormat(http.header("X-VibeDock-Image-Format").c_str(),size,true);
-    bool full=!delta&&validImage(http,size);
+    uint8_t paletteBits=client_policy::parsePaletteFormat(http.header("X-VibeDock-Image-Format").c_str(),size,true);
+    bool delta=paletteBits||client_policy::parseImageFormat(http.header("X-VibeDock-Image-Format").c_str(),size,true);
+    if(!delta)paletteBits=client_policy::parsePaletteFormat(http.header("X-VibeDock-Image-Format").c_str(),size);
+    uint32_t paletteLength=0;
+    bool full=!delta&&(paletteBits?(client_policy::paletteBodyLength(http.header("X-VibeDock-Length").c_str(),size,paletteBits,paletteLength)&&(http.getSize()<0||http.getSize()==int(paletteLength))):validImage(http,size));
     uint32_t length=0,payload=0,check=0;
 #if defined(ESP32)
     if (full&&size.width==panel.width()&&size.height==panel.height()) keepShadow(false);
@@ -1479,8 +1495,8 @@ void pull() {
     uint32_t reading=millis();bool first=!haveImage;bool https=servers[serverIndex].startsWith("https");
     imageProblem=F("unsupported image or delta basis");
     bool complete=accepted&&(delta
-        ?readImageDelta(http.getStreamPtr(),size,length,payload,check,https?15000:8000)
-        :readImage(http.getStreamPtr(),size,https?15000:8000));
+        ?readImageDelta(http.getStreamPtr(),size,length,payload,check,https?15000:8000,paletteBits)
+        :readImage(http.getStreamPtr(),size,https?15000:8000,paletteBits,paletteLength));
     if (!complete && delta && turnedWithoutCopy) {
       pullSoon();  // not an error: the whole picture in the new orientation follows right away
     } else if (complete) {

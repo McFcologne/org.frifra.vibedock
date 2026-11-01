@@ -479,3 +479,72 @@ and requests `/image.bmp` only when the device has completed another image. No p
 additional image buffer is kept on the device. Missing or unknown
 values leave its saved preference unchanged (initial default: dark). The setting does not alter the rendered
 image, theme selection, colour calibration or backlight.
+
+### Optional indexed images and deltas (palette v1)
+
+Hardware firmware opts in with `X-VibeDock-Palette: 1`. Older firmware keeps RGB565. Browser/status previews
+(`X-VibeDock-Preview: 1`) and web displays always bypass lossy reduction. Their PNGs may use an exact indexed
+palette when it reduces size without changing any pixel. Photos follow the same lossless PNG rule.
+
+On hardware, a slideshow photo ignores the size rules: it always gets a palette of at most 256 colors. A photo
+with fewer colors keeps exactly its own colors and needs only as many bits per pixel as they require; a photo
+with more is reduced to 256. Quality metrics and the adaptive levels do not apply to photos.
+
+**Settings → Hardware display colors** stores ordered rules in `DATA_DIR/image-colors.json`: maximum width,
+maximum height and 32, 64, 256 or full colors. Both dimensions must fit; first match wins. Default rules are
+420×420 → 32 and 640×640 → 256, otherwise full colors. Empty rules disable lossy reduction. These rules do not
+extend a firmware build's existing maximum accepted image dimensions.
+
+**Allow quality fallback** is the only quality option. The server calibrates all installed themes in standard normal,
+low-quota and sign-in-required reference scenes across the inventory's small display resolutions. It derives a
+shared quality target in an internal 40–50% changed-pixel corridor, with no manual percentage. The count is a
+heuristic, not a perceptual guarantee. Starting at a rule's palette it can choose one level down (32→16, 64→32,
+256→128), retain the rule, or increase at most once (32→64, 64→256, 256→full). Current frames are checked against
+the original RGB565 pixels; a new weather/icon may need the higher palette. The one-increase cap takes priority
+over meeting the target. During asynchronous initial/replacement calibration, one conservative increase is used.
+Installing or editing a theme replaces the reference calibration; device image pulls never wait for that work.
+
+The common palette prioritizes exact present theme base/window paints, dominant quota fill/track paints and representative weather/mood hues. Other
+similar shades share the remaining slots. Whatever palette is selected, unused entries are always removed
+losslessly, including when quality fallback is disabled. Thus a four-color LCD image uses four entries and two
+bits even with a configured 32-, 64- or 256-color limit. Original full-color images with at most 256 colors can also
+use exact indexing; images above that limit retain RGB565 without losing colors.
+
+A full response has `X-VibeDock-Image-Format: indexed<bits>-rgb565-be-<width>x<height>`, with 1–8 bits. The body
+starts with the **actual palette count** as a big-endian u16 (1–256, no more than `2^bits`), then that many RGB565
+big-endian entries. MSB-first indices follow, with each row byte-aligned and unused low padding bits zero.
+Length is `2 + 2 * count + height * ceil(width * bits / 8)`; `X-VibeDock-Length` declares it. Clients validate the
+count, exact declared length and every index. One shared 512-byte palette plus the existing RGB row buffer is
+sufficient: rows expand backwards, then receive the existing tone correction. No framebuffer is added.
+
+Indexed deltas use `indexed<bits>-rgb565-delta-be-<width>x<height>`. Their count and palette prefix precede the
+existing v1 delta section stream. Headers, complete-row hashes and the terminator remain unchanged; each span
+row is packed and byte-aligned separately. Payload FNV covers the count, palette and sections; row checks and
+ETags refer to the reconstructed reduced RGB565 frame. Existing interrupted-transfer recovery still applies.
+
+A delta is never quantized again. The server collects all exact colors in its spans, including unchanged pixels
+enclosed by a span, and uses the minimum palette/bit width that represents them. Lossless shrinking may pass
+more than one palette level. The server compares indexed delta, RGB565 delta, indexed full and full RGB565 body
+sizes (including count/palette/section overhead) and sends the smallest available candidate. Tiny deltas can
+remain RGB565 because a palette would cost more.
+
+Palette selection, pixel-change metrics and encoded bodies are reused by an in-memory fingerprint cache keyed
+by original pixels, dimensions, artwork/bar bounds and effective policy. Changed weather pixels or policy cause
+a cache miss; unchanged pulls reuse the result. The cache retains at most 64 entries and 8 MiB of image payloads.
+Eviction or restart causes a fresh calculation. The live admin comparison at `/admin/color-preview` uses the same
+renderer/encoder and exposes actual palette counts, bit widths, payload bytes and changed-pixel metrics.
+
+Protected theme colors are converted to their exact RGB565 values and reserved before allocating gradient shades.
+A smaller automatic palette is rejected when it cannot retain the protected color set, even if the global changed-
+pixel metric would accept it. This prevents, for example, an LCARS purple accent being replaced by beige.
+
+Icon index-paint extraction uses opaque flat foreground runs from the styled source artwork, before compositing
+onto the theme. Transparent antialias fringes and backdrop pixels are excluded. Distinct paints of similar hue
+remain separate (for example Solarized’s two turquoise stripes). Those observed RGB565 paints join the protected
+theme palette; a lower automatic palette is rejected if it cannot retain the protected set.
+
+Rendered bar regions also contribute their opaque flat paints, preserving rare yellow/red VU-meter end segments
+alongside the dominant active/track colors. These paints share the finite global budget with icons and theme paints.
+
+For calibration details, exact body-size examples, cache invalidation and implementation/extension guidance, see the
+[technical image-pipeline reference](../docs/design/image-color-pipeline.md).

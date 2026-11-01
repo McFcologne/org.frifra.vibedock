@@ -34,16 +34,89 @@ class AccessTest {
     @Autowired SettingsStore store;
     @Autowired UsageService usage;
     @Autowired ThemeSettings themes;
+    @Autowired ImageColorSettings imageColors;
+    @Autowired PhotoLibrary photoLibrary;
+    @Autowired ClientRegistry registry;
     @Autowired ClientRegistry clients;
     @Autowired OtaSigning otaSigning;
     @Autowired DeviceLogs deviceLogs;
     @MockitoBean ProviderClient providers;
     @MockitoBean BrowserLogin login;
     @BeforeEach void resetSettings() throws Exception {
+        imageColors.save(ImageColorSettings.DEFAULT);
         themes.setDark(false);
         for(var scheme:ThemeCatalog.builtins().all())themes.setEnabled(scheme,true);
         store.save(new SettingsStore.Settings(List.of("127.0.0.1/32"),new SettingsStore.Credential("",""),new SettingsStore.Credential("",""),List.of()));
         usage.forgetPacing();usage.configurationChanged();
+    }
+    @Test void paletteIsNegotiatedAndMappingNeverReducesPreviewOrLegacyImages() throws Exception {
+        String key="ef".repeat(32),id="vibedock-palette-test",path="/api/v1/clients/"+id+"/image";
+        clients.paired(id,"Palette",key,"192.168.1.20",80);
+        imageColors.save(new ImageColorSettings.Mapping(ImageColorSettings.DEFAULT.rules(),false));
+        var legacy=mvc.perform(get(path).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(8080);return r;}))
+                .andExpect(status().isOk()).andExpect(header().string("X-VibeDock-Image-Format","rgb565-be-240x240")).andReturn().getResponse();
+        var packed=mvc.perform(get(path).header("Authorization","Bearer "+key).header("X-VibeDock-Palette","1").with(r->{r.setLocalPort(8080);return r;}))
+                .andExpect(status().isOk()).andExpect(header().string("X-VibeDock-Image-Format",org.hamcrest.Matchers.matchesPattern("indexed[1-8]-rgb565-be-240x240"))).andReturn().getResponse();
+        Assertions.assertTrue(packed.getContentAsByteArray().length<legacy.getContentAsByteArray().length);
+        mvc.perform(get(path).header("Authorization","Bearer "+key).header("X-VibeDock-Palette","1").header("If-None-Match",packed.getHeader("ETag")).with(r->{r.setLocalPort(8080);return r;}))
+                .andExpect(status().isNotModified());
+        var preview=mvc.perform(get(path).header("Authorization","Bearer "+key).header("X-VibeDock-Palette","1").header("X-VibeDock-Preview","1").with(r->{r.setLocalPort(8080);return r;}))
+                .andExpect(status().isOk()).andExpect(header().string("X-VibeDock-Image-Format","rgb565-be-240x240")).andReturn().getResponse();
+        Assertions.assertArrayEquals(legacy.getContentAsByteArray(),preview.getContentAsByteArray());
+        mvc.perform(post("/admin/server/image-colors").with(r->{r.setLocalPort(10001);return r;}).with(user("admin").roles("ADMIN"))
+                .param("maxWidth","240").param("maxHeight","240").param("colors","32")).andExpect(status().isForbidden());
+        mvc.perform(post("/admin/server/image-colors").with(r->{r.setLocalPort(10001);return r;}).with(user("admin").roles("ADMIN")).with(csrf())
+                .param("maxWidth","240").param("maxHeight","240").param("colors","32")).andExpect(status().is3xxRedirection());
+        mvc.perform(get(path).header("Authorization","Bearer "+key).header("X-VibeDock-Palette","1").with(r->{r.setLocalPort(8080);return r;}))
+                .andExpect(header().string("X-VibeDock-Image-Format",org.hamcrest.Matchers.matchesPattern("indexed[1-8]-rgb565-be-240x240")));
+        mvc.perform(get("/admin/server").with(r->{r.setLocalPort(10001);return r;}).with(user("admin").roles("ADMIN")))
+                .andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("Hardware display colors")));
+        clients.remove(id);
+    }
+    @Test void photosGetTheLargestPaletteWhateverTheSizeRuleSaysAndWebDisplaysStayFullColor() throws Exception {
+        String key="f0".repeat(32),id="vibedock-photo-palette",path="/api/v1/clients/"+id+"/image";
+        clients.paired(id,"Photo",key,"192.168.1.21",80);
+        var noise=new java.awt.image.BufferedImage(600,600,java.awt.image.BufferedImage.TYPE_INT_RGB);var random=new java.util.Random(7);
+        for(int y=0;y<600;y++)for(int x=0;x<600;x++)noise.setRGB(x,y,random.nextInt(0x1000000));
+        var png=new java.io.ByteArrayOutputStream();javax.imageio.ImageIO.write(noise,"png",png);
+        var photo=photoLibrary.add(png.toByteArray());var old=clients.defaultDesign();
+        try{
+            imageColors.save(new ImageColorSettings.Mapping(List.of(new ImageColorSettings.Rule(420,420,32)),false));
+            var view=mvc.perform(get(path).header("Authorization","Bearer "+key).header("X-VibeDock-Palette","1").with(r->{r.setLocalPort(8080);return r;}))
+                    .andExpect(status().isOk()).andReturn().getResponse();
+            Assertions.assertEquals("indexed5-rgb565-be-240x240",view.getHeader("X-VibeDock-Image-Format"),"usage monitor follows the 32 color rule");
+            clients.configureDesign(new Design(old.scheme(),old.mood(),null,old.layout(),new Design.Photos(List.of(photo.id()),60,false,null,null)));
+            var shown=mvc.perform(get(path).header("Authorization","Bearer "+key).header("X-VibeDock-Palette","1").with(r->{r.setLocalPort(8080);return r;}))
+                    .andExpect(status().isOk()).andReturn().getResponse();
+            Assertions.assertEquals("indexed8-rgb565-be-240x240",shown.getHeader("X-VibeDock-Image-Format"),"a photo uses up to 256 colors");
+            // A photo with few colors keeps exactly those colors and needs only as many bits as they require.
+            var flat=new java.awt.image.BufferedImage(600,600,java.awt.image.BufferedImage.TYPE_INT_RGB);
+            for(int y=0;y<600;y++)for(int x=0;x<600;x++)flat.setRGB(x,y,x<200?0xff0000:x<400?0x00ff00:0x0000ff);
+            var flatPng=new java.io.ByteArrayOutputStream();javax.imageio.ImageIO.write(flat,"png",flatPng);var simple=photoLibrary.add(flatPng.toByteArray());
+            try{
+                clients.configureDesign(new Design(old.scheme(),old.mood(),null,old.layout(),new Design.Photos(List.of(simple.id()),60,false,null,null)));
+                mvc.perform(get(path).header("Authorization","Bearer "+key).header("X-VibeDock-Palette","1").with(r->{r.setLocalPort(8080);return r;}))
+                        .andExpect(header().string("X-VibeDock-Image-Format",org.hamcrest.Matchers.matchesPattern("indexed[1-4]-rgb565-be-240x240")));
+            }finally{photoLibrary.delete(simple.id());}
+            var legacy=mvc.perform(get(path).header("Authorization","Bearer "+key).with(r->{r.setLocalPort(8080);return r;}))
+                    .andExpect(status().isOk()).andExpect(header().string("X-VibeDock-Image-Format","rgb565-be-240x240")).andReturn().getResponse();
+            Assertions.assertTrue(shown.getContentAsByteArray().length<legacy.getContentAsByteArray().length);
+        }finally{clients.configureDesign(old);photoLibrary.delete(photo.id());clients.remove(id);}
+    }
+    @Test void liveColorComparisonUsesTheActualCodecAndRemainsAdminOnly() throws Exception {
+        mvc.perform(get("/admin/color-preview").with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isUnauthorized());
+        mvc.perform(get("/admin/color-preview").with(r->{r.setLocalPort(10001);return r;}).with(user("admin").roles("ADMIN")))
+                .andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("Live color comparison")));
+        mvc.perform(get("/admin/color-preview/data").param("source","reference").param("mode","32").param("fallback","false")
+                .with(r->{r.setLocalPort(10001);return r;}).with(user("admin").roles("ADMIN")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.cards.length()").value(45))
+                .andExpect(jsonPath("$.cards[?(@.id == 'handheld')].used").value(org.hamcrest.Matchers.hasItem(4)))
+                .andExpect(jsonPath("$.cards[?(@.id == 'handheld')].bits").value(org.hamcrest.Matchers.hasItem(2)))
+                .andExpect(jsonPath("$.cards[?(@.id == 'handheld')].payloadBytes").value(org.hamcrest.Matchers.hasItem(14410)));
+        mvc.perform(get("/admin/color-preview/data").param("display","web").param("mode","32").param("fallback","false")
+                .with(r->{r.setLocalPort(10001);return r;}).with(user("admin").roles("ADMIN")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.cards[0].width").value(480)).andExpect(jsonPath("$.cards[0].changed").value(0));
+        mvc.perform(get("/admin/color-preview/data").param("mode","16").with(r->{r.setLocalPort(10001);return r;}).with(user("admin").roles("ADMIN"))).andExpect(status().isBadRequest());
     }
     @Test void deviceWebAppearanceFollowsServerOnFullAndUnchangedImages() throws Exception {
         String key="ab".repeat(32),id="vibedock-ui-theme",path="/api/v1/clients/"+id+"/image";
@@ -1141,7 +1214,7 @@ class AccessTest {
     }
     @org.junit.jupiter.api.Test void themeIconCatalogAndRastersStayOnTheAuthenticatedAdminListener() throws Exception {
         mvc.perform(get("/admin/designs").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.icons.length()").value(80));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.icons.length()").value(79));
         mvc.perform(get("/admin/themes/debugger/icons/theme.png").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
                 .andExpect(status().isOk()).andExpect(content().contentType("image/png"));
         mvc.perform(get("/admin/themes/debugger/icons/theme.png").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10002);return r;}))

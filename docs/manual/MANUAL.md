@@ -902,7 +902,7 @@ Wi-Fi is all it takes.
 # Settings
 
 **Settings** holds the server's network addresses, who may read its API, the old push connection, the
-administration password and where it stores its data. **Save network settings** saves the network block, **Save access settings** the API access and the
+administration password, hardware display color rules and where it stores its data. **Save network settings** saves the network block, **Save access settings** the API access and the
 legacy connection.
 
 ## Network
@@ -943,6 +943,86 @@ after updates. The badge shows which one applies. **Back to ADMIN_PASSWORD** del
 own password is lost, delete `admin-password` in the data directory and restart the server; `ADMIN_PASSWORD`
 applies again. Changing or resetting the password signs out every session, this one included; sign in again
 with the new password.
+
+## Hardware display colors
+
+Use **Settings → Hardware display colors** to define ordered size rules. Each rule sets maximum width, maximum
+height and 32, 64, 256 or full colors. Both dimensions must fit; the first match wins. Move rules with the arrows,
+remove one with ×, then save. **Restore defaults** restores 420×420 → 32 and 640×640 → 256. Unmatched sizes use
+full colors; removing every rule disables lossy reduction. Rules are stored in `DATA_DIR/image-colors.json`.
+
+**Allow quality fallback** is the only automatic-quality switch. The server compares every installed theme across
+small display sizes at low (5%), average (50%) and high (95%) remaining quota, then derives a quality target
+internally; no percentage must be adjusted by hand. Normal quota changes are therefore already represented by the
+reference palette.
+It can move one palette level down or at most one up. A 32-color rule can therefore use 16, 32 or 64 colors. It
+checks changed weather/icon pixels again; the target is a visual-quality heuristic, not a guarantee of identical
+appearance. During initial calibration one conservative higher level is used without blocking device pulls.
+
+Unused colors are always removed losslessly, with or without automatic quality. A four-color LCD image is sent
+with four entries and two bits per pixel, even with a 32-/64-/256-color rule. Theme base/window colors, active/inactive bar colors and weather/
+mood hues receive priority in lossy palettes. Web displays and browser previews keep full-color pixels; PNG
+storage uses an exact palette only when smaller. Older firmware still receives the original RGB565 format.
+
+The decoder reuses its row buffer with one 512-byte palette and no extra framebuffer. At 240×240, 32 actually
+used colors need 36,066 bytes instead of 115,200; four colors need 14,410 bytes. Deltas use the smallest exact
+palette of their spans without another color reduction. The server sends whichever supported full/delta variant
+is smallest, with existing row checks and interrupted-transfer recovery.
+
+Image fingerprints cache the palette, metric and encoded frame until pixels or policy change. The cache is
+bounded to 64 entries and 8 MiB of image payloads; eviction or restart requires a new calculation.
+
+**Live color comparison** opens `/admin/color-preview`: inspect all themes using current server data or clearly
+labelled reference scenes. Switch resolution, palette or automatic quality for all cards together. Images always
+use the selected native pixel dimensions (1:1); columns adapt without scaling the images.
+The ↑ / ↓ icons show a larger/smaller palette; tooltips explain them. Each card shows actual colors, bits and bytes.
+The Web option defaults to lossless. Reference scenes never query providers or change device settings.
+
+### Much smaller full images and partial updates
+
+Color reduction and partial images work together. The server renders the complete new image, chooses its hardware
+palette and keeps that resulting image as the reference for the next update. It then sends only the changed spans
+when that is smaller. The partial image receives its own exact palette of the colors actually needed in those spans;
+this second compression does not change pixels again. If a complete image is cheaper, the server sends that instead.
+
+For a 240×240 display, the original RGB565 full image is **115,200 bytes**. The following full-image sizes include
+the palette and its count; they assume the stated number of colors is actually used:
+
+| Actual colors | Bits per pixel | Full-image bytes | Reduction versus RGB565 |
+| ---: | ---: | ---: | ---: |
+| 256 | 8 | 58,114 | 49.6% |
+| 32 | 5 | 36,066 | 68.7% |
+| 16 | 4 | 28,834 | 75.0% |
+| 4 | 2 | 14,410 | 87.5% |
+| 2 | 1 | 7,206 | 93.7% |
+
+A hypothetical four-color update covering one 40×10-pixel span needs only **160 bytes**, including its palette,
+section header, row checks and terminator. That is 98.9% less than the four-color full image, or 99.86% less than
+the original RGB565 full image. Actual partial-image savings depend on what changed; this is a calculated example,
+not a measured typical transfer. Unchanged images can use HTTP 304 without an image body.
+
+These figures describe image bodies, excluding HTTP/TLS/network overhead and retransmissions. They reduce the
+bytes a slow or weakly connected display must receive; they do not guarantee a particular download time. The device
+still expands the pixels and draws them using its normal display path.
+
+**Checking your own installation:** the server's `Image transfer` log names the mode, original RGB565 full size,
+actual payload and byte/percentage saving. `palette-K` means K colors were actually transmitted. In **Live color
+comparison**, compare the original full frame, optimized full frame, changed-pixel percentage and actual color count.
+Do not compare a PNG file size directly with hardware payload size: they are different formats. The comparison
+page does not simulate the exact history of a particular device's partial updates; use transfer logs for those.
+
+Install both the new server and compatible firmware to obtain indexed hardware transfers. An older display keeps
+working with RGB565 and its supported partial-image protocol. Web displays and browser previews always keep their
+rendered colors; their PNGs are indexed only when it is pixel-identical and smaller. Hardware quantization can be
+visually close but remains lossy; subsequent palette shrinking and partial-image packing are exact relative to it.
+
+The automatic selector reserves present theme/window colors, weather and mood artwork paints, and active/inactive
+bar paints including rare Hi-Fi yellow/red segments. This keeps important small accents from being replaced merely
+because background pixels dominate. There is a finite shared color budget: inspect unusually rich custom themes
+and use a larger palette or full colors when necessary.
+
+For formulas, protocol details, cache invalidation and future changes, see the
+[technical image-pipeline reference](../design/image-color-pipeline.md).
 
 ## Storage
 

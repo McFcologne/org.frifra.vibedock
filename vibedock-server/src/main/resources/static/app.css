@@ -1,5 +1,8 @@
 /* VibeDock administration – shared styles for the login and admin pages. Light by default, dark via [data-theme=dark]. */
 :root{
+  /* The complete administration shell grows together on wide screens, while retaining the familiar 1040 px layout
+     on ordinary desktops. Keeping this value here prevents a page body and the sticky header from drifting apart. */
+  --content-width:clamp(1040px,calc(100vw - 400px),1700px);
   --bg:#f3f5f9;--bg-accent:radial-gradient(1200px 500px at 85% -10%,#dfe8ff 0,transparent 60%),radial-gradient(900px 400px at -10% 0,#e7f6ef 0,transparent 55%);
   --card:#ffffff;--card-2:#f8fafc;--text:#16202f;--muted:#627086;--line:#e2e7ef;--input:#ffffff;
   --accent:#5146d8;--accent-2:#5146d8;--accent-text:#ffffff;--accent-soft:#efedff;
@@ -23,14 +26,14 @@ a{color:var(--accent)}code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace
 
 /* Top bar */
 .appbar{position:sticky;top:0;z-index:5;backdrop-filter:saturate(1.4) blur(12px);-webkit-backdrop-filter:saturate(1.4) blur(12px);background:color-mix(in srgb,var(--card) 78%,transparent);border-bottom:1px solid var(--line)}
-.appbar-inner{max-width:1040px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:12px}
+.appbar-inner{max-width:var(--content-width,1040px);margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:12px}
 .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text)}
 .brand small{margin:0;font-size:12px}
 .logo{width:34px;height:34px;flex:none}
 .spacer{flex:1}
 
 /* Layout */
-main{max-width:1040px;margin:0 auto;padding:24px 20px 64px}
+main{max-width:var(--content-width,1040px);margin:0 auto;padding:24px 20px 64px}
 .intro{margin:0 0 18px}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 @media(max-width:760px){.grid-2{grid-template-columns:1fr}}
@@ -208,7 +211,7 @@ button.small{padding:5px 10px;font-size:13px;font-weight:500}
 #internal-url,#external-url{max-width:30em}#poll-seconds{max-width:8em}
 
 /* One display-design editor for defaults and device overrides. Image previews come from the server renderer. */
-.admin-nav{max-width:1040px;margin:0 auto;padding:0 20px 10px;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+.admin-nav{max-width:var(--content-width,1040px);margin:0 auto;padding:0 20px 10px;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
 .admin-nav a{padding:7px 12px;border-radius:9px;color:var(--muted);text-decoration:none;font-size:14px;font-weight:600;white-space:nowrap}
 .admin-nav a:hover{color:var(--text,inherit);background:var(--card-2)}.admin-nav a.active{background:var(--accent-soft);color:var(--accent)}
 .layout-heading{display:flex;justify-content:space-between;gap:20px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
@@ -313,9 +316,9 @@ select{padding-right:32px}small,.meta{font-size:12px}small{margin-top:8px}
 .source-manage>summary{font-weight:400}
 
 /* Shared build and project information stays below the page content. */
-body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>main{width:100%;flex:1}
+body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>main{width:min(100%,var(--content-width));flex:1}
 .app-footer{border-top:1px solid var(--line);background:var(--card);color:var(--muted);font-size:12px}
-.app-footer-inner{max-width:1040px;margin:auto;padding:16px 26px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.app-footer-inner{max-width:var(--content-width,1040px);margin:auto;padding:16px 26px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .app-footer nav{display:flex;gap:20px;flex-wrap:wrap}.app-footer a{color:var(--muted);text-decoration:none}.app-footer a:hover{text-decoration:underline;color:var(--accent)}
 .license-report,.log-lines{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.6 ui-monospace,SFMono-Regular,monospace;color:var(--text);margin:18px 0 0}
 /* Device log page: one line per span; the server's lines about the display between its own, in the accent colour, on demand. */
@@ -523,3 +526,6 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 
 .te-icon>img{float:right;margin:0 0 12px 12px}.te-icon::after{content:"";display:block;clear:both}.te-icon h4{margin-top:4px}.te-icon .te-actions{clear:both}
 @media(max-width:480px){.theme-card-menu .theme-card-tools{position:fixed;left:16px;right:16px;top:auto;bottom:16px;min-width:0}.theme-card-menu .theme-card-tools .button,.theme-card-menu .theme-card-tools button{padding:12px 10px}}
+
+.image-color-scroll{overflow-x:auto}.image-color-table{width:100%;max-width:760px;min-width:540px;border-spacing:8px 6px;margin-left:-8px}.image-color-table th{text-align:left;font-size:13px;color:var(--muted);font-weight:600;padding:0 0 4px}.image-color-table td{vertical-align:middle}.image-color-table input,.image-color-table select{width:100%;min-width:0;margin:0}.image-color-table td:last-child{white-space:nowrap;width:160px}
+.color-test-controls{position:sticky;top:110px;z-index:3}.color-test-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--color-card-width,240px)),1fr));gap:16px}.color-test-grid .card{padding:12px;min-width:0}.color-test-grid h3{display:flex;align-items:center;gap:6px;font-size:15px;margin:0 0 8px;min-width:0}.color-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.color-palette{flex:none;border:1px solid var(--line);border-radius:5px;padding:1px 5px;color:var(--primary);font-size:12px;line-height:18px;font-variant-numeric:tabular-nums;font-weight:700;background:var(--card-2)}.color-test-image{overflow:hidden;margin-bottom:8px}.color-test-image img{display:block;max-width:none;margin:0 auto}.color-test-grid small{line-height:1.6;overflow-wrap:anywhere}@media(max-width:700px){.color-test-controls{position:static}}
