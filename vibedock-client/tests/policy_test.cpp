@@ -194,6 +194,8 @@ int main(){
   assert(!pullDue(5000,beforeWrap,30));assert(pullDue(29000,beforeWrap,30));
   assert(!imageStale(5000,beforeWrap,30));
   assert(nextServer(0,2)==1);assert(nextServer(1,2)==0);assert(nextServer(0,1)==0);assert(nextServer(0,0)==0);
+  assert(staysAtServer(true,true,false)&&!staysAtServer(true,false,false)&&!staysAtServer(false,true,false));
+  assert(staysAtServer(false,false,true)&&staysAtServer(false,true,true));
   assert(pullRequestAllowed(5000,0));assert(!pullRequestAllowed(4999,0));assert(!pullRequestAllowed(1000,beforeWrap));assert(pullRequestAllowed(5000,beforeWrap));
   assert(!pairingLocked(4));assert(pairingLocked(5));
   assert(countsAsPowerCycle(0));assert(countsAsPowerCycle(6));for(uint32_t r=1;r<=5;r++)assert(!countsAsPowerCycle(r));

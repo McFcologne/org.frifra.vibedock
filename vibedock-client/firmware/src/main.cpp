@@ -1547,9 +1547,10 @@ void pull() {
     // Connection failed: try the other announced address next time. An answer that stalled after a successful TLS
     // handshake (lost packets on the way) is first retried at the same address.
     bool stalled = lastConnectionProblem.indexOf(" after TLS;") >= 0;
-    uint8_t next = stalled && failedInRow == 0 ? serverIndex : client_policy::nextServer(serverIndex, serverCount);
+    bool lanSilent = lastConnectionProblem.indexOf("works, no HTTP answer") >= 0;  // plain http, TCP accepted
+    uint8_t next = client_policy::staysAtServer(stalled, failedInRow == 0, lanSilent) ? serverIndex : client_policy::nextServer(serverIndex, serverCount);
     if (next != serverIndex) logEvent(String(F("Trying ")) + servers[next] + F(" next"), true);
-    else if (stalled) logEvent(String(F("Retrying ")) + servers[next], true);
+    else if (stalled || lanSilent) logEvent(String(F("Retrying ")) + servers[next], true);
     String failed = servers[serverIndex];
     serverIndex = next;
     // The next attempt right away (as many as there are addresses), not only after the poll interval.
