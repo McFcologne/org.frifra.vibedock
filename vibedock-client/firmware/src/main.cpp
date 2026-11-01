@@ -488,6 +488,7 @@ void showWrapped(const String &text, int top, int lines, uint16_t colour, uint8_
 }
 // The device's own screen: logo, name, status (as an orange pill for problems) and the progress of the start.
 bool reasonOnScreen = false;  // "Server unreachable" with its reason: the address line shows the next attempt
+uint8_t silentInRow = 0;  // consecutive failures where TCP worked but no HTTP answer came
 uint8_t failedInRow = 0, imageFailures = 0;      // connection failures since the last answer, to try every address once right away
 void message(const String &value, Step step = Step::None, bool problem = false) {
   PhaseScope drawing(Phase::Draw);
@@ -1419,7 +1420,7 @@ void pull() {
   lastStatus = code;
   if (code != 401) rejectedKeys = 0;  // only 401 answers in an unbroken row count (any other answer or no answer ends it)
   if (code > 0) {
-    failedInRow = 0; pendingGesture = "";  // the server has it (an older one ignores it)
+    failedInRow = 0; silentInRow = 0; pendingGesture = "";  // the server has it (an older one ignores it)
     if (storedIndex != serverIndex) saveConfig();  // flash only when the answering address changes
   }
   if (code == 200 || code == 304) {
@@ -1547,9 +1548,11 @@ void pull() {
     // Connection failed: try the other announced address next time. An answer that stalled after a successful TLS
     // handshake (lost packets on the way) is first retried at the same address.
     bool stalled = lastConnectionProblem.indexOf(" after TLS;") >= 0;
-    uint8_t next = stalled && failedInRow == 0 ? serverIndex : client_policy::nextServer(serverIndex, serverCount);
+    bool lanSilent = lastConnectionProblem.indexOf("works, no HTTP answer") >= 0;  // plain http, TCP accepted
+    silentInRow = lanSilent ? (silentInRow < 255 ? silentInRow + 1 : 1) : 0;
+    uint8_t next = client_policy::staysAtServer(stalled, failedInRow == 0, silentInRow) ? serverIndex : client_policy::nextServer(serverIndex, serverCount);
     if (next != serverIndex) logEvent(String(F("Trying ")) + servers[next] + F(" next"), true);
-    else if (stalled) logEvent(String(F("Retrying ")) + servers[next], true);
+    else if (stalled || lanSilent) logEvent(String(F("Retrying ")) + servers[next], true);
     String failed = servers[serverIndex];
     serverIndex = next;
     // The next attempt right away (as many as there are addresses), not only after the poll interval.

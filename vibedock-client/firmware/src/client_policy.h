@@ -85,6 +85,14 @@ constexpr bool imageStale(uint32_t now, uint32_t lastImage, uint32_t pollSeconds
 }
 // After a failed connection the next announced server address is tried.
 constexpr uint8_t nextServer(uint8_t current, uint8_t count) { return count == 0 ? 0 : uint8_t((current + 1) % count); }
+// The address accepted the TCP connection but sent no HTTP answer: the server is up and another address (the external
+// one, usually unreachable from an IoT network and costly in memory over TLS) cannot answer better, so stay. Every
+// sixth silent failure in a row still lets the next address try, so a silent wrong service cannot block the working one.
+// An address that did not even accept TCP is the case the next one is for. silentInRow counts this failure too.
+constexpr uint8_t silentRetriesBeforeNext = 5;
+constexpr bool staysAtServer(bool stalledAfterTls, bool firstFailure, uint8_t silentInRow) {
+  return (stalledAfterTls && firstFailure) || (silentInRow > 0 && silentInRow % (silentRetriesBeforeNext + 1) != 0);
+}
 // The server may ask for an immediate pull (POST /pull, e.g. after a design change); at most every 5 seconds.
 constexpr uint32_t pullRequestMs = 5000;
 constexpr bool pullRequestAllowed(uint32_t now, uint32_t lastRequest) { return uint32_t(now - lastRequest) >= pullRequestMs; }
