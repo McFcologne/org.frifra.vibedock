@@ -1,0 +1,1 @@
+- **Sign-in problems explained in the server log:** a request rejected by the CSRF check is now logged as a warning with the reason (missing or wrong token), the cookie names that arrived, whether the session was known and a few request headers, never their values. It helps to find out why the sign-in form ends on a 403 page in some browsers.
