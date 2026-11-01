@@ -34,7 +34,7 @@ class AdminRememberMeTest {
     }
     @Test void persistentCookieRestoresAuthenticationAndLogoutRevokesItWithoutASession() throws Exception {
         Cookie cookie=login(true,false),other=login(true,false);
-        assertNotNull(cookie);assertEquals(AdminLoginTokens.MAX_AGE,cookie.getMaxAge());assertTrue(cookie.isHttpOnly());assertFalse(cookie.getSecure());assertEquals("Strict",cookie.getAttribute("SameSite"));
+        assertNotNull(cookie);assertEquals(AdminLoginTokens.MAX_AGE,cookie.getMaxAge());assertTrue(cookie.isHttpOnly());assertFalse(cookie.getSecure());assertEquals("Lax",cookie.getAttribute("SameSite"));
         mvc.perform(atAdmin(get("/admin").cookie(cookie))).andExpect(status().isOk());
         // No session attached: logout still revokes the persistent credential, including a copied cookie.
         mvc.perform(atAdmin(get("/logout").accept("text/html").cookie(cookie))).andExpect(redirectedUrl("/login?logout"));
