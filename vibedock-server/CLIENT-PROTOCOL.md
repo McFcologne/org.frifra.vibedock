@@ -407,7 +407,8 @@ to protect HTTPS traffic; none of its certificate checks change.
 **Transfer diagnostics:** every device RGB565 pull with an image logs `Image transfer <device>: <mode>,
 full=<M> bytes, payload=<N> bytes, saved=<M-N> bytes (<P>%)`; modes are delta, delta resumed, full image and
 preview. Savings
-have one decimal place and always compare with the full RGB565 image: full images save 0%. Unchanged images
+have one decimal place and compare with the full RGB565 image: full images save 0%. A delta sent with a palette
+also states `palette full=<K> bytes, saved against it=<K-N> bytes (<Q>%)`, the saving against the full palette image. Unchanged images
 (**304**) come with every poll and are logged at debug level only. Numbers describe the selected response body,
 not HTTP/TLS overhead, TCP retransmissions or proof of reception. The next device ETag identifies the accepted
 complete image. The device log keeps its events as before (the first image after a start, aborted images); a

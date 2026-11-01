@@ -1006,7 +1006,8 @@ bytes a slow or weakly connected display must receive; they do not guarantee a p
 still expands the pixels and draws them using its normal display path.
 
 **Checking your own installation:** the server's `Image transfer` log names the mode, original RGB565 full size,
-actual payload and byte/percentage saving. `palette-K` means K colors were actually transmitted. In **Live color
+actual payload and byte/percentage saving; a partial update with a palette also gives the full palette image and the
+saving against it. `palette-K` means K colors were actually transmitted. In **Live color
 comparison**, compare the original full frame, optimized full frame, changed-pixel percentage and actual color count.
 Do not compare a PNG file size directly with hardware payload size: they are different formats. The comparison
 page does not simulate the exact history of a particular device's partial updates; use transfer logs for those.
