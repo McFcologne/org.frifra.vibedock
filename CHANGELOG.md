@@ -2,6 +2,83 @@
 
 The release workflow publishes the section of the tagged version (`## 0.1.0` for the tag `v0.1.0` or `0.1.0`) above the list of commits that GitHub generates.
 
+## 0.4.0
+
+Themes become portable packages you can edit, export and import, the gallery grows to 45 built-in themes, and
+hardware displays receive much smaller images. Update the server image first; everything below works with the
+firmware displays already run, except the indexed image bodies, which need this firmware (update the displays over
+Wi-Fi from the administration; displays on older firmware keep receiving RGB565 as before). Existing designs keep
+their themes, emoticon and *None* choices.
+
+### Themes
+
+- **Theme packages:** every built-in theme loads its manifest, palette, font and drawing recipe from a
+  self-contained package directory, with the appearance pixel-identical to the former renderer (checked over 1,750
+  panel, layout, data and browser-scale combinations). The `.vibetheme` archive carries theme and icon IDs, renderer
+  requirements, package-relative files and SHA-256 checks; a bounded reader, JSON Schema and an example are included.
+  Themes are now an ordered catalog of immutable definitions keyed by their existing IDs, so theme order, disabled
+  selections and design files stay compatible.
+- **Import and export:** share compact ZIP `.vibetheme` packages, optionally with a coding-agent guide and the format
+  schemas. The administration validates, installs, updates or copies themes without a restart; a selected design
+  resolves the latest package on its next image. Built-ins stay protected, and themes or fixed icons in use cannot be
+  removed. An invalid import leaves the catalog intact, and missing packages keep their saved references with a
+  temporary fallback. Exports omit unreferenced graphics but keep declared icons and license notices.
+- **Theme editor:** palette, font, style, decoration and package-icon controls, with previews rendered as the device
+  renders them for different panel sizes. Customise a built-in as an independent copy, save versioned updates of an
+  installed theme, or export an unsaved draft. Concurrent updates are rejected without losing the page-local draft.
+  Design controls come first; sharing metadata and drawing operations are collapsed. Unsaved drafts can be discarded
+  and a built-in appearance restored, without touching the installed theme until *Save*.
+- **Editable window paints:** Classic Mac, Classic Windows, Windows 11 and macOS expose surface, title bar, title
+  text, borders and profile-specific shadow and corner settings. These window recipes use renderer version 2;
+  version 1 imports keep their look, and older readers reject version 2 instead of ignoring it.
+- **Compact theme gallery:** five columns, a selection marker, an edit pencil and an accessible menu for the package
+  actions replace the stacked buttons. Availability per instance and the protection of themes in use stay intact.
+- **Theme icons:** the design editor keeps the emoticon or *None* choice, follows a theme's default icon, or keeps a
+  fixed icon from the theme catalog. Every theme has an original vector default, the earlier illustrations remain
+  available. The first opt-in over an existing configuration creates a private rollback snapshot; a missing fixed icon
+  falls back to the stored emoticon. Selected emoticons always show the bundled Twemoji images, also after a reload.
+- **Ten more themes:** Windows XP, Windows 7, DOS, Nuclear, Halloween, Christmas, Winter, Cyberpunk, Orbital and
+  Oscilloscope bring the gallery to 45 built-ins, each with an original, attributed SVG default icon and an editable
+  recipe. The original 35 appearances stay unchanged.
+- **Icon artwork:** uploaded SVGs stay vectors and are cleaned on upload (the editor reports what was removed and
+  accepts literal presentation styles and `currentColor`; XML entities are rejected). An optional uniform color
+  applies to SVG icons, and single-color PNGs with transparency can get a main color; *Reset* restores the source of
+  the editing session, and saved packages contain the colored SVG.
+- **Credits:** creators and licenses are tracked per icon, a custom upload needs a creator, and packages and previews
+  list the credits per asset. Twemoji notices stay only while its artwork is included. The editor asks for missing
+  creators before save or export and can remember a contributor suggestion on the server across restarts, with
+  confirmation per new icon and a *Forget* action.
+- **Offline preview:** an export contains a script-free `preview.html` with a rendered snapshot and the package icons,
+  branded with the VibeDock icon, for inspection after extraction.
+
+### Displays and images
+
+- **Automatic hardware palettes:** ordered width and height rules select 32, 64, 256 or full colors (by default 32
+  up to 420×420 and 256 up to 640×640). One quality switch calibrates all themes across small displays and low,
+  average and high quota reference states and allows one lower or at most one higher level. Theme base and window
+  paints, bar contrast and weather and mood hues keep priority. Photos use up to 256 colors, and an invalid
+  `image-colors.json` falls back to the defaults.
+- **Only the colors in use are sent:** unused palette entries are removed losslessly at every limit. Full images and
+  exact delta spans use the smallest index width, and compatible firmware streams them with one shared 512-byte
+  palette. Legacy firmware keeps RGB565; web images keep every pixel and use smaller exact PNG palettes.
+- **Substantial savings:** at 240×240 a full RGB565 image is 115,200 bytes; with 32 colors it is 36,066 bytes
+  (68.7% less), with 16 colors 28,834 (75.0% less), with four colors 14,410 (87.5% less), including palettes
+  (calculated body sizes, not radio measurements). A single 40×10 four-color patch is 160 bytes including checks.
+  Updates transfer only changed spans when that is cheaper; unchanged images still answer with HTTP 304. The transfer
+  log shows the raw size, the payload, the mode and the saving.
+- **Cached analysis and live comparison:** image fingerprints reuse quality metrics and encoded frames; a changed icon
+  or policy is recalculated. The live comparison in the administration shows all themes at their native pixel sizes
+  with actual color counts, bytes, metrics and ↑/↓ indicators, references labelled apart from live data. The
+  [image pipeline reference](https://github.com/McFcologne/org.frifra.vibedock/blob/main/docs/design/image-color-pipeline.md)
+  describes algorithms, protection of semantic colors, calibration, packet layout and byte formulas; the
+  [manual](https://github.com/McFcologne/org.frifra.vibedock/blob/main/docs/manual/MANUAL.md#much-smaller-full-images-and-partial-updates)
+  explains the controls.
+- **Explicit LCD footer colors:** a custom footer background survives the color reduction of the Handheld LCD; its
+  four-shade look stays the default.
+- **Old update errors go away:** a failed Wi-Fi update (for example *no answer within ten minutes* while the display
+  was offline) stayed on its device card until the server restarted, also after new firmware came over USB. It now
+  disappears with the first pull that reports another firmware.
+
 ## 0.3.3
 
 Displays keep their pairing and an M1 recovers on its own when its memory runs low; the administration names why a
