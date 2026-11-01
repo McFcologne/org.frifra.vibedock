@@ -2,6 +2,29 @@
 
 The release workflow publishes the section of the tagged version (`## 0.1.0` for the tag `v0.1.0` or `0.1.0`) above the list of commits that GitHub generates.
 
+## 0.4.1
+
+Fixes for sign-in from other apps and for displays on networks without internet. Update the server image first. The
+firmware change needs the new firmware on the display: update it over Wi-Fi from the administration.
+
+### Administration
+
+- **Sign-in from links and shortcuts:** the session and "Stay signed in" cookies are now `SameSite=Lax` instead of
+  `Strict`. Opening the administration from another app (for example in mobile Edge) no longer drops the cookies,
+  shows the sign-in page although you are signed in, and ends on a 403 page after signing in. Cross-site form posts
+  stay blocked. Browsers get the new cookies with their next sign-in.
+
+### Displays and images
+
+- **Clearer transfer log:** a partial update that is sent with a palette also names the full palette image and the
+  saving against it (`palette full=14410 bytes, saved against it=… (98.8%)`). The saving against the raw RGB565
+  image, which counts the palette and the partial update together, stays as before.
+- **Fewer external detours while the server answers slowly (firmware):** when the server accepts the connection but
+  the HTTP answer is missing, the display retries the same address and tries the next one (the external HTTPS address)
+  only after six such failures in a row, instead of at every failure. In a network without internet that detour cannot
+  succeed, and each failed TLS attempt used up memory on the VibeTV Classic. The external address is still tried at
+  once when the first address does not accept a connection at all.
+
 ## 0.4.0
 
 Themes become portable packages you can edit, export and import, the gallery grows to 45 built-in themes, and
