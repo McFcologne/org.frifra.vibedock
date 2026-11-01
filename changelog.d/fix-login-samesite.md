@@ -1,1 +1,0 @@
-- **Sign-in from links and shortcuts:** the session and "Stay signed in" cookies are now `SameSite=Lax` instead of `Strict`. Opening the administration from another app (for example in mobile Edge) no longer drops the cookies, shows the sign-in page although you are signed in, and ends on a 403 page after signing in. Cross-site form posts stay blocked.
