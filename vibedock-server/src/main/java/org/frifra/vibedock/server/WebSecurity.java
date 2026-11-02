@@ -62,6 +62,9 @@ class WebSecurity {
                     if(denied instanceof org.springframework.security.web.csrf.CsrfException csrf){
                         response.setHeader("X-VibeDock-CSRF","invalid");
                         org.slf4j.LoggerFactory.getLogger(WebSecurity.class).warn("{}",csrfRejection(request,csrf));
+                        // A sign-in form kept open in a tab (its session expired or the server restarted) is no error page:
+                        // a fresh sign-in page with the usual hint takes its place.
+                        if("/login".equals(request.getRequestURI())&&"POST".equals(request.getMethod())){response.sendRedirect(request.getContextPath()+"/login?expired");return;}
                     }
                     response.sendError(HttpServletResponse.SC_FORBIDDEN);
                 }))

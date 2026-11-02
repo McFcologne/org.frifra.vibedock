@@ -72,3 +72,12 @@ test('leaving the editor right after an edit through the navigation saves it fir
   expect((await (await page.request.get(app.baseURL+'/admin/designs')).json()).defaults.scheme).toBe('ocean');
   await editor(page,app);await expect(page.locator('#design-scheme')).toHaveValue('ocean');
 });
+
+test('the sign-in page never puts the session id into links and a stale form returns to it',async ({app})=>{
+  const first=await fetch(app.baseURL+'/login',{redirect:'manual'});
+  const html=await first.text();
+  expect(html).not.toContain('jsessionid');expect(first.headers.getSetCookie().join(';')).toContain('JSESSIONID');
+  // The form is posted without the session that issued its token, as after a timeout or a server restart.
+  const stale=await fetch(app.baseURL+'/login',{method:'POST',redirect:'manual',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({username:'admin',password:app.password,_csrf:/name="_csrf" value="([^"]+)"/.exec(html)[1]})});
+  expect(stale.status).toBe(302);expect(new URL(stale.headers.get('location'),app.baseURL).pathname+new URL(stale.headers.get('location'),app.baseURL).search).toBe('/login?expired');
+});

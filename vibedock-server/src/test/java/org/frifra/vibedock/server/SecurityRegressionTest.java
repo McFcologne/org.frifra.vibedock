@@ -151,4 +151,8 @@ class SecurityRegressionTest {
   mvc.perform(get("/admin/designs").with(r->{r.setLocalPort(adminPort);return r;})).andExpect(status().isUnauthorized());
   mvc.perform(get("/admin/designs").with(httpBasic("admin","audit-original-password")).with(r->{r.setLocalPort(port);return r;})).andExpect(status().isNotFound());
  }
+ @Test void aSignInFormWithoutAValidSessionLeadsBackToTheSignInPage() throws Exception {
+  mvc.perform(post("/login").param("username","admin").param("password","x").with(r->{r.setLocalPort(adminPort);return r;}))
+    .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/login?expired"));
+ }
 }
