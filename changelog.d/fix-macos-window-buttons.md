@@ -1,0 +1,1 @@
+- **macOS theme keeps its window buttons:** the red, yellow and green window buttons are protected colours in the palette reduction, so they no longer disappear or turn into a neighbouring shade at 16 to 128 colors.
