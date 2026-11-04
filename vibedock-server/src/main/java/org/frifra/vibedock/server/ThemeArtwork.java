@@ -35,7 +35,7 @@ final class ThemeArtwork {
                     for(int line=y;line<y+height;line+=3){ink.setColor(new Color(255,255,255,5));ink.drawLine(x,line,x+width,line);}
                 }
                 case QUEST -> {ink.setColor(new Color(0x20213a));ink.fillRect(x+3,y+3,width-6,height-6);ink.setColor(new Color(0x60668d));ink.drawRect(x+3,y+3,width-7,height-7);}
-                case BAUHAUS -> {ink.setColor(new Color(s.title));ink.fillRect(x,y+3,4,height-6);ink.setColor(new Color(0xc6a12f));ink.fillOval(x+width-17,y+9,7,7);}
+                case BAUHAUS -> {ink.setColor(new Color(s.title));ink.fillRect(x,y+3,4,height-6);ink.setColor(new Color(BAUHAUS_HIGHLIGHT));ink.fillOval(x+width-17,y+9,7,7);}
                 case INDUSTRIAL -> {
                     ink.setColor(new Color(0x626965));ink.drawRect(x+3,y+3,width-7,height-7);
                     for(int left:new int[]{x+5,x+width-6}){ink.setColor(new Color(0x92978b));ink.fillOval(left-1,y+5,2,2);}
@@ -46,6 +46,7 @@ final class ThemeArtwork {
         }finally{ink.dispose();}
     }
     /** Room a theme's own decoration takes at the top right of a band, kept free of the battery icon (Bauhaus: its dot). */
+    static final int BAUHAUS_HIGHLIGHT=0xc6a12f;
     static int cornerRoom(Scheme s){return s.style==Scheme.Style.BAUHAUS?11:0;}
     /** Syntax headings stay inside their slot, including narrow and compact layouts. */
     static boolean heading(Graphics2D g,Scheme s,String title,int x,int baseline,int width,int size){

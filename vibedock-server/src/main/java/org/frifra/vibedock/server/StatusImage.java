@@ -292,6 +292,7 @@ public class StatusImage {
         }
         var primary=new LinkedHashSet<Integer>();
         for(int rgb:new int[]{scheme.background,scheme.title,scheme.text,scheme.muted,scheme.track,scheme.warning})primary.add(to565(rgb));
+        if(scheme.style==Scheme.Style.BAUHAUS)primary.add(to565(ThemeArtwork.BAUHAUS_HIGHLIGHT));
         var window=scheme.drawing.window();
         if(window!=null)for(int rgb:new int[]{window.surface(),window.titleBar(),window.titleText(),window.border(),window.highlight(),window.edgeLight(),window.edgeDark(),window.controls()})primary.add(to565(rgb));
         for(var area:barAreas){var bounds=area.intersection(new Rectangle(0,0,pw,ph));
