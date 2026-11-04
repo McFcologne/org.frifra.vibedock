@@ -1,1 +1,0 @@
-- **Sign-in page left open:** a sign-in form that stays open until its session has expired, or until the server restarted, no longer ends on a 403 page. The sign-in page opens again with its hint. Pages also no longer get `;jsessionid=…` appended to their links, which made the stylesheet fail (an unformatted page) and "Back to the administration" end on a 400 page.

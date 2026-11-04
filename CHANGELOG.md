@@ -2,6 +2,32 @@
 
 The release workflow publishes the section of the tagged version (`## 0.1.0` for the tag `v0.1.0` or `0.1.0`) above the list of commits that GitHub generates.
 
+## 0.4.2
+
+Fixes for signing in to the administration after hours and for two themes whose small colour accents got lost on the
+display. Update the server image; the firmware is unchanged. Browsers get the new cookies with their next sign-in.
+
+### Administration
+
+- **Stay signed in after hours:** when the persistent cookie signs you in, it is sent to the browser again once per
+  session. A cookie that an earlier version stored as `SameSite=Strict` (not sent by some in-app browsers when a tab is
+  restored, so the sign-in page appeared although you were signed in) is replaced by the current one at the next visit
+  instead of after the next hourly renewal.
+- **Sign-in page left open:** a sign-in form that stays open until its session has expired, or until the server
+  restarted, no longer ends on a 403 page. The sign-in page opens again with its hint. Pages also no longer get
+  `;jsessionid=…` appended to their links, which made the stylesheet fail (an unformatted page) and "Back to the
+  administration" end on a 400 page.
+- **Sign-in problems explained in the server log:** a request rejected by the CSRF check is now logged as a warning
+  with the reason (missing or wrong token), the cookie names that arrived, whether the session was known and a few
+  request headers, never their values. It helps to find out why the sign-in form ends on a 403 page in some browsers.
+
+### Displays and images
+
+- **macOS theme keeps its window buttons:** the red, yellow and green window buttons are protected colours in the
+  palette reduction, so they no longer disappear or turn into a neighbouring shade at 16 to 128 colors.
+- **Bauhaus keeps its ochre dot:** the highlight dot is a protected colour in the palette reduction, so it no longer
+  turns into the yellow of a neighbouring icon at 16 to 128 colors.
+
 ## 0.4.1
 
 Fixes for sign-in from other apps and for displays on networks without internet. Update the server image first. The
