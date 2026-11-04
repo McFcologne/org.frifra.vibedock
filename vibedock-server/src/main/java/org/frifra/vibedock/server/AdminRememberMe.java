@@ -14,7 +14,7 @@ import java.io.IOException;
 /** Persistent browser sign-in; session expiry remains separate from the 30-day browser token. */
 @Component
 final class AdminRememberMe extends AbstractRememberMeServices {
-    static final String COOKIE="vibedock-login",KEY="vibedock-browser-login";
+    static final String COOKIE="vibedock-login",KEY="vibedock-browser-login",REFRESHED="vibedock.login-cookie-refreshed";
     private final AdminLoginTokens tokens;private final AdminAccount account;
     AdminRememberMe(AdminAccount account,AdminLoginTokens tokens){
         super(KEY,account);this.account=account;this.tokens=tokens;
@@ -73,7 +73,15 @@ final class AdminRememberMe extends AbstractRememberMeServices {
                         SecurityContextHolder.clearContext();cancelCookie(request,response);
                     }else{
                         String token=raw(request);
-                        try{if(tokens.renew(token,account.loginIdentity()))setCookie(new String[]{token},AdminLoginTokens.MAX_AGE,request,response);}
+                        try{
+                            if(tokens.renew(token,account.loginIdentity()))setCookie(new String[]{token},AdminLoginTokens.MAX_AGE,request,response);
+                            else if(auth instanceof org.springframework.security.authentication.RememberMeAuthenticationToken&&token!=null&&tokens.valid(token,account.loginIdentity())){
+                                // Signed in by the cookie itself: send it once more per session so a cookie stored with older
+                                // attributes (SameSite=Strict, which some in-app browsers do not send on a restored tab) is replaced.
+                                var session=request.getSession();
+                                if(session.getAttribute(REFRESHED)==null){session.setAttribute(REFRESHED,Boolean.TRUE);setCookie(new String[]{token},AdminLoginTokens.MAX_AGE,request,response);}
+                            }
+                        }
                         catch(IOException e){logger.warn("Could not renew browser sign-in");}
                     }
                 }

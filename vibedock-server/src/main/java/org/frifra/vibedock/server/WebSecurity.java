@@ -59,7 +59,13 @@ class WebSecurity {
         return http
                 .exceptionHandling(e -> e.defaultAuthenticationEntryPointFor(login,browsers).accessDeniedHandler((request,response,denied)->{
                     // This marker permits one safe client retry: CSRF rejected the request before any controller ran.
-                    if(denied instanceof org.springframework.security.web.csrf.CsrfException)response.setHeader("X-VibeDock-CSRF","invalid");
+                    if(denied instanceof org.springframework.security.web.csrf.CsrfException csrf){
+                        response.setHeader("X-VibeDock-CSRF","invalid");
+                        org.slf4j.LoggerFactory.getLogger(WebSecurity.class).warn("{}",csrfRejection(request,csrf));
+                        // A sign-in form kept open in a tab (its session expired or the server restarted) is no error page:
+                        // a fresh sign-in page with the usual hint takes its place.
+                        if("/login".equals(request.getRequestURI())&&"POST".equals(request.getMethod())){response.sendRedirect(request.getContextPath()+"/login?expired");return;}
+                    }
                     response.sendError(HttpServletResponse.SC_FORBIDDEN);
                 }))
                 .authorizeHttpRequests(a -> a.requestMatchers("/api/v1/usage","/api/v1/clients/*/image","/api/v1/clients/*/firmware","/api/v1/clients/*/log","/web/*","/web/*/image.png","/web/*/icon.png","/web/*/state","/web/*/swipe").permitAll()
@@ -80,6 +86,16 @@ class WebSecurity {
                         // Web display pages: the secret in the path is the access, there is no session.
                         PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST,"/web/*/swipe")))
                 .httpBasic(Customizer.withDefaults()).build();
+    }
+    /** Why a request failed CSRF, without values: cookie names and yes/no facts only, no tokens, ids or query strings. */
+    static String csrfRejection(HttpServletRequest request,org.springframework.security.web.csrf.CsrfException denied){
+        var names=new java.util.TreeSet<String>();
+        if(request.getCookies()!=null)for(Cookie cookie:request.getCookies())names.add(cookie.getName());
+        boolean token=request.getHeader("X-CSRF-TOKEN")!=null||request.getParameter("_csrf")!=null;
+        return "CSRF rejected "+request.getMethod()+" "+request.getRequestURI()+": "+denied.getClass().getSimpleName()
+                +", cookies "+names+", session known "+request.isRequestedSessionIdValid()+", token sent "+token
+                +", Sec-Fetch-Site "+request.getHeader("Sec-Fetch-Site")+", Origin "+(request.getHeader("Origin")!=null?"set":"none")
+                +", Referer "+(request.getHeader("Referer")!=null?"set":"none");
     }
     @Bean FilterRegistrationBean<Filter> portAndIpGuard(SettingsStore settings,
             @Value("${vibedock.admin-port}") int adminPort) {
