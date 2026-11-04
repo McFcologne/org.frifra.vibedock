@@ -1,1 +1,0 @@
-- **Bauhaus keeps its ochre dot:** the highlight dot is a protected colour in the palette reduction, so it no longer turns into the yellow of a neighbouring icon at 16 to 128 colors.
