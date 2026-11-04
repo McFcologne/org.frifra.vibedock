@@ -293,6 +293,7 @@ public class StatusImage {
         var primary=new LinkedHashSet<Integer>();
         for(int rgb:new int[]{scheme.background,scheme.title,scheme.text,scheme.muted,scheme.track,scheme.warning})primary.add(to565(rgb));
         if(scheme.style==Scheme.Style.BAUHAUS)primary.add(to565(ThemeArtwork.BAUHAUS_HIGHLIGHT));
+        if(scheme.style==Scheme.Style.MACOS)for(int rgb:MACOS_LIGHTS)primary.add(to565(rgb));
         var window=scheme.drawing.window();
         if(window!=null)for(int rgb:new int[]{window.surface(),window.titleBar(),window.titleText(),window.border(),window.highlight(),window.edgeLight(),window.edgeDark(),window.controls()})primary.add(to565(rgb));
         for(var area:barAreas){var bounds=area.intersection(new Rectangle(0,0,pw,ph));
@@ -540,6 +541,8 @@ public class StatusImage {
             g.drawString(status,cx-40-reserve-g.getFontMetrics().stringWidth(status),y+bar-6);}
     }
     /** macOS: rounded window with the red, yellow and green buttons, the title in the middle (left of the status). */
+    /** The window buttons are a few pixels of colour and part of every macOS window: the palette reduction protects them. */
+    private static final int[] MACOS_LIGHTS={0xff5f57,0xfebc2e,0x28c840};
     private static void macosWindow(Graphics2D g,Scheme scheme,String title,String status,int top,int x,int width,int height,Battery icon){
         var chrome=scheme.drawing.window();
         int y=top-19,bar=19;
@@ -547,8 +550,7 @@ public class StatusImage {
         g.setColor(new Color(chrome.surface()));g.fillRoundRect(x,y,width,height,2*chrome.radius(),2*chrome.radius());
         g.setColor(new Color(chrome.border()));g.drawRoundRect(x,y,width-1,height-1,2*chrome.radius(),2*chrome.radius());
         windowTitleBackground(g,chrome,x,y,width,height,bar);
-        int[] lights={0xff5f57,0xfebc2e,0x28c840};
-        for(int i=0;i<3;i++){g.setColor(new Color(lights[i]));g.fillOval(x+8+i*13,y+bar/2-4,9,9);}
+        for(int i=0;i<3;i++){g.setColor(new Color(MACOS_LIGHTS[i]));g.fillOval(x+8+i*13,y+bar/2-4,9,9);}
         g.setFont(new Font(scheme.font(),Font.BOLD,11));var metrics=g.getFontMetrics();int tw=metrics.stringWidth(title);
         // Centred; left beside the lights with a status, or when the battery icon leaves no room for the centred title.
         // A narrow window moves title and icon a little apart, nearer to the lights and the edge.
