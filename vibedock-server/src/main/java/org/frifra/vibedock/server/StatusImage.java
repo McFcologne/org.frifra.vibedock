@@ -180,7 +180,7 @@ public class StatusImage {
             case TERMINAL -> {
                 text(g,scheme,"> "+title.toUpperCase(Locale.ROOT),10,top,15,scheme.title,true);
                 if(status!=null)right(g,scheme,status,w-10-reserve,top,10,scheme.warning);
-                if(icon!=null)batteryIcon(g,icon,w-10,top-6,scheme.text,scheme.warning);
+                if(icon!=null)batteryIcon(g,icon,w-10,top-6,scheme.title,scheme.warning);
             }
             case MAC -> macWindow(g,scheme,title,status,top,4,w-9,height-(bottom?8:4),icon);
             case WINDOWS -> windowsWindow(g,scheme,title,status,top,4,w-8,height-(bottom?6:3),icon);
@@ -190,7 +190,7 @@ public class StatusImage {
             default -> {
                 if(!ThemeArtwork.heading(g,scheme,title,10,top,(status!=null?Math.min(w-20,w/2-12):w-20)-reserve,16))text(g,scheme,title,10,top,16,scheme.title,true);
                 if(status!=null)right(g,scheme,status,w-10-reserve,top,10,scheme.warning);
-                if(icon!=null)batteryIcon(g,icon,w-10-ThemeArtwork.cornerRoom(scheme),top-6,scheme.text,scheme.warning);
+                if(icon!=null)batteryIcon(g,icon,w-10-ThemeArtwork.cornerRoom(scheme),top-6,scheme.title,scheme.warning);
                 // Newsprint: a thin rule below the heading, like a column.
                 if(scheme.style==Scheme.Style.PRINT){g.setColor(new Color(scheme.text));g.fillRect(10,top+4,w-20,1);}
             }
@@ -331,7 +331,7 @@ public class StatusImage {
             default -> {
                 int reserve=icon==null?0:BATTERY_ROOM+ThemeArtwork.cornerRoom(scheme);
                 if(!ThemeArtwork.heading(g,scheme,title,6,top,w/2-12-reserve,10))text(g,scheme,(scheme.style==Scheme.Style.TERMINAL?"> ":"")+title,6,top,10,scheme.title,true);
-                if(icon!=null)batteryIcon(g,icon,w/2-6-ThemeArtwork.cornerRoom(scheme),top-4,scheme.text,scheme.warning);
+                if(icon!=null)batteryIcon(g,icon,w/2-6-ThemeArtwork.cornerRoom(scheme),top-4,scheme.title,scheme.warning);
             }
         }
         if(!p.status().equals("ok")){
@@ -385,7 +385,7 @@ public class StatusImage {
                 int room=w-20-titleWidth-8-reserve;
                 if(!ThemeArtwork.heading(g,scheme,title,10,top,(status!=null?Math.min(w-20,w/2-12):w-20)-reserve,13))text(g,scheme,terminal?"> "+title.toUpperCase(Locale.ROOT):title,10,top,13,scheme.title,true);
                 if(status!=null){status=fit(g,scheme,terminal?status.toUpperCase(Locale.ROOT):status,10,room);if(status!=null)right(g,scheme,status,w-10-reserve,top,10,scheme.warning);}
-                if(icon!=null)batteryIcon(g,icon,w-10-ThemeArtwork.cornerRoom(scheme),top-5,scheme.text,scheme.warning);
+                if(icon!=null)batteryIcon(g,icon,w-10-ThemeArtwork.cornerRoom(scheme),top-5,scheme.title,scheme.warning);
             }
         }
         if(p.period()!=null)miniWindow(g,scheme,p.period().equals("Month")?"30d":p.period(),p.week(),4,bars,w-8);
@@ -535,7 +535,7 @@ public class StatusImage {
         boolean tight=icon!=null&&titleEnd+6>cx-40-BATTERY_WIDTH;
         if(!tight){g.drawRect(cx-19,cy-3,6,6);g.drawLine(cx-34,cy,cx-28,cy);}
         int reserve=icon==null?0:BATTERY_ROOM;
-        if(icon!=null)batteryIcon(g,icon,tight?cx-10:cx-40,cy,chrome.controls(),scheme.warning);
+        if(icon!=null)batteryIcon(g,icon,tight?cx-10:cx-40,cy,chrome.titleText(),scheme.warning);
         status=fitStatus(g,scheme,status,cx-38-titleEnd-8-reserve);
         if(status!=null){g.setFont(new Font(scheme.font(),Font.PLAIN,9));g.setColor(new Color(scheme.warning));
             g.drawString(status,cx-40-reserve-g.getFontMetrics().stringWidth(status),y+bar-6);}
@@ -559,7 +559,7 @@ public class StatusImage {
         int tx=tight?x+46:status==null&&(icon==null||centre+tw+6<=x+width-8-BATTERY_WIDTH)?centre:x+50;
         g.setColor(new Color(chrome.titleText()));g.drawString(title,tx,y+bar-5);
         int reserve=icon==null?0:BATTERY_ROOM;
-        if(icon!=null)batteryIcon(g,icon,x+width-(tight?5:8),y+bar/2,chrome.controls(),scheme.warning);
+        if(icon!=null)batteryIcon(g,icon,x+width-(tight?5:8),y+bar/2,chrome.titleText(),scheme.warning);
         status=fitStatus(g,scheme,status,x+width-8-reserve-(tx+tw+8));
         if(status!=null){g.setFont(new Font(scheme.font(),Font.PLAIN,9));g.setColor(new Color(scheme.warning));
             g.drawString(status,x+width-8-reserve-g.getFontMetrics().stringWidth(status),y+bar-6);}
@@ -607,7 +607,7 @@ public class StatusImage {
         g.setColor(new Color(chrome.titleText()));g.drawString(title,tx,y+bar-4);
         // Narrow screens: the status is shortened to the room right of the title.
         int reserve=icon==null?0:BATTERY_ROOM;
-        if(icon!=null){g.setColor(new Color(chrome.titleBar()));g.fillRect(x+width-6-BATTERY_WIDTH-4,y+1,BATTERY_WIDTH+8,bar-1);batteryIcon(g,icon,x+width-6,y+bar/2,chrome.controls(),chrome.controls());}
+        if(icon!=null){g.setColor(new Color(chrome.titleBar()));g.fillRect(x+width-6-BATTERY_WIDTH-4,y+1,BATTERY_WIDTH+8,bar-1);batteryIcon(g,icon,x+width-6,y+bar/2,chrome.titleText(),chrome.titleText());}
         if(status!=null)status=fit(g,scheme,status,9,x+width-6-4-(tx+w+6)-4-reserve);
         if(status!=null){
             g.setFont(new Font(scheme.font(),Font.PLAIN,9));
