@@ -321,6 +321,24 @@ public class ClientRegistry {
         boolean match=MessageDigest.isEqual(given.getBytes(StandardCharsets.US_ASCII),stored.getBytes(StandardCharsets.US_ASCII));
         return match && state.devices().stream().anyMatch(d->d.identifier().equals(id));
     }
+    /**
+     * The token a display shows its page's image with: the server announces it with every pull, the browser sends it
+     * with /api/v1/clients/&lt;id&gt;/preview.png. It follows from the key's hash (never the key itself), so it needs no storage
+     * and changes with the key. It allows nothing but looking at the picture the display shows.
+     */
+    public synchronized String previewToken(String id){
+        String keyHash=find(id).keyHash();
+        try{
+            var digest=MessageDigest.getInstance("SHA-256").digest((id+":"+keyHash+":preview").getBytes(StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(digest,0,16);
+        }catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}
+    }
+    /** True when the token is the display's current one; false for an unknown display too (no hint which). */
+    public synchronized boolean previewAllowed(String id,String token){
+        if(token==null||!token.matches("[a-f0-9]{32}"))return false;
+        if(state.devices().stream().noneMatch(d->d.identifier().equals(id)&&d.web()==null))return false;
+        return MessageDigest.isEqual(token.getBytes(StandardCharsets.US_ASCII),previewToken(id).getBytes(StandardCharsets.US_ASCII));
+    }
     /** Records a pull; written to disk at most once a minute per client to spare the data directory. */
     public synchronized void pulled(String id,String peer) throws IOException {var c=find(id);pulled(id,peer,c.serverFooter(),c.firmware());}
     public synchronized void pulled(String id,String peer,boolean serverFooter) throws IOException {pulled(id,peer,serverFooter,find(id).firmware());}

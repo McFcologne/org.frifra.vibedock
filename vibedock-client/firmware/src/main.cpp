@@ -76,6 +76,9 @@ uint32_t lastPull = 0, lastImage = 0, lastFooter = 0, lastReconnect = 0;
 // The wait the server announced after the last pull (X-VibeDock-Next-Pull), 0: every poll interval. pending: it was
 // still asking a source of this display, so the picture may change shortly.
 uint32_t pullWaitMs = 0; bool pullPending = false;
+// The token the server announced for the picture on this display's page (X-VibeDock-Preview-Token, 32 hex digits): the
+// browser loads the picture from the server with it, the display does not relay it. Empty until the first answer.
+char previewToken[33] = "";
 uint32_t pullIntervalMs() { return pullWaitMs ? pullWaitMs : client_policy::clampPoll(pollSeconds) * 1000u; }
 // Pull in the next loop (or after delayMs); an announced wait no longer applies.
 void pullSoon(uint32_t delayMs = 0) { pullWaitMs = 0; lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u + delayMs; }
@@ -649,8 +652,22 @@ void pageStart(const String &subtitle) {
 }
 // A tiny live status for open browser pages; no image buffer or persistent socket on the device.
 const char PAGE_LIVE[] PROGMEM = R"JS((()=>{
-  const light=document.getElementById('ui-light'), image=document.querySelector('img.screen');
-  let version=image?.dataset.imageVersion, loading=false;
+  const light=document.getElementById('ui-light'), image=document.querySelector('img.screen'), note=document.getElementById('image-note');
+  // The picture comes from the server (addresses in data-previews, tried in turn), not through this display.
+  const urls=(image?.dataset.previews||'').split('|').filter(Boolean);
+  let version=image?.dataset.imageVersion, loading=false, index=0;
+  function show(v,start){
+    let n=0; loading=true;
+    const go=()=>{image.src=urls[(start+n)%urls.length]+'&v='+encodeURIComponent(v);};
+    image.onload=()=>{index=(start+n)%urls.length;version=v;loading=false;if(note)note.hidden=true;};
+    image.onerror=()=>{if(++n<urls.length)go();else{loading=false;if(note)note.hidden=false;}};
+    go();
+  }
+  if(image&&urls.length){
+    image.onerror=()=>show(version||'0',1);
+    const retry=document.getElementById('image-retry');
+    if(retry)retry.onclick=()=>{if(note)note.hidden=true;show(version||'0',index);};
+  }
   async function poll(){
     try {
       if(document.hidden||loading)return;
@@ -659,12 +676,7 @@ const char PAGE_LIVE[] PROGMEM = R"JS((()=>{
       const state=await response.json();
       light.media=state.dark?'not all':'all';
       const next=state.boot+':'+state.image;
-      if(image&&state.image&&version!==next){
-        loading=true;
-        image.onload=()=>{version=next;loading=false;};
-        image.onerror=()=>{loading=false;};
-        image.src='/image.bmp?v='+encodeURIComponent(next);
-      }
+      if(image&&urls.length&&state.image&&version!==next)show(next,index);
     }catch(e){}finally{setTimeout(poll,5000);}
   }
   setTimeout(poll,5000);
@@ -1178,7 +1190,7 @@ File *uploadFile = nullptr; String uploadRequest;
 int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
   if (!r.http.begin(*r.client, url)) return HTTPC_ERROR_CONNECTION_FAILED;
   const char *wanted[] = {"ETag", "X-VibeDock-Image-Format", "X-VibeDock-Poll-Seconds", "X-VibeDock-Tls-Pin", "X-VibeDock-Redraw", "X-VibeDock-Update", "x-MD5", "X-VibeDock-Length", "X-VibeDock-Send-Log", "X-VibeDock-Orientation",
-      "X-VibeDock-Base", "X-VibeDock-Check", "X-VibeDock-Payload", "X-VibeDock-Next-Pull", "X-VibeDock-UI"
+      "X-VibeDock-Base", "X-VibeDock-Check", "X-VibeDock-Payload", "X-VibeDock-Next-Pull", "X-VibeDock-UI", "X-VibeDock-Preview-Token"
 #ifdef VIBEDOCK_AUDIO_ES8311
       , "X-VibeDock-Quota"
 #endif
@@ -1459,6 +1471,11 @@ void pull() {
   if ((code == 200 || code == 304) && client_policy::parseNextPull(http.header("X-VibeDock-Next-Pull").c_str(), nextSeconds, nextPending)) {
     pullWaitMs = nextSeconds * 1000u; pullPending = nextPending; lastPull = millis();
   } else { pullWaitMs = 0; pullPending = false; }
+  if ((code == 200 || code == 304) && http.hasHeader("X-VibeDock-Preview-Token")) {
+    String token = http.header("X-VibeDock-Preview-Token"); bool valid = token.length() == 32;
+    for (uint8_t i = 0; valid && i < 32; i++) valid = isxdigit(token[i]);
+    if (valid) token.toCharArray(previewToken, sizeof(previewToken));
+  }
   if ((code == 200 || code == 304) && http.hasHeader("X-VibeDock-Orientation")) {
     uint8_t next = client_policy::turnsOf(http.header("X-VibeDock-Orientation").c_str(), turns, panel.width() == panel.height());
     if (next != turns) {
@@ -1716,12 +1733,23 @@ void colourCard() {
   uint16_t w = lastImageSize.width ? lastImageSize.width : 240, h = lastImageSize.height ? lastImageSize.height : 240;
   String &card = pageChunk; card.clear();
   card += F("<form action=\"/colours\" method=\"post\"><section class=\"card\"><h2>Display colours</h2>"
-      "<div style=\"display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start\"><figure style=\"margin:0;flex:none\"><img class=\"screen\" src=\"/image.bmp?t=");
-  card += millis(); card += F("\" data-image-version=\""); card += String(diag.boot) + ":" + String(imageRevision); card += F("\" width=\""); card += w; card += F("\" height=\""); card += h; card += F("\" style=\"width:"); card += w;
+      "<div style=\"display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start\"><figure style=\"margin:0;flex:none\"><img class=\"screen\"");
+  // Without a token (no answer from the server yet) there is no picture: the page says so below.
+  if (previewToken[0]) {
+    String path = String(F("/api/v1/clients/")) + identifier + F("/preview.png?t=") + previewToken;
+    card += F(" src=\""); card += html(servers[serverIndex] + path); card += F("&v=0\" data-previews=\"");
+    for (uint8_t i = 0; i < serverCount; i++) { uint8_t at = (serverIndex + i) % serverCount; if (i) card += '|'; card += html(servers[at] + path); }
+    card += '"';
+    sendChunk();
+  }
+  card += F(" data-image-version=\""); card += String(diag.boot) + ":" + String(imageRevision); card += F("\" width=\""); card += w; card += F("\" height=\""); card += h; card += F("\" style=\"width:"); card += w;
   card += F("px;height:"); card += h;
   sendChunk();
   card += F("px;max-width:100%;object-fit:contain;image-rendering:pixelated\" alt=\"Current image\">"
-      "<figcaption class=\"muted\">Uncorrected, as the server sends it. <a href=\"/\">Reload</a></figcaption></figure><div style=\"flex:1;min-width:200px\">");
+      "<figcaption class=\"muted\">Uncorrected, as the server sends it. <a href=\"/\">Reload</a></figcaption>"
+      "<p id=\"image-note\" class=\"muted\"");
+  if (previewToken[0]) card += F(" hidden");
+  card += F(">The picture comes from the server and is not reachable from this browser yet. <button type=\"button\" id=\"image-retry\">Retry</button></p></figure><div style=\"flex:1;min-width:200px\">");
   sendChunk();
   slider("gamma", F("Gamma (higher: darker mid tones)"), toneSettings.gamma, minGamma, maxGamma, 5, true);
   slider("red", F("Red"), toneSettings.red, minGain, maxGain, 1, false);
@@ -1767,32 +1795,6 @@ void saveColours() {
   if (web.hasArg("live")) { web.send(204, "text/plain", ""); return; }  // slider moved, the page stays
   web.sendHeader("Location", "/", true); web.send(303, "text/plain", "");
 }
-// The device keeps no copy of the image (too little RAM), so it fetches a fresh one from the server and
-// passes it on as a top-down 16-bit BMP (RGB565 bit fields); the server sends big-endian, BMP wants little-endian.
-void imagePage() {
-  if (mode != Mode::Paired) { web.send(404, "text/plain", String(F("Not paired"))); return; }
-  ImageRequest request; HTTPClient &http = request.http;
-  client_policy::ImageSize size;
-  if (requestImage(request, false) != 200 || !validImage(http, size)) { web.send(502, "text/plain", String(F("No image from the server"))); return; }
-  uint8_t head[66] = {'B', 'M'};
-  auto put = [&](int offset, uint32_t value, int bytes) { for (int i = 0; i < bytes; i++) head[offset + i] = value >> (8 * i); };
-  // BMP rows are padded to 4 bytes: odd widths get 2 extra bytes per row.
-  const uint32_t row = 2u * size.width, padded = (row + 3) & ~3u, data = padded * size.height;
-  put(2, sizeof(head) + data, 4); put(10, sizeof(head), 4); put(14, 40, 4); put(18, size.width, 4); put(22, uint32_t(-int32_t(size.height)), 4);
-  put(26, 1, 2); put(28, 16, 2); put(30, 3, 4); put(34, data, 4); put(38, 2835, 4); put(42, 2835, 4);
-  put(54, 0xF800, 4); put(58, 0x07E0, 4); put(62, 0x001F, 4);
-  web.sendHeader("Cache-Control", "no-store");
-  web.setContentLength(sizeof(head) + data);
-  web.send(200, "image/bmp", "");
-  web.sendContent((const char *)head, sizeof(head));
-  readRows(http.getStreamPtr(), size, [&](int, uint8_t *bytes) {
-    for (uint32_t i = 0; i < row; i += 2) std::swap(bytes[i], bytes[i + 1]);
-    web.sendContent((const char *)bytes, row);
-    if (padded != row) web.sendContent("\0\0", padded - row);
-    return web.client().connected();
-  }, 15000);
-  http.end();
-}
 // The server asks for an immediate pull, e.g. after a design change. No data: the pull itself is authenticated.
 uint32_t lastPullRequest = 0, lastUiRequest = 0;
 void handlePullRequest() {
@@ -1826,7 +1828,6 @@ void handlePullRequest() {
 void startPairingServer() {
   web.on("/", HTTP_GET, statusPage);
   serveIcons(); serveUi();
-  web.on("/image.bmp", HTTP_GET, imagePage);
   web.on("/colours", HTTP_POST, saveColours);
 #ifdef VIBEDOCK_AUDIO_ES8311
   web.on("/audio", HTTP_POST, saveAudio);
