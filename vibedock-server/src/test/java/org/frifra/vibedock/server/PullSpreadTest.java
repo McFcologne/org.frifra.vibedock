@@ -1,0 +1,43 @@
+package org.frifra.vibedock.server;
+
+import org.junit.jupiter.api.Test;
+import java.util.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+/** Several displays do not pull in the same second: fixed steps, the order drawn anew every round. */
+class PullSpreadTest {
+    @Test void aRoundGivesEveryDisplayAnotherStepInRisingSteps(){
+        var spread=new PullSpread(new Random(7));
+        var offsets=new TreeSet<Integer>();
+        for(String d:List.of("a","b","c","d","e","f"))offsets.add(spread.offset(d,60,6));
+        assertEquals(new TreeSet<>(List.of(0,2,4,6,8,10)),offsets,"six displays: steps of two seconds up to ten");
+    }
+    @Test void theOrderIsDrawnAnewEveryRound(){
+        var spread=new PullSpread(new Random(3));var orders=new HashSet<List<String>>();
+        for(int round=0;round<12;round++){
+            var order=new ArrayList<String>();var seen=new HashMap<String,Integer>();
+            for(String d:List.of("a","b","c","d")){seen.put(d,spread.offset(d,60,4));}
+            seen.entrySet().stream().sorted(Map.Entry.comparingByValue()).forEach(e->order.add(e.getKey()));
+            orders.add(order);
+        }
+        assertTrue(orders.size()>3,"different orders: "+orders.size());
+    }
+    @Test void aDisplayThatAsksAgainStartsANewRound(){
+        var spread=new PullSpread(new Random(1));
+        int first=spread.offset("a",60,3);spread.offset("b",60,3);
+        // "a" asks again before "c" did: its round is over, the slots are free again.
+        spread.offset("a",60,3);
+        int third=spread.offset("c",60,3);
+        assertTrue(third>=0&&third<=10);assertTrue(first>=0&&first<=10);
+    }
+    @Test void aSingleDisplayAndShortIntervalsGetNothing(){
+        var spread=new PullSpread(new Random(1));
+        assertEquals(0,spread.offset("a",60,1));assertEquals(0,spread.offset("a",60,0));
+        assertEquals(0,spread.offset("a",19,5));assertEquals(0,spread.offset("b",2,5));
+    }
+    @Test void moreDisplaysThanSlotsStillStayWithinTenSeconds(){
+        var spread=new PullSpread(new Random(5));
+        for(int i=0;i<40;i++){int o=spread.offset("d"+(i%25),60,25);assertTrue(o>=0&&o<=10,"offset "+o);}
+        assertEquals(1,Math.max(1,PullSpread.MAX_OFFSET/24));
+    }
+}

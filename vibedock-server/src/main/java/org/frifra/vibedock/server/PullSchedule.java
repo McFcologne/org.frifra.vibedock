@@ -24,6 +24,10 @@ class PullSchedule {
     private final UsageService usage;private final DesignService designs;private final ClientRegistry registry;private final DevicePoke poke;
     private final java.time.Clock clock;
     private final Map<String,Integer> pendingInRow=new ConcurrentHashMap<>();
+    /** Spreads the pulls of several displays over a few seconds; replaceable for tests. */
+    PullSpread spread=new PullSpread(new Random());
+    /** A display that pulled within this many seconds counts for the spread. */
+    static final long ACTIVE_WITHIN=900;
     PullSchedule(UsageService usage,DesignService designs,ClientRegistry registry,DevicePoke poke,java.time.Clock clock){
         this.usage=usage;this.designs=designs;this.registry=registry;this.poke=poke;this.clock=clock;
     }
@@ -46,7 +50,14 @@ class PullSchedule {
         long at=schedule.at();
         Long boundary=designs.nextPhotoBoundary(design);if(boundary!=null)at=Math.min(at,boundary+1);
         long wait=at==Long.MAX_VALUE?limit:at-now;
-        return current(device,(int)Math.max(MIN_SECONDS,Math.min(limit,wait)),preview);
+        int seconds=(int)Math.max(MIN_SECONDS,Math.min(limit,wait));
+        return current(device,preview?seconds:seconds+spread.offset(device,seconds,pulling(now)),preview);
+    }
+    /** How many paired displays pull right now (the status page's copies and web displays do not count). */
+    private int pulling(long now){
+        int count=0;
+        for(var v:registry.views())if(v.web()==null&&v.lastPullAt()!=null&&now-v.lastPullAt()<=ACTIVE_WITHIN)count++;
+        return count;
     }
     private Next current(String device,int seconds,boolean preview){
         if(!preview)pendingInRow.remove(device);
