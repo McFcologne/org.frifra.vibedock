@@ -2,6 +2,32 @@
 
 The release workflow publishes the section of the tagged version (`## 0.1.0` for the tag `v0.1.0` or `0.1.0`) above the list of commits that GitHub generates.
 
+## 0.5.0
+
+The displays now report what they measure, and the administration shows it as curves and a table. Several displays no
+longer pull in the same second, the status page of a display loads its picture straight from the server, and the
+VibeTV Classic shows its status page completely. Update the server image first; everything below except the measured
+values, the status page picture, the complete status page and the faster retry works with the firmware displays
+already run. Those four need the new firmware: update the displays over Wi-Fi from the administration. The status
+page of a display shows its picture after its first pull following the update.
+
+### Administration
+
+- **Measured values of the displays:** displays send memory, Wi-Fi signal, picture time, battery voltage and how long the backlight was dimmed with every pull in one short header (`X-VibeDock-Metrics`, `CLIENT-PROTOCOL.md` 3i). The server keeps one sample every 5 minutes for 30 days. *Logs → Metrics* shows memory, Wi-Fi and battery curves and a table, the key figures of a log include the samples in its time, the support file has them as `samples`, and `/admin/metrics.csv` exports them as CSV (filter by display and period). Needs firmware newer than 0.4.2.
+- **Battery simulation in the design preview:** a checkbox with a level (unknown, 100, 60, 20, 10 %) shows the battery icon in the preview of the design page, to see how it looks in a theme. Nothing is saved.
+
+### Displays and images
+
+- **Displays no longer pull in the same second:** with several displays the announced time to the next pull gets up to 10 s on top, in fixed steps with a random order that is drawn anew every round (`CLIENT-PROTOCOL.md` 3h). Not for `pending` answers, slideshows, single displays or intervals under 20 s.
+- **Picture on the display's status page straight from the server:** the display no longer fetches and relays the picture for its page (`/image.bmp` is gone, which saves memory and time on the VibeTV Classic). The server announces a token with every pull, the page loads `/api/v1/clients/<id>/preview.png?t=<token>` from the server, tries the second server address when the first does not load, and offers *Retry* (`CLIENT-PROTOCOL.md` 3j). The picture appears after the display's first pull following the update.
+- **Device status page complete on the VibeTV Classic:** the page is sent in slices of 256 bytes and built piece by piece in one buffer. When the Wi-Fi took only part of a write, the page used to break off or show the chunk sizes as text. A new row shows the free memory and the largest free block.
+- **Battery icon in the colour of the title text:** on a display that runs on its battery, the icon at the top right is drawn in the colour of the window title (or heading) instead of the body text or the window controls, so it reads like part of the title bar in every theme.
+- **Faster retry when the server does not answer:** over plain http a display waits 3 s instead of 5 s for the answer to a pull before it retries (the log shows `read Timeout, TCP ... works, no HTTP answer` on a weak connection). https is unchanged.
+
+### Development
+
+- **Checks run once per change:** the checks run for pull requests and for pushes to `main` and `release/**` only, so a push to a branch with an open pull request no longer starts them twice, and a new push to a pull request cancels its running check.
+
 ## 0.4.2
 
 Fixes for signing in to the administration after hours and for two themes whose small colour accents got lost on the

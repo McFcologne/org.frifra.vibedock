@@ -31,7 +31,7 @@ git tag vX.Y.Z  ──push──▶  GitHub Actions: Release VibeDock (.github/w
                               │                  from docs/DOCKERHUB.md (with the secrets below)
                               ├─ firmware  → vibedock-<board>-<version>.bin for every board
                               └─ release   → GitHub release (draft, files uploaded, then published)
-push / pull request  ──────▶  GitHub Actions: Verify VibeDock (.github/workflows/verify.yml), check server-and-browser
+push to main / release/**, pull request  ──▶  GitHub Actions: Verify VibeDock (.github/workflows/verify.yml), check server-and-browser
 ```
 
 - The **version** comes from the Git tag (`vibedock-server/scripts/version.sh`); `v0.1.0` and `0.1.0` both work. The

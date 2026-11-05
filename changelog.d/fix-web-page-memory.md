@@ -1,1 +1,0 @@
-- **Device status page complete on the VibeTV Classic:** the page is sent in slices of 256 bytes and built piece by piece in one buffer. When the Wi-Fi took only part of a write, the page used to break off or show the chunk sizes as text. A new row shows the free memory and the largest free block.

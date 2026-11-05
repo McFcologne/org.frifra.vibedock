@@ -1,1 +1,0 @@
-- **Faster retry when the server does not answer:** over plain http a display waits 3 s instead of 5 s for the answer to a pull before it retries (the log shows `read Timeout, TCP ... works, no HTTP answer` on a weak connection). https is unchanged.

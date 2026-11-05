@@ -77,3 +77,22 @@ Needs firmware newer than 0.1.1; displays with older firmware keep the USB way. 
   phase, but a panic's backtrace is only printed on the serial port. A core dump would need its own flash partition:
   a separate change of the partition table, not part of this step. Decoding needs the ELF of the exact build
   (`ELF_OUT` in `scripts/images.sh`).
+
+## Step 5 – measured values over time (implemented)
+
+- With every pull, firmware newer than 0.4.2 sends `X-VibeDock-Metrics` (`CLIENT-PROTOCOL.md` 3i): memory (free, lowest
+  since the last request, largest block, after a TLS handshake and its stack), the time of the last picture, Wi-Fi
+  signal and drops, battery voltage, brightness and the seconds the display was active and dimmed. The version comes
+  first and the order never changes; an empty field was not measured; units are fixed (memory in 100 bytes, time in
+  100 ms, voltage in 10 mV, all hex).
+- The server (`DeviceMetrics`) keeps one sample per display every 5 minutes and with every new start, for 30 days, in
+  `data/device-logs/<identifier>/metrics.jsonl`, one JSON line each. A sample carries the lowest free memory of all pulls
+  since the sample before, so a dip between two samples is not lost. Unreadable lines and samples older than 30 days are
+  dropped when the file is rewritten.
+- *Devices › Logs › Metrics* (`/admin/clients/{id}/metrics?hours=6|24|72|168|720`) draws memory, Wi-Fi and battery
+  curves as inline SVG (`MetricsChart`, a dashed line per restart) and a table of the newest samples.
+  `GET /admin/metrics.csv` (`MetricsCsv`) exports them: comma, dot decimals, the unit in the column name, UTC and local
+  time, firmware and reason of the start; filters `device`, `from`, `to`, `raw`. Text cells that could start a
+  spreadsheet formula (`=`, `+`, `-`, `@`, tab, carriage return, also after leading white space) get a leading `'`.
+- The key figures of a log (`DeviceLogTimeline.figures`) count the samples of the log's period as well, and the support
+  file carries them as `samples`. Older firmware sends nothing; nothing depends on it.
