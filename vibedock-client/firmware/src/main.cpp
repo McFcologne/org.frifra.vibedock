@@ -1231,7 +1231,9 @@ int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
   r.http.collectHeaders(wanted, sizeof(wanted)/sizeof(wanted[0]));
   // HTTP/1.0: a reverse proxy (Synology) then cannot answer chunked; the body ends with the connection or its length.
   r.http.useHTTP10(true);
-  r.http.setTimeout(r.verified ? 15000 : 5000);
+  // Plain http to the server answers within milliseconds when it answers at all (the picture rows have their own, longer
+  // timeout): a request that gets no answer within 3 s is retried instead of waiting 5 s (https: the handshake takes longer).
+  r.http.setTimeout(r.verified ? 15000 : url.startsWith("https") ? 5000 : 3000);
   r.http.addHeader("Accept-Encoding", "identity");  // never compressed: the image is read byte for byte  // over TLS 1.3 a 16 kB record has to arrive whole before any byte reads r.http.setReuse(false);
   r.http.addHeader("Authorization", String(F("Bearer ")) + key);
   r.http.addHeader("X-VibeDock-Device-IP", WiFi.localIP().toString());  // the server may only see a NAT gateway
