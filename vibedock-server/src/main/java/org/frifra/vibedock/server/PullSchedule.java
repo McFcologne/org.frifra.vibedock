@@ -51,7 +51,7 @@ class PullSchedule {
         Long boundary=designs.nextPhotoBoundary(design);if(boundary!=null)at=Math.min(at,boundary+1);
         long wait=at==Long.MAX_VALUE?limit:at-now;
         int seconds=(int)Math.max(MIN_SECONDS,Math.min(limit,wait));
-        return current(device,preview?seconds:seconds+spread.offset(device,seconds,pulling(now)),preview);
+        return current(device,preview?seconds:spread.announce(device,seconds,limit,pulling(now)),preview);
     }
     /** How many paired displays pull right now (the status page's copies and web displays do not count). */
     private int pulling(long now){

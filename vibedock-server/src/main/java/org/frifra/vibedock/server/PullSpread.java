@@ -14,9 +14,20 @@ final class PullSpread {
     static final int MAX_OFFSET=10,MIN_INTERVAL=20;
     private final Random random;private final Map<String,Integer> slots=new HashMap<>();private int roundSize;
     PullSpread(Random random){this.random=random;}
+    /** Whether displays get a step at all: several displays and an interval of at least {@value #MIN_INTERVAL} s. */
+    static boolean spreads(int seconds,int devices){return seconds>=MIN_INTERVAL&&devices>=2;}
+    /**
+     * The interval to announce: the interval plus the display's step, but never more than {@code limit}. Where displays
+     * are spread, the interval itself is held {@value #MAX_OFFSET} s below the limit, so below it every display keeps
+     * its own step.
+     */
+    synchronized int announce(String device,int seconds,int limit,int devices){
+        int base=spreads(seconds,devices)?Math.min(seconds,limit-MAX_OFFSET):seconds;
+        return base+offset(device,seconds,devices);
+    }
     /** The seconds to add for a display that is announced an interval of {@code seconds}; devices: how many displays pull. */
     synchronized int offset(String device,int seconds,int devices){
-        if(seconds<MIN_INTERVAL||devices<2)return 0;
+        if(!spreads(seconds,devices))return 0;
         if(devices!=roundSize){slots.clear();roundSize=devices;}  // other displays: a new round
         Integer kept=slots.get(device);
         if(kept!=null){

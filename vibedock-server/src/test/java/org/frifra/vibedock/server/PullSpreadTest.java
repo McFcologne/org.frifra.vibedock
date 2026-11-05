@@ -57,4 +57,16 @@ class PullSpreadTest {
         for(int i=0;i<40;i++){int o=spread.offset("d"+(i%25),60,25);assertTrue(o>=0&&o<=10,"offset "+o);}
         assertEquals(1,Math.max(1,PullSpread.MAX_OFFSET/24));
     }
+    @Test void theAnnouncedTimeNeverPassesTheLimitAndTheStepsStayApart(){
+        for(int limit:new int[]{120,600})for(int seconds:new int[]{20,115,120,300,600}){
+            var spread=new PullSpread(new Random(limit+seconds));var announced=new TreeSet<Integer>();
+            for(String d:List.of("a","b","c")){
+                int next=spread.announce(d,Math.min(seconds,limit),limit,3);
+                assertTrue(next<=limit,"limit "+limit+", interval "+seconds+": "+next);announced.add(next);
+            }
+            assertEquals(3,announced.size(),"three displays, three different times at limit "+limit+", interval "+seconds);
+        }
+        assertEquals(60,new PullSpread(new Random(1)).announce("a",60,120,1),"a single display keeps its interval");
+        assertEquals(5,new PullSpread(new Random(1)).announce("a",5,120,3),"short intervals stay as they are");
+    }
 }
