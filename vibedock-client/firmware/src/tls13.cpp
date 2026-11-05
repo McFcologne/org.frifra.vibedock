@@ -77,6 +77,7 @@ String &lastError() { static String text; return text; }
 bool &versionRefused() { static bool refused = false; return refused; }
 // Heap Mbed TLS holds now and at most during the last connection: the ESP8266 has little to spare.
 size_t used = 0, peak = 0;
+uint32_t afterHeap = 0, stackBytes = 0;
 size_t sent = 0, received = 0, records = 0; int lastRead = 0;  // traffic after the handshake
 size_t recordHave = 0, recordWant = 0; int tcpWaiting = 0; uint32_t lastByte = 0;  // where reading stands
 size_t failed = 0, failedLargest = 0;  // allocations Mbed TLS did not get during the handshake
@@ -269,7 +270,8 @@ int Tls13Client::open(const String &host, IPAddress ip, uint16_t port, bool byNa
   }
   tls13::handshaking = false;
   String timing = String(F(" after ")) + String(millis() - started) + F(" ms (") + String(computing) + F(" computing, step ") + String(ssl_.state) + ")";
-  String stack = String(F(", stack ")) + String(stackUsed()) + "/" + String(STACK_WORDS * 4);
+  tls13::stackBytes = stackUsed();
+  String stack = String(F(", stack ")) + String(tls13::stackBytes) + "/" + String(STACK_WORDS * 4);
   if (code) {
     tls13::versionRefused() = code == MBEDTLS_ERR_SSL_BAD_PROTOCOL_VERSION;
     String alert;
@@ -298,6 +300,7 @@ int Tls13Client::open(const String &host, IPAddress ip, uint16_t port, bool byNa
   mbedtls_x509_crt_free(&ca_);
   ready_ = true; tls13::sent = tls13::received = tls13::records = 0; tls13::lastRead = 0; tls13::lastByte = millis();
   tls13::recordHave = tls13::recordWant = 0; tls13::tcpWaiting = 0;
+  tls13::afterHeap = ESP.getFreeHeap();
   String after = ", " + tls13::heapText() + F(" free after");
   tls13::lastSuccess() = String("TLS 1.3 ") + (pin_ ? "pinned " : "full check ") + mbedtls_ssl_get_ciphersuite(&ssl_) + timing + F("; heap ")
       + heapBefore + F(", TLS ") + String(tls13::peak) + stack + after;

@@ -12,6 +12,19 @@ int main(){
   using namespace client_policy;
   assert(percentEncoded("FRIFRA")=="FRIFRA"&&percentEncoded("a;b=c d")=="a%3Bb%3Dc%20d"&&percentEncoded("Caf\xc3\xa9")=="Caf%C3%A9");
   {
+    // X-VibeDock-Metrics: version first, empty = not measured, hex units as documented in client_policy.h.
+    Metrics m;m.up=3600;m.freeBytes=23584;m.lowestBytes=22904;m.blockBytes=16560;m.afterTlsBytes=11808;m.tlsStackBytes=1460;m.pictureMs=1467;
+    m.hasRssi=true;m.rssi=-58;m.drops=3;m.millivolts=3940;m.brightness=60;m.activeSeconds=3000;m.dimmedSeconds=600;
+    char text[96];size_t n=metricsHeader(text,sizeof(text),m);
+    assert(std::string(text)=="1;3600;eb;e5;a5;76;e;e;-3a;3;18a;60;3000;600"&&n==strlen(text));
+    Metrics none;none.up=5;n=metricsHeader(text,sizeof(text),none);
+    assert(std::string(text)=="1;5;;;;;;;;0;;;0;0"&&n==strlen(text));
+    m.rssi=0;m.hasRssi=true;m.millivolts=-1;m.brightness=-1;metricsHeader(text,sizeof(text),m);
+    assert(std::string(text).find(";e;0;3;;;3000;600")!=std::string::npos);
+    char small[12];n=metricsHeader(small,sizeof(small),m);assert(n==strlen(small)&&n<=11);
+    assert(metricsHeader(small,0,m)==0);
+  }
+  {
     ImageSize size;assert(parseImageFormat("rgb565-delta-be-16x16",size,true));
     assert(!parseImageFormat("rgb565-delta-be-16x16",size));
     uint32_t parsed;assert(parseHash("0776765d",parsed)&&parsed==0x0776765d);

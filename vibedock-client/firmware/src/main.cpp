@@ -100,12 +100,42 @@ void diagPhase(Phase phase) { if (diag.phase != uint8_t(phase)) { diag.phase = u
 struct PhaseScope { uint8_t before; explicit PhaseScope(Phase phase) : before(diag.phase) { diagPhase(phase); } ~PhaseScope() { diagPhase(Phase(before)); } };
 // Before restarting on purpose: the next start is then this intent, not an unexpected restart.
 void diagIntent(Intent intent) { diag.intent = uint8_t(intent); diagWrite(); }
+// ---- metrics: X-VibeDock-Metrics with every request (see client_policy::Metrics) ----
+// Lowest free heap since the last request, last picture read time, battery voltage while on battery, and how long the
+// backlight was dimmed (a display left alone) against fully lit; all seconds since the start.
+uint32_t metricLowest = UINT32_MAX, dimmedMs = 0, dimmedSince = 0, batteryMv = 0;
+int32_t metricPictureMs = -1;
+void metricSample() { uint32_t heap = ESP.getFreeHeap(); if (heap < metricLowest) metricLowest = heap; }
+void metricDimmed(bool on) {
+  if (on) dimmedSince = millis(); else dimmedMs += millis() - dimmedSince;
+}
 void diagSample() {
+  metricSample();
   uint32_t heap = ESP.getFreeHeap(); if (heap < heapLow) heapLow = heap;
   uint32_t low = platform::minFreeHeap();
   diag.uptime = millis() / 1000; diag.heapFree = heap; diag.heapMin = low ? low : heapLow;
   diag.rssi = WiFi.status() == WL_CONNECTED ? int8_t(constrain(WiFi.RSSI(), -127, 0)) : 0;
   diagWrite();
+}
+String metricsHeader() {
+  metricSample();
+  client_policy::Metrics m;
+  uint32_t now = millis(), dimmed_ms = dimmedMs + (dimmed ? now - dimmedSince : 0);
+  m.up = now / 1000; m.freeBytes = ESP.getFreeHeap(); m.lowestBytes = metricLowest;
+#if defined(ESP8266)
+  m.blockBytes = ESP.getMaxFreeBlockSize();
+  if (tls13::afterHeap) m.afterTlsBytes = tls13::afterHeap;
+  if (tls13::stackBytes) m.tlsStackBytes = tls13::stackBytes;
+#else
+  m.blockBytes = ESP.getMaxAllocHeap();
+#endif
+  m.pictureMs = metricPictureMs;
+  if (WiFi.status() == WL_CONNECTED) { m.hasRssi = true; m.rssi = constrain(WiFi.RSSI(), -127, 0); }
+  m.drops = diag.drops; m.millivolts = batteryMv ? int32_t(batteryMv) : -1; m.brightness = brightness;
+  m.dimmedSeconds = dimmed_ms / 1000; m.activeSeconds = m.up > m.dimmedSeconds ? m.up - m.dimmedSeconds : 0;
+  metricLowest = UINT32_MAX;  // the next request reports its own lowest
+  char text[96]; client_policy::metricsHeader(text, sizeof(text), m);
+  return text;
 }
 void diagBegin() {
   client_policy::DiagRecord stored{};
@@ -1212,6 +1242,7 @@ int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
   r.http.addHeader("X-VibeDock-Display", String(panel.width()) + "x" + String(panel.height()));  // suggests the display type
   r.http.addHeader("X-VibeDock-Board", VIBEDOCK_BOARD);  // which firmware build an update needs
   r.http.addHeader("X-VibeDock-Diag", diagHeader());  // start, run time, memory, Wi-Fi (older servers ignore it)
+  r.http.addHeader("X-VibeDock-Metrics", metricsHeader());  // the measured values of this pull, see client_policy::Metrics
   // Updates over Wi-Fi: "1" with the server's signing key, "no-key" when paired before the server sent one.
   r.http.addHeader("X-VibeDock-Ota", platform::hasOtaKey() ? "1" : "no-key");
   if (!updateError.isEmpty()) r.http.addHeader("X-VibeDock-Update-Error", updateError);
@@ -1533,6 +1564,7 @@ void pull() {
       ++imageRevision;
       lastImageSize=size;deltaReady=size.width==panel.width()&&size.height==panel.height();
       etag = http.header("ETag"); lastImage = millis(); haveImage = true; staleScreen = false; footer(); imageFailures = 0; resuming = false;
+      metricPictureMs = millis() - reading; metricSample();
       if (first) logEvent(String(F("Image shown, read in ")) + String(millis() - reading) + " ms", true);
     } else {
       pullWaitMs = client_policy::waitAfterImage(false, pullWaitMs); pullPending = false;
@@ -2068,7 +2100,7 @@ void setup() {
 bool powerWake() {
   lastActivity = millis();
   if (!dimmed) return false;
-  dimmed = false; platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness);
+  metricDimmed(false); dimmed = false; platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness);
   return true;
 }
 void setPowerSaving(bool on) {
@@ -2091,6 +2123,7 @@ void powerPoll() {
     auto reading = battery::read();
     bool charging = strcmp(reading.chargeSignal, "active") == 0 || strcmp(reading.chargeSignal, "unstable") == 0;
     batteryLevel = reading.supported ? reading.estimatedPercent : -1;
+    batteryMv = reading.supported && powerSource.battery ? reading.millivolts : 0;  // only reported while running on the battery
     if (powerSource.update(client_policy::onBattery(battery::usbHost(), charging))) {
       logEvent(powerSource.battery ? F("Power: battery") : F("Power: USB or charging"), true);
       // The battery icon in the image appears or goes away with the next image, right away.
@@ -2099,7 +2132,7 @@ void powerPoll() {
     setPowerSaving(powerSavingAllowed && powerSource.battery && mode == Mode::Paired);
   }
   if (powerSaving && !dimmed && client_policy::dimDue(millis(), lastActivity)) {
-    dimmed = true; platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, client_policy::dimmedBrightness(brightness));
+    dimmed = true; metricDimmed(true); platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, client_policy::dimmedBrightness(brightness));
   }
 #endif
 }
