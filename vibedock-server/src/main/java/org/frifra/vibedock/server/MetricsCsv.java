@@ -22,20 +22,24 @@ final class MetricsCsv {
         var cells=new ArrayList<String>();
         cells.add(DateTimeFormatter.ISO_INSTANT.format(at.truncatedTo(java.time.temporal.ChronoUnit.SECONDS)));
         cells.add(DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(at.truncatedTo(java.time.temporal.ChronoUnit.SECONDS).atZone(zone)));
-        cells.add(device);cells.add(context.name());cells.add(context.firmware());cells.add(context.reason());cells.add(s.boot());
+        cells.add(cell(device));cells.add(cell(context.name()));cells.add(cell(context.firmware()));cells.add(cell(context.reason()));cells.add(cell(s.boot()));
         cells.add(text(s.up()));cells.add(tenths(s.freeBytes(),1000));cells.add(tenths(s.lowestBytes(),1000));cells.add(tenths(s.blockBytes(),1000));
         cells.add(tenths(s.afterTlsBytes(),1000));cells.add(tenths(s.tlsStackBytes(),1000));cells.add(tenths(s.pictureMs(),1000));
         cells.add(text(s.rssi()));cells.add(text(s.drops()));cells.add(text(s.millivolts()));cells.add(text(s.brightness()));
         cells.add(text(s.activeSeconds()));cells.add(text(s.dimmedSeconds()));
-        if(raw)cells.add(s.raw());
-        out.append(String.join(",",cells.stream().map(MetricsCsv::cell).toList())).append("\r\n");
+        if(raw)cells.add(cell(s.raw()));
+        out.append(String.join(",",cells)).append("\r\n");
     }
     static String text(Number n){return n==null?"":n.toString();}
     static String tenths(Integer value,int unit){return value==null?"":String.format(Locale.ROOT,"%.1f",value/(double)unit);}
-    /** A cell, quoted when it holds a comma, a quote or a line break; never null. Spreadsheet formulas are not started by a cell. */
+    /** Characters that start a formula in a spreadsheet (after leading white space; a tab or a carriage return at the start counts too). */
+    private static final String FORMULA_START="=+-@\t\r";
+    /** A text cell (names and the like, which a user can choose): quoted when needed and never the start of a spreadsheet formula. Never null. */
     static String cell(String value){
         if(value==null)return "";
-        String text=value.startsWith("=")||value.startsWith("+")||value.startsWith("@")?"'"+value:value;
+        String stripped=value.stripLeading();
+        boolean formula=!stripped.isEmpty()&&FORMULA_START.indexOf(stripped.charAt(0))>=0||!value.isEmpty()&&FORMULA_START.indexOf(value.charAt(0))>=0;
+        String text=formula?"'"+value:value;
         return text.contains(",")||text.contains("\"")||text.contains("\n")||text.contains("\r")?"\""+text.replace("\"","\"\"")+"\"":text;
     }
 }

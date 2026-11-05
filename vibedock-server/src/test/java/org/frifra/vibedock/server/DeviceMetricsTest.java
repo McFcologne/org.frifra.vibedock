@@ -100,6 +100,17 @@ class DeviceMetricsTest {
         assertEquals("1970-01-01T00:00:01Z,1970-01-01T00:00:01Z,vibedock-0a1b2c000030,,,,,5,,,,,,,,0,,,0,0,1;5;;;;;;;;0;;;0;0",lines[2]);
         assertFalse(MetricsCsv.header(false).contains("raw"));
     }
+    @Test void textCellsNeverStartAFormulaButNumbersStayNumbers(){
+        for(String name:new String[]{"=1+1","+1","-1+cmd|' /C calc'!A0","@SUM(A1)","\t=1"," =1","  -2","\r=1","\n=1 ","\t"})
+            assertTrue(MetricsCsv.cell(name).replace("\"","").startsWith("'"),"neutralised: "+name.replace("\t","<tab>").replace("\r","<cr>").replace("\n","<lf>"));
+        for(String name:new String[]{"Kitchen","a-b","1-2","","x=y"," ok"})
+            assertFalse(MetricsCsv.cell(name).startsWith("'"),"left alone: "+name);
+        assertEquals("",MetricsCsv.cell(null));
+        var out=new StringBuilder();
+        MetricsCsv.row(out,"vibedock-0a1b2c000030",DeviceMetrics.parse(FULL,1_000,"0000beef"),new MetricsCsv.Context("-1+cmd","0.4.3","power-on"),ZoneOffset.UTC,false);
+        assertTrue(out.toString().contains(",\"'-1+cmd\"")||out.toString().contains(",'-1+cmd,"),out.toString());
+        assertTrue(out.toString().contains(",-58,"),"the signal stays a number");
+    }
     @Test void keyFiguresAlsoCountWhatTheSamplesMeasured(){
         var samples=List.of(DeviceMetrics.parse("1;10;f0;50;a0;60;20;20;-32;0;;;1;0",1,null),DeviceMetrics.parse("1;70;f0;a0;a0;70;10;30;-46;0;;;1;0",2,null));
         var withLog=DeviceLogTimeline.figures(List.of("+3s Wi-Fi X: 192.168.1.2, -60 dBm, heap 20000"),samples);
