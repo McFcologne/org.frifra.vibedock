@@ -529,3 +529,15 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 
 .image-color-scroll{overflow-x:auto}.image-color-table{width:100%;max-width:760px;min-width:540px;border-spacing:8px 6px;margin-left:-8px}.image-color-table th{text-align:left;font-size:13px;color:var(--muted);font-weight:600;padding:0 0 4px}.image-color-table td{vertical-align:middle}.image-color-table input,.image-color-table select{width:100%;min-width:0;margin:0}.image-color-table td:last-child{white-space:nowrap;width:160px}
 .color-test-controls{position:sticky;top:110px;z-index:3}.color-test-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--color-card-width,240px)),1fr));gap:16px}.color-test-grid .card{padding:12px;min-width:0}.color-test-grid h3{display:flex;align-items:center;gap:6px;font-size:15px;margin:0 0 8px;min-width:0}.color-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.color-palette{flex:none;border:1px solid var(--line);border-radius:5px;padding:1px 5px;color:var(--primary);font-size:12px;line-height:18px;font-variant-numeric:tabular-nums;font-weight:700;background:var(--card-2)}.color-test-image{overflow:hidden;margin-bottom:8px}.color-test-image img{display:block;max-width:none;margin:0 auto}.color-test-grid small{line-height:1.6;overflow-wrap:anywhere}@media(max-width:700px){.color-test-controls{position:static}}
+
+/* Device metrics: curves as inline SVG */
+.metric-chart{width:100%;height:auto;display:block}
+.metric-chart .grid{stroke:var(--line);stroke-width:1}
+.metric-chart .axis{fill:var(--muted);font-size:10px}
+.metric-chart .restart{stroke:var(--warn);stroke-width:1;stroke-dasharray:3 3}
+.metric-chart .curve{fill:none;stroke-width:1.8;stroke-linejoin:round}
+.metric-chart .c0,.metric-legend .c0{stroke:var(--accent);background:var(--accent)}
+.metric-chart .c1,.metric-legend .c1{stroke:var(--err);background:var(--err)}
+.metric-chart .c2,.metric-legend .c2{stroke:var(--ok);background:var(--ok)}
+.metric-legend{font-size:12px;color:var(--muted)}.metric-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 4px 0 10px;vertical-align:baseline}
+.metric-periods a{margin-right:10px}.metric-periods a.current{font-weight:700;text-decoration:none;color:var(--text)}

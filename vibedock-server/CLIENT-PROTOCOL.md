@@ -262,6 +262,44 @@ start per display (the last 20); a header from older firmware is simply absent. 
 handler, kept in RTC memory as well; they are decoded with the ELF of that firmware (`addr2line -pfiaC -e firmware.elf
 <addresses>`, see `vibedock-client/FLASHING.md`, *Decoding a crash*). The full backtrace stays on the serial port.
 
+## 3i. Metrics (device → server)
+
+Firmware newer than 0.4.2 sends with every image pull the values it measures, in one compact header (older firmware
+sends none and keeps working):
+
+```
+X-VibeDock-Metrics: 1;3600;eb;e5;a5;76;e;e;-3a;3;18a;60;3000;600
+```
+
+Fields, in this order, separated by `;`. The version comes first (`1`); the order never changes, new fields are only
+appended, and a receiver ignores trailing fields it does not know. An empty field was not measured.
+
+| # | Field | Unit and format |
+| --- | --- | --- |
+| 1 | version | `1` |
+| 2 | `up` | seconds since the start, decimal |
+| 3 | `free` | free heap at the pull, in units of 100 bytes (kB × 10), hex |
+| 4 | `lowest` | lowest free heap since the last request, same unit |
+| 5 | `block` | largest free block, same unit |
+| 6 | `afterTls` | free heap after the last TLS handshake (ESP8266 with TLS only), same unit |
+| 7 | `tlsStack` | stack the last TLS handshake used (ESP8266 with TLS only), same unit |
+| 8 | `pictureMs` | time to read the last complete picture, in units of 100 ms (seconds × 10), hex |
+| 9 | `rssi` | Wi-Fi signal in dBm, signed hex without factor (`-3a` = −58); empty without Wi-Fi |
+| 10 | `drops` | Wi-Fi connection losses since the start, decimal |
+| 11 | `mv` | battery voltage in units of 10 mV, hex; only while running on the battery |
+| 12 | `bright` | backlight in percent, decimal |
+| 13 | `activeS` | seconds since the start with the backlight at its set brightness, decimal |
+| 14 | `dimS` | seconds since the start with the backlight dimmed (a display left alone), decimal |
+
+The server keeps one sample per display every 5 minutes, and one at every new start, in
+`device-logs/<id>/metrics.jsonl` for 30 days. A kept sample carries the header as received and the lowest free heap
+of all pulls since the sample before it, so a dip between two samples is not lost. *Devices → Logs → Metrics* shows
+curves (memory, Wi-Fi signal, battery voltage) and a table; the key figures of a log also count the samples in its time;
+the support file has them as `samples` (rows with named columns). `GET /admin/metrics.csv` exports them: comma as
+separator, dot as decimal mark, the unit in each column name, an empty cell for a value that was not measured, time in
+UTC and local; parameters `device` (default all paired displays), `from` and `to` (`yyyy-MM-dd` or an instant) and
+`raw=true` (adds the header as received).
+
 ## 3j. Picture on the display's page (server → device → browser)
 
 The status page of a display shows the picture the server sends it. The display does not relay it (it keeps no copy,

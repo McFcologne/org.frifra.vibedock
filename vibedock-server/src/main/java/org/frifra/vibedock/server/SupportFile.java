@@ -51,16 +51,33 @@ class SupportFile {
             return text.isEmpty()?null:text.length()>max?text.substring(0,max)+" …":text;
         }
     }
-    record Contents(Report report,SupportDiagnosis.Overview diagnosis,Summary summary,List<Source> sources,List<Display> displays,List<String> serverLog,List<String> accessLog,List<DeviceLog> deviceLogs) {}
+    /**
+     * What a display measured (DeviceMetrics) in the chosen days, one row per kept sample, oldest first; the columns
+     * name the values of a row in order (null = not measured): the time as UTC ISO text, the start's boot id, then the
+     * values in bytes, milliseconds, dBm, mV, % and seconds as their names say.
+     */
+    record Samples(String identifier,List<String> columns,List<List<Object>> rows) {
+        static final List<String> COLUMNS=List.of("time","boot","up_s","free_B","lowest_free_B","largest_block_B","free_after_tls_B","tls_stack_B","picture_ms",
+                "rssi_dBm","wifi_drops","battery_mV","brightness_pct","active_s","dimmed_s");
+        static Samples of(String identifier,List<DeviceMetrics.Sample> samples){
+            var rows=new ArrayList<List<Object>>();
+            for(var s:samples)rows.add(Arrays.asList(java.time.Instant.ofEpochMilli(s.at()).truncatedTo(java.time.temporal.ChronoUnit.SECONDS).toString(),s.boot(),
+                    s.up(),s.freeBytes(),s.lowestBytes(),s.blockBytes(),s.afterTlsBytes(),s.tlsStackBytes(),s.pictureMs(),s.rssi(),s.drops(),s.millivolts(),s.brightness(),
+                    s.activeSeconds(),s.dimmedSeconds()));
+            return new Samples(identifier,COLUMNS,rows);
+        }
+    }
+    record Contents(Report report,SupportDiagnosis.Overview diagnosis,Summary summary,List<Source> sources,List<Display> displays,List<String> serverLog,List<String> accessLog,List<DeviceLog> deviceLogs,
+                    List<Samples> samples) {}
     record Created(String name,String key,byte[] bytes) {}
 
     private final ApplicationInfo info;private final SettingsStore settings;private final UsageService usage;private final ClientRegistry registry;
     private final DeviceLogs logs;private final ObjectMapper json;private final Clock clock;private final Path logDir;
-    private final DeviceDiagnostics diagnostics;private final StorageErrors storage;
+    private final DeviceDiagnostics diagnostics;private final StorageErrors storage;private final DeviceMetrics metrics;
     private final SecureRandom random=new SecureRandom();
     SupportFile(ApplicationInfo info,SettingsStore settings,UsageService usage,ClientRegistry registry,DeviceLogs logs,ObjectMapper json,Clock clock,
-                @Value("${vibedock.log-dir}") String logDir,DeviceDiagnostics diagnostics,StorageErrors storage){
-        this.diagnostics=diagnostics;this.storage=storage;
+                @Value("${vibedock.log-dir}") String logDir,DeviceDiagnostics diagnostics,StorageErrors storage,DeviceMetrics metrics){
+        this.metrics=metrics;this.diagnostics=diagnostics;this.storage=storage;
         this.info=info;this.settings=settings;this.usage=usage;this.registry=registry;this.logs=logs;this.json=json;this.clock=clock;this.logDir=Path.of(logDir);
     }
 
@@ -148,7 +165,13 @@ class SupportFile {
                 Files.exists(Path.of("/.dockerenv")),ZoneId.systemDefault().getId(),runtime.getUptime()/1000,now,days,registry.pollSeconds(),
                 s.allowedIps().size(),s.accounts().size(),displays.size(),info.getTestMode(),hideHosts);
         var diagnosis=new SupportDiagnosis.Overview(SupportDiagnosis.LEGEND,SupportDiagnosis.server(serverLog,storage.problem()==null),overview);
-        return new Contents(report,diagnosis,summary,sources,displays,serverLog,logLines("access.",since,redactor),deviceLogs);
+        var samples=new ArrayList<Samples>();
+        for(var v:registry.views()){
+            if(v.web()!=null)continue;
+            var kept=metrics.samples(v.identifier(),since.toEpochMilli(),now+1);
+            if(!kept.isEmpty())samples.add(Samples.of(v.identifier(),kept));
+        }
+        return new Contents(report,diagnosis,summary,sources,displays,serverLog,logLines("access.",since,redactor),deviceLogs,samples);
     }
 
     /** The server log or the access logs since the given time, oldest first (see {@link ServerLogFiles#read}). */

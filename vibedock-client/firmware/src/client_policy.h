@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <math.h>
+#include <stdio.h>
 #include <string>
 // Pure timing and format rules of the VibeDock client (protocol v2), shared with the native test.
 namespace client_policy {
@@ -291,6 +292,40 @@ inline uint32_t diagCheck(const DiagRecord &r) {
 }
 inline bool diagValid(const DiagRecord &r) {
   return r.magic == diagMagic && r.check == diagCheck(r) && r.boot != 0 && phaseName(r.phase) != nullptr && r.intent <= 3;
+}
+// ---- metrics: X-VibeDock-Metrics, one measuring point per pull (DeviceMetrics on the server) ----
+// "1;up;free;lowest;block;afterTls;tlsStack;pictureMs;rssi;drops;mv;bright;activeS;dimS". The version comes first and
+// the order never changes, new fields are only appended; an empty field was not measured. Memory is in units of 100
+// bytes (KB x 10), the picture time in units of 100 ms (s x 10), the voltage in units of 10 mV, all in hex; the signal
+// is a signed hex number (dBm). Run time, drops, brightness (%), active and dimmed seconds are plain numbers.
+struct Metrics {
+  uint32_t up = 0;
+  int32_t freeBytes = -1, lowestBytes = -1, blockBytes = -1, afterTlsBytes = -1, tlsStackBytes = -1, pictureMs = -1;
+  bool hasRssi = false; int rssi = 0;
+  uint32_t drops = 0;
+  int32_t millivolts = -1, brightness = -1;
+  uint32_t activeSeconds = 0, dimmedSeconds = 0;
+};
+// Writes the header value into out (NUL-terminated, cut off at cap); returns its length.
+inline size_t metricsHeader(char *out, size_t cap, const Metrics &m) {
+  if (cap == 0) return 0;
+  size_t n = 0;
+  auto add = [&](const char *format, long value) {
+    if (n + 1 >= cap) return;
+    int w = snprintf(out + n, cap - n, format, value);
+    if (w > 0) n = size_t(w) >= cap - n ? cap - 1 : n + size_t(w);
+  };
+  auto hex = [&](int32_t value, long unit) { if (value >= 0) add(";%lx", value / unit); else add(";", 0); };
+  add("1;%lu", long(m.up));
+  hex(m.freeBytes, 100); hex(m.lowestBytes, 100); hex(m.blockBytes, 100); hex(m.afterTlsBytes, 100); hex(m.tlsStackBytes, 100);
+  hex(m.pictureMs, 100);
+  if (!m.hasRssi) add(";", 0); else if (m.rssi < 0) add(";-%lx", -long(m.rssi)); else add(";%lx", m.rssi);
+  add(";%lu", long(m.drops));
+  hex(m.millivolts, 10);
+  if (m.brightness >= 0) add(";%ld", m.brightness); else add(";", 0);
+  add(";%lu", long(m.activeSeconds)); add(";%lu", long(m.dimmedSeconds));
+  out[n] = 0;
+  return n;
 }
 // X-VibeDock-Orientation as quarter turns clockwise: "upright" 0, "rotated-90" 1, "flipped" 2, "rotated-270" 3. The
 // quarter turns only on a square panel (the picture would not fit otherwise); anything else keeps the current turn.

@@ -16,6 +16,8 @@ bool &versionRefused();
 String traffic();       // bytes sent and received since the handshake, and the last read result
 String &lastSuccess();  // cipher suite, handshake time and memory of the last successful connection
 String heapText();      // free DRAM heap, plus the IRAM heap the record buffers use
+// Of the last handshake, for the metrics: free DRAM heap after a successful one (0 before the first) and the stack bytes it used.
+extern uint32_t afterHeap, stackBytes;
 // SHA-1 of the server certificate of the last handshake (false if none was seen), for the pin.
 bool leafFingerprint(uint8_t out[20]);
 extern void (*wait)();   // called while the handshake waits for the server, e.g. to answer the USB console
