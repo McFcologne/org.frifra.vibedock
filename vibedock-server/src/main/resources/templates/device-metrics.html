@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Device metrics')}"></head>
+<body>
+<header th:replace="~{fragments :: appbar('devices')}"></header>
+<main>
+<div class="page-heading"><div><h2 th:text="${'Metrics of ' + deviceName}">Metrics</h2>
+  <p>What the display measured and sent with its pulls, one sample every <span th:text="${interval}">5</span> minutes, kept for
+  <span th:text="${keepDays}">30</span> days. <code th:text="${identifier}"></code></p></div>
+  <div class="heading-actions"><a class="button secondary" th:href="@{/admin/clients/{id}/logs(id=${identifier})}">Logs</a>
+    <a class="button secondary" th:href="@{/admin/metrics.csv(device=${identifier})}" title="All kept samples of this display as CSV">Export CSV</a></div></div>
+<nav class="meta metric-periods" aria-label="Period">
+  <a th:each="p:${periods}" th:href="@{/admin/clients/{id}/metrics(id=${identifier},hours=${p})}" th:class="${p == hours} ? 'current'"
+     th:text="${p &lt; 24 ? p + ' h' : (p / 24) + ' d'}">24 h</a></nav>
+<p class="meta" th:if="${count == 0}">No samples in this period. Firmware newer than 0.4.2 sends them; a display that is off or asleep sends none.</p>
+<section class="card" th:if="${!memory.isEmpty()}">
+  <div class="card-head"><h3 class="grow">Memory</h3>
+    <span class="metric-legend"><i class="c0"></i>Free <i class="c1"></i>Lowest free <i class="c2"></i>Largest block</span></div>
+  <div th:utext="${memory}"></div>
+  <p class="meta">Free heap at the pull, the lowest since the sample before, and the largest block in one piece. Dashed lines mark a restart.</p>
+</section>
+<section class="card" th:if="${!wifi.isEmpty()}">
+  <div class="card-head"><h3 class="grow">Wi-Fi signal</h3></div>
+  <div th:utext="${wifi}"></div>
+</section>
+<section class="card" th:if="${!battery.isEmpty()}">
+  <div class="card-head"><h3 class="grow">Battery voltage</h3></div>
+  <div th:utext="${battery}"></div>
+  <p class="meta">Only while the display runs on its battery.</p>
+</section>
+<section class="card" th:if="${count > 0}">
+  <div class="card-head"><h3 class="grow">Samples</h3><span class="meta" th:text="${'Newest ' + shown + ' of ' + count}"></span></div>
+  <table class="firmware-devices log-figures">
+    <thead><tr><th>Time</th><th>Free kB</th><th>Lowest kB</th><th>Block kB</th><th>After TLS kB</th><th>TLS stack kB</th><th>Picture s</th>
+      <th>Wi-Fi dBm</th><th>Drops</th><th>Battery mV</th><th>Bright %</th><th>Active</th><th>Dimmed</th></tr></thead>
+    <tbody><tr th:each="row:${rows}"><td th:each="cell:${row}" th:text="${cell}"></td></tr></tbody>
+  </table>
+</section>
+</main>
+<footer th:replace="~{fragments :: footer}"></footer>
+</body></html>

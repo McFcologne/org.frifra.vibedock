@@ -16,7 +16,7 @@ class DeviceApiController {
     static final String IMAGE_FORMAT="rgb565-be-240x240";
     private static final Logger log=LoggerFactory.getLogger(DeviceApiController.class);
     private final ClientRegistry registry;private final DesignService designs;private final ServerAddresses addresses;private final TlsTrust trust;
-    private final Firmware firmware;private final OtaSigning signing;private final DeviceLogs logs;private final AdminEvents events;private final DeviceDiagnostics diagnostics;
+    private final Firmware firmware;private final OtaSigning signing;private final DeviceLogs logs;private final AdminEvents events;private final DeviceDiagnostics diagnostics;private final DeviceMetrics metrics;
     private final DevicePower power;
     private final ImageDelta delta;
     private final PullSchedule schedule;
@@ -25,11 +25,11 @@ class DeviceApiController {
     @org.springframework.beans.factory.annotation.Autowired private ImageQuality imageQuality;
     @org.springframework.beans.factory.annotation.Autowired private ImagePalette.Cache paletteCache;
     DeviceApiController(ClientRegistry registry,DesignService designs,ServerAddresses addresses,TlsTrust trust,Firmware firmware,OtaSigning signing,DeviceLogs logs,AdminEvents events,
-                        DeviceDiagnostics diagnostics,DevicePower power,ImageDelta delta,PullSchedule schedule,ThemeSettings themes,DevicePoke poke){
+                        DeviceDiagnostics diagnostics,DeviceMetrics metrics,DevicePower power,ImageDelta delta,PullSchedule schedule,ThemeSettings themes,DevicePoke poke){
         this.poke=poke;
         this.themes=themes;
         this.delta=delta;this.schedule=schedule;
-        this.power=power;this.logs=logs;this.events=events;this.diagnostics=diagnostics;this.registry=registry;this.designs=designs;this.addresses=addresses;this.trust=trust;this.firmware=firmware;this.signing=signing;
+        this.power=power;this.logs=logs;this.events=events;this.diagnostics=diagnostics;this.metrics=metrics;this.registry=registry;this.designs=designs;this.addresses=addresses;this.trust=trust;this.firmware=firmware;this.signing=signing;
     }
     /**
      * Why a device request is refused, null when its key fits. Unknown devices and wrong keys get the same 401, on
@@ -68,6 +68,8 @@ class DeviceApiController {
                 request.getHeader("X-VibeDock-Subnet-Mask"));
         // The display's own state (newer firmware): its start and run time, memory and Wi-Fi; nothing for older firmware.
         diagnostics.report(identifier,request.getHeader("X-VibeDock-Diag"),registry.get(identifier).firmware(),request.getHeader("X-VibeDock-Board"));
+        // The measured values of the pull (firmware newer than 0.4.2), kept every 5 minutes.
+        metrics.report(identifier,request.getHeader(DeviceMetrics.HEADER),diagnostics.live(identifier).map(DeviceDiagnostics.Live::bootId).orElse(null));
         // Which address it used: behind a reverse proxy the host it asked for is in X-Forwarded-Host.
         String used=usedHost(request.getHeader("X-Forwarded-Host"),request.getHeader("Host"));
         diagnostics.route(identifier,route(used,addresses.configuredInternal(),addresses.external()),used);

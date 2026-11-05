@@ -106,6 +106,29 @@ final class DeviceLogTimeline {
         return new Figures(heap,afterTls,stack,stackSize,slowest,pictures,aborted,weakest,strongest);
     }
     /**
+     * The figures of a log together with the samples the display sent in its time (DeviceMetrics): the lowest free heap,
+     * the lowest after TLS, the highest TLS stack, the slowest picture and the weakest and strongest signal also count
+     * what the samples measured, so a log that missed a dip still shows it.
+     */
+    static Figures figures(List<String> lines,List<DeviceMetrics.Sample> samples){
+        var f=figures(lines);
+        if(samples.isEmpty())return f;
+        Integer heap=f.lowestHeap(),afterTls=f.lowestAfterTls(),stack=f.highestStack(),stackSize=f.stackSize(),slowest=f.slowestPicture(),weakest=f.weakestSignal(),strongest=f.strongestSignal();
+        for(var s:samples){
+            if(s.lowestBytes()!=null)heap=min(heap,s.lowestBytes());
+            if(s.afterTlsBytes()!=null)afterTls=min(afterTls,s.afterTlsBytes());
+            if(s.tlsStackBytes()!=null)stack=max(stack,s.tlsStackBytes());
+            if(s.pictureMs()!=null)slowest=max(slowest,s.pictureMs());
+            if(s.rssi()!=null&&s.rssi()<0){weakest=min(weakest,s.rssi());strongest=max(strongest,s.rssi());}
+        }
+        return new Figures(heap,afterTls,stack,stackSize,slowest,f.pictures(),f.aborted(),weakest,strongest);
+    }
+    /** The samples of the span of a log. */
+    static List<DeviceMetrics.Sample> samplesOf(DeviceMetrics metrics,String identifier,List<String> lines,long savedAt){
+        var span=span(lines,savedAt);
+        return metrics.samples(identifier,span[0].toEpochMilli(),span[1].toEpochMilli()+1);
+    }
+    /**
      * The figures of a log as table cells, each with the change against the log before it in brackets when both name
      * it and it differs: lowest free heap, lowest free heap after TLS, TLS stack, slowest complete picture, pictures
      * shown and aborted, Wi-Fi signal.

@@ -14,10 +14,10 @@ import java.util.List;
 class DeviceAdminController {
     private static final Logger log=LoggerFactory.getLogger(DeviceAdminController.class);
     private final ClientRegistry registry;private final ClientPairing pairing;private final DesignService designs;private final ServerAddresses addresses;private final DevicePoke poke;
-    private final Firmware firmware;private final ApplicationInfo info;private final DeviceLogs logs;private final AdminEvents events;private final DeviceDiagnostics diagnostics;
+    private final Firmware firmware;private final ApplicationInfo info;private final DeviceLogs logs;private final AdminEvents events;private final DeviceDiagnostics diagnostics;private final DeviceMetrics metrics;
     DeviceAdminController(ClientRegistry registry,ClientPairing pairing,DesignService designs,ServerAddresses addresses,DevicePoke poke,Firmware firmware,ApplicationInfo info,DeviceLogs logs,AdminEvents events,
-                          DeviceDiagnostics diagnostics){
-        this.info=info;this.logs=logs;this.events=events;this.diagnostics=diagnostics;
+                          DeviceDiagnostics diagnostics,DeviceMetrics metrics){
+        this.metrics=metrics;this.info=info;this.logs=logs;this.events=events;this.diagnostics=diagnostics;
         this.registry=registry;this.pairing=pairing;this.designs=designs;this.addresses=addresses;this.poke=poke;this.firmware=firmware;
     }
     @PostMapping("/admin/clients/invite") String invite(@RequestParam String ip,@RequestParam(defaultValue="80") int port,
@@ -40,7 +40,7 @@ class DeviceAdminController {
         return "redirect:/admin/server";
     }
     @PostMapping("/admin/clients/{identifier}/remove") String remove(@PathVariable String identifier,RedirectAttributes flash) throws IOException {
-        try{registry.remove(identifier);logs.deleteAll(identifier);diagnostics.forget(identifier);}
+        try{registry.remove(identifier);logs.deleteAll(identifier);diagnostics.forget(identifier);metrics.forget(identifier);}
         catch(IllegalArgumentException e){flash.addFlashAttribute("deviceRemovalError","The device was already removed.");}
         return "redirect:/admin/devices";
     }
@@ -164,8 +164,9 @@ class DeviceAdminController {
             for(int i=0;i<saved.size();i++){
                 var log=saved.get(i);
                 // Logs are newest first: the one after this is the one before it.
-                var before=i+1<saved.size()?DeviceLogTimeline.figures(saved.get(i+1).lines()):null;
-                var figures=DeviceLogTimeline.figures(log.lines());
+                var next=i+1<saved.size()?saved.get(i+1):null;
+                var before=next==null?null:DeviceLogTimeline.figures(next.lines(),DeviceLogTimeline.samplesOf(metrics,identifier,next.lines(),next.entry().savedAt()));
+                var figures=DeviceLogTimeline.figures(log.lines(),DeviceLogTimeline.samplesOf(metrics,identifier,log.lines(),log.entry().savedAt()));
                 var item=new java.util.HashMap<String,Object>();
                 item.put("entry",log.entry());item.put("text",String.join("\n",log.lines()));
                 var merged=DeviceLogTimeline.merge(log.lines(),log.entry().savedAt(),log.serverLines()==null?List.of():log.serverLines());

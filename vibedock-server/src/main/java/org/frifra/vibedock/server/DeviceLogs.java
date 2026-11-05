@@ -20,6 +20,8 @@ class DeviceLogs {
     static final int KEEP=10,MAX_LINES=500,MAX_LINE=400,MAX_BYTES=64*1024;
     /** The starts the display reported (DeviceDiagnostics), beside its logs. */
     static final String STARTS="starts.json";
+    /** The measured values the display sent (DeviceMetrics), beside its logs. */
+    static final String METRICS="metrics.jsonl";
     static final List<String> SOURCES=List.of("usb","net");
     private static final Pattern IDENTIFIER=Pattern.compile("[A-Za-z0-9_.:-]{8,80}");
     private static final Pattern NAME=Pattern.compile("\\d{13}-(usb|net)(-\\d{1,2})?\\.json");
@@ -122,7 +124,7 @@ class DeviceLogs {
     /** Removes every log of a device, e.g. when the device is removed. */
     synchronized void deleteAll(String identifier) throws IOException {
         Path dir=directory(identifier);requests.remove(identifier);lastRequests.remove(identifier);
-        Files.deleteIfExists(dir.resolve(STARTS));
+        Files.deleteIfExists(dir.resolve(STARTS));Files.deleteIfExists(dir.resolve(METRICS));
         for(String name:names(dir))Files.deleteIfExists(dir.resolve(name));
         try{Files.deleteIfExists(dir);}catch(DirectoryNotEmptyException ignored){}
     }
