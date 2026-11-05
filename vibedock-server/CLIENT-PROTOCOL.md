@@ -366,7 +366,7 @@ when the picture of this display can change next, so the display pulls then inst
   photo of a running slideshow; the start or end of a scheduled one.
 - **Spread:** with several displays pulling, `state=current` answers of 20 s or more get up to 10 s on top, so the
   displays do not pull in the same second. Every display takes a free step (0, s, 2s, ... with s = 10 / (displays - 1),
-  at least 1 s) at random; the order is drawn anew every round (a round ends when a display asks again). No offset for
+  at least 1 s) at random and keeps it for the whole round; the order is drawn anew every round (a round ends when every display had its step and one asks again, or when the number of displays changes). No offset for
   a single display, for `pending` answers, for a running slideshow or for intervals shorter than 20 s.
 - `state=pending`: one of those sources is due or being asked and its reading is not published yet. The seconds run
   to when the collection should be done; repeated `pending` answers wait at least 2, 5, 10, then 30 s, so a slow

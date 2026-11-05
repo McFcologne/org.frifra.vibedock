@@ -22,13 +22,30 @@ class PullSpreadTest {
         }
         assertTrue(orders.size()>3,"different orders: "+orders.size());
     }
-    @Test void aDisplayThatAsksAgainStartsANewRound(){
-        var spread=new PullSpread(new Random(1));
-        int first=spread.offset("a",60,3);spread.offset("b",60,3);
-        // "a" asks again before "c" did: its round is over, the slots are free again.
-        spread.offset("a",60,3);
-        int third=spread.offset("c",60,3);
-        assertTrue(third>=0&&third<=10);assertTrue(first>=0&&first<=10);
+    @Test void aDisplayThatAsksAgainKeepsItsStepWhileOthersWait(){
+        for(long seed=0;seed<50;seed++){
+            var spread=new PullSpread(new Random(seed));
+            int a=spread.offset("a",60,3),b=spread.offset("b",60,3);
+            assertEquals(a,spread.offset("a",60,3),"a keeps its step");
+            assertEquals(b,spread.offset("b",60,3),"b keeps its step");
+            int c=spread.offset("c",60,3);
+            assertEquals(3,new HashSet<>(List.of(a,b,c)).size(),"c gets the free step, seed "+seed);
+        }
+    }
+    @Test void aRoundEndsWhenEveryDisplayHadItsSlotAndOneAsksAgain(){
+        var spread=new PullSpread(new Random(2));
+        for(int round=0;round<30;round++){
+            var steps=new TreeSet<Integer>();
+            for(String d:List.of("a","b","c"))steps.add(spread.offset(d,60,3));
+            assertEquals(new TreeSet<>(List.of(0,5,10)),steps,"round "+round);
+        }
+    }
+    @Test void aChangedNumberOfDisplaysStartsANewRound(){
+        var spread=new PullSpread(new Random(4));
+        spread.offset("a",60,3);spread.offset("b",60,3);
+        var steps=new TreeSet<Integer>();
+        for(String d:List.of("a","b","c","d"))steps.add(spread.offset(d,60,4));
+        assertEquals(4,steps.size(),"four displays, four different steps");
     }
     @Test void aSingleDisplayAndShortIntervalsGetNothing(){
         var spread=new PullSpread(new Random(1));
