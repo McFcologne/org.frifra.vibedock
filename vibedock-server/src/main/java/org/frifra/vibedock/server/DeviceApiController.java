@@ -41,6 +41,17 @@ class DeviceApiController {
         if(key==null||!key.matches("[a-f0-9]{64}"))return HttpStatus.BAD_REQUEST;
         return registry.authenticate(identifier,key)?null:HttpStatus.UNAUTHORIZED;
     }
+    /**
+     * The picture of a display for the page of the display itself: the browser loads it from the server with the token
+     * the server announced to the display. 404 for an unknown display or a wrong token; nothing but this picture is open.
+     */
+    @GetMapping(value="/api/v1/clients/{identifier}/preview.png",produces="image/png")
+    ResponseEntity<byte[]> preview(@PathVariable String identifier,@RequestParam(value="t",required=false) String token,HttpServletRequest request) throws IOException {
+        if(!registry.previewAllowed(identifier,token))return ResponseEntity.notFound().build();
+        var client=registry.get(identifier);
+        byte[] png=designs.render(DesignService.forDevice(client.design(),client.serverFooter()),client.ip(),client.display(),identifier).png();
+        return ResponseEntity.ok().contentType(org.springframework.http.MediaType.IMAGE_PNG).cacheControl(org.springframework.http.CacheControl.noStore()).body(png);
+    }
     @GetMapping("/api/v1/clients/{identifier}/image")
     ResponseEntity<byte[]> image(@PathVariable String identifier,@RequestHeader(value="Authorization",required=false) String authorization,
                                  @RequestHeader(value="If-None-Match",required=false) String etag,HttpServletRequest request) throws IOException {
@@ -106,6 +117,8 @@ class DeviceApiController {
         boolean previewPull="1".equals(request.getHeader("X-VibeDock-Preview"));
         var next=schedule.next(identifier,display,previewPull);
         headers.set("X-VibeDock-Next-Pull",next.header());
+        // The token the display's own page shows this picture with (served by the server, not relayed by the display).
+        headers.set("X-VibeDock-Preview-Token",registry.previewToken(identifier));
         if(!previewPull&&"1".equals(request.getHeader("X-VibeDock-Schedule")))
             registry.expectPull(identifier,next.seconds());
         // Only clients that explicitly support sound receive quota metadata. Preview pulls neither need nor consume it.

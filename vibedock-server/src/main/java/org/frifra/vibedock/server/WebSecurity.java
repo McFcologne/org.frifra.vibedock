@@ -68,7 +68,7 @@ class WebSecurity {
                     }
                     response.sendError(HttpServletResponse.SC_FORBIDDEN);
                 }))
-                .authorizeHttpRequests(a -> a.requestMatchers("/api/v1/usage","/api/v1/clients/*/image","/api/v1/clients/*/firmware","/api/v1/clients/*/log","/web/*","/web/*/image.png","/web/*/icon.png","/web/*/state","/web/*/swipe").permitAll()
+                .authorizeHttpRequests(a -> a.requestMatchers("/api/v1/usage","/api/v1/clients/*/image","/api/v1/clients/*/preview.png","/api/v1/clients/*/firmware","/api/v1/clients/*/log","/web/*","/web/*/image.png","/web/*/icon.png","/web/*/state","/web/*/swipe").permitAll()
                 // Login page assets; the port guard still limits them to the administration port.
                 .requestMatchers("/login","/error","/app.css","/theme.js","/logo.svg","/favicon.ico","/apple-touch-icon.png").permitAll()
                 .anyRequest().hasRole("ADMIN"))
@@ -114,7 +114,7 @@ class WebSecurity {
                 boolean api=path.equals("/api/v1/usage");
                 // Device pull (protocol v2): authenticated by the device key in the controller.
                 boolean upload=path.matches("/api/v1/clients/[A-Za-z0-9_.:-]{8,80}/log");
-                boolean image=upload||path.matches("/api/v1/clients/[A-Za-z0-9_.:-]{8,80}/(image|firmware)")
+                boolean image=upload||path.matches("/api/v1/clients/[A-Za-z0-9_.:-]{8,80}/(image|firmware|preview\\.png)")
                         // Web displays: authenticated by the secret in the link in the controller.
                         ||path.matches("/web/[a-f0-9]{64}(/image\\.png|/icon\\.png|/state)?");
                 // The swipe of a web display page: like the page, but POST.

@@ -262,6 +262,22 @@ start per display (the last 20); a header from older firmware is simply absent. 
 handler, kept in RTC memory as well; they are decoded with the ELF of that firmware (`addr2line -pfiaC -e firmware.elf
 <addresses>`, see `vibedock-client/FLASHING.md`, *Decoding a crash*). The full backtrace stays on the serial port.
 
+## 3j. Picture on the display's page (server → device → browser)
+
+The status page of a display shows the picture the server sends it. The display does not relay it (it keeps no copy,
+and relaying cost memory and time): every answer to an image pull carries `X-VibeDock-Preview-Token: <32 hex digits>`,
+and the page's `<img>` points to the server:
+
+```
+GET <server>/api/v1/clients/<identifier>/preview.png?t=<token>
+```
+
+The token follows from the display's key hash (never the key itself) and allows nothing but looking at that picture:
+`404` for a wrong, missing or foreign token and for an unknown display, always the same answer; not served on the
+administration port; `Cache-Control: no-store`. It changes only with the key. The page lists the display's server
+addresses (the one that answered last first); the browser tries them in turn when one does not load, and then offers
+*Retry*. Without a token (no answer from the server yet, or an older server) the page shows no picture.
+
 ## 3g. Battery power saving (server → device, experimental)
 
 Boards with a battery connection whose chip has its own USB (Waveshare 1.54, 1.47, C6 1.69, S3 1.69, LilyGO
