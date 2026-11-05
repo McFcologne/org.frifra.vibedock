@@ -1325,7 +1325,7 @@ switch **Server lines** on a log shows them between the display's lines, in the 
 server time; while it is on, **Download** includes them too. Logs without such entries have no switch.
 
 **Metrics.** The **Metrics** button on a display's log page opens what the display measured and sent with its pulls
-(firmware newer than 0.4.2). The server keeps one sample per display every 5 minutes and with every start, for 30 days,
+(firmware 0.5.0 and newer). The server keeps one sample per display every 5 minutes and with every start, for 30 days,
 and in a sample the lowest free memory of all pulls since the sample before, so a dip between two samples is not lost.
 Choose the period (6 hours, 1, 3, 7 or 30 days): the curves show the free memory, the lowest free memory and the largest
 block in one piece (a dashed line marks a restart), the Wi-Fi signal and, while the display runs on its battery, the

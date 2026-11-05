@@ -159,8 +159,11 @@ when the poll should be done, at most every 2, 5, 10, then 30 s. Upper limit: 10
 ask for an immediate pull, 2 minutes for the others. Failed pulls, immediate pull requests and older servers use the
 poll interval as before. The status page shows the next pull. With several displays the server adds up to 10 s to the
 announced time, a fixed step of its own for every display and round, so they do not pull in the same second (not for
-`pending`, slideshows, a single display or times under 20 s). See
-[the protocol](../vibedock-server/CLIENT-PROTOCOL.md#3h-next-pull-server--device).
+`pending`, slideshows, a single display or times under 20 s). With every pull the display also sends what it measures
+(memory, Wi-Fi signal, picture time, battery, in the short header `X-VibeDock-Metrics`); the server shows it under
+*Logs → Metrics*. See the protocol,
+[3h](../vibedock-server/CLIENT-PROTOCOL.md#3h-next-pull-server--device) and
+[3i](../vibedock-server/CLIENT-PROTOCOL.md#3i-metrics-device--server).
 
 ## Image transfer
 

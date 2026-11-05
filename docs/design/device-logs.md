@@ -80,7 +80,7 @@ Needs firmware newer than 0.1.1; displays with older firmware keep the USB way. 
 
 ## Step 5 – measured values over time (implemented)
 
-- With every pull, firmware newer than 0.4.2 sends `X-VibeDock-Metrics` (`CLIENT-PROTOCOL.md` 3i): memory (free, lowest
+- With every pull, firmware 0.5.0 and newer sends `X-VibeDock-Metrics` (`CLIENT-PROTOCOL.md` 3i): memory (free, lowest
   since the last request, largest block, after a TLS handshake and its stack), the time of the last picture, Wi-Fi
   signal and drops, battery voltage, brightness and the seconds the display was active and dimmed. The version comes
   first and the order never changes; an empty field was not measured; units are fixed (memory in 100 bytes, time in

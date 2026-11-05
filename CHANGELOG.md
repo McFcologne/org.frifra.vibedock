@@ -13,7 +13,7 @@ page of a display shows its picture after its first pull following the update.
 
 ### Administration
 
-- **Measured values of the displays:** displays send memory, Wi-Fi signal, picture time, battery voltage and how long the backlight was dimmed with every pull in one short header (`X-VibeDock-Metrics`, `CLIENT-PROTOCOL.md` 3i). The server keeps one sample every 5 minutes for 30 days. *Logs → Metrics* shows memory, Wi-Fi and battery curves and a table, the key figures of a log include the samples in its time, the support file has them as `samples`, and `/admin/metrics.csv` exports them as CSV (filter by display and period). Needs firmware newer than 0.4.2.
+- **Measured values of the displays:** displays send memory, Wi-Fi signal, picture time, battery voltage and how long the backlight was dimmed with every pull in one short header (`X-VibeDock-Metrics`, `CLIENT-PROTOCOL.md` 3i). The server keeps one sample every 5 minutes for 30 days. *Logs → Metrics* shows memory, Wi-Fi and battery curves and a table, the key figures of a log include the samples in its time, the support file has them as `samples`, and `/admin/metrics.csv` exports them as CSV (filter by display and period). Needs firmware 0.5.0.
 - **Battery simulation in the design preview:** a checkbox with a level (unknown, 100, 60, 20, 10 %) shows the battery icon in the preview of the design page, to see how it looks in a theme. Nothing is saved.
 
 ### Displays and images
