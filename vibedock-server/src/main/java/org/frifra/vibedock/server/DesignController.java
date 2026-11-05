@@ -67,12 +67,20 @@ class DesignController {
     }
     /** Same renderer, snapshot and effective settings as the device pull; nothing is saved. */
     @PostMapping(value="/admin/design-preview.png",produces="image/png") @ResponseBody byte[] preview(
-            @RequestParam(defaultValue="default") String target,@RequestBody DesignService.Input input) throws IOException {
+            @RequestParam(defaultValue="default") String target,@RequestParam(required=false) String battery,@RequestBody DesignService.Input input) throws IOException {
+        var simulated=simulatedBattery(battery);
         boolean defaults=target.equals("default");var previous=defaults?registry.defaultDesign():registry.designFor(target);
         var design=input.inherit()?registry.defaultDesign():designs.resolve(input,previous);
-        if(defaults)return designs.render(design,"Preview",DisplayType.M1,target).png();
+        if(defaults)return designs.render(design,"Preview",DisplayType.M1,target,1,simulated).png();
         var device=registry.get(target);var display=input.display()!=null?DisplayType.of(input.display()):device.display();
         String footer=device.web()!=null?WebDisplayController.footer(info):device.ip();
-        return designs.render(DesignService.forDevice(design,device.serverFooter()),footer,display,target).png();
+        return designs.render(DesignService.forDevice(design,device.serverFooter()),footer,display,target,1,simulated).png();
+    }
+    /** The preview's battery simulation: "unknown" (three dots) or a level 0 to 100; empty or missing keeps what the display reported. */
+    static StatusImage.Battery simulatedBattery(String text){
+        if(text==null||text.isBlank())return null;
+        if(text.equals("unknown"))return new StatusImage.Battery(null);
+        try{return new StatusImage.Battery(Integer.parseInt(text.trim()));}
+        catch(IllegalArgumentException e){throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST,"battery: unknown or a level 0 to 100");}
     }
 }
