@@ -65,9 +65,13 @@ class DesignService {
     StatusImage.Image render(Design design,String ip,DisplayType type,String display) throws IOException {return render(design,ip,type,display,1);}
     /** The same at scale times the type's pixels (web displays on high-resolution screens; PNG only). */
     StatusImage.Image render(Design design,String ip,DisplayType type,String display,double scale) throws IOException {
+        return render(design,ip,type,display,scale,null);
+    }
+    /** The same with a battery icon of the caller's choice (the preview's simulation); null keeps what the display reported. */
+    StatusImage.Image render(Design design,String ip,DisplayType type,String display,double scale,StatusImage.Battery simulated) throws IOException {
         var photo=currentPhoto(design,display);
         if(photo.isPresent()){var image=photos.render(photo.get(),type,scale);if(image.isPresent())return image.get();}
-        return render(design,ip,type,scale,power.battery(display));
+        return render(design,ip,type,scale,simulated!=null?simulated:power.battery(display));
     }
     /** The photos of the design's slideshow that still exist, if it is active now. */
     java.util.List<String> activePhotos(Design design){return activePhotos(design,null);}

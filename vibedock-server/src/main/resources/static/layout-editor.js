@@ -484,13 +484,16 @@
     if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? 'Your session expired. Reload and sign in again.' : (await response.text()).slice(0, 240) || 'Request failed.');
     return response;
   }
+  $('#preview-battery').addEventListener('change', () => { $('#preview-battery-level').disabled = !$('#preview-battery').checked; schedulePreview(0); });
+  $('#preview-battery-level').addEventListener('change', () => schedulePreview(0));
   function schedulePreview(delay = 250) {
     clearTimeout(timer); request?.abort(); const version = ++previewVersion;
     previewPending = true; $('#preview-status').textContent = 'Updating preview…'; controls();
     timer = setTimeout(async () => {
       const controller = new AbortController(); request = controller;
       try {
-        const response = await post('/admin/design-preview.png?target=' + encodeURIComponent(target), {...draft, inherit}, controller.signal);
+        const battery = $('#preview-battery').checked ? '&battery=' + encodeURIComponent($('#preview-battery-level').value) : '';
+        const response = await post('/admin/design-preview.png?target=' + encodeURIComponent(target) + battery, {...draft, inherit}, controller.signal);
         const blob = await response.blob(); if (version !== previewVersion) return;
         const nextUrl = URL.createObjectURL(blob); const oldUrl = previewUrl;
         $('#design-preview-image').src = nextUrl; previewUrl = nextUrl; if (oldUrl) URL.revokeObjectURL(oldUrl);
