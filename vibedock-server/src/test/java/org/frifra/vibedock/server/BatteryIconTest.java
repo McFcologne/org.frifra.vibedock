@@ -37,9 +37,14 @@ class BatteryIconTest {
             var battery=image(scheme,Layout.DEFAULT,new StatusImage.Battery(100),snapshot);
             int inColour=0;
             for(int y=0;y<24;y++)for(int x=150;x<240;x++)
-                if(plain.getRGB(x,y)!=battery.getRGB(x,y)&&(battery.getRGB(x,y)&0xffffff)==expected)inColour++;
+                if(plain.getRGB(x,y)!=battery.getRGB(x,y)&&((battery.getRGB(x,y)&0xffffff)==expected||(battery.getRGB(x,y)&0xffffff)==rgb565(expected)))inColour++;
             Assertions.assertTrue(inColour>=20,scheme+": the icon is drawn in the colour of the title text");
         }
+    }
+    /** The colour as the display image holds it: 5 bits red, 6 bits green, 5 bits blue, expanded to 8 bits. */
+    private static int rgb565(int rgb){
+        int r=(rgb>>16&0xff)>>3,g=(rgb>>8&0xff)>>2,b=(rgb&0xff)>>3;
+        return (r*255/31)<<16|(g*255/63)<<8|(b*255/31);
     }
     @Test void aStatusMovesLeftOfTheIconInsteadOfUnderIt() throws Exception {
         var limited=snapshot("rate_limited");
