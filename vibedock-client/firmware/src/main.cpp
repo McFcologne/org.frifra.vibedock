@@ -619,10 +619,22 @@ String html(const String &value) {
   return out;
 }
 // Starts a chunked HTML answer; subtitle must already be escaped.
+// One buffer for the pieces of a web page, reserved at start while the heap is still in one piece: it keeps its place
+// for the whole run, so building a page neither needs a large block later nor leaves holes behind. Every piece is
+// sent at once and the buffer is reused.
+String pageChunk;
+void sendChunk() { web.sendContent(pageChunk); pageChunk.clear(); }
+// Large pieces from flash go out in slices. A single write of a few kB was taken only in part (the TCP send buffer
+// was full), and the server did not notice: the next chunk header then stood inside the data and showed up as text
+// ("ea", "47e") in the browser, with the style sheet or the logo cut off. Different on every load.
+constexpr size_t SLICE = 256;
+void sendProgmem(PGM_P data, size_t size) { for (size_t at = 0; at < size; at += SLICE) web.sendContent_P(data + at, min(SLICE, size - at)); }
+// A fixed file (script, icon) of known length, in slices as well.
+void sendFixed(const char *type, PGM_P data, size_t size) { web.setContentLength(size); web.send(200, type, ""); sendProgmem(data, size); }
 void pageStart(const String &subtitle) {
   web.sendHeader("Cache-Control", "no-store");
   platform::chunkedStart(web, "text/html; charset=utf-8");
-  web.sendContent_P(PAGE_HEAD);
+  sendProgmem(PAGE_HEAD, strlen_P(PAGE_HEAD));
   web.sendContent(uiDark ? F("<style id=\"ui-light\" media=\"not all\">") : F("<style id=\"ui-light\">"));
   web.sendContent(F(":root{color-scheme:light}body{background:#f3f5fa;color:#162030}"
       ".card{background:#fff;border-color:#dce2ed}.net{border-color:#dce2ed}"
@@ -632,7 +644,7 @@ void pageStart(const String &subtitle) {
   web.sendContent(String(F("<title>VibeDock - ")) + subtitle + F("</title><link rel=\"icon\" href=\"/favicon.ico\" sizes=\"32x32\">"
       "<link rel=\"icon\" href=\"/favicon.svg\" type=\"image/svg+xml\"><link rel=\"apple-touch-icon\" href=\"/apple-touch-icon.png\">"
       "</head><body><main><header>"));
-  web.sendContent_P(PAGE_LOGO);
+  sendProgmem(PAGE_LOGO, strlen_P(PAGE_LOGO));
   web.sendContent(String(F("<div><h1>VibeDock</h1><p>")) + subtitle + F("</p></div></header>"));
 }
 // A tiny live status for open browser pages; no image buffer or persistent socket on the device.
@@ -664,19 +676,19 @@ void uiState() {
 }
 void serveUi() {
   web.on("/ui-state",HTTP_GET,uiState);
-  web.on("/ui.js",HTTP_GET,[]{web.sendHeader("Cache-Control","no-store");web.send_P(200,"text/javascript",PAGE_LIVE);});
+  web.on("/ui.js",HTTP_GET,[]{web.sendHeader("Cache-Control","no-store");sendFixed("text/javascript",PAGE_LIVE,strlen_P(PAGE_LIVE));});
 }
 // Browser icons, the same as the administration's; registered in the setup portal and on the status page.
 void serveIcons() {
   auto icon = [](const char *path, const char *type, PGM_P data, size_t size) {
-    web.on(path, HTTP_GET, [=] { web.sendHeader("Cache-Control", "max-age=86400"); web.send_P(200, type, data, size); });
+    web.on(path, HTTP_GET, [=] { web.sendHeader("Cache-Control", "max-age=86400"); sendFixed(type, data, size); });
   };
   icon("/favicon.ico", "image/x-icon", (PGM_P)ICON_ICO, sizeof(ICON_ICO));
   icon("/apple-touch-icon.png", "image/png", (PGM_P)ICON_TOUCH, sizeof(ICON_TOUCH));
   icon("/favicon.svg", "image/svg+xml", PAGE_LOGO, strlen_P(PAGE_LOGO));
 }
 void pageEnd() {
-  web.sendContent_P(PAGE_HINT);
+  sendProgmem(PAGE_HINT, strlen_P(PAGE_HINT));
   web.sendContent(F("</main><script src=\"/ui.js\" defer></script></body></html>"));
   platform::chunkedEnd(web);
 }
@@ -1594,6 +1606,7 @@ String statusLine(String &css) {
   css = "ok"; return "Connected";
 }
 void colourCard();
+uint32_t largestFreeBlock();
 void audioCard();
 // Power source and battery power saving for the status page: closes the open <dd> of the row before, then <dt>/<dd>
 // pairs (the Power card of boards without battery measurement drops the leading "</dd>").
@@ -1609,19 +1622,29 @@ void statusPage() {
   bool paired = mode == Mode::Paired;
   pageStart(html(deviceName));
   String css, state = statusLine(css);
-  String body = String(F("<section class=\"card\"><h2>Status</h2><p class=\"state ")) + css + "\">" + state + F("</p><dl>"
-      "<dt>IP address</dt><dd>") + currentIp() + F("</dd><dt>Wi-Fi</dt><dd>") + html(WiFi.SSID()) + " (" + String(WiFi.RSSI()) + F(" dBm)</dd>");
+  // In small pieces through pageChunk (see colourCard): one String for the card was cut off in the middle of a word.
+  String &b = pageChunk; b.clear();
+  b += F("<section class=\"card\"><h2>Status</h2><p class=\"state "); b += css; b += F("\">"); b += state;
+  b += F("</p><dl><dt>IP address</dt><dd>"); b += currentIp();
+  b += F("</dd><dt>Wi-Fi</dt><dd>"); b += html(WiFi.SSID()); b += " ("; b += WiFi.RSSI(); b += F(" dBm)</dd>");
+  sendChunk();
   if (paired) {
-    body += String(F("<dt>Server</dt><dd>")) + html(servers[serverIndex]) + F("</dd><dt>Last update</dt><dd>")
-        + (haveImage ? String((millis() - lastImage) / 1000) + F(" s ago") : String("-")) + F("</dd><dt>Fallback poll interval</dt><dd>")
-        + String(pollSeconds) + F(" s</dd>") + (pullWaitMs ? String(F("<dt>Next pull</dt><dd>in "))
-        + String((pullWaitMs - min(pullWaitMs, uint32_t(millis() - lastPull)) + 999) / 1000) + F(" s")
-        + (pullPending ? F(" (new readings expected)") : F(" (as announced by the server)")) + F("</dd>") : String());
+    b += F("<dt>Server</dt><dd>"); b += html(servers[serverIndex]); b += F("</dd><dt>Last update</dt><dd>");
+    if (haveImage) { b += (millis() - lastImage) / 1000; b += F(" s ago"); } else b += '-';
+    b += F("</dd><dt>Fallback poll interval</dt><dd>"); b += pollSeconds; b += F(" s</dd>");
+    sendChunk();
+    if (pullWaitMs) {
+      b += F("<dt>Next pull</dt><dd>in "); b += (pullWaitMs - min(pullWaitMs, uint32_t(millis() - lastPull)) + 999) / 1000; b += F(" s");
+      b += pullPending ? F(" (new readings expected)") : F(" (as announced by the server)");
+      b += F("</dd>"); sendChunk();
+    }
   }
-  body += String(F("<dt>Device ID</dt><dd>")) + identifier + F("</dd><dt>Last start</dt><dd>") + html(String(startKind) + " (" + platform::resetReason() + ")") + F("</dd><dt>Firmware</dt><dd>" VIBEDOCK_VERSION "</dd></dl>");
-  if (!paired) body += F("<p class=\"muted\">Enter this IP address and the pairing code shown on the display in the VibeDock administration.</p>");
-  body += F("</section>");
-  web.sendContent(body);
+  b += F("<dt>Device ID</dt><dd>"); b += identifier; b += F("</dd><dt>Last start</dt><dd>");
+  b += html(String(startKind) + " (" + platform::resetReason() + ")");
+  sendChunk();
+  b += F("</dd><dt>Memory</dt><dd>"); b += ESP.getFreeHeap(); b += F(" B free, largest block "); b += largestFreeBlock(); b += F(" B</dd><dt>Firmware</dt><dd>" VIBEDOCK_VERSION "</dd></dl>");
+  if (!paired) b += F("<p class=\"muted\">Enter this IP address and the pairing code shown on the display in the VibeDock administration.</p>");
+  b += F("</section>"); sendChunk();
   auto power = battery::read();
   if (power.supported) {
     String card = F("<section class=\"card\"><h2>Battery</h2><dl><dt>Measured voltage</dt><dd>");
@@ -1661,37 +1684,52 @@ void audioCard() {
       "A sustained connection loss sounds once. Pairing prompts do not repeat continuously.</p></section>"));
 #endif
 }
+// Largest block that can still be allocated in one piece: what a TLS handshake or a page piece needs.
+uint32_t largestFreeBlock() {
+#if defined(ESP8266)
+  return ESP.getMaxFreeBlockSize();
+#else
+  return ESP.getMaxAllocHeap();
+#endif
+}
 // Colour correction of this panel. Every change is applied when a slider is released and the image is redrawn,
 // so the display can be compared with the server preview right away; the BMP above stays uncorrected.
-String slider(const char *name, const __FlashStringHelper *label, int value, int low, int high, int step, bool gamma) {
-  // Text in flash (F): on the ESP8266 plain literals take RAM the TLS handshake needs.
-  String s = F("<label class=\"f\" for=\""); s += name; s += F("\">"); s += label; s += F(" <b>");
+void slider(const char *name, const __FlashStringHelper *label, int value, int low, int high, int step, bool gamma) {
+  // Text in flash (F): on the ESP8266 plain literals take RAM the TLS handshake needs. Sent in two pieces.
+  String &s = pageChunk; s.clear();
+  s += F("<label class=\"f\" for=\""); s += name; s += F("\">"); s += label; s += F(" <b>");
   s += gamma ? String(value / 100.0, 2) : String(value) + F(" %");
   s += F("</b></label><input type=\"range\" id=\""); s += name; s += F("\" name=\""); s += name;
   s += F("\" min=\""); s += low; s += F("\" max=\""); s += high; s += F("\" step=\""); s += step; s += F("\" value=\""); s += value;
+  sendChunk();
   s += F("\" oninput=\"this.previousSibling.lastChild.textContent=");
   s += gamma ? F("(this.value/100).toFixed(2)") : F("this.value+' %'");
   s += F("\" onchange=\"const b=new URLSearchParams(new FormData(this.form));b.set('live','1');fetch('/colours',{method:'POST',body:b}).catch(()=>this.form.submit())\">");
-  return s;
+  sendChunk();
 }
 // The image as the server sends it, uncorrected, next to the sliders: the reference the display is matched to. A
-// slider change goes to the display in the background; the page and the image stay as they are.
+// slider change goes to the display in the background; the page and the image stay as they are. Sent in small pieces
+// through pageChunk: one String for the whole card needed several kB in one piece, and on the ESP8266 a failed
+// append cut the page off after the heading.
 void colourCard() {
   using namespace client_policy;
   uint16_t w = lastImageSize.width ? lastImageSize.width : 240, h = lastImageSize.height ? lastImageSize.height : 240;
-  String card = F("<form action=\"/colours\" method=\"post\"><section class=\"card\"><h2>Display colours</h2>"
+  String &card = pageChunk; card.clear();
+  card += F("<form action=\"/colours\" method=\"post\"><section class=\"card\"><h2>Display colours</h2>"
       "<div style=\"display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start\"><figure style=\"margin:0;flex:none\"><img class=\"screen\" src=\"/image.bmp?t=");
   card += millis(); card += F("\" data-image-version=\""); card += String(diag.boot) + ":" + String(imageRevision); card += F("\" width=\""); card += w; card += F("\" height=\""); card += h; card += F("\" style=\"width:"); card += w;
   card += F("px;height:"); card += h;
+  sendChunk();
   card += F("px;max-width:100%;object-fit:contain;image-rendering:pixelated\" alt=\"Current image\">"
       "<figcaption class=\"muted\">Uncorrected, as the server sends it. <a href=\"/\">Reload</a></figcaption></figure><div style=\"flex:1;min-width:200px\">");
-  card += slider("gamma", F("Gamma (higher: darker mid tones)"), toneSettings.gamma, minGamma, maxGamma, 5, true);
-  card += slider("red", F("Red"), toneSettings.red, minGain, maxGain, 1, false);
-  card += slider("green", F("Green"), toneSettings.green, minGain, maxGain, 1, false);
-  card += slider("blue", F("Blue"), toneSettings.blue, minGain, maxGain, 1, false);
+  sendChunk();
+  slider("gamma", F("Gamma (higher: darker mid tones)"), toneSettings.gamma, minGamma, maxGamma, 5, true);
+  slider("red", F("Red"), toneSettings.red, minGain, maxGain, 1, false);
+  slider("green", F("Green"), toneSettings.green, minGain, maxGain, 1, false);
+  slider("blue", F("Blue"), toneSettings.blue, minGain, maxGain, 1, false);
   card += F("<p class=\"muted\">Applied to this display only: move a slider until the display looks like the image beside it.</p>"
       "<button name=\"reset\" value=\"1\">Reset to defaults</button></div></div></section></form>");
-  web.sendContent(card);
+  sendChunk();
 }
 // Settings changed in quick series (brightness swipes, colour sliders): written to flash once, 3 s after the last
 // change, between pulls. Writing at once with every slider move restarted the ESP32-C6 ("Exception").
@@ -1930,6 +1968,7 @@ void initJd9853() {
 void setup() {
   platform::crashBegin();  // the crash of the run before, and from now on the panic handler
   diagBegin();  // first: anything before would overwrite the state of the run before
+  pageChunk.reserve(512);  // before the heap fragments: web pages are built in this one buffer
   Serial.setRxBufferSize(1024); Serial.begin(115200);  // the flasher sends in paced chunks
 #if defined(ESP32) && ARDUINO_USB_CDC_ON_BOOT
   Serial.setTxTimeoutMs(0); // an attached Mac must never hold the network startup waiting for USB reads
