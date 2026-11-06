@@ -1,0 +1,1 @@
+- **E-paper board marked as tested:** the Waveshare ESP32-S3-ePaper-1.54 (V2) runs on the real board; the *untested board* note on its device card is gone. Contrast thresholds and ghosting are still being tuned.

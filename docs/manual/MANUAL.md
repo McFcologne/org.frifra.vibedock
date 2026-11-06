@@ -16,7 +16,7 @@ unable to operate VibeDock, in particular:
 - **Damage from flashing.** Writing firmware can make a device unusable ("bricked"), erase its original firmware and
   settings, or damage it, e.g. through a wrong board, an interrupted write, unsuitable cables, power supplies or
   adapters. Original firmware cannot be restored without your own full backup. Flashing voids any manufacturer
-  warranty and is done entirely at your own risk. Of the ESP32 builds only the Waveshare ESP32-S3-Touch-LCD-1.47, ESP32-S3-Touch-LCD-1.54 and ESP32-C6-Touch-LCD-1.69 have been tested on hardware; the others are prepared and untested.
+  warranty and is done entirely at your own risk. Of the ESP32 builds only the Waveshare ESP32-S3-Touch-LCD-1.47, ESP32-S3-Touch-LCD-1.54, ESP32-C6-Touch-LCD-1.69 and ESP32-S3-ePaper-1.54 (V2) have been tested on hardware; the others are prepared and untested.
 - **Security.** No software is free of errors. We cannot guarantee that VibeDock is free of security
   vulnerabilities. The server encrypts provider sign-ins and tokens in its data directory; keep that directory and its backups private. The
   administration uses plain HTTP unless you put HTTPS in front of it, and displays talk to the server over the
@@ -1060,7 +1060,7 @@ firmware card decides which image is shown, downloaded and installed:
 | Waveshare ESP32-S3-Touch-LCD-1.47 | ESP32-S3 | 1.47" JD9853 172×320 | tested |
 | Waveshare ESP32-S3-Touch-LCD-1.54 | ESP32-S3 | 1.54" ST7789 240×240, CST816 touch | tested |
 | Waveshare ESP32-C6-Touch-LCD-1.69 | ESP32-C6 | 1.69" ST7789V2 240×280 | tested |
-| Waveshare ESP32-S3-ePaper-1.54 (V2) | ESP32-S3 | 1.54" e-paper 200×200, black and white, no touch | prepared |
+| Waveshare ESP32-S3-ePaper-1.54 (V2) | ESP32-S3 | 1.54" e-paper 200×200, black and white, no touch | tested |
 | ESP32-C3 with ST7789 240×240 | ESP32-C3 | e.g. C3 SuperMini | prepared |
 
 *Tested*: runs on real hardware (installation over USB, pairing, images; on the Waveshare boards also touch). *Prepared*: builds, with the settings the tested boards called for, but has not run on hardware yet.
