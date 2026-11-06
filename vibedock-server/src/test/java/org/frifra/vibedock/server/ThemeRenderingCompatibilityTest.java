@@ -26,6 +26,7 @@ class ThemeRenderingCompatibilityTest {
         for(var original:BaselineScheme.values()){
             var scheme=Scheme.parse(original.id());
             for(var type:DisplayType.INVENTORY)for(var example:cases()){
+                if(type.grey())continue;  // greyscale panels are new (see GreyDisplayTest), not part of the frozen colour drawing
                 compare(before,after,original,scheme,type,1,example,emoji);
             }
             // A fractional high-DPI scale and a large fitted browser, with the same SVG rasterisation on both sides.

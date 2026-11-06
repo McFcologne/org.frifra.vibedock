@@ -107,16 +107,14 @@ class EPaper {
   // milliseconds must not keep it from ever being quiet.
   void settle() { if (moved) { moved = false; dirty = true; changedAt = millis(); } }
 
-  // The paper tones of the themes (an off-white background, a dark grey ink) become pure white and black: below BLACK_BELOW
-  // black, above WHITE_ABOVE white, in between stretched. What stays grey then is dithered with a 4 x 4 ordered pattern.
-  static constexpr int BLACK_BELOW = 48, WHITE_ABOVE = 208;
+  // The server already sends greyscale with raised contrast (display type 200x200): what stays grey is dithered with a
+  // 4 x 4 ordered pattern.
   void toBits(uint8_t *bits) const {
     static const uint8_t bayer[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
     memset(bits, 0, BYTES);
     for (int y = 0; y < N; y++)
       for (int x = 0; x < N; x++) {
         int g = grey[y * N + x];
-        g = g <= BLACK_BELOW ? 0 : g >= WHITE_ABOVE ? 255 : (g - BLACK_BELOW) * 255 / (WHITE_ABOVE - BLACK_BELOW);
         if (g > bayer[y & 3][x & 3] * 16 + 8) bits[y * ROW_BYTES + (x >> 3)] |= 0x80 >> (x & 7);  // 1 = white
       }
   }

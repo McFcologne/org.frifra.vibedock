@@ -53,7 +53,7 @@ public class StatusImage {
     public Image render(UsageService.Snapshot snapshot,String ip,Look look,DisplayType type,double scale) throws IOException {
         if(!(scale>=1&&scale<=MAX_SCALE))throw new IllegalArgumentException("Scale 1–"+MAX_SCALE);
         var fitted=new Look(look.emoji(),look.scheme(),look.weatherIcon(),look.weatherText(),look.layout().fit(type),look.battery());
-        return new Frame(type.width(),type.height(),type.corner(),scale).draw(snapshot,ip,fitted);
+        return new Frame(type.width(),type.height(),type.corner(),scale,type.grey()).draw(snapshot,ip,fitted);
     }
     /** Opaque flat foreground paints, not background pixels or transparent antialias fringes. */
     static Set<Integer> iconIndexColors(BufferedImage icon){
@@ -69,17 +69,25 @@ public class StatusImage {
         return result;
     }
     private static boolean opaqueSame(BufferedImage image,int x,int y,int rgb){int c=image.getRGB(x,y);return (c>>>24)==255&&rgb565(c)==rgb;}
+    /** Greyscale levels of black-and-white panels: up to BLACK_BELOW black, from WHITE_ABOVE white, stretched in between. */
+    static final int BLACK_BELOW=48,WHITE_ABOVE=208;
+    /** The grey of a colour (luminance) with the contrast raised: off-white paper becomes white, dark grey ink black. */
+    static int greyContrast(int rgb){
+        int l=(((rgb>>16)&255)*77+((rgb>>8)&255)*150+(rgb&255)*29)>>8;
+        int g=l<=BLACK_BELOW?0:l>=WHITE_ABOVE?255:(l-BLACK_BELOW)*255/(WHITE_ABOVE-BLACK_BELOW);
+        return g<<16|g<<8|g;
+    }
     static int rgb565(int rgb){return ((rgb>>19)&31)<<11|((rgb>>10)&63)<<5|((rgb>>3)&31);}
     static final double MAX_SCALE=8;
     /** One rendering at a given size; the drawing code below works for any width and height. */
     private final class Frame {
-    final int w,h,corner;final double scale;
+    final int w,h,corner;final double scale;final boolean grey;
     /** The battery icon until the first usage band has drawn it at its top right. */
     Battery battery;
     final Set<Rectangle> accentAreas=new LinkedHashSet<>();
     final Set<Rectangle> barAreas=new LinkedHashSet<>();
     final Set<Integer> iconPaints=new LinkedHashSet<>();
-    Frame(int w,int h,int corner,double scale){this.w=w;this.h=h;this.corner=corner;this.scale=scale;}
+    Frame(int w,int h,int corner,double scale,boolean grey){this.w=w;this.h=h;this.corner=corner;this.scale=scale;this.grey=grey;}
     /** Width and height of an icon in the frame's pixels (icons come at scale times their size). */
     int iw(BufferedImage icon){return (int)Math.round(icon.getWidth()/scale);}
     int ih(BufferedImage icon){return (int)Math.round(icon.getHeight()/scale);}
@@ -283,15 +291,17 @@ public class StatusImage {
             }
             // Terminal schemes: every other row darker, like the scan lines of an old monitor (rows of the display).
             if(scheme.style==Scheme.Style.TERMINAL&&(((int)(y/scale))&1)==1)rgb=(((rgb>>16&255)*7/10)<<16)|(((rgb>>8&255)*7/10)<<8)|((rgb&255)*7/10);
+            // Black-and-white panels (e-paper): greyscale with raised contrast, in the preview as on the device.
+            if(grey)rgb=greyContrast(rgb);
             // Scaled (web displays): full colour; devices: RGB565, and the PNG shows what they show.
-            if(scale!=1){if(scheme.style==Scheme.Style.TERMINAL)image.setRGB(x,y,rgb);continue;}
+            if(scale!=1){if(grey||scheme.style==Scheme.Style.TERMINAL)image.setRGB(x,y,rgb);continue;}
             int r=(rgb>>19)&31,b=(rgb>>3)&31,green=(rgb>>10)&63;
             int value=(r<<11)|(green<<5)|b;
             pixels[offset++]=(byte)(value>>8);pixels[offset++]=(byte)value;
             image.setRGB(x,y,((r*255/31)<<16)|((green*255/63)<<8)|(b*255/31));
         }
         var primary=new LinkedHashSet<Integer>();
-        for(int rgb:new int[]{scheme.background,scheme.title,scheme.text,scheme.muted,scheme.track,scheme.warning})primary.add(to565(rgb));
+        for(int rgb:new int[]{scheme.background,scheme.title,scheme.text,scheme.muted,scheme.track,scheme.warning})primary.add(to565(grey?greyContrast(rgb):rgb));
         if(scheme.style==Scheme.Style.BAUHAUS)primary.add(to565(ThemeArtwork.BAUHAUS_HIGHLIGHT));
         if(scheme.style==Scheme.Style.MACOS)for(int rgb:MACOS_LIGHTS)primary.add(to565(rgb));
         var window=scheme.drawing.window();

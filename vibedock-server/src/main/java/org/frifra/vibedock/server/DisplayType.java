@@ -8,9 +8,10 @@ import java.util.*;
  * The renderer adapts any design to the type: it keeps the first usage bands that fit and shows a split band's first
  * source alone on narrow screens.
  */
-public record DisplayType(String id,String label,int width,int height,int corner) {
-    /** corner: radius of the panel's rounded corners in pixels (0 = square); the image keeps its text clear of them. */
-    public DisplayType(String id,String label,int width,int height){this(id,label,width,height,0);}
+public record DisplayType(String id,String label,int width,int height,int corner,boolean grey) {
+    /** corner: radius of the panel's rounded corners in pixels (0 = square); the image keeps its text clear of them. grey: black-and-white panel, the image is greyscale with raised contrast. */
+    public DisplayType(String id,String label,int width,int height,int corner){this(id,label,width,height,corner,false);}
+    public DisplayType(String id,String label,int width,int height){this(id,label,width,height,0,false);}
     public static final DisplayType M1=new DisplayType("vibedock-m1","VibeTV M1 / Waveshare 1.54\" · 240×240 ST7789",240,240);
     public static final List<DisplayType> INVENTORY=List.of(M1,
             new DisplayType("240x280","240×280 · 1.69\" ST7789",240,280,36),
@@ -20,7 +21,7 @@ public record DisplayType(String id,String label,int width,int height,int corner
             new DisplayType("172x320","172×320 · 1.47\" JD9853",172,320,18),
             new DisplayType("135x240","135×240 · 1.14\" ST7789",135,240),
             new DisplayType("128x160","128×160 · 1.8\" ST7735",128,160),
-            new DisplayType("200x200","200×200 · 1.54\" e-paper, black and white",200,200));
+            new DisplayType("200x200","200×200 · 1.54\" e-paper, black and white",200,200,0,true));
     /**
      * Web displays only: the image takes the shape of the browser window and its full resolution (see
      * {@link #fitting}); the size here is what the administration's previews and programs without a size get.
