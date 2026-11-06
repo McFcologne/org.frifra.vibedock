@@ -20,7 +20,7 @@ public record Board(String id,String label,String chip,String display,String not
             new Board("waveshare-s3-touch-lcd-147","Waveshare ESP32-S3-Touch-LCD-1.47","ESP32-S3","172x320","1.47\" JD9853 172×320, touch",true),
             new Board("waveshare-s3-touch-lcd-154","Waveshare ESP32-S3-Touch-LCD-1.54","ESP32-S3","vibedock-m1","1.54\" ST7789 240×240, CST816 touch",true),
             new Board("waveshare-c6-touch-lcd-169","Waveshare ESP32-C6-Touch-LCD-1.69","ESP32-C6","240x280","1.69\" ST7789V2 240×280, touch",true),
-            new Board("waveshare-s3-epaper-154","Waveshare ESP32-S3-ePaper-1.54 (V2)","ESP32-S3","200x200","1.54\" e-paper 200×200, black and white, V2 (8 MB flash), battery connector",false),
+            new Board("waveshare-s3-epaper-154","Waveshare ESP32-S3-ePaper-1.54 (V2)","ESP32-S3","200x200","1.54\" e-paper 200×200, black and white, V2 (8 MB flash), battery connector",true),
             new Board("esp32-c3-st7789","ESP32-C3 with ST7789 240×240","ESP32-C3","vibedock-m1","e.g. C3 SuperMini, wired SCL 4 · SDA 6 · DC 2 · RES 3 · BLK 10",false));
     /** A board id as devices report it (letters, digits, dot, dash, underscore). */
     private static final java.util.regex.Pattern ID=java.util.regex.Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,39}");
