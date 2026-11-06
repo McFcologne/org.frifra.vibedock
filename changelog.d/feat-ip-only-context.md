@@ -1,0 +1,1 @@
+- **Weather and mood can be hidden:** the *Weather & mood* band of a design has a switch *Show weather, update time and mood*. Without it the band shrinks to the row of the device IP (22 px instead of 56 px) and the usage bands get the room, so a small display such as the 200 × 200 e-paper board shows two full bands instead of one.

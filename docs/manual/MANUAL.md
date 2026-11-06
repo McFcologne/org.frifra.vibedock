@@ -668,7 +668,7 @@ fit. **On tall screens** chooses where spare height goes: *Spread the bands even
 top*, where the bands stay together and a weather and mood band at the end keeps to the bottom edge.
 
 The **Weather & mood** band holds the weather (icon and temperature for the **Weather location**) and the selected
-**Icon**; **Swap weather & mood** exchanges the two slots. The update time and the IP address move with this band.
+**Icon**; **Swap weather & mood** exchanges the two slots. The update time and the IP address move with this band. Without **Show weather, update time and mood** the band shrinks to the row of the IP address (22 instead of 56 px) and the usage bands get the room: on a 200 px display, e.g. the e-paper board, two full bands fit instead of one.
 
 Change the order with the grip (drag) or with ↑ and ↓, remove a band with ×, add one with **+ Add usage band**. A
 data source that is paused or unavailable is shown as such on the display.

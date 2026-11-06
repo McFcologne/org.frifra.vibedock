@@ -143,7 +143,8 @@ public class StatusImage {
             // Aligned to the top: the bands stay together, only a weather/mood band at the end moves to the bottom edge.
             var bands=look.layout().bands();
             int nominal=bands.stream().filter(Layout.Usage.class::isInstance).mapToInt(Layout.Band::height).sum();
-            int room=h-Layout.CONTEXT_HEIGHT,used=Math.min(nominal,room)+Layout.CONTEXT_HEIGHT;
+            int contextHeight=look.layout().context().height();
+            int room=h-contextHeight,used=Math.min(nominal,room)+contextHeight;
             int gaps=bands.size()-1,spare=Math.max(0,h-used);
             // Rounded panels: spare height first moves the top band out of the corners a little.
             int y=Math.min(spare,corner/3);spare-=y;
@@ -224,7 +225,7 @@ public class StatusImage {
      */
     private void context(Graphics2D g,UsageService.Snapshot snapshot,String ip,Look look,Layout.Context band,int y){
         var scheme=look.scheme();
-        if(scheme.style==Scheme.Style.CODE||scheme.drawing.footerBackground()!=null){g.setColor(new Color(ThemeArtwork.footerBackground(scheme)));g.fillRect(0,y,w,56);}
+        if(scheme.style==Scheme.Style.CODE||scheme.drawing.footerBackground()!=null){g.setColor(new Color(ThemeArtwork.footerBackground(scheme)));g.fillRect(0,y,w,band.height());}
         // Time of the newest provider reading, not of this rendering: the image (and its ETag) only changes with new data.
         var observed=snapshot.providers().values().stream().map(UsageService.Provider::observedAt).filter(Objects::nonNull).max(Long::compare);
         String time=observed.map(t->DateTimeFormatter.ofPattern("HH:mm").withZone(zone).format(Instant.ofEpochSecond(t))).orElse("--:--");
@@ -232,7 +233,9 @@ public class StatusImage {
         // Narrow screens (below 200 px): only the time, in the middle between weather and mood.
         boolean narrow=w<200;
         BufferedImage rightMood=null;int weatherLeft=w;  // left edge of a temperature in the IP row
-        if(!band.moodLeft()){
+        if(band.ipOnly()){
+            // Only the IP row: no weather, update time or mood.
+        }else if(!band.moodLeft()){
             var weatherIcon=look(look.weatherIcon(),scheme);var emoji=look(look.emoji(),scheme);
             if(look.weatherText()!=null){
                 // Weather left: icon, temperature, then the update time on the same line.
@@ -271,7 +274,7 @@ public class StatusImage {
         if(!full.equals(label)){size=10;label=fit(g,scheme,full,size,room);}
         // An address that does not fit loses its prefix, then its leading segments: the last ones tell displays apart.
         if(!full.equals(label)&&!ip.contains(" "))label=fitTail(g,scheme,ip,size,room);
-        if(label!=null)text(g,scheme,label,left,y+51,size,desktopText(scheme),false);
+        if(label!=null)text(g,scheme,label,left,y+(band.ipOnly()?16:51),size,desktopText(scheme),false);
         // Mood right, in front of the IP corner. Developer themes raise it another 6 px inside the same slot.
         if(rightMood!=null)put(g,rightMood,w-moodMargin-iw(rightMood),y+50-ih(rightMood)-(scheme.developer()?6:0));
     }
