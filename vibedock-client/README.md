@@ -85,7 +85,7 @@ buffers and protocol strings and fails if any are found on a board without audio
 
 Select **Waveshare ESP32-S3-ePaper-1.54 (V2)** in the administration. The board has a 1.54" black-and-white e-paper panel
 (200 × 200, SSD1681), no touch and no backlight; the V2 has the ESP32-S3-PICO-1-N8R8 (8 MB flash, 8 MB PSRAM), the V1 is
-another hardware and not supported. The server renders 200 × 200 in greyscale with raised contrast (off-white paper becomes white, dark ink black; the
+another hardware and not supported. The server renders 200 × 200 in greyscale with raised contrast (off-white paper becomes white, dark ink black; mostly dark designs are inverted, so every theme is dark on light; the
 administration's preview shows the same picture); the *E-Ink* theme gives the best result. The firmware
 turns the picture into black and white (the remaining greys become a dither pattern) and refreshes the panel once the picture is
 complete: a partial refresh (about 0.3 s) normally, a full one (about 2 s, flashing) at the first picture, after twelve

@@ -72,11 +72,21 @@ public class StatusImage {
     /** Greyscale levels of black-and-white panels: up to BLACK_BELOW black, from WHITE_ABOVE white, stretched in between. */
     static final int BLACK_BELOW=48,WHITE_ABOVE=208;
     /** The grey of a colour (luminance) with the contrast raised: off-white paper becomes white, dark grey ink black. */
-    static int greyContrast(int rgb){
+    static int greyContrast(int rgb){return greyContrast(rgb,false);}
+    /** invert: dark designs become light on paper (the dark ink of a light design stays dark). */
+    static int greyContrast(int rgb,boolean invert){
         int l=(((rgb>>16)&255)*77+((rgb>>8)&255)*150+(rgb&255)*29)>>8;
         int g=l<=BLACK_BELOW?0:l>=WHITE_ABOVE?255:(l-BLACK_BELOW)*255/(WHITE_ABOVE-BLACK_BELOW);
+        if(invert)g=255-g;
         return g<<16|g<<8|g;
     }
+    /** True when the image is mostly dark: black-and-white panels then show it inverted. */
+    static boolean mostlyDark(BufferedImage image){
+        long sum=0;int w=image.getWidth(),h=image.getHeight();
+        for(int y=0;y<h;y++)for(int x=0;x<w;x++){int rgb=image.getRGB(x,y);sum+=(((rgb>>16)&255)*77+((rgb>>8)&255)*150+(rgb&255)*29)>>8;}
+        return sum/(double)(w*h)<MEAN_DARK;
+    }
+    static final int MEAN_DARK=110;
     static int rgb565(int rgb){return ((rgb>>19)&31)<<11|((rgb>>10)&63)<<5|((rgb>>3)&31);}
     static final double MAX_SCALE=8;
     /** One rendering at a given size; the drawing code below works for any width and height. */
@@ -282,6 +292,7 @@ public class StatusImage {
     private Image encode(BufferedImage image,Scheme scheme) throws IOException {
         int pw=image.getWidth(),ph=image.getHeight();
         byte[] pixels=new byte[scale==1?pw*ph*2:0];int offset=0;
+        boolean flip=grey&&mostlyDark(image);
         for(int y=0;y<ph;y++)for(int x=0;x<pw;x++){
             int rgb=image.getRGB(x,y);
             // LCD: reduce artwork to four shades, but retain an explicitly chosen footer paint.
@@ -292,7 +303,7 @@ public class StatusImage {
             // Terminal schemes: every other row darker, like the scan lines of an old monitor (rows of the display).
             if(scheme.style==Scheme.Style.TERMINAL&&(((int)(y/scale))&1)==1)rgb=(((rgb>>16&255)*7/10)<<16)|(((rgb>>8&255)*7/10)<<8)|((rgb&255)*7/10);
             // Black-and-white panels (e-paper): greyscale with raised contrast, in the preview as on the device.
-            if(grey)rgb=greyContrast(rgb);
+            if(grey)rgb=greyContrast(rgb,flip);
             // Scaled (web displays): full colour; devices: RGB565, and the PNG shows what they show.
             if(scale!=1){if(grey||scheme.style==Scheme.Style.TERMINAL)image.setRGB(x,y,rgb);continue;}
             int r=(rgb>>19)&31,b=(rgb>>3)&31,green=(rgb>>10)&63;
@@ -301,7 +312,7 @@ public class StatusImage {
             image.setRGB(x,y,((r*255/31)<<16)|((green*255/63)<<8)|(b*255/31));
         }
         var primary=new LinkedHashSet<Integer>();
-        for(int rgb:new int[]{scheme.background,scheme.title,scheme.text,scheme.muted,scheme.track,scheme.warning})primary.add(to565(grey?greyContrast(rgb):rgb));
+        for(int rgb:new int[]{scheme.background,scheme.title,scheme.text,scheme.muted,scheme.track,scheme.warning})primary.add(to565(grey?greyContrast(rgb,flip):rgb));
         if(scheme.style==Scheme.Style.BAUHAUS)primary.add(to565(ThemeArtwork.BAUHAUS_HIGHLIGHT));
         if(scheme.style==Scheme.Style.MACOS)for(int rgb:MACOS_LIGHTS)primary.add(to565(rgb));
         var window=scheme.drawing.window();

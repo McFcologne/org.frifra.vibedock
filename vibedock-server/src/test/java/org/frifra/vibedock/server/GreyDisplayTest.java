@@ -47,5 +47,13 @@ class GreyDisplayTest {
         var image=ImageIO.read(new ByteArrayInputStream(renderer.render(snapshot(),"192.168.1.50",look,EPAPER,1).png()));
         Assertions.assertTrue((image.getRGB(2,2)&0xffffff)>=0xf8f8f8,Integer.toHexString(image.getRGB(2,2)));
     }
+    @Test void darkDesignsAreInvertedLightOnesAreNot() throws Exception {
+        for(var scheme:ThemeCatalog.builtins().all()){
+            var look=new StatusImage.Look(null,scheme,null,"13°",Layout.DEFAULT);
+            var image=ImageIO.read(new ByteArrayInputStream(renderer.render(snapshot(),"192.168.1.50",look,EPAPER,1).png()));
+            long sum=0;for(int y=0;y<200;y++)for(int x=0;x<200;x++)sum+=image.getRGB(x,y)>>8&255;
+            Assertions.assertTrue(sum/40000.0>=100,scheme.label+" is mostly light on paper: "+sum/40000.0);
+        }
+    }
     static UsageService.Snapshot snapshot(){return ThemesImageTest.snapshot();}
 }
