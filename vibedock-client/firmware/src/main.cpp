@@ -30,11 +30,21 @@
 #ifndef VIBEDOCK_VERSION
 #define VIBEDOCK_VERSION "dev"  // set by version.py from the Git tag
 #endif
+#include "epaper.h"
+#if defined(VIBEDOCK_EPAPER)
+EPaper panel;  // black-and-white e-paper: the same calls as TFT_eSPI, see epaper.h
+TFT_eSPI canvasParent;  // only the parent of the canvas: the sprite draws in memory, the controller is never started
+#else
 TFT_eSPI panel;
+#endif
 // The device's own screens (start, setup, pairing, messages) are laid out for 240 x 240. Panels of another size draw
 // them on a 240 x 240 canvas that present() scales onto the panel; server images go to the panel directly.
 #if VIBEDOCK_CANVAS
+#if defined(VIBEDOCK_EPAPER)
+TFT_eSprite canvas(&canvasParent);
+#else
 TFT_eSprite canvas(&panel);
+#endif
 TFT_eSprite &display = canvas;
 #else
 TFT_eSPI &display = panel;
@@ -406,6 +416,9 @@ void present(bool force = true) {
   const int width = panel.width(), height = panel.height(), side = std::min(width, height);
   const int left = (width - side) / 2, top = (height - side) / 2;
   static uint16_t line[TFT_WIDTH > TFT_HEIGHT ? TFT_WIDTH : TFT_HEIGHT];
+#if defined(VIBEDOCK_EPAPER)
+  panel.setInvert(true);  // the own screens are light on dark; on paper dark on light
+#endif
   if (left > 0) { panel.fillRect(0, 0, left, height, TFT_BLACK); panel.fillRect(left + side, 0, width - left - side, height, TFT_BLACK); }
   if (top > 0) { panel.fillRect(0, 0, width, top, TFT_BLACK); panel.fillRect(0, top + side, width, height - top - side, TFT_BLACK); }
   for (int y = 0; y < side; y++) {
@@ -416,6 +429,9 @@ void present(bool force = true) {
 #endif
     panel.pushImage(left, top + y, side, 1, line);
   }
+#if defined(VIBEDOCK_EPAPER)
+  panel.setInvert(false);
+#endif
 #else
   (void)force;
 #endif
@@ -468,6 +484,9 @@ int8_t spinningStep = -1; uint8_t spinPhase = 0;
 int stepX(int i) { return 30 + 60 * i; }
 constexpr int STEP_Y = 180;
 void spin() {
+#if defined(VIBEDOCK_EPAPER)
+  return;  // an animation every 250 ms would mean a refresh every 250 ms
+#endif
   if (spinningStep < 0) return;
   int x = stepX(spinningStep); uint32_t from = (spinPhase++ % 12) * 30;
   display.drawSmoothArc(x, STEP_Y, 6, 4, 0, 360, TRACK, TFT_BLACK, false);
@@ -1566,6 +1585,9 @@ void pull() {
       ++imageRevision;
       lastImageSize=size;deltaReady=size.width==panel.width()&&size.height==panel.height();
       etag = http.header("ETag"); lastImage = millis(); haveImage = true; staleScreen = false; footer(); imageFailures = 0; resuming = false;
+#if defined(VIBEDOCK_EPAPER)
+      panel.service(true);  // the picture is complete: onto the paper
+#endif
       metricPictureMs = millis() - reading; metricSample();
       if (first) logEvent(String(F("Image shown, read in ")) + String(millis() - reading) + " ms", true);
     } else {
@@ -2021,7 +2043,11 @@ void setup() {
 #define VIBEDOCK_ROTATION 0
 #endif
   BOOT_TRACE("panel init");
+#if defined(VIBEDOCK_EPAPER)
+  if (!panel.init()) Serial.println(F("e-paper: no memory for the frame"));
+#else
   panel.init();
+#endif
   BOOT_TRACE("panel init done");
 #if defined(VIBEDOCK_BOOT_TRACE) && defined(ESP32) && ESP_ARDUINO_VERSION_MAJOR >= 3
   // Which driver holds the display pins (GPIO, SPI_MASTER_*, ...).
@@ -2043,7 +2069,9 @@ void setup() {
   BOOT_TRACE("canvas ready");
 #endif
   // Dark until the saved brightness is known: a dimmed display no longer flashes at full brightness on every start.
+#if !defined(VIBEDOCK_EPAPER)
   pinMode(TFT_BL, OUTPUT); digitalWrite(TFT_BL, TFT_BACKLIGHT_ON == HIGH ? LOW : HIGH);
+#endif
 #if VIBEDOCK_TOUCH
   BOOT_TRACE("touch");
   touch::begin();
@@ -2209,6 +2237,9 @@ bool applyOrientation(uint8_t next) {
 }
 
 void loop() {
+#if defined(VIBEDOCK_EPAPER)
+  panel.service();  // sends the frame once it has been quiet
+#endif
   serialPoll();
   if (audio::takeVolumeChange()) { saveLater(); powerWake(); }
   powerPoll();

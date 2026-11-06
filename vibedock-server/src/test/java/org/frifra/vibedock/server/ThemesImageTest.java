@@ -53,6 +53,7 @@ class ThemesImageTest {
         Assertions.assertEquals(ThemeCatalog.builtins().all().size(),EXAMPLES.size(),"every scheme has an example");
         var twemoji=new Twemoji(emoji.toString());var renderer=new StatusImage("Europe/Berlin");
         var snapshot=snapshot();
+        var type=DisplayType.of(System.getenv("VIBEDOCK_THEMES_DISPLAY"));  // e.g. 200x200: the e-paper greyscale
         int k=2,columns=5,cell=256*k,label=22*k,gap=16*k,rows=(EXAMPLES.size()+columns-1)/columns;
         var sheet=new BufferedImage(gap+columns*cell,gap/2+rows*(label+240*k+gap)+gap/2,BufferedImage.TYPE_INT_RGB);
         var g=sheet.createGraphics();
@@ -62,7 +63,7 @@ class ThemesImageTest {
         for(int i=0;i<EXAMPLES.size();i++){
             var e=EXAMPLES.get(i);int x=gap+(i%columns)*cell,y=gap/2+(i/columns)*(label+240*k+gap);
             var look=new StatusImage.Look(ThemeIcons.image(new Design.Icon("theme-default",null,null),e.scheme(),Twemoji.SIZE*k).orElseThrow(),e.scheme(),required(twemoji,e.weather(),24*k),e.temperature(),Layout.DEFAULT);
-            var image=ImageIO.read(new ByteArrayInputStream(renderer.render(snapshot,"192.168.1.50",look,DisplayType.M1,k).png()));
+            var image=ImageIO.read(new ByteArrayInputStream(renderer.render(snapshot,"192.168.1.50",look,type,k).png()));
             g.setColor(new Color(0x3c4048));g.drawString(e.scheme().label,x,y+15*k);
             g.drawImage(image,x,y+label,null);
         }

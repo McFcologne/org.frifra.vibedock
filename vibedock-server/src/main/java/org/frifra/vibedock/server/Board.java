@@ -20,6 +20,7 @@ public record Board(String id,String label,String chip,String display,String not
             new Board("waveshare-s3-touch-lcd-147","Waveshare ESP32-S3-Touch-LCD-1.47","ESP32-S3","172x320","1.47\" JD9853 172×320, touch",true),
             new Board("waveshare-s3-touch-lcd-154","Waveshare ESP32-S3-Touch-LCD-1.54","ESP32-S3","vibedock-m1","1.54\" ST7789 240×240, CST816 touch",true),
             new Board("waveshare-c6-touch-lcd-169","Waveshare ESP32-C6-Touch-LCD-1.69","ESP32-C6","240x280","1.69\" ST7789V2 240×280, touch",true),
+            new Board("waveshare-s3-epaper-154","Waveshare ESP32-S3-ePaper-1.54 (V2)","ESP32-S3","200x200","1.54\" e-paper 200×200, black and white, V2 (8 MB flash), battery connector",false),
             new Board("esp32-c3-st7789","ESP32-C3 with ST7789 240×240","ESP32-C3","vibedock-m1","e.g. C3 SuperMini, wired SCL 4 · SDA 6 · DC 2 · RES 3 · BLK 10",false));
     /** The board of an id; unknown or missing ids are the VibeTV M1. */
     public static Board of(String id){return find(id).orElse(M1);}
@@ -51,6 +52,6 @@ public record Board(String id,String label,String chip,String display,String not
     public double drawSeconds(){return esp8266()?1.2:.5;}
     /** The case the administration draws around the preview (CSS class), null for the default light one. */
     public String previewCase(){
-        return switch(id){case "waveshare-s3-touch-lcd-147"->"case-147";case "waveshare-c6-touch-lcd-169"->"case-c6";case "waveshare-s3-touch-lcd-154"->"case-154";case "esp32-cyd"->"case-cyd";case "lilygo-t-display"->"case-tdisplay";case "lilygo-t-display-s3"->"case-tdisplay-s3";case "waveshare-s3-lcd-169"->"case-s3-169";case "esp32-c3-st7789"->"case-c3";default->null;};
+        return switch(id){case "waveshare-s3-touch-lcd-147"->"case-147";case "waveshare-c6-touch-lcd-169"->"case-c6";case "waveshare-s3-touch-lcd-154"->"case-154";case "waveshare-s3-epaper-154"->"case-epaper";case "esp32-cyd"->"case-cyd";case "lilygo-t-display"->"case-tdisplay";case "lilygo-t-display-s3"->"case-tdisplay-s3";case "waveshare-s3-lcd-169"->"case-s3-169";case "esp32-c3-st7789"->"case-c3";default->null;};
     }
 }
