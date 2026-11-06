@@ -1,3 +1,4 @@
 - **Metrics window on the device cards:** a *Metrics* button left of *Edit design* opens the memory, Wi-Fi and battery charts of the display in a window, for the last 6 hours (or the last day when there are few samples), with a link to the full metrics page.
 - **Offline gaps in the charts:** where no sample arrived for more than 15 minutes, also up to now, the charts show a light grey area marked *Offline*.
 - **Scrollable sample table:** the table on the metrics page keeps its header and scrolls instead of growing with the samples.
+- **Turned device case no longer overlaps the card text:** a case that is not square (the e-paper board) takes the room of its turned shape in the card.
