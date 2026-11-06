@@ -13,6 +13,7 @@
   <a th:each="p:${periods}" th:href="@{/admin/clients/{id}/metrics(id=${identifier},hours=${p})}" th:class="${p == hours} ? 'current'"
      th:text="${p &lt; 24 ? p + ' h' : (p / 24) + ' d'}">24 h</a></nav>
 <p class="meta" th:if="${count == 0}">No samples in this period. Firmware newer than 0.4.2 sends them; a display that is off or asleep sends none.</p>
+<th:block th:fragment="charts">
 <section class="card" th:if="${!memory.isEmpty()}">
   <div class="card-head"><h3 class="grow">Memory</h3>
     <span class="metric-legend"><i class="c0"></i>Free <i class="c1"></i>Lowest free <i class="c2"></i>Largest block</span></div>
@@ -28,13 +29,14 @@
   <div th:utext="${battery}"></div>
   <p class="meta">Only while the display runs on its battery.</p>
 </section>
+<p class="meta" th:if="${count > 0}">Grey areas marked Offline: no sample arrived (display off, asleep or not reachable).</p></th:block>
 <section class="card" th:if="${count > 0}">
   <div class="card-head"><h3 class="grow">Samples</h3><span class="meta" th:text="${'Newest ' + shown + ' of ' + count}"></span></div>
-  <table class="firmware-devices log-figures">
+  <div class="samples-scroll"><table class="firmware-devices log-figures">
     <thead><tr><th>Time</th><th>Free kB</th><th>Lowest kB</th><th>Block kB</th><th>After TLS kB</th><th>TLS stack kB</th><th>Picture s</th>
       <th>Wi-Fi dBm</th><th>Drops</th><th>Battery mV</th><th>Bright %</th><th>Active</th><th>Dimmed</th></tr></thead>
     <tbody><tr th:each="row:${rows}"><td th:each="cell:${row}" th:text="${cell}"></td></tr></tbody>
-  </table>
+  </table></div>
 </section>
 </main>
 <footer th:replace="~{fragments :: footer}"></footer>

@@ -21,10 +21,21 @@ class DeviceMetricsController {
         this.registry=registry;this.metrics=metrics;this.diagnostics=diagnostics;this.clock=clock;
     }
     private static final int TABLE_ROWS=200;
+    /** The popup of a device card: 6 h when the last 6 h hold enough samples to show a course, otherwise 24 h. */
+    static final int POPUP_MIN_SAMPLES=12;
+    @GetMapping("/admin/clients/{identifier}/metrics/popup") String popup(@PathVariable String identifier,Model model) {
+        long now=clock.millis();
+        int period=metrics.samples(identifier,now-6*3_600_000L,now+1).size()>=POPUP_MIN_SAMPLES?6:24;
+        fill(identifier,period,model);
+        return "device-metrics-popup :: div.metrics-popup";
+    }
     @GetMapping("/admin/clients/{identifier}/metrics") String page(@PathVariable String identifier,@RequestParam(defaultValue="24") int hours,Model model) {
+        fill(identifier,PERIODS.contains(hours)?hours:24,model);
+        return "device-metrics";
+    }
+    private void fill(String identifier,int period,Model model) {
         String name=identifier;
         try{name=registry.get(identifier).name();}catch(IllegalArgumentException notPaired){ /* samples of a display that is not paired any more */ }
-        int period=PERIODS.contains(hours)?hours:24;
         long to=clock.millis(),from=to-period*3_600_000L;
         var samples=metrics.samples(identifier,from,to+1);
         ZoneId zone=ZoneId.systemDefault();
@@ -47,7 +58,6 @@ class DeviceMetricsController {
         }
         model.addAttribute("rows",rows);
         model.addAttribute("shown",rows.size());
-        return "device-metrics";
     }
     /**
      * All kept samples as CSV, oldest first per display. device limits it to one display (default: all paired

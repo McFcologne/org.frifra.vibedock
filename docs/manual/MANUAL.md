@@ -1324,12 +1324,12 @@ display from the same time: image transfers (delta or full, bytes, next pull), s
 switch **Server lines** on a log shows them between the display's lines, in the accent colour, with all times in
 server time; while it is on, **Download** includes them too. Logs without such entries have no switch.
 
-**Metrics.** The **Metrics** button on a display's log page opens what the display measured and sent with its pulls
+**Metrics.** The **Metrics** button on a display's card (*Devices*, left of *Edit design*) opens a window with the charts of the display: the last 6 hours, or the last day when the display sent fewer than a stretch of samples, with a link to the full page. The **Metrics** button on a display's log page opens what the display measured and sent with its pulls
 (firmware 0.5.0 and newer). The server keeps one sample per display every 5 minutes and with every start, for 30 days,
 and in a sample the lowest free memory of all pulls since the sample before, so a dip between two samples is not lost.
 Choose the period (6 hours, 1, 3, 7 or 30 days): the curves show the free memory, the lowest free memory and the largest
 block in one piece (a dashed line marks a restart), the Wi-Fi signal and, while the display runs on its battery, the
-battery voltage. Below them a table lists the newest samples with the free memory, the lowest and largest block, the
+battery voltage. Light grey areas marked *Offline* show where no sample arrived for more than 15 minutes (the display was off, asleep or not reachable), also up to now. Below them a scrollable table lists the newest samples with the free memory, the lowest and largest block, the
 memory after a TLS handshake and its stack, the time of the last picture, signal, Wi-Fi drops, battery voltage,
 brightness and how long the display was active and dimmed. A value that was not measured stays empty. **Export CSV**
 (or `/admin/metrics.csv`) hands the samples to a spreadsheet: comma as separator, dot as decimal mark, the unit in the

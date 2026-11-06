@@ -542,3 +542,11 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 .metric-legend{font-size:12px;color:var(--muted)}.metric-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 4px 0 10px;vertical-align:baseline}
 .metric-periods a{margin-right:10px}.metric-periods a.current{font-weight:700;text-decoration:none;color:var(--text)}
 .preview-battery{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;margin:12px 0 0}.preview-battery label{display:flex;gap:6px;align-items:center;color:var(--text)}
+
+/* Metrics: scrollable sample table, offline gaps, popup of the device cards */
+.samples-scroll{max-height:420px;overflow:auto}
+.samples-scroll thead th{position:sticky;top:0;background:var(--card);z-index:1}
+.metric-chart .offline{fill:var(--muted);fill-opacity:.14;stroke:none}
+.metric-chart .offline-label{fill:var(--muted);font-size:10px}
+.metrics-dialog{width:min(760px,calc(100vw - 32px))}
+.metrics-dialog .card{margin:0 0 12px;box-shadow:none}
