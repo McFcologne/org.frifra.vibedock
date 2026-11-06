@@ -44,15 +44,15 @@ class PullScheduleTest {
     @Test void aReadingThatIsStaleAlreadyNeverMakesTheDisplayPullEveryTwoSeconds(@TempDir Path dir) throws Exception {
         var settings=new SettingsStore(dir.toString(),json);
         settings.save(new SettingsStore.Settings(List.of(),new SettingsStore.Credential("token",""),new SettingsStore.Credential("",""),List.of()));
-        settings.savePolling(new SettingsStore.UsagePolling(false,5,5));
+        settings.savePolling(new SettingsStore.UsagePolling(false,10,10));
         var client=mock(ProviderClient.class);var clock=mock(Clock.class);
         Instant start=Instant.parse("2026-10-13T20:00:00Z");when(clock.instant()).thenReturn(start);
         when(client.fetch(eq("codex"),any())).thenReturn(new ProviderClient.Reading(new ProviderClient.Window(20,1900000000),null));
         var service=new UsageService(settings,client,mock(DeviceSender.class),clock);
         service.refresh();
-        // The interval shortened to one minute: the reading is stale after 151 s, the next poll stays at five minutes.
+        // The interval shortened to one minute: the reading is stale after 241 s, the next poll stays at ten minutes.
         settings.savePolling(new SettingsStore.UsagePolling(false,1,1));service.pollingChanged();
-        long now=start.getEpochSecond()+200;when(clock.instant()).thenReturn(Instant.ofEpochSecond(now));
+        long now=start.getEpochSecond()+260;when(clock.instant()).thenReturn(Instant.ofEpochSecond(now));
         var next=service.schedule(List.of("codex"));
         assertFalse(next.pending());
         assertTrue(next.at()>now+60,"waits for the next poll, not "+(next.at()-now)+" s");

@@ -110,7 +110,7 @@ class ContractTest {
         when(client.fetch(eq("codex"),any())).thenReturn(new ProviderClient.Reading(new ProviderClient.Window(20,1900000000),null));
         var service=new UsageService(settings,client,mock(DeviceSender.class),clock);
         service.refresh();assertNotNull(service.snapshot().providers().get("codex").fiveHour());
-        when(clock.instant()).thenReturn(start.plusSeconds(151));
+        when(clock.instant()).thenReturn(start.plusSeconds(241));
         assertEquals("stale",service.snapshot().providers().get("codex").status());
         assertNull(service.snapshot().providers().get("codex").fiveHour());
         settings.save(new SettingsStore.Settings(List.of(),new SettingsStore.Credential("second",""),settings.get().claude(),List.of()));

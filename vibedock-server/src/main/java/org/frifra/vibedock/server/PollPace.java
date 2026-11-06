@@ -62,6 +62,8 @@ final class PollPace {
     }
     void failed(long now){limited=false;nextAt=slot(now,minutes);}
     /** Readings older than one interval plus a grace period count as stale. */
-    long staleAfterSeconds(){return minutes*60L+90;}
+    long staleAfterSeconds(){return minutes*60L+GRACE;}
+    /** Slot rounding (up to a minute) plus the collection (up to a minute) plus slack: a poll that is a little late must not blank the bands. */
+    static final long GRACE=180;
     private static long slot(long now,int minutes){return (now+minutes*60L+59)/60*60;}
 }
