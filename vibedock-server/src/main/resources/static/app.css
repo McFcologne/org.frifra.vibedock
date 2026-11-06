@@ -118,7 +118,7 @@ button:disabled{opacity:.55;cursor:default}
 /* The case turns with the setting, the light does not: gradient angle and shadow offsets are turned back by the same
    angle (--turn is set on .device; the case itself is rotated by minus --turn). */
 .device-front.case-epaper{--dx:calc(sin(var(--turn,0deg))*-1);--dy:cos(var(--turn,0deg));
-  padding:calc(var(--s)*.37) calc(var(--s)*.18) calc(var(--s)*.48);border-radius:calc(var(--s)*.13);
+  padding:calc(var(--s)*.324) calc(var(--s)*.139) calc(var(--s)*.459);border-radius:calc(var(--s)*.12);
   background:linear-gradient(calc(180deg + var(--turn,0deg)),#fcfcfb,#eeeeeb 70%,#e2e2de);
   box-shadow:calc(var(--dx)*max(1px,calc(var(--s)*.008))) calc(var(--dy)*max(1px,calc(var(--s)*.008))) 0 #fff inset,
     calc(var(--dx)*var(--s)*-.02) calc(var(--dy)*var(--s)*-.02) calc(var(--s)*.03) rgba(0,0,0,.06) inset,
@@ -126,8 +126,8 @@ button:disabled{opacity:.55;cursor:default}
     calc(var(--dx)*var(--s)*.05) calc(var(--dy)*var(--s)*.05) calc(var(--s)*.12) rgba(20,25,35,.16)}
 /* The sloped rim around the window slopes down to the screen: four border colours meet in mitred corners, light from the
    upper left, so the upper and left faces are in shadow and the lower and right ones lit. */
-.case-epaper .device-glass{padding:0;background:#d9d9d4;border:calc(var(--s)*.04) solid;border-color:#b0b0aa #eeeeea #ffffff #c6c6c0;
-  border-radius:calc(var(--s)*.03)}
+.case-epaper .device-glass{padding:0;background:#d9d9d4;border:calc(var(--s)*.07) solid;border-color:#c2c2bc #f0f0ec #fafaf8 #d0d0ca;
+  border-radius:calc(var(--s)*.09)}
 .case-epaper .device-screen{outline:max(1px,calc(var(--s)*.006)) solid #74746f;outline-offset:calc(var(--s)*-.006)}
 /* The prepared boards, from the makers' drawings and photos (--s is the screen width; offsets are mm / active width).
    Cheap Yellow Display: yellow PCB 86 x 50 mm, screen 57.6 x 43.2 mm, shifted away from the micro-USB end (right). */
