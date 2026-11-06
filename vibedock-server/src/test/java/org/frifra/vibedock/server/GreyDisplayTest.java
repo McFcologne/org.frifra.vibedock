@@ -55,5 +55,16 @@ class GreyDisplayTest {
             Assertions.assertTrue(sum/40000.0>=100,scheme.label+" is mostly light on paper: "+sum/40000.0);
         }
     }
+    @Test void darkAreasAreLightenedButKeepTheirContent() throws Exception {
+        var image=new BufferedImage(100,100,BufferedImage.TYPE_INT_RGB);
+        for(int y=0;y<100;y++)for(int x=0;x<100;x++)image.setRGB(x,y,y<50?0xffffff:0x202020);
+        for(int x=20;x<60;x++)image.setRGB(x,75,0xffffff);  // text in the dark area
+        for(int x=20;x<60;x++)image.setRGB(x,25,0x000000);  // text in the light area
+        GreyRegions.lighten(image);
+        Assertions.assertEquals(0xffffff,image.getRGB(5,5)&0xffffff,"light area unchanged");
+        Assertions.assertEquals(0,image.getRGB(30,25)&0xffffff,"dark text on light unchanged");
+        Assertions.assertTrue((image.getRGB(5,90)&255)>=200,"dark area is light");
+        Assertions.assertEquals(0,image.getRGB(30,75)&255,"light text in a dark area becomes dark");
+    }
     static UsageService.Snapshot snapshot(){return ThemesImageTest.snapshot();}
 }

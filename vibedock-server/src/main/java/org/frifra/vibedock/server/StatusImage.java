@@ -305,11 +305,20 @@ public class StatusImage {
             // Black-and-white panels (e-paper): greyscale with raised contrast, in the preview as on the device.
             if(grey)rgb=greyContrast(rgb,flip);
             // Scaled (web displays): full colour; devices: RGB565, and the PNG shows what they show.
-            if(scale!=1){if(grey||scheme.style==Scheme.Style.TERMINAL)image.setRGB(x,y,rgb);continue;}
+            if(grey){image.setRGB(x,y,rgb);continue;}  // packed below, after the dark areas are lightened
+            if(scale!=1){if(scheme.style==Scheme.Style.TERMINAL)image.setRGB(x,y,rgb);continue;}
             int r=(rgb>>19)&31,b=(rgb>>3)&31,green=(rgb>>10)&63;
             int value=(r<<11)|(green<<5)|b;
             pixels[offset++]=(byte)(value>>8);pixels[offset++]=(byte)value;
             image.setRGB(x,y,((r*255/31)<<16)|((green*255/63)<<8)|(b*255/31));
+        }
+        if(grey){
+            GreyRegions.lighten(image);
+            if(scale==1)for(int y=0;y<ph;y++)for(int x=0;x<pw;x++){
+                int rgb=image.getRGB(x,y),r=(rgb>>19)&31,b=(rgb>>3)&31,green=(rgb>>10)&63,value=(r<<11)|(green<<5)|b;
+                pixels[offset++]=(byte)(value>>8);pixels[offset++]=(byte)value;
+                image.setRGB(x,y,((r*255/31)<<16)|((green*255/63)<<8)|(b*255/31));
+            }
         }
         var primary=new LinkedHashSet<Integer>();
         for(int rgb:new int[]{scheme.background,scheme.title,scheme.text,scheme.muted,scheme.track,scheme.warning})primary.add(to565(grey?greyContrast(rgb,flip):rgb));
