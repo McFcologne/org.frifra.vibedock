@@ -69,11 +69,13 @@ class EPaper {
     for (int32_t j = 0; j < h; j++) for (int32_t i = 0; i < w; i++) put(x + i, y + j, greyOf(data[j * w + i]));
     settle();
   }
-  // Called from loop() and after a finished picture (force): sends the frame when it has been quiet.
+  // Called from loop() and after a finished picture (force): sends the frame when it has been quiet (force: at once), but
+  // never sooner than MIN_GAP_MS after the last refresh; a frame that has to wait is sent by a later call.
   void service(bool force = false) {
     if (!grey || !dirty) return;
     uint32_t now = millis();
-    if (!force && (now - changedAt < QUIET_MS || (refreshed && now - lastRefresh < MIN_GAP_MS))) return;
+    if (!force && now - changedAt < QUIET_MS) return;           // force (a finished picture) skips the quiet time
+    if (refreshed && now - lastRefresh < MIN_GAP_MS) return;     // but never the minimum gap: the panel wears with every refresh
     refresh();
   }
   bool pending() const { return dirty; }
