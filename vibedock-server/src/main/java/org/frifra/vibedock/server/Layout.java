@@ -14,7 +14,7 @@ import java.util.*;
  * together at the top and a weather/mood band at the end keeps to the bottom edge.
  */
 public record Layout(List<Band> bands,@JsonInclude(JsonInclude.Include.NON_DEFAULT) boolean alignTop) {
-    public static final int USAGE_HEIGHT=92,USAGE_MIN_HEIGHT=88,COMPACT_HEIGHT=46,COMPACT_MIN_HEIGHT=44,CONTEXT_HEIGHT=56,MAX_USAGE_BANDS=5;
+    public static final int USAGE_HEIGHT=92,USAGE_MIN_HEIGHT=88,COMPACT_HEIGHT=46,COMPACT_MIN_HEIGHT=44,CONTEXT_HEIGHT=56,IP_HEIGHT=22,MAX_USAGE_BANDS=5;
     public Layout(List<Band> bands){this(bands,false);}
 
     @JsonTypeInfo(use=JsonTypeInfo.Id.NAME,property="type")
@@ -32,8 +32,15 @@ public record Layout(List<Band> bands,@JsonInclude(JsonInclude.Include.NON_DEFAU
         public int height(){return compact?COMPACT_HEIGHT:USAGE_HEIGHT;}
         public int minHeight(){return compact?COMPACT_MIN_HEIGHT:USAGE_MIN_HEIGHT;}
     }
-    /** Weather and mood; moodLeft swaps their slots. The left slot is shorter because the IP sits below it. */
-    public record Context(boolean moodLeft) implements Band { public int height(){return CONTEXT_HEIGHT;} }
+    /**
+     * Weather and mood; moodLeft swaps their slots. The left slot is shorter because the IP sits below it. ipOnly leaves
+     * weather, update time and mood out: the band shrinks to the row of the device IP ({@value #IP_HEIGHT} px), the room
+     * goes to the usage bands (two full ones fit a 200 px display).
+     */
+    public record Context(boolean moodLeft,@JsonInclude(JsonInclude.Include.NON_DEFAULT) boolean ipOnly) implements Band {
+        public Context(boolean moodLeft){this(moodLeft,false);}
+        public int height(){return ipOnly?IP_HEIGHT:CONTEXT_HEIGHT;}
+    }
 
     public static final Layout DEFAULT=new Layout(List.of(new Usage(List.of("codex")),new Usage(List.of("claude")),new Context(false)));
     public Layout {
@@ -49,7 +56,7 @@ public record Layout(List<Band> bands,@JsonInclude(JsonInclude.Include.NON_DEFAU
         var next=new ArrayList<Band>();int used=0;boolean full=false;
         for(var band:bands){
             if(band instanceof Usage u){
-                if(full||(used>0&&used+u.minHeight()>type.bandRoom())){full=true;continue;}
+                if(full||(used>0&&used+u.minHeight()>type.height()-context().height())){full=true;continue;}
                 used+=u.minHeight();
                 next.add(type.halfWidth()||u.sources().size()==1?u:new Usage(List.of(u.sources().get(0))));
             }else next.add(band);

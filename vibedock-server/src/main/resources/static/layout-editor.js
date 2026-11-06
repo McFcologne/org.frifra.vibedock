@@ -127,6 +127,13 @@
       head.append(actions); article.append(head);
       const content = element('div', 'design-band-content');
       if (isContext(band)) {
+        // Weather and mood can be left out: the band shrinks to the row of the device IP and the usage bands get the room.
+        const show = element('label', 'design-check'), box = element('input'); box.type = 'checkbox'; box.checked = !band.ipOnly; box.disabled = inherit;
+        box.addEventListener('change', () => { if (inherit) return; band.ipOnly = !box.checked; if (!band.ipOnly) delete band.ipOnly; renderBands(); changed(); });
+        show.append(box, document.createTextNode(' Show weather, update time and mood'));
+        content.append(show);
+        if (band.ipOnly) { content.append(element('small', '', 'Only the device IP stays; the usage bands get the room.')); }
+        else {
         const pair = element('div', 'design-slot-pair');
         ['left', 'right'].forEach((side, i) => { const mood = band.moodLeft ? i === 0 : i === 1;
           const slot = element('div', 'design-slot ' + side); slot.append(element('span', 'meta', side === 'left' ? 'Short left slot (IP below)' : 'Tall right slot'),
@@ -136,6 +143,7 @@
         const swap = element('button', 'secondary small', 'Swap weather & mood ⇄'); swap.type = 'button';
         swap.addEventListener('click', () => { band.moodLeft = !band.moodLeft; renderBands(); changed(); });
         content.append(swap, element('small', '', 'The update time and the device IP move with this band. Weather shows the icon and temperature only.'));
+        }
       } else {
         const slots = element('div', 'design-source-slots');
         band.sources.forEach((source, i) => { const label = element('label', '', band.sources.length === 1 ? 'Data source' : i === 0 ? 'Left source' : 'Right source');
@@ -178,7 +186,7 @@
     const shown = new Set(); let used = 0, full = false;
     for (const band of usage) {
       const height = band.compact ? 44 : 88;
-      if (full || (used > 0 && used + height > shownType().bandRoom)) { full = true; continue; }
+      if (full || (used > 0 && used + height > shownType().bandRoom + (draft.layout.bands.some(b => isContext(b) && b.ipOnly) ? 34 : 0))) { full = true; continue; }
       used += height; shown.add(band);
     }
     return shown;
