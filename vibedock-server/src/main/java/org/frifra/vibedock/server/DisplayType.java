@@ -19,7 +19,8 @@ public record DisplayType(String id,String label,int width,int height,int corner
             new DisplayType("170x320","170×320 · 1.9\" ST7789",170,320),
             new DisplayType("172x320","172×320 · 1.47\" JD9853",172,320,18),
             new DisplayType("135x240","135×240 · 1.14\" ST7789",135,240),
-            new DisplayType("128x160","128×160 · 1.8\" ST7735",128,160));
+            new DisplayType("128x160","128×160 · 1.8\" ST7735",128,160),
+            new DisplayType("200x200","200×200 · 1.54\" e-paper, black and white",200,200));
     /**
      * Web displays only: the image takes the shape of the browser window and its full resolution (see
      * {@link #fitting}); the size here is what the administration's previews and programs without a size get.

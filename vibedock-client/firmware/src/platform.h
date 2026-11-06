@@ -153,6 +153,9 @@ inline String freeHeap() {
 // Backlight brightness in percent by PWM; 100 drives the pin fully on. Once the PWM is attached the pin stays on it,
 // also at 100 %: switching it back to a plain output (pinMode) detaches the PWM, and later dimming had no effect.
 inline void backlight(uint8_t pin, bool activeHigh, uint8_t percent) {
+#if defined(VIBEDOCK_EPAPER)
+  (void)pin; (void)activeHigh; (void)percent; return;  // e-paper has no backlight
+#endif
   if (percent > 100) percent = 100;
   uint32_t duty = uint32_t(percent) * 255 / 100; if (!activeHigh) duty = 255 - duty;
 #if defined(ESP8266)

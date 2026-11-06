@@ -6,7 +6,7 @@ Turn a compatible VibeDock display into a small Wi-Fi dashboard for your provide
 
 The firmware targets the **VibeTV M1: ESP8266EX with 4 MB flash and a 240×240 ST7789 display**, the desk display sold by Vibe TV ([vibetv.shop](https://vibetv.shop/); not affiliated with this project). Wi-Fi setup, pairing, image pulls and colour calibration are in use on real hardware.
 
-The same sources also build for ESP32 boards with a display: Cheap Yellow Display (ESP32-2432S028R), LilyGO T-Display, LilyGO T-Display-S3, Waveshare ESP32-S3-LCD-1.69, Waveshare ESP32-S3-Touch-LCD-1.47, Waveshare ESP32-S3-Touch-LCD-1.54, Waveshare ESP32-C6-Touch-LCD-1.69 and an ESP32-C3 with a 240×240 ST7789 (wiring and display types in [CLIENT-PROTOCOL.md](../vibedock-server/CLIENT-PROTOCOL.md#boards)). Each is a PlatformIO environment in `firmware/platformio.ini`; `firmware/src/platform.h` holds what differs between the chips. Tested on hardware: the VibeTV M1, the Waveshare ESP32-S3-Touch-LCD-1.47, ESP32-S3-Touch-LCD-1.54 and ESP32-C6-Touch-LCD-1.69. The other boards are prepared: they build and use what the tested boards showed, but have not run on hardware (status per board in [CLIENT-PROTOCOL.md](../vibedock-server/CLIENT-PROTOCOL.md#boards), tests in [VALIDATION.md](../vibedock-server/VALIDATION.md)).
+The same sources also build for ESP32 boards with a display: Cheap Yellow Display (ESP32-2432S028R), LilyGO T-Display, LilyGO T-Display-S3, Waveshare ESP32-S3-LCD-1.69, Waveshare ESP32-S3-Touch-LCD-1.47, Waveshare ESP32-S3-Touch-LCD-1.54, Waveshare ESP32-C6-Touch-LCD-1.69, Waveshare ESP32-S3-ePaper-1.54 (V2, black-and-white e-paper) and an ESP32-C3 with a 240×240 ST7789 (wiring and display types in [CLIENT-PROTOCOL.md](../vibedock-server/CLIENT-PROTOCOL.md#boards)). Each is a PlatformIO environment in `firmware/platformio.ini`; `firmware/src/platform.h` holds what differs between the chips. Tested on hardware: the VibeTV M1, the Waveshare ESP32-S3-Touch-LCD-1.47, ESP32-S3-Touch-LCD-1.54 and ESP32-C6-Touch-LCD-1.69. The other boards are prepared: they build and use what the tested boards showed, but have not run on hardware (status per board in [CLIENT-PROTOCOL.md](../vibedock-server/CLIENT-PROTOCOL.md#boards), tests in [VALIDATION.md](../vibedock-server/VALIDATION.md)).
 
 <p align="center"><img src="../docs/manual/images/62-image-test-bench.png" width="320" alt="Example of the VibeDock status display with usage bands, weather, mood, update time and IP address"></p>
 
@@ -80,6 +80,24 @@ The physical volume buttons are GPIO4 (+) and GPIO0 (-); GPIO5 (PWR) is not used
 16-bit stereo I2S with identical samples in both channels. Other boards explicitly exclude the audio source and do not include its quota parser or overlay buffer.
 Before merging flash images, the build checks the linked ELF and application binary for accidental audio code,
 buffers and protocol strings and fails if any are found on a board without audio.
+
+### Waveshare ESP32-S3-ePaper-1.54 (V2, e-paper)
+
+Select **Waveshare ESP32-S3-ePaper-1.54 (V2)** in the administration. The board has a 1.54" black-and-white e-paper panel
+(200 × 200, SSD1681), no touch and no backlight; the V2 has the ESP32-S3-PICO-1-N8R8 (8 MB flash, 8 MB PSRAM), the V1 is
+another hardware and not supported. The server renders 200 × 200; choose the *E-Ink* theme for the best result. The firmware
+turns the picture into black and white (greys become a dither pattern) and refreshes the panel once the picture is
+complete: a partial refresh (about 0.3 s) normally, a full one (about 2 s, flashing) at the first picture, after twelve
+partial ones and when much of the picture changed. A picture that did not change is not sent to the panel again. The device's
+own screens (setup, pairing, messages) are drawn dark on light and without animation. The wiring is in `firmware/platformio.ini`
+and follows the [manufacturer's V2 example](https://github.com/waveshareteam/ESP32-S3-ePaper-1.54/tree/main/02_Example/ESP-IDF/V2/07_BATT_PWR_Test)
+(SPI on GPIO 10-13, RST 9, BUSY 8, panel supply GPIO 6). With `-D VIBEDOCK_EPAPER_PARTIAL=0` every refresh is a full one.
+Not yet run on hardware.
+
+**Battery.** A 3.7 V lithium cell on the MX1.25 connector powers the board. The firmware holds the battery supply on
+(GPIO 17, as the manufacturer's example) and measures the voltage on GPIO 4 (ADC1 channel 3, divider of 2); the status
+page, `VIBEDOCK-BATTERY` and the metrics report it. The board has no known charging signal, and the power-saving mode of the
+LCD boards (which dims the backlight) does not apply. The PWR button is not used yet.
 
 ### Battery readings on the Waveshare ESP32-S3-Touch-LCD-1.54
 

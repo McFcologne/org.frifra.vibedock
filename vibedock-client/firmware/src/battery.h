@@ -1,9 +1,11 @@
-// Battery sensing: the voltage on VIBEDOCK_BATTERY_ADC (battery / 3) and, where wired, the charger's active-low CHRG on
+// Battery sensing: the voltage on VIBEDOCK_BATTERY_ADC (battery / VIBEDOCK_BATTERY_DIVIDER, 3 by default) and, where wired, the charger's active-low CHRG on
 // VIBEDOCK_BATTERY_CHARGE. Boards without them do not touch any GPIO.
 // - Waveshare ESP32-S3-Touch-LCD-1.54: GPIO1 voltage, GPIO3 CHRG (vendor schematic and bsp_power_manager.c at
 //   waveshareteam/ESP32-S3-Touch-LCD-1.54, revision 5157db7c888e476fd57f8a95020800377447478f).
 // - Waveshare ESP32-C6-Touch-LCD-1.69: GPIO0 voltage (BAT_ADC, VBAT - 200k - BAT_ADC - 100k - GND in the vendor
 //   schematic); the charger's STAT pin is not connected, so there is no charging signal.
+// - Waveshare ESP32-S3-ePaper-1.54 V2: GPIO4 (ADC1 channel 3) behind a divider of 2; GPIO17 holds the battery supply on
+//   (vendor example 07_BATT_PWR_Test); no charging signal known.
 #pragma once
 #include <Arduino.h>
 #include "client_policy.h"
@@ -13,6 +15,9 @@
 #include "soc/usb_serial_jtag_reg.h"
 #endif
 
+#ifndef VIBEDOCK_BATTERY_DIVIDER
+#define VIBEDOCK_BATTERY_DIVIDER 3  // the board's voltage divider: battery / 3 unless a board says otherwise
+#endif
 namespace battery {
 struct Reading {
   bool supported = false;
@@ -51,7 +56,7 @@ inline Reading read() {
 #endif
     delay(1);
   }
-  result.millivolts = (total * 3u + 8u) / 16u;
+  result.millivolts = (total * VIBEDOCK_BATTERY_DIVIDER + 8u) / 16u;
   result.estimatedPercent = client_policy::batteryEstimate(result.millivolts);
 #ifdef VIBEDOCK_BATTERY_CHARGE
   result.chargeSignal = active == 16 ? "active" : active == 0 ? "inactive" : "unstable";
