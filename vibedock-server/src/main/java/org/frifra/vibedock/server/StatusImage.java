@@ -268,6 +268,18 @@ public class StatusImage {
         // Rounded panels: the text starts where the corner leaves room near the bottom edge.
         int left=Math.max(10,inset(4)+3),size=12,room=Math.min(150,w)-4-left;
         int moodMargin=Math.max(6,inset(12));
+        // Only the IP row: the whole width is available. The update time (right-aligned) is reserved first when the
+        // address still fits beside it, at 12 or 10 pt; otherwise the time is left out.
+        String rowTime=null;int edge=w-moodMargin;
+        if(band.ipOnly()){
+            left=Math.max(6,inset(4));room=edge-left;
+            String whole=ip.contains(" ")?ip:"IP: "+ip;
+            g.setFont(new Font(scheme.font(),Font.PLAIN,10));
+            for(String candidate:new String[]{updated,time}){
+                int r=edge-g.getFontMetrics().stringWidth(candidate)-8-left;
+                if(whole.equals(fit(g,scheme,whole,12,r))||whole.equals(fit(g,scheme,whole,10,r))){rowTime=candidate;room=r;break;}
+            }
+        }
         if(rightMood!=null)room=Math.min(room,w-moodMargin-iw(rightMood)-4-left);
         room=Math.min(room,weatherLeft-4-left);
         String full=ip.contains(" ")?ip:"IP: "+ip,label=fit(g,scheme,full,size,room);
@@ -275,6 +287,9 @@ public class StatusImage {
         // An address that does not fit loses its prefix, then its leading segments: the last ones tell displays apart.
         if(!full.equals(label)&&!ip.contains(" "))label=fitTail(g,scheme,ip,size,room);
         if(label!=null)text(g,scheme,label,left,y+(band.ipOnly()?16:51),size,desktopText(scheme),false);
+        // Only the IP row: the time of the newest reading at the right, so a display that is not updated any more
+        // shows it (e-paper keeps its picture without power).
+        if(rowTime!=null)right(g,scheme,rowTime,edge,y+16,10,desktopMuted(scheme));
         // Mood right, in front of the IP corner. Developer themes raise it another 6 px inside the same slot.
         if(rightMood!=null)put(g,rightMood,w-moodMargin-iw(rightMood),y+50-ih(rightMood)-(scheme.developer()?6:0));
     }

@@ -42,4 +42,15 @@ class ContextIpOnlyTest {
         int ink=0;for(int y=178;y<200;y++)for(int x=0;x<150;x++)if((b.getRGB(x,y)&255)<100)ink++;
         Assertions.assertTrue(ink>20,"IP text in the last row: "+ink);
     }
+    @Test void theUpdateTimeStandsRightOfTheIpWhenThereIsRoom() throws Exception {
+        var renderer=new StatusImage("Europe/Berlin");
+        var look=new StatusImage.Look(null,Scheme.E_INK,null,null,twoFull(true));
+        var wide=ImageIO.read(new ByteArrayInputStream(renderer.render(ThemesImageTest.snapshot(),"10.0.0.5",look,DisplayType.M1).png()));
+        int ink=0;for(int y=240-20;y<240;y++)for(int x=150;x<240;x++)if((wide.getRGB(x,y)&255)<160)ink++;
+        Assertions.assertTrue(ink>15,"time at the right of a short IP: "+ink);
+        // On the 200 px e-paper the long IP leaves room for the time only
+        var epaper=ImageIO.read(new ByteArrayInputStream(renderer.render(ThemesImageTest.snapshot(),"192.168.123.185",look,EPAPER).png()));
+        int right=0;for(int y=178;y<200;y++)for(int x=150;x<200;x++)if((epaper.getRGB(x,y)&255)<160)right++;
+        Assertions.assertTrue(right>5,"time at the right of the long IP: "+right);
+    }
 }
