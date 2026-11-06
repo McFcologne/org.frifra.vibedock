@@ -1142,6 +1142,11 @@ own, for example a test version from your checkout:
    installs this build over USB, and **Update to …** offers it over Wi-Fi, signed with the server's key, to the
    displays of this board.
 
+A firmware built for a board this server does not list (your own board ID in `platformio.ini`) is recognised as
+**Own build: <id>**: the display keeps its ID and a screen size between 64 and 480 pixels per side that it reports, but
+the server never offers it firmware, so it cannot be given the firmware of another board by mistake. Update such a
+display with your own build over USB or Wi-Fi from your checkout.
+
 **Use the built-in firmware** removes the upload; the firmware of the server's version applies again. Only upload
 firmware you built from these sources and trust: the displays install it.
 

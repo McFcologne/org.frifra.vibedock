@@ -30,7 +30,8 @@ class DesignController {
                 .map(v->new Target(v.identifier(),v.name(),v.ip(),v.overridden(),v.design(),v.serverFooter(),v.display().id(),v.board().previewCase(),v.web()!=null)).toList(),
                 usage.snapshot().providers().keySet().stream().map(id->new SourceOption(id,usage.snapshot().label(id))).toList(),
                 schemeOptions(),
-                DisplayType.WEB.stream().map(t->new DisplayOption(t.id(),t.label(),t.width(),t.height(),t.bandRoom(),t.halfWidth())).toList(),designs.themeSnapshot().icons());
+                java.util.stream.Stream.concat(DisplayType.WEB.stream(),registry.views().stream().map(v->v.display()).filter(t->!DisplayType.WEB.contains(t)).distinct())  // own sizes devices reported
+                        .map(t->new DisplayOption(t.id(),t.label(),t.width(),t.height(),t.bandRoom(),t.halfWidth())).toList(),designs.themeSnapshot().icons());
     }
     private List<SchemeOption> schemeOptions(){
         var snapshot=designs.themeSnapshot();var options=new LinkedHashMap<String,SchemeOption>();

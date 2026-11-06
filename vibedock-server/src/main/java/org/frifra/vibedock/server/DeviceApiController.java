@@ -76,9 +76,10 @@ class DeviceApiController {
         String updateError=request.getHeader("X-VibeDock-Update-Error");
         registry.otaReport(identifier,request.getHeader("X-VibeDock-Ota"),
                 updateError!=null&&updateError.matches("[ -~]{1,120}")?updateError:null);
-        // The device knows its board (firmware build); it decides which firmware an update installs.
+        // The device knows its board (firmware build); it decides which firmware an update installs. A board this server
+        // does not know (an own build) is kept as it is reported: it gets no firmware.
         String board=request.getHeader("X-VibeDock-Board");
-        if(board!=null&&Board.find(board).isPresent()&&!registry.get(identifier).board().id().equals(board)){
+        if(Board.reportable(board)&&!registry.get(identifier).board().id().equals(board)){
             try{registry.setBoard(identifier,board);}catch(IOException e){log.warn("Could not store the board of {}: {}",identifier,e.toString());}
         }
         // A device that reports its screen size gets the image in it; a type chosen in the administration stays.
