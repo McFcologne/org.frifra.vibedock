@@ -1,1 +1,0 @@
-- **Battery simulation in the design preview:** a checkbox with a level (unknown, 100, 60, 20, 10 %) shows the battery icon in the preview of the design page, to see how it looks in a theme. Nothing is saved.

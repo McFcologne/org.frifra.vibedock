@@ -1,1 +1,0 @@
-- **Displays no longer pull in the same second:** with several displays the announced time to the next pull gets up to 10 s on top, in fixed steps with a random order that is drawn anew every round (`CLIENT-PROTOCOL.md` 3h). Not for `pending` answers, slideshows, single displays or intervals under 20 s.

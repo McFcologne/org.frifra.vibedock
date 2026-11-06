@@ -11,40 +11,40 @@ import java.util.*;
 import java.util.List;
 
 /**
- * Draws every colour scheme with example data, with the server's renderer at twice the size (sharp on high-resolution
+ * Draws every colour scheme with example data and its default theme icon, with the server's renderer at twice the size (sharp on high-resolution
  * screens), into target/themes.png. With the Twemoji graphics versioned in the repository; VIBEDOCK_TWEMOJI names
  * another SVG folder. The picture of the README and the manual (docs/manual/themes.png; outside images/, which
  * scripts/docs.sh makes again) is made with
  * {@code VIBEDOCK_THEMES_IMAGE=../docs/manual/themes.png mvn test -Dtest=ThemesImageTest} (from vibedock-server).
  */
 class ThemesImageTest {
-    record Example(Scheme scheme,String mood,String weather,String temperature) {}
+    record Example(Scheme scheme,String weather,String temperature) {}
     static final List<Example> EXAMPLES=List.of(
-            new Example(Scheme.MIDNIGHT,"🤖","⛅","13°"),new Example(Scheme.OCEAN,"🐙","🌧","9°"),new Example(Scheme.FOREST,"🌵","☀","21°"),
-            new Example(Scheme.SUNSET,"🔥","🌥","17°"),new Example(Scheme.LAVENDER,"🦄","🌨","-2°"),new Example(Scheme.MONO,"🎧","☁","11°"),
-            new Example(Scheme.PAPER,"☕","⛅","14°"),new Example(Scheme.SKY,"🐧","☁","6°"),new Example(Scheme.SAND,"🍀","🌥","19°"),
-            new Example(Scheme.TERMINAL_GREEN,"👾","⛅","13°"),new Example(Scheme.TERMINAL_AMBER,"🍯","⛅","13°"),new Example(Scheme.CLASSIC_MAC,"🍎","☀","21°"),
-            new Example(Scheme.CLASSIC_WINDOWS,"💾","⛅","16°"),new Example(Scheme.WINDOWS_11,"💻","⛅","15°"),new Example(Scheme.MACOS,"🍏","☀","22°"),
-            new Example(Scheme.STARSHIP,"🖖","🌥","12°"),new Example(Scheme.HANDHELD,"🍄","☀","20°"),new Example(Scheme.BLUEPRINT,"📐","⛅","14°"),
-            new Example(Scheme.NEON,"🌆","🌙","18°"),new Example(Scheme.NEWSPRINT,"📰","🌧","10°"),
-            new Example(Scheme.MISSION_CONTROL,"😎","⛅","13°"),new Example(Scheme.DEPARTURE_BOARD,"😎","⛅","13°"),
-            new Example(Scheme.NORDIC,"😎","⛅","13°"),new Example(Scheme.HI_FI,"😎","⛅","13°"),
-            new Example(Scheme.SOLARIZED,"😎","⛅","13°"),new Example(Scheme.PIXEL_QUEST,"😎","⛅","13°"),
-            new Example(Scheme.BAUHAUS,"😎","⛅","13°"),new Example(Scheme.E_INK,"😎","⛅","13°"),
-            new Example(Scheme.INDUSTRIAL,"😎","⛅","13°"),new Example(Scheme.PORCELAIN,"😎","⛅","13°"),
-            new Example(Scheme.GITHUB_DARK,"😎","⛅","13°"),new Example(Scheme.VS_CODE,"😎","⛅","13°"),
-            new Example(Scheme.TERMINAL,"😎","⛅","13°"),new Example(Scheme.GIT_DIFF,"😎","⛅","13°"),
-            new Example(Scheme.DEBUGGER,"😎","⛅","13°"),
-            new Example(Scheme.WINDOWS_XP,null,"⛅","13°"),
-            new Example(Scheme.WINDOWS_7,null,"⛅","13°"),
-            new Example(Scheme.DOS,null,"⛅","13°"),
-            new Example(Scheme.NUCLEAR,null,"⛅","13°"),
-            new Example(Scheme.HALLOWEEN,null,"⛅","13°"),
-            new Example(Scheme.CHRISTMAS,null,"⛅","13°"),
-            new Example(Scheme.WINTER,null,"⛅","13°"),
-            new Example(Scheme.CYBERPUNK,null,"⛅","13°"),
-            new Example(Scheme.ORBITAL,null,"⛅","13°"),
-            new Example(Scheme.OSCILLOSCOPE,null,"⛅","13°"));
+            new Example(Scheme.MIDNIGHT,"⛅","13°"),new Example(Scheme.OCEAN,"🌧","9°"),new Example(Scheme.FOREST,"☀","21°"),
+            new Example(Scheme.SUNSET,"🌥","17°"),new Example(Scheme.LAVENDER,"🌨","-2°"),new Example(Scheme.MONO,"☁","11°"),
+            new Example(Scheme.PAPER,"⛅","14°"),new Example(Scheme.SKY,"☁","6°"),new Example(Scheme.SAND,"🌥","19°"),
+            new Example(Scheme.TERMINAL_GREEN,"⛅","13°"),new Example(Scheme.TERMINAL_AMBER,"⛅","13°"),new Example(Scheme.CLASSIC_MAC,"☀","21°"),
+            new Example(Scheme.CLASSIC_WINDOWS,"⛅","16°"),new Example(Scheme.WINDOWS_11,"⛅","15°"),new Example(Scheme.MACOS,"☀","22°"),
+            new Example(Scheme.STARSHIP,"🌥","12°"),new Example(Scheme.HANDHELD,"☀","20°"),new Example(Scheme.BLUEPRINT,"⛅","14°"),
+            new Example(Scheme.NEON,"🌙","18°"),new Example(Scheme.NEWSPRINT,"🌧","10°"),
+            new Example(Scheme.MISSION_CONTROL,"⛅","13°"),new Example(Scheme.DEPARTURE_BOARD,"⛅","13°"),
+            new Example(Scheme.NORDIC,"⛅","13°"),new Example(Scheme.HI_FI,"⛅","13°"),
+            new Example(Scheme.SOLARIZED,"⛅","13°"),new Example(Scheme.PIXEL_QUEST,"⛅","13°"),
+            new Example(Scheme.BAUHAUS,"⛅","13°"),new Example(Scheme.E_INK,"⛅","13°"),
+            new Example(Scheme.INDUSTRIAL,"⛅","13°"),new Example(Scheme.PORCELAIN,"⛅","13°"),
+            new Example(Scheme.GITHUB_DARK,"⛅","13°"),new Example(Scheme.VS_CODE,"⛅","13°"),
+            new Example(Scheme.TERMINAL,"⛅","13°"),new Example(Scheme.GIT_DIFF,"⛅","13°"),
+            new Example(Scheme.DEBUGGER,"⛅","13°"),
+            new Example(Scheme.WINDOWS_XP,"⛅","13°"),
+            new Example(Scheme.WINDOWS_7,"⛅","13°"),
+            new Example(Scheme.DOS,"⛅","13°"),
+            new Example(Scheme.NUCLEAR,"⛅","13°"),
+            new Example(Scheme.HALLOWEEN,"⛅","13°"),
+            new Example(Scheme.CHRISTMAS,"⛅","13°"),
+            new Example(Scheme.WINTER,"⛅","13°"),
+            new Example(Scheme.CYBERPUNK,"⛅","13°"),
+            new Example(Scheme.ORBITAL,"⛅","13°"),
+            new Example(Scheme.OSCILLOSCOPE,"⛅","13°"));
 
     @Test void drawsEveryScheme() throws Exception {
         var emoji=Twemoji.locate(System.getenv("VIBEDOCK_TWEMOJI"));
@@ -61,7 +61,7 @@ class ThemesImageTest {
         g.setFont(new Font(Font.SANS_SERIF,Font.PLAIN,14*k));
         for(int i=0;i<EXAMPLES.size();i++){
             var e=EXAMPLES.get(i);int x=gap+(i%columns)*cell,y=gap/2+(i/columns)*(label+240*k+gap);
-            var look=new StatusImage.Look(e.mood()==null?ThemeIcons.image(new Design.Icon("theme-default",null,null),e.scheme(),Twemoji.SIZE*k).orElseThrow():required(twemoji,e.mood(),Twemoji.SIZE*k),e.scheme(),required(twemoji,e.weather(),24*k),e.temperature(),Layout.DEFAULT);
+            var look=new StatusImage.Look(ThemeIcons.image(new Design.Icon("theme-default",null,null),e.scheme(),Twemoji.SIZE*k).orElseThrow(),e.scheme(),required(twemoji,e.weather(),24*k),e.temperature(),Layout.DEFAULT);
             var image=ImageIO.read(new ByteArrayInputStream(renderer.render(snapshot,"192.168.1.50",look,DisplayType.M1,k).png()));
             g.setColor(new Color(0x3c4048));g.drawString(e.scheme().label,x,y+15*k);
             g.drawImage(image,x,y+label,null);

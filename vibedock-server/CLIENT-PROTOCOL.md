@@ -264,7 +264,7 @@ handler, kept in RTC memory as well; they are decoded with the ELF of that firmw
 
 ## 3i. Metrics (device → server)
 
-Firmware newer than 0.4.2 sends with every image pull the values it measures, in one compact header (older firmware
+Firmware 0.5.0 and newer sends with every image pull the values it measures, in one compact header (older firmware
 sends none and keeps working):
 
 ```
@@ -535,7 +535,7 @@ image pull; invalid values return 400. A change within 5 s of the last one retur
 device writes it to flash); the next image response brings it. It shares the existing unauthenticated `/pull` callback and cannot change
 pairing, credentials, calibration or server addresses. Unreachable devices learn the value through their next
 authenticated image response. An open page polls local `/ui-state` every five seconds, skips hidden tabs,
-and requests `/image.bmp` only when the device has completed another image. No persistent connection or
+and reloads the picture from the server (3j) only when the device has completed another image. No persistent connection or
 additional image buffer is kept on the device. Missing or unknown
 values leave its saved preference unchanged (initial default: dark). The setting does not alter the rendered
 image, theme selection, colour calibration or backlight.

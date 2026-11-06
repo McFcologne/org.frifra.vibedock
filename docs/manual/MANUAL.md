@@ -220,6 +220,7 @@ Everything the server keeps lives in the data directory, by default `vibedock-se
 | `ota-signing.key` | Key that signs firmware updates; displays accept updates only signed with it |
 | `firmware/` | Own firmware builds uploaded under **Devices → Firmware**, one folder per board (only when used) |
 | `logs/` | `vibedock.log` and the daily request logs (kept 14 days) |
+| `device-logs/` | Per display the last starts and, from firmware 0.5.0, the measured values (`metrics.jsonl`, 30 days) |
 
 The directory contains **encrypted credentials and the private `.installation-id` needed to read them**: keep it private, never commit or publish it. Settings and sign-in caches remain readable JSON; only credential fields such as tokens, refresh tokens and API keys are encrypted. The portal password remains a BCrypt hash, without additional encryption. Include hidden files in a backup; existing plaintext credentials and the earlier whole-file encryption format are migrated automatically on startup. Password-protected data-source exports remain independent of that installation identity. It survives
 restarts, rebuilds and updates of the image.
@@ -618,6 +619,9 @@ and do not appear on the firmware page.
 
 The display editor sets what a display shows. **Design for** chooses the default design or a device. The preview
 on the right is rendered by the server exactly as the display will show it. Every change is saved right away.
+Under the preview, **Simulate battery** simulates a display that runs on its battery: tick it and choose a level
+(unknown, 100, 60, 20 or 10 %) to see the icon in the chosen theme (see [Battery power saving](#battery-power-saving-experimental)).
+It changes only the preview; nothing is saved.
 
 <img src="images/30-display-default.png" width="100%" alt="Default design">
 
@@ -919,6 +923,12 @@ can change next, after the next poll of the sources it shows (all sources are po
 several providers do not make it pull more often). The interval applies to older firmware, after a failed pull and
 before the first answer, and as grace before *Updates missing*. Web display links use these addresses too.
 
+With several displays the server adds up to 10 seconds to the announced time, so that they do not all pull in the same
+second: every display gets a fixed step of its own (with six displays 0, 2, 4, 6, 8 and 10 seconds)
+and keeps it for the round; the order is drawn anew with every round. A single display, a running slideshow, a
+`pending` answer and times under 20 seconds get nothing on top, and the time never passes the display's limit of 10 minutes
+(2 minutes for a display the server cannot reach directly).
+
 ## Read-only API access
 
 <img src="images/50-settings-api.png" width="80%" alt="Read-only API access">
@@ -1187,6 +1197,7 @@ Reasons under *Server unreachable*:
 | `TLS 1.3 … out of memory …` | The display ran out of memory during the handshake. Send the log line. |
 | `TLS 1.3 … alert from the server …`, `server does not speak TLS 1.3` | The server refused the connection; the alert names why. A server with TLS 1.2 only works on the M1 over its TLS 1.2 fallback. |
 | `read Timeout (-11) after TLS; sent …, got … B …` | The encrypted connection worked, but the answer stalled (`got` bytes arrived). Mostly a lossy network; the display retries at once. |
+| `read Timeout, TCP … works, no HTTP answer` | Over plain http the server did not answer within 3 seconds (firmware 0.5.0; 5 seconds before); the display retries. Now and then is harmless; often: see [Slow pictures and aborted transfers](#slow-pictures-and-aborted-transfers-wi-fi). |
 | `no root certificate for https from pairing` | The display was paired without an https root. Pair it again. |
 | `clock not set yet (NTP), needed for https` | The display has no time yet; it needs `pool.ntp.org`. It goes away after a few seconds. |
 
@@ -1215,6 +1226,13 @@ Work from the display outwards: what the display shows, what its log says, then 
 pairing code means it is not paired, *Server unreachable* means Wi-Fi works but no server address answers. A display
 that shows an image and the green status under **Devices** is fine; a stale image disappears after three missed
 polls.
+
+**The status page.** Every display answers on its IP address (`http://<device-ip>/`) with a status page in the local network.
+It shows the state, the picture the display shows and, in the *Memory* row, the free memory and its largest block in one
+piece. The picture is loaded from the server, not from the display: the page asks the server for it with a token that the
+display got with its last pull, tries the second server address when the first does not load and offers **Retry**. The
+page shows no picture before the display's first pull after an update, or when the server is older than 0.5.0. The VibeTV
+Classic builds the page piece by piece, so it arrives complete even when little memory is left.
 
 ## Touch displays
 
@@ -1272,7 +1290,7 @@ If the display misses updates on battery, switch it off again.
 
 **Battery icon.** While one of these displays runs on its battery, its picture shows a small battery at the top right
 of the first usage band (beside a status such as *Rate limited*, in window themes in the title bar), whether power
-saving is on or not. The 1.54 and the C6 1.69 fill it to their measured level in steps of 20 %, red below 20 %; the others only know
+saving is on or not. It has the colour of the title text of the theme, so it reads like part of the heading or the title bar. The 1.54 and the C6 1.69 fill it to their measured level in steps of 20 %, red below 20 %; the others only know
 that they run on battery and show three dots in it (level unknown), an empty frame means 0 %. The device card's preview shows it as well. On USB it disappears. The
 server draws it into the image, so the display only sends one more header with its pulls; the image changes only when
 the level steps or the power source changes. The LilyGO T-Display has a battery connection too,
@@ -1305,6 +1323,20 @@ change against the log before in brackets. When a log is saved, the server also 
 display from the same time: image transfers (delta or full, bytes, next pull), starts, saved logs and updates. The
 switch **Server lines** on a log shows them between the display's lines, in the accent colour, with all times in
 server time; while it is on, **Download** includes them too. Logs without such entries have no switch.
+
+**Metrics.** The **Metrics** button on a display's log page opens what the display measured and sent with its pulls
+(firmware 0.5.0 and newer). The server keeps one sample per display every 5 minutes and with every start, for 30 days,
+and in a sample the lowest free memory of all pulls since the sample before, so a dip between two samples is not lost.
+Choose the period (6 hours, 1, 3, 7 or 30 days): the curves show the free memory, the lowest free memory and the largest
+block in one piece (a dashed line marks a restart), the Wi-Fi signal and, while the display runs on its battery, the
+battery voltage. Below them a table lists the newest samples with the free memory, the lowest and largest block, the
+memory after a TLS handshake and its stack, the time of the last picture, signal, Wi-Fi drops, battery voltage,
+brightness and how long the display was active and dimmed. A value that was not measured stays empty. **Export CSV**
+(or `/admin/metrics.csv`) hands the samples to a spreadsheet: comma as separator, dot as decimal mark, the unit in the
+column name, local and UTC time, firmware and the reason of the start, for all displays or one with `device`, and for a
+period with `from` and `to` (`yyyy-MM-dd` or an instant); `raw=true` adds the header as the display sent it. Text cells that start like a formula are
+saved with a leading apostrophe. The key figures of a log use the samples of its period as well, and the support file
+carries them as `samples`.
 
 The table also shows how fresh the **newest log** is: how long ago the server received it (server time; its lines can
 be much older), over USB or the network, the firmware it came from and, with firmware 0.2.0, the start it was sent in

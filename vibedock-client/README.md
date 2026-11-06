@@ -157,8 +157,13 @@ every poll interval, so with sources polled every minute it pulls once a minute 
 between; with longer intervals it pulls less often. While a source is still being asked (`state=pending`) it comes back
 when the poll should be done, at most every 2, 5, 10, then 30 s. Upper limit: 10 minutes for displays the server can
 ask for an immediate pull, 2 minutes for the others. Failed pulls, immediate pull requests and older servers use the
-poll interval as before. The status page shows the next pull. See
-[the protocol](../vibedock-server/CLIENT-PROTOCOL.md#3h-next-pull-server--device).
+poll interval as before. The status page shows the next pull. With several displays the server adds up to 10 s to the
+announced time, a fixed step of its own for every display and round, so they do not pull in the same second (not for
+`pending`, slideshows, a single display or times under 20 s). With every pull the display also sends what it measures
+(memory, Wi-Fi signal, picture time, battery, in the short header `X-VibeDock-Metrics`); the server shows it under
+*Logs → Metrics*. See the protocol,
+[3h](../vibedock-server/CLIENT-PROTOCOL.md#3h-next-pull-server--device) and
+[3i](../vibedock-server/CLIENT-PROTOCOL.md#3i-metrics-device--server).
 
 ## Image transfer
 
@@ -389,7 +394,7 @@ several are connected. Enumeration is passive; only the selected port is queried
 | Image | RGB565, most significant byte first, 16–480 px per side as named in the format header (240 × 240: 115,200 bytes), scaled to the screen. Delta images (`rgb565-delta-be-WxH`) carry only changed row spans and are checked by length, payload hash and a hash over all rows. Invalid transfers are rejected and the next pull gets the complete image; a transfer cut off on the way resumes with the rest. |
 | Memory and redraw | One input row (at most 960 bytes) plus one row of 16-bit pixels. ESP32 boards keep a copy of the picture when PSRAM or enough heap is free (for turns and colour correction); the M1 does not. Row hashes avoid redrawing unchanged rows and are the basis for delta images. |
 | IP footer | Current server images carry the IP reported by the device (`X-VibeDock-Footer: server`). On its own status screens, the device draws the footer itself. |
-| Polling | Every answer announces the next pull (`X-VibeDock-Next-Pull`: 2 s to 10 minutes, 2 minutes for displays the server cannot reach directly). The fallback poll interval (default 30 seconds, clamped to 10–3,600 seconds) applies to older servers and after failed pulls. Image reads use an eight-second abort limit (15 seconds over https); the browser BMP proxy has a separate transfer limit. |
+| Polling | Every answer announces the next pull (`X-VibeDock-Next-Pull`: 2 s to 10 minutes, 2 minutes for displays the server cannot reach directly). The fallback poll interval (default 30 seconds, clamped to 10–3,600 seconds) applies to older servers and after failed pulls. Image reads use an eight-second abort limit (15 seconds over https). The wait for the answer to a pull is 3 seconds over plain http, 5 seconds over https and 15 seconds after a full certificate check; then the display retries. |
 | Version | Compiled in from the Git tag by `firmware/version.py`, like the server: `0.1.0` on the tag `0.1.0` (or `v0.1.0`), `0.1.0-3-g<commit>` after it, `-dirty` with uncommitted changes. |
 | Persistence | `/standalone.json` in LittleFS stores Wi-Fi, identifier, pairing credentials, server addresses and colour settings. Treat the file and device backups as private. The setup-network password is never stored. |
 | HTTPS | Pairing supplies a trusted root and certificate fingerprint. Normal requests check the fingerprint; after certificate renewal, root/hostname/validity verification allows learning a new fingerprint. Certificate checks require time from NTP (`pool.ntp.org`). Verification fails closed. The VibeTV M1 speaks TLS 1.3 (Mbed TLS; the full check once, then the pinned certificate) and TLS 1.2 only for servers that refuse 1.3; the ESP32 boards TLS 1.2. See [TLS.md](TLS.md). |
@@ -406,7 +411,11 @@ Wi-Fi setup, pairing, image pulls, display output and colour calibration have be
 The device's setup and status web pages inherit the server administration's Light/Dark choice through the next
 authenticated image response (including HTTP 304). Reachable devices also receive an appearance-only push
 over the existing `/pull` callback, independently of image updates. Open pages apply changes within five seconds and reload their preview only after a new
-complete image; hidden tabs pause polling. Preview updates stream a full image only while the page is open.
+complete image; hidden tabs pause polling. The picture on the status page comes from the server, not from the display:
+every pull answer carries `X-VibeDock-Preview-Token`, the page loads `/api/v1/clients/<id>/preview.png?t=<token>`, tries
+the second server address when the first does not load and offers *Retry* (see
+[the protocol](../vibedock-server/CLIENT-PROTOCOL.md#3j-picture-on-the-displays-page-server--device--browser)). The page
+is built in slices of 256 bytes, and its *Memory* row shows the free memory and the largest free block.
 The last choice persists across restarts; an unpaired device defaults to dark. The image colour scheme is separate.
 
 ### Hardware image palettes

@@ -1,1 +1,0 @@
-- **Battery icon in the colour of the title text:** on a display that runs on its battery, the icon at the top right is drawn in the colour of the window title (or heading) instead of the body text or the window controls, so it reads like part of the title bar in every theme.
