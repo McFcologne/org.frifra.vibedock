@@ -64,6 +64,19 @@
   // saves at once; the card turns with it and the device with its next pull (asked right away).
   // The case turns with the picture in it (the glass keeps its turn); then the display draws the new picture
   // upright, row by row from the top, over the previous one, which stays turned until it is drawn over.
+  // A case that is not square takes the room of its turned shape: the card keeps its layout box, so a quarter turn
+  // shifts half the difference of height and width (as a share of the screen width, so it holds in the lightbox too)
+  // from the vertical to the horizontal margin of the device (--fit, app.css).
+  const fitTurn = device => {
+    const front = device.querySelector('.device-front'), image = device.querySelector('img');
+    if (!front || !image || !image.offsetWidth) return;
+    const quarters = Math.round((parseFloat(device.style.getPropertyValue('--turn')) || 0) / 90);
+    const share = Math.abs(quarters) % 2 === 1 ? (front.offsetHeight - front.offsetWidth) / 2 / image.offsetWidth : 0;
+    device.style.setProperty('--fit', share.toFixed(4));
+  };
+  const fitAll = () => document.querySelectorAll('.client-card .device').forEach(fitTurn);
+  fitAll(); window.addEventListener('load', fitAll);
+  document.querySelectorAll('.client-card .device img').forEach(image => image.addEventListener('load', () => fitTurn(image.closest('.device'))));
   const showTurn = (form, degrees) => {
     const device = form.closest('.client-card')?.querySelector('.device'), glass = device?.querySelector('.device-glass');
     form.querySelector('[data-turn-value]').textContent = degrees + '°';
@@ -72,7 +85,7 @@
     let step = ((degrees - before) % 360 + 360) % 360; if (step > 180) step -= 360;
     const target = before + step;
     if (!device || !glass || target === before) return;
-    glass.style.setProperty('--glass-turn', before + 'deg'); device.style.setProperty('--turn', target + 'deg');
+    glass.style.setProperty('--glass-turn', before + 'deg'); device.style.setProperty('--turn', target + 'deg'); fitTurn(device);
     clearTimeout(glass.turnTimer); glass.querySelector('.turn-old')?.remove();
     glass.turnTimer = setTimeout(() => {
       const image = glass.querySelector('img:not(.turn-old)'), screen = image?.closest('.device-screen');

@@ -143,4 +143,31 @@ class DeviceMetricsTest {
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString(id))));
         mvc.perform(admin(get("/admin/metrics.csv").param("from","yesterday"))).andExpect(status().isBadRequest());
     }
+    @Test void theChartMarksGapsWithoutSamplesAsOffline(){
+        long t0=Instant.parse("2026-11-05T08:00:00Z").toEpochMilli(),step=DeviceMetrics.INTERVAL_SECONDS*1000L;
+        var samples=new ArrayList<DeviceMetrics.Sample>();
+        for(int i=0;i<4;i++)samples.add(sample(t0+i*step,-50));
+        for(int i=0;i<4;i++)samples.add(sample(t0+(20+i)*step,-60));   // 16 intervals without a sample in between
+        var series=List.of(new MetricsChart.Series("Signal",DeviceMetrics.Sample::rssi));
+        String svg=MetricsChart.svg(samples,t0,t0+30*step,series,1,false,"dBm",ZoneOffset.UTC);
+        assertEquals(2,svg.split("class=\"offline\"",-1).length-1,"the gap in between and the time after the last sample");
+        assertTrue(svg.contains(">Offline</text>"));
+        var dense=new ArrayList<DeviceMetrics.Sample>();
+        for(int i=0;i<=24;i++)dense.add(sample(t0+i*step,-50));
+        assertFalse(MetricsChart.svg(dense,t0,t0+24*step,series,1,false,"dBm",ZoneOffset.UTC).contains("class=\"offline\""));
+    }
+    private static DeviceMetrics.Sample sample(long at,int rssi){
+        return new DeviceMetrics.Sample(at,"0000beef","",1L,null,null,null,null,null,null,rssi,0,null,null,null,null);
+    }
+    @Test void theCardPopupShowsTheChartsAndLinksToThePage() throws Exception {
+        String id="vibedock-0a1b2c000041";
+        clients.paired(id,"Popup shelf","ab".repeat(32),"192.168.1.61",80,"vibedock-m1");
+        liveMetrics.report(id,FULL,"0000beef");
+        mvc.perform(admin(get("/admin/clients/"+id+"/metrics/popup"))).andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("<svg class=\"metric-chart\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("/admin/clients/"+id+"/metrics?hours=24")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("<html"))));
+        mvc.perform(admin(get("/admin/devices"))).andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("data-metrics-url=\"/admin/clients/"+id+"/metrics/popup\"")));
+    }
 }

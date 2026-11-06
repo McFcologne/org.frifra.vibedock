@@ -8,7 +8,7 @@ import java.util.function.Function;
 /**
  * A curve chart of metric samples as inline SVG (no script, colours from the administration's style sheet). The line
  * breaks where samples are more than twice the keeping interval apart or a new start begins; a dashed line marks
- * each start.
+ * each start, and a light grey area marked "Offline" where no sample arrived for more than three intervals.
  */
 final class MetricsChart {
     private MetricsChart(){}
@@ -44,6 +44,13 @@ final class MetricsChart {
         out.append("<text class=\"axis\" x=\"").append(LEFT).append("\" y=\"").append(H-6).append("\">").append(TIME.format(java.time.Instant.ofEpochMilli(from).atZone(zone))).append("</text>");
         out.append("<text class=\"axis\" x=\"").append(W-RIGHT).append("\" y=\"").append(H-6).append("\" text-anchor=\"end\">").append(TIME.format(java.time.Instant.ofEpochMilli(to).atZone(zone))).append("</text>");
         out.append("<text class=\"axis unit\" x=\"").append(LEFT+4).append("\" y=\"").append(TOP+10).append("\">").append(escape(unit)).append("</text>");
+        // Offline: no sample at all for more than three intervals (the display was off, asleep or not reachable), also up to now.
+        long gap=3L*DeviceMetrics.INTERVAL_SECONDS*1000;DeviceMetrics.Sample last=null;
+        for(var s:samples){
+            if(last!=null&&s.at()-last.at()>gap)offline(out,last.at(),s.at(),from,span,plotW,plotH);
+            last=s;
+        }
+        if(last!=null&&to-last.at()>gap)offline(out,last.at(),to,from,span,plotW,plotH);
         String boot=null;
         for(var s:samples){
             if(s.boot()!=null&&boot!=null&&!s.boot().equals(boot)){
@@ -66,6 +73,12 @@ final class MetricsChart {
             index++;
         }
         return out.append("</svg>").toString();
+    }
+    private static void offline(StringBuilder out,long start,long end,long from,long span,double plotW,double plotH){
+        double x1=LEFT+plotW*Math.max(0,start-from)/span,x2=LEFT+plotW*Math.min(span,end-from)/span;
+        if(x2-x1<1)return;
+        out.append("<rect class=\"offline\" x=\"").append(f(x1)).append("\" y=\"").append(TOP).append("\" width=\"").append(f(x2-x1)).append("\" height=\"").append(f(plotH)).append("\"><title>Offline</title></rect>");
+        if(x2-x1>=44)out.append("<text class=\"offline-label\" x=\"").append(f((x1+x2)/2)).append("\" y=\"").append(f(TOP+plotH/2+4)).append("\" text-anchor=\"middle\">Offline</text>");
     }
     private static String f(double v){return String.format(Locale.ROOT,"%.1f",v);}
     private static String label(double v,double span){return span>=20?String.format(Locale.ROOT,"%.0f",v):String.format(Locale.ROOT,"%.1f",v);}

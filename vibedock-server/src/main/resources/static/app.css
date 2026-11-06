@@ -82,7 +82,7 @@ button:disabled{opacity:.55;cursor:default}
 .screen{margin:0}
 .screen figcaption{color:#8a97a8;font-size:12px;text-align:center;margin-top:10px}
 /* Previews in the VibeDock case, front view: off-white case, wider bezel at the bottom, black panel edge. */
-.device{--s:240px;display:inline-block;vertical-align:top}
+.device{--s:240px;display:inline-block;vertical-align:top;margin:calc(var(--fit,0)*var(--s)*-1) calc(var(--fit,0)*var(--s))}
 .device-front{padding:calc(var(--s)*.07) calc(var(--s)*.075) calc(var(--s)*.12);border-radius:calc(var(--s)*.11);
   background:linear-gradient(180deg,#fbfaf7,#eeece6 70%,#e3e0d8);box-shadow:inset 0 max(1px,calc(var(--s)*.006)) 0 #fff,inset 0 calc(var(--s)*-.012) calc(var(--s)*.018) rgba(0,0,0,.06),0 0 0 max(1px,calc(var(--s)*.004)) #cfccc3,0 calc(var(--s)*.055) calc(var(--s)*.13) rgba(20,25,35,.16)}
 .device-glass{padding:min(calc(var(--s)*.018),1px);background:#0b0c0e}
@@ -176,7 +176,7 @@ button:disabled{opacity:.55;cursor:default}
 /* On the dark backdrop the case needs a darker rim and a deeper shadow to keep the depth of the small previews. */
 .device-lightbox .device-front{box-shadow:inset 0 calc(var(--s)*.006) 0 #fff,inset 0 calc(var(--s)*-.016) calc(var(--s)*.024) rgba(0,0,0,.12),
   0 0 0 calc(var(--s)*.004) #a8a49a,0 calc(var(--s)*.03) calc(var(--s)*.08) rgba(0,0,0,.45)}
-.device-lightbox .device{--s:min(calc(54vh / max(var(--ratio,1),1)),71vw,720px)}.device-lightbox img{image-rendering:pixelated}
+.device-lightbox .device{margin:0;--s:min(calc(54vh / max(var(--ratio,1),1)),71vw,720px)}.device-lightbox img{image-rendering:pixelated}
 
 /* Clients */
 .client{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;padding:16px 0;border-top:1px solid var(--line)}
@@ -558,3 +558,11 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 .metric-legend{font-size:12px;color:var(--muted)}.metric-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 4px 0 10px;vertical-align:baseline}
 .metric-periods a{margin-right:10px}.metric-periods a.current{font-weight:700;text-decoration:none;color:var(--text)}
 .preview-battery{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;margin:12px 0 0}.preview-battery label{display:flex;gap:6px;align-items:center;color:var(--text)}
+
+/* Metrics: scrollable sample table, offline gaps, popup of the device cards */
+.samples-scroll{max-height:420px;overflow:auto}
+.samples-scroll thead th{position:sticky;top:0;background:var(--card);z-index:1}
+.metric-chart .offline{fill:var(--muted);fill-opacity:.14;stroke:none}
+.metric-chart .offline-label{fill:var(--muted);font-size:10px}
+.metrics-dialog{width:min(760px,calc(100vw - 32px))}
+.metrics-dialog .card{margin:0 0 12px;box-shadow:none}

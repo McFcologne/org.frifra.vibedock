@@ -1,0 +1,9 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org"><body>
+<div class="metrics-popup">
+  <p class="meta"><span th:text="${deviceName}"></span>: last <strong th:text="${hours &lt; 24 ? hours + ' h' : (hours / 24) + ' d'}">6 h</strong>.
+    <a th:href="@{/admin/clients/{id}/metrics(id=${identifier},hours=${hours})}">All metrics</a></p>
+  <p class="meta" th:if="${count == 0}">No samples in this period. A display that is off or asleep sends none.</p>
+  <th:block th:replace="~{device-metrics :: charts}"></th:block>
+</div>
+</body></html>
