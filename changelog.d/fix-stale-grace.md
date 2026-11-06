@@ -1,0 +1,1 @@
+- **Bands no longer blank for a moment:** a reading counts as stale only after one interval plus three minutes (was 90 s). A poll that came a little late (slot rounding plus a slow collection) used to leave empty windows without bars until the new reading arrived seconds later.

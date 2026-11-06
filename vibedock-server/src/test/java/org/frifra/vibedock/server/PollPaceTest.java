@@ -16,7 +16,7 @@ class PollPaceTest {
         assertFalse(pace.due(MINUTE+179,false));
         assertTrue(pace.due(MINUTE+180,false));
         assertTrue(pace.due(MINUTE+30,true));
-        assertEquals(150,pace.staleAfterSeconds());
+        assertEquals(240,pace.staleAfterSeconds());
     }
     @Test void fixedBacksOffOnRateLimitAndRecovers() {
         var pace=new PollPace(new SettingsStore.UsagePolling(false,1,30));long now=MINUTE;

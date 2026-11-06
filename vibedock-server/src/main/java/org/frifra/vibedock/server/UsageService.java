@@ -93,7 +93,7 @@ public class UsageService {
         return new Snapshot(1,now,Collections.unmodifiableMap(view),Collections.unmodifiableMap(labels));
     }
     private long staleAfter(String name) {
-        var p=pace.get(name);return p==null?settings.polling().minMinutes()*60L+90:p.staleAfterSeconds();
+        var p=pace.get(name);return p==null?settings.polling().minMinutes()*60L+PollPace.GRACE:p.staleAfterSeconds();
     }
     /**
      * When the readings of some sources can change next (epoch seconds): the earliest next poll plus the time a
