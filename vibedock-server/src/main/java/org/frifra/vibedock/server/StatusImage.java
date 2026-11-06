@@ -234,7 +234,7 @@ public class StatusImage {
         boolean narrow=w<200;
         BufferedImage rightMood=null;int weatherLeft=w;  // left edge of a temperature in the IP row
         if(band.ipOnly()){
-            // Only the IP row: no weather, update time or mood.
+            // Only the IP row: no weather or mood; the update time is drawn at the end of this method, beside the IP.
         }else if(!band.moodLeft()){
             var weatherIcon=look(look.weatherIcon(),scheme);var emoji=look(look.emoji(),scheme);
             if(look.weatherText()!=null){

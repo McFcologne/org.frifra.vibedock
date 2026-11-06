@@ -2,6 +2,26 @@
 
 The release workflow publishes the section of the tagged version (`## 0.1.0` for the tag `v0.1.0` or `0.1.0`) above the list of commits that GitHub generates.
 
+## 0.5.1
+
+Support for the black-and-white e-paper board Waveshare ESP32-S3-ePaper-1.54 (first tests on hardware are running;
+thresholds and refresh are still being tuned), a metrics window on the device cards, a switch that hides weather and mood so that small displays have room
+for two full bands, and a fix for windows that were drawn empty for a moment. Update the server image first; the
+board needs the firmware of this release (install it over USB), all other displays keep their firmware.
+
+### Displays and images
+
+- **Waveshare ESP32-S3-ePaper-1.54 (V2):** a black-and-white e-paper board with a battery connector (200 × 200, no touch). The server sends the picture in greyscale with raised contrast, dark designs and large dark areas shown light (the preview shows the same); the firmware turns it into black and white and refreshes the panel only when the picture changes (partial refresh, a full one every twelve and after big changes); it measures the battery voltage. First tests on hardware are running; thresholds and refresh are still being tuned.
+- **Windows no longer drawn empty for a moment:** a reading counts as stale only after one interval plus three minutes (was 90 s). A poll that came a little late (slot rounding plus a slow collection) used to leave empty windows without bars until the new reading arrived seconds later.
+
+### Administration
+
+- **Weather and mood can be hidden:** the *Weather & mood* band of a design has a switch *Show weather, update time and mood*. Without it the band shrinks to the row of the device IP (22 px instead of 56 px) and the usage bands get the room, so a small display such as the 200 × 200 e-paper board shows two full bands instead of one. The row shows the time of the last update right-aligned when it fits beside the IP, so an e-paper display shows at a glance whether it is still being updated.
+- **Metrics window on the device cards:** a *Metrics* button left of *Edit design* opens the memory, Wi-Fi and battery charts of the display in a window, for the last 6 hours (or the last day when there are few samples), with a link to the full metrics page.
+- **Offline gaps in the charts:** where no sample arrived for more than 15 minutes, also up to now, the charts show a light grey area marked *Offline*.
+- **Scrollable sample table:** the table on the metrics page keeps its header and scrolls instead of growing with the samples.
+- **Turned device case no longer overlaps the card text:** a case that is not square (the e-paper board) takes the room of its turned shape in the card.
+
 ## 0.5.0
 
 The displays now report what they measure, and the administration shows it as curves and a table. Several displays no
