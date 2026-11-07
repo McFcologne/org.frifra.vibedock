@@ -1,0 +1,1 @@
+- **Request firmware for a new board.** The firmware page has a short form: product page, retailer link, a photo and what the board reports over USB (read in the browser). It produces a package with a JSON report and the photo, to pass on for a build.

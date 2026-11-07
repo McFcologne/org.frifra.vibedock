@@ -65,6 +65,11 @@
   <p class="meta" data-own-state aria-live="polite"></p>
 </section>
 
+<section class="card">
+  <div class="card-head"><h3 class="grow">A board that is not in the list?</h3><a class="button secondary" th:href="@{/admin/firmware/request}">Request firmware</a></div>
+  <p class="meta">Describe the board (display, touch, pins, a photo) and get a package to pass on; the firmware comes back with a manifest of all that.</p>
+</section>
+
 <th:block th:if="${firmware != null}">
 
 <section class="card" id="web-flasher" th:attr="data-firmware=@{/admin/firmware/{file}(file=${firmware.fileName()})},data-version=${firmware.version},data-esptool=@{/admin/firmware/esptool.js},data-board=${board.id},data-chip=${board.chip},data-boards=${boardChips}">

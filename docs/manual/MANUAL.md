@@ -1145,6 +1145,20 @@ own, for example a test version from your checkout:
 **Use the built-in firmware** removes the upload; the firmware of the server's version applies again. Only upload
 firmware you built from these sources and trust: the displays install it.
 
+## Requesting firmware for a new board
+
+A board that is not in the list gets its firmware on request. **Request firmware** on the firmware page asks for little:
+the board's name, a link to its product page (the display and the pins are looked up there), optionally the retailer
+link (where you bought it), a photo of the front, and what the board reports over USB. Connect the board and press
+**Read from the board**: the page reads chip, flash size and features with esptool (Chrome or Edge; the board is only
+read and restarted, nothing is written). Without a browser that can do this, paste the output of `esptool chip_id` and
+`flash_id` into the box.
+
+Nothing is sent from the page. **Create the package** downloads `firmware-request-<id>.zip` with `request.json`
+(the report) and `photo.jpg` (reduced to 1600 pixels). Pass the package on: the firmware is built from it and comes
+back as `firmware.bin`, `flash.bin` and `manifest.json`, its version the one of the server with `-dirty`. Upload the
+files under **Own firmware build**.
+
 # The display's own screens
 
 Until a display has its first image, and during updates, it draws its own screens: logo, version, the state and

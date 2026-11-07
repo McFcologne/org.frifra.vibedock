@@ -62,6 +62,15 @@ class PhotoLibrary {
         }finally{Files.deleteIfExists(temporary);}
         return new Photo(id,w,h,Files.getLastModifiedTime(file(id)).toMillis());
     }
+    /** A photo for sending on (JPEG, upright, at most maxSide pixels); nothing is stored. */
+    static byte[] reduced(byte[] upload,int maxSide) throws IOException {
+        if(upload==null||upload.length==0||upload.length>MAX_UPLOAD)throw new IllegalArgumentException("Choose a photo of up to 30 MB");
+        var image=upright(decode(upload),exifOrientation(upload));
+        double scale=Math.min(1,(double)maxSide/Math.max(image.getWidth(),image.getHeight()));
+        var out=new ByteArrayOutputStream();
+        jpeg(scaled(image,Math.max(1,(int)Math.round(image.getWidth()*scale)),Math.max(1,(int)Math.round(image.getHeight()*scale))),out);
+        return out.toByteArray();
+    }
     synchronized boolean delete(String id) throws IOException {
         if(id==null||!ID.matcher(id).matches())return false;
         rendered.keySet().removeIf(k->k.startsWith(id));

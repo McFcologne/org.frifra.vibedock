@@ -298,7 +298,7 @@ class AccessTest {
                 .andExpect(status().isNotFound());
         mvc.perform(get("/admin").header("Accept","application/json").with(r->{r.setLocalPort(10001);return r;}))
                 .andExpect(status().isUnauthorized());
-        mvc.perform(get("/admin").with(httpBasic("admin","test-password-123"))
+        mvc.perform(get("/admin").with(user("admin").roles("ADMIN"))
                 .with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isOk());
         mvc.perform(get("/api/v1/usage").with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isNotFound());
     }
@@ -1225,4 +1225,14 @@ class AccessTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test void theFirmwareRequestIsAnsweredWithAPackageAndRefusesWrongAnswers() throws Exception {
+        mvc.perform(get("/admin/firmware/request").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("data-firmware-request")));
+        String ok="{\"answers\":{\"board.label\":\"Acme\",\"board.chip\":\"ESP32\",\"maker.productUrl\":\"https://example.com/acme\"}}";
+        mvc.perform(post("/admin/firmware/request").with(user("admin").roles("ADMIN")).with(csrf()).with(r->{r.setLocalPort(10001);return r;})
+                .contentType("application/json").content(ok)).andExpect(status().isOk()).andExpect(content().contentType("application/zip"))
+                .andExpect(header().string("Content-Disposition",org.hamcrest.Matchers.containsString("firmware-request-acme.zip")));
+        mvc.perform(post("/admin/firmware/request").with(user("admin").roles("ADMIN")).with(csrf()).with(r->{r.setLocalPort(10001);return r;})
+                .contentType("application/json").content(ok.replace("ESP32","z80"))).andExpect(status().isBadRequest());
+    }
 }
