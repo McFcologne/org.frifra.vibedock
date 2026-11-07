@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
  * </ul>
  */
 public record Manifest(int schema,String id,String label,String chip,String version,String hardware,Binaries firmware,
-                       Screen display,Capabilities capabilities,Case boardCase) {
+                       Screen display,Capabilities capabilities,Case boardCase,Build build) {
     public static final int SCHEMA=1,MAX_BYTES=16*1024,DISPLAY_MIN=64,DISPLAY_MAX=480;
     public static final Set<String> CHIPS=Set.of("ESP8266","ESP32","ESP32-S2","ESP32-S3","ESP32-C3","ESP32-C6","ESP32-H2");
     private static final Pattern ID=Pattern.compile("[a-z0-9-]{1,40}"),VERSION=Pattern.compile("[0-9A-Za-z.+-]{1,40}"),
@@ -30,6 +30,12 @@ public record Manifest(int schema,String id,String label,String chip,String vers
     public record Screen(int width,int height,int corner,boolean grey) {}
     /** rotations: clockwise degrees the administration offers, always with 0. */
     public record Capabilities(boolean touch,boolean battery,List<Integer> rotations,boolean powerSaving) {}
+    /**
+     * What the build needs to be made again from a manifest alone: the PlatformIO board, the environment it extends, the
+     * -D flags and the libraries. The server never uses it; it is there for taking a build into the sources (a pull request
+     * a person reviews). Only -D NAME=value flags, no other compiler options.
+     */
+    public record Build(String platformioBoard,String extendsEnv,List<String> flags,List<String> libraries) {}
     /** margin: top, right, bottom, left, without the rim; all measures are multiples of the screen width. */
     public record Case(List<BigDecimal> margin,BigDecimal rim,BigDecimal radius,String colour) {}
 
@@ -58,7 +64,26 @@ public record Manifest(int schema,String id,String label,String chip,String vers
         var c=root.has("capabilities")?object(root,"capabilities",true):null;
         var capabilities=new Capabilities(c!=null&&bool(c,"touch"),c!=null&&bool(c,"battery"),c==null?List.of(0):rotations(c),c!=null&&bool(c,"powerSaving"));
         Case boardCase=root.has("case")?boardCase(object(root,"case",true)):null;
-        return new Manifest(schema,id,label,chip,version,hardware,binaries,screen,capabilities,boardCase);
+        Build build=root.has("build")&&!root.get("build").isNull()?build(object(root,"build",true)):null;
+        return new Manifest(schema,id,label,chip,version,hardware,binaries,screen,capabilities,boardCase,build);
+    }
+    private static final Pattern ENV=Pattern.compile("[a-z0-9_-]{1,40}"),FLAG=Pattern.compile("-D [A-Z][A-Z0-9_]{0,63}(=[A-Za-z0-9_.+-]{0,60})?"),
+            LIBRARY=Pattern.compile("[A-Za-z0-9_.-]{1,50}(/[A-Za-z0-9_.-]{1,50})?@[0-9][0-9A-Za-z.+-]{0,20}");
+    private static Build build(JsonNode n){
+        return new Build(text(n,"platformioBoard",true,ENV,"lowercase letters, digits, - and _, up to 40"),
+                n.has("extends")?text(n,"extends",true,ENV,"lowercase letters, digits, - and _, up to 40"):null,
+                list(n,"flags",80,FLAG,"-D NAME or -D NAME=value"),list(n,"libraries",20,LIBRARY,"name@version or owner/name@version"));
+    }
+    private static List<String> list(JsonNode parent,String name,int max,Pattern pattern,String shape){
+        var n=parent.get(name);
+        if(n==null||n.isNull())return List.of();
+        if(!n.isArray()||n.size()>max)throw new IllegalArgumentException("build."+name+" is a list of at most "+max+" entries");
+        var out=new ArrayList<String>();
+        for(var v:n){
+            if(!v.isString()||!pattern.matcher(v.asString()).matches())throw new IllegalArgumentException("build."+name+" entries must be "+shape);
+            out.add(v.asString());
+        }
+        return List.copyOf(out);
     }
     private static Case boardCase(JsonNode n){
         if(!"generic".equals(text(n,"kind",true,null,null)))throw new IllegalArgumentException("case.kind is generic");

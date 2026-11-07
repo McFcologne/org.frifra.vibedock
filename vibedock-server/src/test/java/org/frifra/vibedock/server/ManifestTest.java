@@ -12,7 +12,8 @@ class ManifestTest {
                 +"\"firmware\":{\"sha256\":\""+Manifest.sha256(APP)+"\",\"flashSha256\":\""+Manifest.sha256(FLASH)+"\"},"
                 +"\"display\":{\"width\":240,\"height\":320,\"corner\":0,\"grey\":false},"
                 +"\"capabilities\":{\"touch\":false,\"battery\":true,\"rotations\":[0,180],\"powerSaving\":false},"
-                +"\"case\":{\"kind\":\"generic\",\"margin\":[0.30,0.15,0.40,0.15],\"radius\":0.10,\"rim\":0.06,\"colour\":\"#eeeeea\"}}");
+                +"\"case\":{\"kind\":\"generic\",\"margin\":[0.30,0.15,0.40,0.15],\"radius\":0.10,\"rim\":0.06,\"colour\":\"#eeeeea\"},"
+                +"\"build\":{\"platformioBoard\":\"esp32-s3-devkitc-1\",\"extends\":\"esp32-s3r8\",\"flags\":[\"-D ST7789_DRIVER\",\"-D TFT_WIDTH=240\",\"-D TFT_RGB_ORDER=TFT_BGR\"],\"libraries\":[\"bodmer/TFT_eSPI@2.5.43\"]}}");
         String s=json.toString();
         for(int i=0;i<changes.length;i+=2){assertTrue(s.contains(changes[i]),changes[i]);s=s.replace(changes[i],changes[i+1]);}
         return s;
@@ -31,13 +32,15 @@ class ManifestTest {
         assertTrue(m.capabilities().battery());assertEquals(List.of(0,180),m.capabilities().rotations());
         assertEquals(4,m.boardCase().margin().size());assertEquals("#eeeeea",m.boardCase().colour());
         m.verifyBinaries(APP,FLASH);m.verifyIdentity("my-board","0.6.0");
+        assertEquals("esp32-s3-devkitc-1",m.build().platformioBoard());assertEquals("esp32-s3r8",m.build().extendsEnv());
+        assertEquals(List.of("-D ST7789_DRIVER","-D TFT_WIDTH=240","-D TFT_RGB_ORDER=TFT_BGR"),m.build().flags());assertEquals(List.of("bodmer/TFT_eSPI@2.5.43"),m.build().libraries());
     }
     @Test void aMinimalManifestGetsTheDefaults(){
         String json="{\"schema\":1,\"id\":\"tiny\",\"label\":\"Tiny\",\"chip\":\"ESP8266\",\"version\":\"1.0\",\"firmware\":{\"sha256\":\""+Manifest.sha256(APP)
                 +"\"},\"display\":{\"width\":128,\"height\":160}}";
         var m=Manifest.parse(signed(json));
         assertEquals("prepared",m.hardware());assertEquals(List.of(0),m.capabilities().rotations());assertFalse(m.capabilities().touch());
-        assertNull(m.boardCase());assertNull(m.firmware().flashSha256());m.verifyBinaries(APP,null);
+        assertNull(m.boardCase());assertNull(m.build());assertNull(m.firmware().flashSha256());m.verifyBinaries(APP,null);
     }
     @Test void theChecksumCatchesChangesAndOnlyAChecksumedTextIsAccepted(){
         // Key order, white space and the checksum's place do not matter; the content does.
@@ -72,6 +75,12 @@ class ManifestTest {
         refused(body("\"colour\":\"#eeeeea\"","\"colour\":\"red\""),"colour");
         refused(body("\"sha256\":\""+Manifest.sha256(APP)+"\"","\"sha256\":\"abc\""),"sha256");
         refused(body("\"display\":{\"width\":240,\"height\":320,\"corner\":0,\"grey\":false},",""),"display");
+        // Only -D NAME=value flags: no other compiler options, no commands, no paths or URLs.
+        for(String flag:new String[]{"-O3","-D x=1","-D NAME=a b","-D NAME=$(rm)","-DNAME=1","-include /etc/passwd","-D NAME=\\\"x\\\"","--version","-D NAME=http://x"})
+            refused(body("\"-D ST7789_DRIVER\"","\""+flag+"\""),"flags");
+        refused(body("\"bodmer/TFT_eSPI@2.5.43\"","\"https://evil.example/x.zip\""),"libraries");
+        refused(body("\"platformioBoard\":\"esp32-s3-devkitc-1\"","\"platformioBoard\":\"../x\""),"platformioBoard");
+        refused(body("\"flags\":[\"-D ST7789_DRIVER\"","\"flags\":["+"\"-D A\",".repeat(80)+"\"-D ST7789_DRIVER\""),"flags");
         assertThrows(IllegalArgumentException.class,()->Manifest.parse("[]".getBytes()));
         assertThrows(IllegalArgumentException.class,()->Manifest.parse("not json".getBytes()));
         assertThrows(IllegalArgumentException.class,()->Manifest.parse(new byte[0]));
