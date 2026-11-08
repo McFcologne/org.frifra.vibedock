@@ -62,6 +62,15 @@ public record DisplayType(String id,String label,int width,int height,int corner
         var known=INVENTORY.stream().filter(t->(t.width()+"x"+t.height()).equals(key)).findFirst();
         return known.isPresent()?known:custom(key);
     }
+    /**
+     * The size a board reported. A black-and-white size of the inventory (the e-paper's 200x200) belongs to the board that
+     * has it: another board reporting the same size is a colour display of its own and gets a type without greyscale.
+     */
+    public static Optional<DisplayType> reported(String size,Board board){
+        var type=reported(size);
+        if(type.isPresent()&&type.get().grey()&&!type.get().id().equals(board.display()))return custom(size.trim());
+        return type;
+    }
     private static Optional<DisplayType> custom(String key){
         var m=java.util.regex.Pattern.compile("(\\d{2,3})x(\\d{2,3})").matcher(key);
         if(!m.matches())return Optional.empty();

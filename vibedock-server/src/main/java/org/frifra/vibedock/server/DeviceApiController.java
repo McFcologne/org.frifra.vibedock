@@ -83,7 +83,7 @@ class DeviceApiController {
             try{registry.setBoard(identifier,board);}catch(IOException e){log.warn("Could not store the board of {}: {}",identifier,e.toString());}
         }
         // A device that reports its screen size gets the image in it; a type chosen in the administration stays.
-        DisplayType.reported(request.getHeader("X-VibeDock-Display")).ifPresent(type->{
+        DisplayType.reported(request.getHeader("X-VibeDock-Display"),registry.get(identifier).board()).ifPresent(type->{
             try{if(registry.get(identifier).display()==DisplayType.M1&&type!=DisplayType.M1)registry.setDisplay(identifier,type.id());}
             catch(IOException e){log.warn("Could not store the display type of {}: {}",identifier,e.toString());}
         });

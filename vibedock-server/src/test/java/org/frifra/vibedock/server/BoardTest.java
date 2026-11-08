@@ -51,5 +51,9 @@ class BoardTest {
         Assertions.assertEquals(DisplayType.M1,DisplayType.of("9999x9999"));
         for(String bad:new String[]{"10x10","5000x200","axb","320x","-320x200","320x200x2",""})Assertions.assertTrue(DisplayType.reported(bad).isEmpty(),bad);
         Assertions.assertTrue(DisplayType.reported("200x200").orElseThrow().grey());
+        // Another board with 200x200 is a colour display; only the e-paper board has the greyscale one.
+        Assertions.assertFalse(DisplayType.reported("200x200",Board.of("my-colour-board")).orElseThrow().grey());
+        Assertions.assertTrue(DisplayType.reported("200x200",Board.find("waveshare-s3-epaper-154").orElseThrow()).orElseThrow().grey());
+        Assertions.assertSame(DisplayType.reported("240x280").orElseThrow(),DisplayType.reported("240x280",Board.of("my-colour-board")).orElseThrow());
     }
 }
