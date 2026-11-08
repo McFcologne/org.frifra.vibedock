@@ -181,4 +181,4 @@ jobs:
             done
             [ -n "$ok" ] || { echo "Could not upload $file"; exit 1; }
           done
-          gh release edit "$TAG" --draft=false
+          gh release edit "$TAG" --draft=false --latest
