@@ -2289,5 +2289,5 @@ void loop() {
       if (WiFi.status() == WL_CONNECTED) message("Updates missing", Step::Server, true); else showWaiting();
     }
   }
-  yield();
+  if (powerSaving) delay(dimmed ? client_policy::powerSaveDimmedIdleMs : client_policy::powerSaveIdleMs); else yield();
 }

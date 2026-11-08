@@ -1,0 +1,1 @@
+- **Battery power saving: the display's main loop now sleeps while saving power** (10 ms per round, 40 ms while the backlight is dimmed), so the processor idles between the ticks instead of running without a pause. Touch is still read every 20 ms and wakes the display as before. Measured on batteries of 150 mAh, runs lasted only 1.5 to 5.8 hours.

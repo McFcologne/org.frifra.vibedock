@@ -33,6 +33,11 @@ struct PowerSource {
 constexpr uint32_t dimAfterMs = 60000;
 constexpr bool dimDue(uint32_t now, uint32_t lastActivity) { return now - lastActivity >= dimAfterMs; }
 
+// While saving power the main loop sleeps this long per round, so the processor idles between the ticks instead of
+// running without a pause: 10 ms (touch is read every 20 ms, so nothing is missed), 40 ms while the backlight is dimmed
+// and the loop only waits for the touch that wakes it.
+constexpr uint32_t powerSaveIdleMs = 10, powerSaveDimmedIdleMs = 40;
+
 constexpr uint32_t minPollSeconds = 10, maxPollSeconds = 3600, defaultPollSeconds = 30;
 constexpr uint8_t maxPairingAttempts = 5;
 constexpr uint32_t clampPoll(uint32_t seconds) {
