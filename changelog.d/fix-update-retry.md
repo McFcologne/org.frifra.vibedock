@@ -1,0 +1,1 @@
+- **A failed update over Wi-Fi no longer blocks the next one.** A display that failed to download an update ignored every further offer of that version until its next start, so *Update* did nothing until it was unplugged. It now tries again when the offer comes more than a minute after the failure.
