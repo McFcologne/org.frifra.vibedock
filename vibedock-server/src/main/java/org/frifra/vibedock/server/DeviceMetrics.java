@@ -153,21 +153,30 @@ class DeviceMetrics {
         out.sort(Comparator.comparing(Day::date));
         return out;
     }
-    /** Files of the earlier format, one metrics.jsonl with every sample: split into day files once, then removed. */
+    /** Files of the earlier format, one metrics.jsonl with every sample: split into day files, then removed; repeatable if cut off in between. */
     private void migrate(String identifier) throws IOException {
         if(!migrated.add(identifier))return;
         Path legacy=root.resolve(identifier).resolve(DeviceLogs.METRICS);
         if(!Files.isRegularFile(legacy))return;
-        var byDay=new TreeMap<LocalDate,StringBuilder>();
+        var byDay=new TreeMap<LocalDate,Map<Long,String>>();
         for(String line:Files.readAllLines(legacy,StandardCharsets.UTF_8)){
             if(line.isBlank())continue;
-            try{var s=json.readValue(line,Stored.class);byDay.computeIfAbsent(LocalDate.ofInstant(Instant.ofEpochMilli(s.at()),ZoneOffset.UTC),d->new StringBuilder()).append(json.writeValueAsString(s)).append('\n');}
+            try{var s=json.readValue(line,Stored.class);byDay.computeIfAbsent(LocalDate.ofInstant(Instant.ofEpochMilli(s.at()),ZoneOffset.UTC),d->new LinkedHashMap<>()).putIfAbsent(s.at(),json.writeValueAsString(s));}
             catch(RuntimeException e){log.debug("Skipped an unreadable metrics line of {}",identifier);}
         }
         for(var e:byDay.entrySet()){
             Path file=root.resolve(identifier).resolve("metrics-"+e.getKey()+".jsonl");
             boolean created=!Files.exists(file);
-            Files.writeString(file,e.getValue(),StandardCharsets.UTF_8,StandardOpenOption.CREATE,StandardOpenOption.APPEND);
+            // Repeatable: a run that was cut off before the single file was removed left some samples in the day files; those are not written again.
+            var present=new HashSet<Long>();
+            if(!created)for(String line:Files.readAllLines(file,StandardCharsets.UTF_8)){
+                if(line.isBlank())continue;
+                try{present.add(json.readValue(line,Stored.class).at());}catch(RuntimeException ignored){ /* unreadable lines are skipped when reading */ }
+            }
+            var text=new StringBuilder();
+            e.getValue().forEach((at,line)->{if(!present.contains(at))text.append(line).append('\n');});
+            if(text.length()==0)continue;
+            Files.writeString(file,text.toString(),StandardCharsets.UTF_8,StandardOpenOption.CREATE,StandardOpenOption.APPEND);
             if(created)try{Files.setPosixFilePermissions(file,PosixFilePermissions.fromString("rw-------"));}catch(UnsupportedOperationException ignored){}
         }
         Files.delete(legacy);
