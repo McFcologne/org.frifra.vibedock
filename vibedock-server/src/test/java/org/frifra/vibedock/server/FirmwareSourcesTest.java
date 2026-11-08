@@ -53,4 +53,25 @@ class FirmwareSourcesTest {
         Path file=Files.writeString(dir.resolve("firmware-sources.yaml"),"sources: []");
         assertTrue(assertThrows(IllegalArgumentException.class,()->FirmwareSources.load(file)).getMessage().startsWith("firmware-sources.yaml: "));
     }
+
+    @Test void writtenListReadsBackTheSame(@TempDir Path dir) throws Exception {
+        var list=java.util.List.of(FirmwareSources.OFFICIAL,
+                new FirmwareSources.Source("alt-fw","Alt: \"firmware\" #1","someone/alt-firmware","fw-",false,false,java.util.Set.of("esp32-cyd","m1")));
+        var file=dir.resolve("firmware-sources.yaml");
+        FirmwareSources.write(file,list);
+        assertEquals(list,FirmwareSources.load(file));
+        assertFalse(Files.exists(dir.resolve("firmware-sources.yaml.tmp")));
+    }
+    @Test void aListWithAMistakeIsNotWritten(@TempDir Path dir) throws Exception {
+        var file=dir.resolve("firmware-sources.yaml");
+        var bad=java.util.List.of(new FirmwareSources.Source("Bad Id","x","not a repo","client-v",false,true,java.util.Set.of()));
+        assertThrows(IllegalArgumentException.class,()->FirmwareSources.write(file,bad));
+        assertFalse(Files.exists(file));
+    }
+    @Test void aNewSourceGetsAnIdFromItsRepositoryThatIsFree(){
+        assertEquals("codexbar-display",FirmwareSources.idFor("DreamyTalesPAN/CodexBar-Display",java.util.List.of("vibedock")));
+        assertEquals("codexbar-display-2",FirmwareSources.idFor("a/CodexBar-Display",java.util.List.of("codexbar-display")));
+        assertTrue(FirmwareSources.idFor("a/"+"x".repeat(80),java.util.List.of()).length()<=40);
+        assertEquals("source",FirmwareSources.idFor("a/...",java.util.List.of()));
+    }
 }

@@ -56,19 +56,60 @@
     <form method="post" data-sources-check th:action="@{/admin/firmware/sources/check(board=${board.id})}"><button class="secondary" th:disabled="${checking}" th:text="${checking ? 'Checking …' : 'Check now'}">Check now</button></form></div>
   <p class="meta check-status" data-sources-status role="status" aria-live="polite" th:hidden="${!checking}"><span class="spinner" aria-hidden="true"></span>Checking the sources … this page shows the result by itself.</p>
   <p class="meta">The server downloads firmware from the releases of these repositories once after it starts and then every day.
-    <span th:if="${checkedAt != null}">Last check: <span th:text="${checkedAt}"></span>.</span> The list is <code>firmware-sources.yaml</code> in the data directory, in order of priority.</p>
+    <span th:if="${checkedAt != null}">Last check: <span th:text="${checkedAt}"></span>.</span> The list is <code>firmware-sources.yaml</code> in the data directory, in order of priority; the page changes it, and so can you.</p>
   <p class="notice error" th:if="${sourcesError != null}" th:text="${sourcesError + ' – no firmware is downloaded until this is fixed.'}"></p>
-  <table class="firmware-devices" th:unless="${#lists.isEmpty(sources)}">
-    <thead><tr><th>Source</th><th>Newest downloaded</th><th>Updates over Wi-Fi</th><th>Last check</th></tr></thead>
-    <tbody><tr th:each="entry:${sources}">
-      <td><strong th:text="${entry.source.label}"></strong> <span class="badge" th:unless="${entry.source.enabled}">disabled</span><br>
-        <code th:text="${entry.source.repo + ' · ' + entry.source.tagPrefix + '…'}"></code></td>
-      <td th:text="${entry.latest != null ? entry.latest : '–'}"></td>
-      <td><span class="badge ok" th:if="${entry.source.trusted}">trusted</span>
-        <span class="badge update" th:unless="${entry.source.trusted}" title="Only for flashing over USB; set trusted: true in the file to offer it over Wi-Fi">USB only</span></td>
-      <td><span th:if="${entry.checkedAt == 0}">not yet</span><span class="notice error" th:if="${entry.error != null}" th:text="${entry.error}"></span>
-        <span class="badge ok" th:if="${entry.checkedAt != 0 and entry.error == null}">ok</span></td></tr></tbody>
-  </table>
+  <p class="notice error" th:if="${sourceError != null}" th:text="${sourceError}"></p>
+  <ul class="source-list" th:unless="${#lists.isEmpty(sources)}">
+    <li class="source-item" th:each="entry:${sources}" th:classappend="${!entry.source.enabled} ? 'is-off'">
+      <div class="source-head">
+        <strong class="source-name" th:text="${entry.source.label}"></strong>
+        <span class="badge" th:unless="${entry.source.enabled}">off</span>
+        <span class="badge ok" th:if="${entry.source.trusted}" title="Displays may update from this source over Wi-Fi">trusted</span>
+        <span class="badge update" th:unless="${entry.source.trusted}" title="Only for flashing over USB, never for updates over Wi-Fi">USB only</span>
+      </div>
+      <p class="source-repo"><a th:href="${'https://github.com/' + entry.source.repo + '/releases'}" target="_blank" rel="noopener noreferrer"><code th:text="${entry.source.repo}"></code></a>
+        <span class="meta" th:if="${!entry.source.tagPrefix.isEmpty()}">tags <code th:text="${entry.source.tagPrefix + '…'}"></code></span>
+        <span class="meta" th:if="${entry.source.tagPrefix.isEmpty()}">every tag</span></p>
+      <dl class="source-facts">
+        <div><dt>Newest downloaded</dt><dd th:text="${entry.latest != null ? entry.latest : '–'}"></dd></div>
+        <div><dt>Last check</dt><dd>
+          <span class="meta" th:if="${entry.checkedAt == 0}">not yet</span>
+          <span class="badge ok" th:if="${entry.checkedAt != 0 and entry.error == null}">ok</span>
+          <span class="notice error" th:if="${entry.error != null}" th:text="${entry.error}"></span></dd></div>
+      </dl>
+      <div class="source-actions">
+        <form method="post" th:action="@{/admin/firmware/sources/{id}/enabled(id=${entry.source.id})}">
+          <input type="hidden" name="board" th:value="${board.id}"><input type="hidden" name="on" th:value="${!entry.source.enabled}">
+          <button class="secondary" th:text="${entry.source.enabled ? 'Switch off' : 'Switch on'}"></button></form>
+        <form method="post" th:if="${entry.source.trusted and entry.source.id != 'vibedock'}" th:action="@{/admin/firmware/sources/{id}/trusted(id=${entry.source.id})}">
+          <input type="hidden" name="board" th:value="${board.id}"><input type="hidden" name="on" value="false">
+          <button class="secondary">USB only</button></form>
+        <form method="post" th:if="${entry.source.id != 'vibedock'}" th:action="@{/admin/firmware/sources/{id}/remove(id=${entry.source.id})}">
+          <input type="hidden" name="board" th:value="${board.id}"><button class="secondary danger">Remove</button></form>
+      </div>
+      <details class="source-trust" th:unless="${entry.source.trusted}">
+        <summary>Allow updates over Wi-Fi</summary>
+        <form method="post" th:action="@{/admin/firmware/sources/{id}/trusted(id=${entry.source.id})}">
+          <input type="hidden" name="board" th:value="${board.id}"><input type="hidden" name="on" value="true">
+          <p class="meta">Firmware of this source runs on your displays. Trust it only if you trust its owner; a display installs what the source publishes.</p>
+          <label class="check"><input type="checkbox" name="confirm" value="yes" required> I trust <strong th:text="${entry.source.repo}"></strong></label>
+          <button class="secondary">Trust this source</button></form>
+      </details>
+    </li>
+  </ul>
+  <details class="source-add" th:if="${sourcesError == null}">
+    <summary>Add a source</summary>
+    <form method="post" th:action="@{/admin/firmware/sources/add}">
+      <input type="hidden" name="board" th:value="${board.id}">
+      <div class="source-form">
+        <div><label for="source-repo">GitHub repository</label><input id="source-repo" name="repo" required maxlength="140" placeholder="owner/name" autocomplete="off" spellcheck="false"></div>
+        <div><label for="source-prefix">Tag prefix of the releases</label><input id="source-prefix" name="tagPrefix" maxlength="40" placeholder="client-v" autocomplete="off" spellcheck="false"></div>
+        <div><label for="source-label">Name (optional)</label><input id="source-label" name="label" maxlength="80" autocomplete="off"></div>
+      </div>
+      <p class="meta">The releases must carry the files of a VibeDock client release (<code>index.json</code> and the images). A new source is for flashing over USB only; trust it afterwards if displays may update from it over Wi-Fi.</p>
+      <button>Add source</button>
+    </form>
+  </details>
   <p th:if="${firmware != null}">This board runs <strong th:text="${firmware.version}"></strong> from
     <th:block th:if="${firmware.uploaded}">your upload</th:block>
     <th:block th:if="${!firmware.uploaded and firmware.source != null}"><strong th:text="${sourceLabels.get(firmware.source) ?: firmware.source}"></strong><span class="badge update" th:unless="${firmware.wifi}" title="This source is not trusted: no updates over Wi-Fi">USB only</span></th:block>

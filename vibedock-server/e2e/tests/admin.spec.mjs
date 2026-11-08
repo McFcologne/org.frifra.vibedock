@@ -366,6 +366,42 @@ test('Check now follows the firmware check and shows its result without a reload
   await expect(status).toBeHidden();
 });
 
+test('firmware sources are added, trusted on confirmation, switched off and removed on the page',async ({page,app}) => {
+  await page.setViewportSize({width:360,height:800});
+  await page.goto(app.baseURL+'/admin/firmware');
+  const section=page.locator('.firmware-sources');
+  await section.locator('.source-add summary').click();
+  await section.getByLabel('GitHub repository').fill('someone/a-firmware-repository-with-a-rather-long-name');
+  await section.getByLabel('Tag prefix of the releases').fill('fw-');
+  await section.getByRole('button',{name:'Add source'}).click();
+  const item=section.locator('.source-item').filter({hasText:'someone/a-firmware-repository-with-a-rather-long-name'});
+  await expect(item).toBeVisible();
+  await expect(item.locator('.badge',{hasText:'USB only'})).toBeVisible();
+  // Nothing sticks out of the card on a phone.
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  // The same repository with the same prefix is refused with a reason.
+  await section.locator('.source-add summary').click();
+  await section.getByLabel('GitHub repository').fill('someone/a-firmware-repository-with-a-rather-long-name');
+  await section.getByLabel('Tag prefix of the releases').fill('fw-');
+  await section.getByRole('button',{name:'Add source'}).click();
+  await expect(section.locator('.notice.error')).toContainText('in the list already');
+  // Trust needs the confirmation.
+  await item.locator('.source-trust summary').click();
+  await item.getByRole('button',{name:'Trust this source'}).click();
+  await expect(item.locator('.source-trust input[name=confirm]')).toBeFocused();   // the browser asks for the checkbox first
+  await item.locator('.source-trust input[name=confirm]').check();
+  await item.getByRole('button',{name:'Trust this source'}).click();
+  await expect(item.locator('.badge',{hasText:'trusted'})).toBeVisible();
+  await item.getByRole('button',{name:'USB only'}).click();
+  await expect(item.locator('.badge',{hasText:'USB only'})).toBeVisible();
+  await item.getByRole('button',{name:'Switch off'}).click();
+  await expect(item.locator('.badge',{hasText:'off'})).toBeVisible();
+  // The official source cannot be removed.
+  await expect(section.locator('.source-item').filter({hasText:'VibeDock (official)'}).getByRole('button',{name:'Remove'})).toHaveCount(0);
+  await item.getByRole('button',{name:'Remove'}).click();
+  await expect(section.locator('.source-item').filter({hasText:'a-firmware-repository'})).toHaveCount(0);
+});
+
 test('troubleshooting loads and refreshes server logs only for an administrator',async ({page,app}) => {
   const denied=await fetch(app.baseURL+'/admin/server-log',{redirect:'manual'});
   expect(denied.status).toBe(401);

@@ -1,5 +1,6 @@
 package org.frifra.vibedock.server;
 
+import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
@@ -80,6 +81,39 @@ public final class FirmwareSources {
         }
         return List.copyOf(out);
     }
+    /** The id of a new source: the repository's name in the form of {@link #ID}, made unique among {@code taken}. */
+    public static String idFor(String repo,Collection<String> taken){
+        String name=repo.substring(repo.indexOf('/')+1).toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+","-").replaceAll("^-+|-+$","");
+        if(name.isEmpty())name="source";
+        if(name.length()>36)name=name.substring(0,36).replaceAll("-+$","");
+        String id=name;
+        for(int n=2;taken.contains(id);n++)id=name+"-"+n;
+        return id;
+    }
+
+    /** The list as the file holds it; {@link #parse} reads it back. */
+    public static String toYaml(List<Source> sources){
+        var list=new ArrayList<Map<String,Object>>();
+        for(var s:sources){
+            var m=new LinkedHashMap<String,Object>();
+            m.put("id",s.id());m.put("label",s.label());m.put("repo",s.repo());m.put("tagPrefix",s.tagPrefix());
+            m.put("trusted",s.trusted());m.put("enabled",s.enabled());
+            if(!s.boards().isEmpty())m.put("boards",new ArrayList<>(new TreeSet<>(s.boards())));
+            list.add(m);
+        }
+        var options=new DumperOptions();options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);options.setIndent(2);options.setIndicatorIndent(2);options.setIndentWithIndicator(true);
+        return new Yaml(options).dump(Map.of("sources",list));
+    }
+
+    /** Writes the list to the file (atomically) after reading it back, so that the file never holds a mistake. */
+    public static void write(Path file,List<Source> sources) throws IOException {
+        String yaml=toYaml(sources);
+        parse(yaml);
+        Path tmp=file.resolveSibling(file.getFileName()+".tmp");
+        Files.writeString(tmp,yaml,StandardCharsets.UTF_8);
+        Files.move(tmp,file,StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);
+    }
+
     private static String text(Map<?,?> m,String key,String at,Pattern form,String shape,boolean required){
         Object v=m.get(key);
         if(v==null){if(required)throw new IllegalArgumentException(at+key+" is missing");return null;}

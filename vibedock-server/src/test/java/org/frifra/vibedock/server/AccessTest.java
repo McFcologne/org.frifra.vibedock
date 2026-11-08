@@ -901,6 +901,30 @@ class AccessTest {
         mvc.perform(get("/admin/firmware/sources/state").with(admin).with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNotFound());
         mvc.perform(post("/admin/firmware/sources/check").with(admin).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isForbidden());
         mvc.perform(post("/admin/firmware/sources/check").with(admin).with(csrf()).with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNotFound());
+        // Sources are added, trusted only with the confirmation, switched off and removed from the page; only on the admin port, with a token.
+        for(var action:new String[]{"add","alt-firmware/remove","alt-firmware/enabled","alt-firmware/trusted"}){
+            mvc.perform(post("/admin/firmware/sources/"+action).with(admin).with(r->{r.setLocalPort(10001);return r;}).param("repo","someone/alt-firmware").param("on","true")).andExpect(status().isForbidden());
+            mvc.perform(post("/admin/firmware/sources/"+action).with(admin).with(csrf()).with(r->{r.setLocalPort(8080);return r;}).param("repo","someone/alt-firmware").param("on","true")).andExpect(status().isNotFound());
+        }
+        mvc.perform(post("/admin/firmware/sources/add").with(admin).with(csrf()).with(r->{r.setLocalPort(10001);return r;}).param("repo","https://github.com/someone/alt-firmware").param("tagPrefix","fw-"))
+                .andExpect(status().is3xxRedirection());
+        mvc.perform(get("/admin/firmware").with(admin).with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("someone/alt-firmware")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("USB only")));
+        mvc.perform(post("/admin/firmware/sources/add").with(admin).with(csrf()).with(r->{r.setLocalPort(10001);return r;}).param("repo","someone/alt-firmware").param("tagPrefix","fw-"))
+                .andExpect(flash().attribute("sourceError",org.hamcrest.Matchers.containsString("in the list already")));
+        mvc.perform(post("/admin/firmware/sources/alt-firmware/trusted").with(admin).with(csrf()).with(r->{r.setLocalPort(10001);return r;}).param("on","true"))
+                .andExpect(flash().attribute("sourceError",org.hamcrest.Matchers.containsString("Confirm")));
+        mvc.perform(post("/admin/firmware/sources/alt-firmware/trusted").with(admin).with(csrf()).with(r->{r.setLocalPort(10001);return r;}).param("on","true").param("confirm","yes"))
+                .andExpect(flash().attributeCount(0));
+        mvc.perform(post("/admin/firmware/sources/vibedock/remove").with(admin).with(csrf()).with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(flash().attribute("sourceError",org.hamcrest.Matchers.containsString("official")));
+        mvc.perform(post("/admin/firmware/sources/alt-firmware/enabled").with(admin).with(csrf()).with(r->{r.setLocalPort(10001);return r;}).param("on","false"))
+                .andExpect(flash().attributeCount(0));
+        mvc.perform(post("/admin/firmware/sources/alt-firmware/remove").with(admin).with(csrf()).with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(flash().attributeCount(0));
+        mvc.perform(get("/admin/firmware").with(admin).with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("someone/alt-firmware"))));
         mvc.perform(post("/admin/firmware/pin").with(admin).with(csrf()).with(r->{r.setLocalPort(10001);return r;}).param("board","esp32-cyd").param("version","vibedock|9.9.9"))
                 .andExpect(status().isBadRequest());
         mvc.perform(post("/admin/firmware/pin").with(admin).with(csrf()).with(r->{r.setLocalPort(10001);return r;}).param("board","esp32-cyd").param("version","nonsense"))

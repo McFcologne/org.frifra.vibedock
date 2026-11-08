@@ -1159,7 +1159,7 @@ firmware you built from these sources and trust: the displays install it.
 The server downloads firmware from the releases of GitHub repositories, once after it starts and then every day, and
 keeps the newest two versions of each source in `firmware/releases/` of the data directory. Without a file it uses the
 official source (`McFcologne/org.frifra.vibedock`, tags `client-vX.Y.Z`). `firmware-sources.yaml` in the data directory
-adds or replaces sources; the order is the priority, and for each board the first source with matching firmware wins:
+adds or replaces sources; the order is the priority, and for each board the first source with matching firmware wins. **Devices → Firmware** edits the same file: *Add a source* takes the repository and the tag prefix (a new source is for USB only), a source can be switched off, set to *USB only* again or removed, and *Allow updates over Wi-Fi* trusts it after a confirmation. The page writes the file anew, so comments in it are not kept; the official source can be switched off but not removed:
 
 ```yaml
 sources:
