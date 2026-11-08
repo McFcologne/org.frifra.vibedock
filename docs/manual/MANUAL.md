@@ -1287,7 +1287,7 @@ Battery presence and operation without USB have not been established. No motion-
 ### Battery power saving (experimental)
 
 Displays with a battery connection have the switch **Battery power saving** on their device
-card: Waveshare 1.54, 1.47 and C6 1.69 (tested boards), Waveshare S3 1.69 and LilyGO T-Display-S3 (prepared). It is
+card: Waveshare 1.54, 1.47 and C6 1.69 (tested boards), Waveshare S3 1.69, LilyGO T-Display-S3 and the Waveshare e-paper 1.54 (prepared). It is
 off by default. Switched on, the display saves power while it runs on its battery, that is without a computer on its
 USB port (and on the 1.54 without charging):
 
@@ -1295,7 +1295,7 @@ USB port (and on the 1.54 without charging):
   drop packets; it stays off while the display pulls its picture (or loads an update), so transfers are not slowed;
 - the processor at 80 MHz instead of 240 (C6: 160) MHz;
 - the backlight dims to 10 % after a minute without touch or volume button. The next touch only wakes it; swipe again
-  for the gesture.
+  for the gesture. The e-paper has no backlight and keeps its picture without power, so only the first two apply.
 
 Plugging into a computer ends it within about ten seconds. A charger or power bank without data lines counts as
 battery operation, except on the 1.54 while it charges; that does no harm. The display's status page shows **Power
