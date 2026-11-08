@@ -25,6 +25,14 @@ protocol as before; the displays keep working with the firmware they run.
 
 - **Server and firmware are released separately.** The server has its own tags (`server-vX.Y.Z`) and releases with the JAR and the Docker image; the firmware keeps its `client-v` releases. The *Latest* label on GitHub stays with the server. Until the first `server-v` tag existed, the plain tags (`v0.5.1`) gave the server's version. See `RELEASING.md`.
 
+## Client 0.6.1
+
+Same firmware as 0.6.0; only the manifest of the e-paper board changes: its `index.json` now lists the Waveshare ESP32-S3-ePaper-1.54 (V2) as run on the real board (`hardware: tested`). Updating the displays is optional.
+
+### Firmware
+
+- **E-paper board marked as tested.** The release manifest no longer calls the Waveshare e-paper 1.54 *prepared*.
+
 ## Client 0.6.0
 
 The first firmware release of its own: a tag `client-vX.Y.Z` builds the firmware of every board and publishes it with an
