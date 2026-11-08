@@ -1,1 +1,0 @@
-- **The Waveshare e-paper 1.54 gets the Battery power saving switch** on its device card (Wi-Fi modem sleep and 80 MHz while it runs on its battery). It has no backlight, so nothing is dimmed.
