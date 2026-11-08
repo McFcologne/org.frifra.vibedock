@@ -57,6 +57,7 @@ class BoardTest {
         Assertions.assertFalse(DisplayType.reported("200x200",Board.of("my-colour-board")).orElseThrow().grey());
         Assertions.assertTrue(DisplayType.reported("200x200",Board.find("waveshare-s3-epaper-154").orElseThrow()).orElseThrow().grey());
         Assertions.assertSame(DisplayType.reported("240x280").orElseThrow(),DisplayType.reported("240x280",Board.of("my-colour-board")).orElseThrow());
+    }
     private static final Path SCRIPT=Path.of("../vibedock-client/firmware/manifest.py"),INI=Path.of("../vibedock-client/firmware/platformio.ini");
     private static String python(Path dir,String... args) throws IOException,InterruptedException {
         var command=new ArrayList<String>(List.of("python3",SCRIPT.toAbsolutePath().toString()));command.addAll(List.of(args));
