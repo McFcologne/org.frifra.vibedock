@@ -1130,7 +1130,9 @@ Backup, restore and the repository's `vibedock-client/scripts/flash.sh` are desc
 
 Paired displays are updated from the server: **Update to …** on the overview, the
 device card or the firmware page. The display downloads the image, checks the server's signature and restarts; on
-a problem it keeps the running firmware and reports the reason with its next pull.
+a problem it keeps the running firmware and reports the reason with its next pull. Updating many displays at once is fine: the
+server lets two of them download at a time and tells the others with a later pull, so a small display does not run out of
+memory or lose its connection while the others download (the overview keeps showing *updating* for those that wait).
 
 ## Own firmware build
 

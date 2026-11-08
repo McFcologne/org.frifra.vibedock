@@ -227,4 +227,38 @@ class ClientTest {
             assertThrows(IllegalArgumentException.class,()->pairing.invite("127.0.0.1",port,"12345","",List.of("http://x:1")));
         }finally{server.stop(0);}
     }
+    /** A clock the test moves by hand. */
+    static final class Hand extends Clock {
+        java.time.Instant now=java.time.Instant.parse("2026-11-08T19:00:00Z");
+        public java.time.ZoneId getZone(){return java.time.ZoneOffset.UTC;}
+        public Clock withZone(java.time.ZoneId zone){return this;}
+        public java.time.Instant instant(){return now;}
+    }
+    @Test void aRequestedUpdateIsOfferedToTwoDisplaysAtATime(@TempDir Path dir) throws Exception {
+        var clock=new Hand();var registry=new ClientRegistry(dir.toString(),json,clock);
+        var ids=List.of("vibedock-aa0001","vibedock-aa0002","vibedock-aa0003","vibedock-aa0004");
+        for(var id:ids){
+            registry.paired(id,id,key,"192.168.1.10",80);
+            registry.pulled(id,"192.168.1.10",true,"0.5.1");registry.otaReport(id,"1",null);
+            assertTrue(registry.requestUpdate(id,"0.6.1"));
+        }
+        // The first two get the offer, again with every pull until they are done; the others wait.
+        assertTrue(registry.offerUpdate(ids.get(0),"0.6.1"));assertTrue(registry.offerUpdate(ids.get(1),"0.6.1"));
+        assertFalse(registry.offerUpdate(ids.get(2),"0.6.1"));assertFalse(registry.offerUpdate(ids.get(3),"0.6.1"));
+        assertTrue(registry.offerUpdate(ids.get(0),"0.6.1"));
+        // A device that runs the version has finished: its slot goes to the next one in line.
+        registry.pulled(ids.get(0),"192.168.1.10",true,"0.6.1");
+        assertFalse(registry.offerUpdate(ids.get(0),"0.6.1"));
+        assertTrue(registry.offerUpdate(ids.get(2),"0.6.1"));
+        assertFalse(registry.offerUpdate(ids.get(3),"0.6.1"));
+        // A failed update frees the slot too; its request is over.
+        registry.otaReport(ids.get(1),"1","0.6.1: download interrupted");
+        assertFalse(registry.offerUpdate(ids.get(1),"0.6.1"));
+        assertTrue(registry.offerUpdate(ids.get(3),"0.6.1"));
+        // A device that never fetches loses its slot after a while.
+        assertTrue(registry.requestUpdate(ids.get(1),"0.6.1"));
+        assertFalse(registry.offerUpdate(ids.get(1),"0.6.1"));
+        clock.now=clock.now.plusSeconds(ClientRegistry.UPDATE_OFFER_SECONDS+1);
+        assertTrue(registry.offerUpdate(ids.get(1),"0.6.1"));
+    }
 }

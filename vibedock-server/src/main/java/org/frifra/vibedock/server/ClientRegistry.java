@@ -314,6 +314,25 @@ public class ClientRegistry {
         if(!FirmwareVersion.offered(version,find(id).firmware())){updateRequested.remove(id);return false;}
         expireUpdate(id);return updateRequested.containsKey(id);
     }
+    /** Offers in flight: when each device was told to fetch its update. A display downloading needs memory and the server's bandwidth. */
+    private final Map<String,Long> updateOffered=new HashMap<>();
+    static final int UPDATE_PARALLEL=2;
+    static final long UPDATE_OFFER_SECONDS=150;
+    /**
+     * Whether this pull tells the device to fetch its update now. Updates are requested for many displays at once, but
+     * only {@value #UPDATE_PARALLEL} are offered at a time (a small display that downloads while others do runs out of
+     * memory or loses its connection and gives up until its next start); the others wait with their request and get
+     * the offer with a later pull, when a slot is free: the device has restarted with the new version, reported a
+     * failure, or {@value #UPDATE_OFFER_SECONDS} s have passed since the offer.
+     */
+    public synchronized boolean offerUpdate(String id,String version){
+        if(!updatePending(id,version)){updateOffered.remove(id);return false;}
+        long now=clock.instant().getEpochSecond();
+        updateOffered.entrySet().removeIf(e->now-e.getValue()>UPDATE_OFFER_SECONDS||!updateRequested.containsKey(e.getKey()));
+        if(updateOffered.containsKey(id))return true;
+        if(updateOffered.size()>=UPDATE_PARALLEL)return false;
+        updateOffered.put(id,now);return true;
+    }
     /** Constant-time key check; false for unknown identifiers so callers cannot tell them apart. */
     public synchronized boolean authenticate(String id,String key){
         String given=key==null||!key.matches("[a-f0-9]{64}")?"0".repeat(64):hash(key);
