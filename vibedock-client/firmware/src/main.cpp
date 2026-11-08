@@ -1003,7 +1003,8 @@ void forgetAnchor() { platform::clearAnchor(); LittleFS.remove("/anchor.der"); }
 // ---- updates over Wi-Fi ----
 // The public key of the paired server; firmware is installed over Wi-Fi only with a valid signature of that server.
 String updateError;  // why the last update failed; reported with the next pull
-String failedUpdate;  // not tried again until the next start
+String failedUpdate;  // the version of the last failed update; offered again within a minute it is skipped (the pull that reports the failure)
+uint32_t failedUpdateAt = 0;  // millis() of that failure; a later offer is a new request of the administrator and is tried
 bool setOtaKey(const String &pem) { return platform::setOtaKey(pem); }
 void loadOtaKey() {
   auto file = LittleFS.open("/ota.pem", "r");
@@ -1384,7 +1385,7 @@ void installUpdate(const String &version) {
   platform::UpdateReserve reserve;  // before the log line and the connection fragment the heap
   message(String(F("Updating to v")) + version, Step::None); updateProgress(0, 1); logEvent(String(F("Update to v")) + version + F(" started"));
   auto fail = [&](const String &reason) {
-    updateError = version + ": " + reason; failedUpdate = version; logEvent(String(F("Update failed: ")) + reason);
+    updateError = version + ": " + reason; failedUpdate = version; failedUpdateAt = millis(); logEvent(String(F("Update failed: ")) + reason);
     message("Update failed", Step::None, true); showDetail(reason.substring(0, 34), PROBLEM); delay(4000);
     haveImage = false; staleScreen = true; etag = ""; forgetRows(); pullSoon();
   };
@@ -1667,7 +1668,7 @@ void pull() {
   }
 #endif
   if (client_policy::validLogRequest(logRequest.c_str())) uploadLog(logRequest);
-  if (!offered.isEmpty() && offered != VIBEDOCK_VERSION && offered != failedUpdate && platform::hasOtaKey()) installUpdate(offered);
+  if (!offered.isEmpty() && offered != VIBEDOCK_VERSION && (offered != failedUpdate || millis() - failedUpdateAt > 60000UL) && platform::hasOtaKey()) installUpdate(offered);
   diagPhase(Phase::Idle);
 }
 
