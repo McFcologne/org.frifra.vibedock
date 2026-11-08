@@ -878,6 +878,14 @@ class AccessTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("McFcologne/org.frifra.vibedock")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Check now")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Nothing has been downloaded for this board yet.")));
+        // The page follows a running check by itself: it marks the section and asks this answer until the check is over.
+        mvc.perform(get("/admin/firmware").with(admin).with(r->{r.setLocalPort(10001);return r;}))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("data-sources-state=\"/admin/firmware/sources/state\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("/firmware-sources.js")));
+        mvc.perform(get("/admin/firmware/sources/state").with(admin).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(org.springframework.http.MediaType.APPLICATION_JSON))
+                .andExpect(content().json("{\"running\":false}"));
+        mvc.perform(get("/admin/firmware/sources/state").with(admin).with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNotFound());
         mvc.perform(post("/admin/firmware/sources/check").with(admin).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isForbidden());
         mvc.perform(post("/admin/firmware/sources/check").with(admin).with(csrf()).with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNotFound());
         mvc.perform(post("/admin/firmware/pin").with(admin).with(csrf()).with(r->{r.setLocalPort(10001);return r;}).param("board","esp32-cyd").param("version","vibedock|9.9.9"))

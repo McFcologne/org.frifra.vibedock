@@ -69,7 +69,10 @@ class FirmwareController {
         model.addAttribute("internalLoopback",addresses.internalIsLoopback(request));
         return "firmware";
     }
-    /** Asks the firmware sources now, in the background; the page shows the result when reloaded. */
+    /** Whether a check of the sources runs right now: the page waits for it and reloads when it is over. */
+    @GetMapping(value="/admin/firmware/sources/state",produces=MediaType.APPLICATION_JSON_VALUE) @ResponseBody
+    Map<String,Object> sourcesState(){return Map.of("running",releases!=null&&releases.running());}
+    /** Asks the firmware sources now, in the background; the page follows the check and shows the result by itself. */
     @PostMapping("/admin/firmware/sources/check") String check(@RequestParam(defaultValue="") String board){
         if(releases!=null&&releases.checkInBackground())log.info("Firmware sources are checked on request");
         return "redirect:/admin/firmware"+(Board.find(board).isPresent()?"?board="+board:"");

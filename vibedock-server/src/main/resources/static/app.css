@@ -346,6 +346,7 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 .hash{overflow-wrap:anywhere;font-size:12px}.badge.update{text-decoration:none;margin-left:6px}.badge.update:hover{filter:brightness(1.1)}
 .firmware-devices{width:100%;border-collapse:collapse;margin:18px 0 0;font-size:13px}
 .firmware-sources .firmware-devices{display:block;overflow-x:auto}.firmware-sources code{overflow-wrap:anywhere}
+.check-status{display:flex;align-items:center;gap:8px}.check-status[hidden]{display:none}.spinner{flex:none;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.spinner{animation-duration:3s}}
 /* Logs table: long start reasons and firmware names wrap instead of pushing the buttons out of the card; on a phone
    every display is a block with labelled lines. */
 .log-targets td{overflow-wrap:anywhere}.log-targets .badge{white-space:normal;overflow-wrap:anywhere;max-width:100%}
