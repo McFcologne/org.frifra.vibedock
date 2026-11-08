@@ -101,6 +101,23 @@ class DeviceMetricsTest {
         assertFalse(Files.exists(file),"the single file is gone");
         try(var days=Files.list(folder)){assertTrue(days.allMatch(f->f.getFileName().toString().matches("metrics-\\d{4}-\\d{2}-\\d{2}\\.jsonl")));}
     }
+    @Test void aMigrationThatWasCutOffDoesNotWriteSamplesTwice(@TempDir Path dir) throws Exception {
+        var clock=new TestClock();String id="vibedock-0a1b2c000024";
+        Path folder=Files.createDirectories(dir.resolve("device-logs").resolve(id));
+        long first=clock.now-3_600_000L,second=clock.now-1_800_000L;
+        String l1="{\"at\":"+first+",\"boot\":null,\"raw\":\""+FULL+"\",\"lowest\":null}",l2="{\"at\":"+second+",\"boot\":null,\"raw\":\""+FULL+"\",\"lowest\":null}";
+        Files.writeString(folder.resolve(DeviceLogs.METRICS),l1+"\n"+l2+"\n");
+        // The day file already holds the first sample: the server stopped before the single file was removed.
+        String day=java.time.format.DateTimeFormatter.ISO_LOCAL_DATE.format(Instant.ofEpochMilli(first).atZone(ZoneOffset.UTC));
+        Files.writeString(folder.resolve("metrics-"+day+".jsonl"),l1+"\n");
+        var metrics=new DeviceMetrics(dir.toString(),json,clock);
+        var kept=metrics.samples(id,0,Long.MAX_VALUE);
+        assertEquals(2,kept.size());assertEquals(first,kept.get(0).at());assertEquals(second,kept.get(1).at());
+        assertFalse(Files.exists(folder.resolve(DeviceLogs.METRICS)));
+        // And a second run (a restart with the single file still there) changes nothing.
+        Files.writeString(folder.resolve(DeviceLogs.METRICS),l1+"\n"+l2+"\n");
+        assertEquals(2,new DeviceMetrics(dir.toString(),json,clock).samples(id,0,Long.MAX_VALUE).size());
+    }
     @Test void daysBeyondTheRetentionAreDeletedAndTheRangeReadsOnlyItsDays(@TempDir Path dir) throws Exception {
         var clock=new TestClock();int[] days={90};
         var metrics=new DeviceMetrics(dir.toString(),json,clock,()->days[0]);String id="vibedock-0a1b2c000023";
