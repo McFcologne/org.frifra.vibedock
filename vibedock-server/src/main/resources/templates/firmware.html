@@ -4,7 +4,7 @@
 <body>
 <header th:replace="~{fragments :: appbar('devices')}"></header>
 <main>
-<div class="page-heading"><div><h2>Device firmware</h2><p>The firmware built from the same sources as this server, one build per supported board, or an own build you upload.
+<div class="page-heading"><div><h2>Device firmware</h2><p>The firmware downloaded from the client releases, one build per supported board, or an own build you upload.
   Something not working? See <a th:href="@{/admin/troubleshooting}">Troubleshooting</a>.</p></div>
   <a class="button secondary" th:href="@{/admin/devices}">← Devices</a></div>
 
@@ -21,8 +21,9 @@
     <p class="notice warn" th:unless="${board.tested}">This firmware builds, but it has never run on this board. Back up the flash before installing it (step 2 below); if the display stays dark, install the backup again.</p>
     <noscript><button>Show</button></noscript>
   </form>
-  <p th:if="${firmware == null and !anyFirmware}"><strong>No firmware in this installation.</strong> The Docker image built with <code>docker compose up -d --build</code> or <code>scripts/image.sh</code>
-    contains it; a server started from the IDE or with <code>java -jar</code> does not. Build it yourself with <code>vibedock-client/scripts/build.sh</code>.</p>
+  <p th:if="${firmware == null and !anyFirmware}"><strong>No firmware in this installation yet.</strong> The image carries none: the server downloads it from the client releases
+    a short while after its start and then every day (see <em>Firmware sources</em>; <em>Check now</em> asks right away). Without network access,
+    upload an own build (built with <code>vibedock-client/scripts/build.sh</code>).</p>
   <p th:if="${firmware == null and anyFirmware}"><strong>No firmware for this board in this installation.</strong> Choose another board.</p>
   <th:block th:if="${firmware != null}">
   <dl class="firmware-facts">
@@ -91,13 +92,13 @@
 <section class="card own-firmware" data-own-firmware th:attr="data-board=${board.id},data-esp8266=${board.esp8266()}">
   <div class="card-head"><h3 class="grow">Own firmware build</h3>
     <form th:if="${uploadedAt != null}" method="post" th:action="@{/admin/firmware/upload/remove(board=${board.id})}"
-          data-confirm="Remove the uploaded build? The built-in firmware applies again."><button class="secondary">Use the built-in firmware</button></form></div>
+          data-confirm="Remove the uploaded build? The released firmware applies again."><button class="secondary">Use the released firmware</button></form></div>
   <p th:if="${uploadedAt != null}"><span class="badge update">Uploaded</span> Build <strong th:text="${firmware.version}"></strong>, uploaded
-    <span th:text="${uploadedAt}"></span>, replaces the built-in firmware of this board for USB and for updates over Wi-Fi.</p>
+    <span th:text="${uploadedAt}"></span>, replaces the released firmware of this board for USB and for updates over Wi-Fi.</p>
   <p>Upload a build of your own, e.g. a test version: <code th:text="${'vibedock-client/firmware/.pio/build/' + board.id + '/firmware.bin'}"></code>
     <th:block th:unless="${board.esp8266()}">and <code>flash.bin</code> from the same folder (the USB image with bootloader and partition table)</th:block>.
     The server reads version and board from the file, signs it with its key for updates over Wi-Fi and offers it to the devices of this board until you
-    go back to the built-in firmware. Only upload firmware you built from these sources and trust: the devices install it.</p>
+    go back to the released firmware. Only upload firmware you built from these sources and trust: the devices install it.</p>
   <p class="notice error" th:if="${uploadIncomplete}" th:text="${board.esp8266() ? 'The upload is incomplete.' : 'Waiting for the second file: upload both firmware.bin and flash.bin of the same build.'}"></p>
   <div class="flash-row"><input type="file" accept=".bin" multiple data-own-files aria-label="Firmware files">
     <button type="button" data-own-upload disabled>Upload</button></div>

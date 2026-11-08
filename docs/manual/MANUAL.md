@@ -1049,7 +1049,7 @@ settings or sign-ins; check the mount and its owner (see [Data directory and bac
 > **Flashing is at your own risk** (see [Disclaimer](#disclaimer)). Always download and keep a full backup of the
 > device first; it is the only way back to its current firmware.
 
-**Devices → Firmware** holds the firmware of the server's version for every supported board. The **Board** in the
+**Devices → Firmware** holds the firmware the server downloaded from the client releases ([Firmware sources](#firmware-sources)) for every supported board. The **Board** in the
 firmware card decides which image is shown, downloaded and installed:
 
 | Board | Chip | Display | Hardware |
@@ -1134,7 +1134,7 @@ a problem it keeps the running firmware and reports the reason with its next pul
 
 ## Own firmware build
 
-**Own firmware build** on the firmware page replaces the built-in firmware of the chosen board with a build of your
+**Own firmware build** on the firmware page replaces the released firmware of the chosen board with a build of your
 own, for example a test version from your checkout:
 
 1. Build it (`vibedock-client/scripts/build.sh <board>`, or IntelliJ).
@@ -1149,7 +1149,7 @@ A firmware built for a board this server does not list (your own board ID in `pl
 the server never offers it firmware, so it cannot be given the firmware of another board by mistake. Update such a
 display with your own build over USB or Wi-Fi from your checkout.
 
-**Use the built-in firmware** removes the upload; the firmware of the server's version applies again. Only upload
+**Use the released firmware** removes the upload; the newest downloaded firmware applies again (see [Firmware sources](#firmware-sources)). Only upload
 firmware you built from these sources and trust: the displays install it.
 
 ## Firmware sources
@@ -1178,14 +1178,13 @@ The server takes only releases whose index names the protocol version it speaks 
 file against the SHA-256 and size of the index, and refuses an app that does not carry the board and version it is
 listed for. A source is `trusted: false` unless the file says `trusted: true`: its firmware can be flashed over USB
 from the browser, but is never offered for updates over Wi-Fi, because the server signs what it offers there. Set
-`trusted: true` only for firmware whose maker and code you trust; the displays install it. Downloaded firmware replaces
-the one built into the image only when its version is newer; an upload of your own always wins. The server asks
+`trusted: true` only for firmware whose maker and code you trust; the displays install it. The image carries no firmware, so the first download
+brings the first one; an upload of your own always wins over a downloaded version. The server asks
 `api.github.com` and downloads from GitHub's hosts only; `FIRMWARE_SYNC=false` turns the downloads off.
 
 **Devices → Firmware** shows the sources with their newest downloaded version, whether they are trusted, and the result of
 the last check (with the error, if there was one). **Check now** asks the sources right away, in the background; reload
-the page to see the result. The page says where the chosen board's firmware comes from (built into the image, your upload
-or a source). **Hold a version for this board** keeps one of the downloaded versions in place of the newest until **Use
+the page to see the result. The page says where the chosen board's firmware comes from (your upload or a source). **Hold a version for this board** keeps one of the downloaded versions in place of the newest until **Use
 the newest again**; a held version is not deleted when newer ones arrive. A mistake in `firmware-sources.yaml` is shown
 there as well, and nothing is downloaded until it is fixed.
 
@@ -1509,7 +1508,7 @@ that VLAN (its default gateway). The displays keep using the internal address; n
 ## Try a test build
 
 To test a fix before a release, build the firmware from your checkout and install it with
-[Own firmware build](#own-firmware-build), over USB or over Wi-Fi. Go back with **Use the built-in firmware**.
+[Own firmware build](#own-firmware-build), over USB or over Wi-Fi. Go back with **Use the released firmware**.
 
 ## Report a problem
 

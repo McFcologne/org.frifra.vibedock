@@ -176,7 +176,7 @@ see the [client README](vibedock-client/README.md).
 
 ## Client firmware and local device page
 
-The easiest way is **Devices → Firmware** in the administration (see Quick start). Alternatively build the image and flash over USB, or take the firmware image of your board (`vibedock-m1-<version>.bin` for the VibeTV M1, `vibedock-<board>-<version>.bin` for the others) from a GitHub release of this (private) repository; releases also carry the server JAR and the Docker images for amd64 and arm64. Flash only after creating a verified backup of **your own** device. Instructions: [client README](vibedock-client/README.md#build-and-test) and [FLASHING.md](vibedock-client/FLASHING.md).
+The easiest way is **Devices → Firmware** in the administration (see Quick start). Alternatively build the image and flash over USB, or take the firmware image of your board (`vibedock-m1-<version>.bin` for the VibeTV M1, `vibedock-<board>-<version>.bin` for the others) from a `client-v` release of this repository (the server JAR has its own `server-v` releases; the Docker image comes from the registries). Flash only after creating a verified backup of **your own** device. Instructions: [client README](vibedock-client/README.md#build-and-test) and [FLASHING.md](vibedock-client/FLASHING.md).
 
 ```sh
 cd vibedock-client
