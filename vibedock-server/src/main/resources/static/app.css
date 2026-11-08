@@ -558,7 +558,7 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 .metric-chart .c1,.metric-legend .c1{stroke:var(--err);background:var(--err)}
 .metric-chart .c2,.metric-legend .c2{stroke:var(--ok);background:var(--ok)}
 .metric-legend{font-size:12px;color:var(--muted)}.metric-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 4px 0 10px;vertical-align:baseline}
-.metric-periods a{margin-right:10px}.metric-periods a.current{font-weight:700;text-decoration:none;color:var(--text)}
+.metric-periods{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}.metric-periods a{margin-right:10px}.metric-periods .metric-range{margin-left:6px;color:var(--muted,inherit)}.metric-periods .metric-older,.metric-periods .metric-newer{margin-right:0}.metric-periods a.current{font-weight:700;text-decoration:none;color:var(--text)}
 .preview-battery{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;margin:12px 0 0}.preview-battery label{display:flex;gap:6px;align-items:center;color:var(--text)}
 
 /* Metrics: scrollable sample table, offline gaps, popup of the device cards */

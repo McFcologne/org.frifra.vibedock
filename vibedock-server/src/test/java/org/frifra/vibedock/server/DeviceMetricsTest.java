@@ -79,15 +79,44 @@ class DeviceMetricsTest {
         assertEquals(3,again.samples(id,0,Long.MAX_VALUE).size(),"60 s after the last kept sample: not kept");
         assertEquals(0,metrics.samples("vibedock-0a1b2c000021",0,Long.MAX_VALUE).size());
     }
-    @Test void samplesOlderThanThirtyDaysGoWithTheNextWrite(@TempDir Path dir) throws Exception {
-        var clock=new TestClock();var metrics=new DeviceMetrics(dir.toString(),json,clock);String id="vibedock-0a1b2c000022";
-        Path file=Files.createDirectories(dir.resolve("device-logs").resolve(id)).resolve(DeviceLogs.METRICS);
+    @Test void theMetricsPagePagesBackByWholeWindowsWithinTheRetention() throws Exception {
+        String id="vibedock-0a1b2c000090";
+        mvc.perform(admin(get("/admin/clients/"+id+"/metrics").param("hours","720")))
+                .andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("Older")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Newer"))));
+        mvc.perform(admin(get("/admin/clients/"+id+"/metrics").param("hours","720").param("back","1")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Newer"))).andExpect(content().string(org.hamcrest.Matchers.containsString("Older")));
+        mvc.perform(admin(get("/admin/clients/"+id+"/metrics").param("hours","720").param("back","3")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Older")))).andExpect(content().string(org.hamcrest.Matchers.containsString("Newer")));
+        mvc.perform(admin(get("/admin/clients/"+id+"/metrics").param("hours","24").param("back","-5"))).andExpect(status().isOk());
+    }
+    @Test void anEarlierSingleFileIsSplitIntoDaysAndOldDaysAreDeleted(@TempDir Path dir) throws Exception {
+        var clock=new TestClock();var metrics=new DeviceMetrics(dir.toString(),json,clock,()->30);String id="vibedock-0a1b2c000022";
+        Path folder=Files.createDirectories(dir.resolve("device-logs").resolve(id)),file=folder.resolve(DeviceLogs.METRICS);
         long old=clock.now-31*86_400_000L,recent=clock.now-2*86_400_000L;
         Files.writeString(file,"{\"at\":"+old+",\"boot\":null,\"raw\":\""+FULL+"\",\"lowest\":null}\nnot json\n{\"at\":"+recent+",\"boot\":null,\"raw\":\""+FULL+"\",\"lowest\":null}\n");
         metrics.report(id,FULL,"0000beef");
         var kept=metrics.samples(id,0,Long.MAX_VALUE);
-        assertEquals(2,kept.size());assertEquals(recent,kept.get(0).at());
-        assertEquals(2,Files.readAllLines(file).stream().filter(l->!l.isBlank()).count()-0,"the old and the unreadable line are gone");
+        assertEquals(2,kept.size(),"the sample older than 30 days and the unreadable line are gone");assertEquals(recent,kept.get(0).at());
+        assertFalse(Files.exists(file),"the single file is gone");
+        try(var days=Files.list(folder)){assertTrue(days.allMatch(f->f.getFileName().toString().matches("metrics-\\d{4}-\\d{2}-\\d{2}\\.jsonl")));}
+    }
+    @Test void daysBeyondTheRetentionAreDeletedAndTheRangeReadsOnlyItsDays(@TempDir Path dir) throws Exception {
+        var clock=new TestClock();int[] days={90};
+        var metrics=new DeviceMetrics(dir.toString(),json,clock,()->days[0]);String id="vibedock-0a1b2c000023";
+        Path folder=Files.createDirectories(dir.resolve("device-logs").resolve(id));
+        var day=java.time.format.DateTimeFormatter.ISO_LOCAL_DATE;
+        for(int back:new int[]{100,60,5}){
+            long at=clock.now-back*86_400_000L;
+            Files.writeString(folder.resolve("metrics-"+day.format(Instant.ofEpochMilli(at).atZone(ZoneOffset.UTC))+".jsonl"),
+                    "{\"at\":"+at+",\"boot\":null,\"raw\":\""+FULL+"\",\"lowest\":null}\n");
+        }
+        assertEquals(3,metrics.samples(id,0,Long.MAX_VALUE).size(),"nothing is deleted before the next write");
+        metrics.report(id,FULL,"0000beef");
+        try(var files=Files.list(folder)){assertEquals(3,files.count(),"the day 100 days back is deleted, 60, 5 and today stay");}
+        assertEquals(3,metrics.samples(id,0,Long.MAX_VALUE).size(),"60 and 5 days back and now");
+        assertEquals(1,metrics.samples(id,clock.now-61*86_400_000L,clock.now-59*86_400_000L).size());
+        assertEquals(90,metrics.keepDays());days[0]=30;assertEquals(30,metrics.keepDays());
     }
     @Test void csvHasUnitsInTheHeaderEmptyCellsAndDotDecimals(){
         var s=DeviceMetrics.parse(FULL,Instant.parse("2026-11-05T16:38:07Z").toEpochMilli(),"0000beef");

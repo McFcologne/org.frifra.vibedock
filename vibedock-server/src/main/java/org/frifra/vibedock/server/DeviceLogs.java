@@ -11,13 +11,14 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 /**
- * The logs read from displays, kept per device below data/device-logs/<identifier>/: the last {@value #KEEP} of each
+ * The logs read from displays, kept per device below data/device-logs/<identifier>/: the logs of the retention period (Settings, default 90 days, at most {@value #MAX_KEPT}) of each
  * device with the time they were read, how (USB or network), and the firmware and board of the display. They feed
  * the device's log page and support bundles. Keys and web display secrets that might show up are removed on saving.
  */
 @Component
 class DeviceLogs {
-    static final int KEEP=10,MAX_LINES=500,MAX_LINE=400,MAX_BYTES=64*1024;
+    /** Logs per device at most, whatever the retention. */
+    static final int MAX_KEPT=200,MAX_LINES=500,MAX_LINE=400,MAX_BYTES=64*1024;
     /** The starts the display reported (DeviceDiagnostics), beside its logs. */
     static final String STARTS="starts.json";
     /** The measured values the display sent (DeviceMetrics), beside its logs. */
@@ -64,11 +65,19 @@ class DeviceLogs {
     private final Map<String,RequestStatus> lastRequests=new HashMap<>();
     private final java.security.SecureRandom random=new java.security.SecureRandom();
     private final Path root;private final ObjectMapper json;private final Clock clock;
-    DeviceLogs(@Value("${vibedock.data-dir}") String dataDir,ObjectMapper json,Clock clock){
-        this.root=Path.of(dataDir).resolve("device-logs");this.json=json;this.clock=clock;
+    private final java.util.function.IntSupplier days;
+    @org.springframework.beans.factory.annotation.Autowired
+    DeviceLogs(@Value("${vibedock.data-dir}") String dataDir,ObjectMapper json,Clock clock,SettingsStore settings){
+        this(dataDir,json,clock,()->settings.retention().logDays());
     }
+    DeviceLogs(String dataDir,ObjectMapper json,Clock clock,java.util.function.IntSupplier days){
+        this.root=Path.of(dataDir).resolve("device-logs");this.json=json;this.clock=clock;this.days=days;
+    }
+    DeviceLogs(String dataDir,ObjectMapper json,Clock clock){this(dataDir,json,clock,()->SettingsStore.Retention.DEFAULT.logDays());}
+    /** Days the logs are kept. */
+    int days(){return days.getAsInt();}
 
-    /** Saves a log read from a display and drops its oldest logs beyond {@value #KEEP}. */
+    /** Saves a log read from a display and drops its logs older than the retention period or beyond {@value #MAX_KEPT}. */
     synchronized Entry save(String identifier,String source,String firmware,String board,List<String> lines) throws IOException {
         return save(identifier,source,firmware,board,lines,null,null);
     }
@@ -93,7 +102,11 @@ class DeviceLogs {
         var stored=new Stored(now,source,short40(firmware),short40(board),clean,boot,uptime,serverLines(identifier,clean,now));
         write(dir,name,stored);
         var names=names(dir);
-        for(String old:names.subList(Math.min(KEEP,names.size()),names.size()))Files.deleteIfExists(dir.resolve(old));
+        long oldest=now-days()*86_400_000L;
+        for(int i=0;i<names.size();i++){
+            // Names start with the save time, so the list is newest first; the newest log always stays.
+            if(i>0&&(i>=MAX_KEPT||Long.parseLong(names.get(i).substring(0,13))<oldest))Files.deleteIfExists(dir.resolve(names.get(i)));
+        }
         return entry(name,stored);
     }
     /** Every display with saved logs (also displays that are not paired). */
@@ -125,6 +138,7 @@ class DeviceLogs {
     synchronized void deleteAll(String identifier) throws IOException {
         Path dir=directory(identifier);requests.remove(identifier);lastRequests.remove(identifier);
         Files.deleteIfExists(dir.resolve(STARTS));Files.deleteIfExists(dir.resolve(METRICS));
+        if(Files.isDirectory(dir))try(var days=Files.newDirectoryStream(dir,"metrics-*.jsonl")){for(Path day:days)Files.deleteIfExists(day);}
         for(String name:names(dir))Files.deleteIfExists(dir.resolve(name));
         try{Files.deleteIfExists(dir);}catch(DirectoryNotEmptyException ignored){}
     }

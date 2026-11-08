@@ -56,7 +56,7 @@
         <th:block th:switch="${t.request.name()}">
           <span th:case="'PENDING'" class="meta"><br>Requested, waiting<th:block th:if="${t.reach != null and t.reach.name() == 'UNREACHABLE'}"> (not reachable now: sends it with its next pull)</th:block></span>
           <span th:case="'TIMED_OUT'" class="meta"><br>Request timed out</span></th:block></td>
-      <td data-label="Saved logs"><a th:href="@{/admin/clients/{id}/logs(id=${c.identifier})}" th:text="${t.logs + ' of ' + keep}"></a></td>
+      <td data-label="Saved logs"><a th:href="@{/admin/clients/{id}/logs(id=${c.identifier})}" th:text="${t.logs}"></a></td>
       <td><form th:if="${t.network}" th:action="@{/admin/clients/{id}/logs/request(id=${c.identifier})}" method="post">
           <button class="secondary" title="The display sends its log over its server connection">Read over the network</button></form>
         <span th:unless="${t.network}" class="meta" title="This firmware sends its log only over USB; update it to read it over the network">USB only</span></td></tr></tbody>

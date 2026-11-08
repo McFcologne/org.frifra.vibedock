@@ -75,6 +75,19 @@
     <div class="form-actions"><button type="button" class="secondary" id="image-color-add">Add rule</button><button class="secondary" name="reset" value="true" formnovalidate>Restore defaults</button><button>Save color rules</button></div>
   </form>
 </section>
+<section class="card" id="retention">
+  <div class="card-head"><h2 class="grow">Retention</h2></div>
+  <p class="meta">How long the measured values and the logs read from displays are kept. The metrics page shows 30 days at a time and pages back through all kept days. The server log and the access log are kept 90 days (<code>LOG_MAX_DAYS</code>).</p>
+  <form th:action="@{/admin/server/retention}" method="post" autocomplete="off" data-dirty-form>
+    <div class="polling-fields">
+      <div><label for="retention-metrics">Metrics, days</label><input id="retention-metrics" name="metricsDays" type="number" th:min="${retentionMin}" th:max="${retentionMax}" required th:value="${retention.metricsDays}"></div>
+      <div><label for="retention-logs">Device logs, days</label><input id="retention-logs" name="logDays" type="number" th:min="${retentionMin}" th:max="${retentionMax}" required th:value="${retention.logDays}"></div>
+    </div>
+    <p class="notice" th:if="${retentionMessage}" th:text="${retentionMessage}"></p>
+    <p class="notice error" th:if="${retentionError}" th:text="${retentionError}"></p>
+    <div class="actions"><button type="submit">Save</button></div>
+  </form>
+</section>
 <section class="card" id="storage">
   <div class="card-head"><h2 class="grow">Storage</h2><span class="badge" th:classappend="${storageProblem == null} ? 'ok'" th:text="${storageProblem == null ? 'Writable' : 'Not writable'}"></span></div>
   <p class="meta">Data directory: <code th:text="${dataDir}"></code> · logs in <code th:text="${logDir}"></code></p>

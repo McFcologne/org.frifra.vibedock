@@ -241,7 +241,15 @@ class Controllers {
         model.addAttribute("devices",settings.devices());
         model.addAttribute("dataDir",dataDir);model.addAttribute("logDir",logDir);
         model.addAttribute("adminUser",admin.name());model.addAttribute("ownPassword",admin.overridden());
+        model.addAttribute("retention",store.retention());model.addAttribute("retentionMin",SettingsStore.Retention.MIN_DAYS);model.addAttribute("retentionMax",SettingsStore.Retention.MAX_DAYS);
         return "server";
+    }
+    @PostMapping("/admin/server/retention") String retention(@RequestParam int metricsDays,@RequestParam int logDays,RedirectAttributes flash) throws Exception {
+        try{
+            store.saveRetention(new SettingsStore.Retention(metricsDays,logDays));
+            flash.addFlashAttribute("retentionMessage","Saved. Data older than this is removed with the next sample or log of a display.");
+        }catch(IllegalArgumentException e){flash.addFlashAttribute("retentionError",e.getMessage());}
+        return "redirect:/admin/server#retention";
     }
     @PostMapping("/admin/server/image-colors") String imageColors(@RequestParam(required=false) List<Integer> maxWidth,
             @RequestParam(required=false) List<Integer> maxHeight,@RequestParam(required=false) List<Integer> colors,
