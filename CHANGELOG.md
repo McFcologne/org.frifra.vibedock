@@ -28,7 +28,7 @@ protocol as before; the displays keep working with the firmware they run.
 
 ## Client 0.6.1
 
-Same firmware as 0.6.0; only the manifest of the e-paper board changes: its `index.json` now lists the Waveshare ESP32-S3-ePaper-1.54 (V2) as run on the real board (`hardware: tested`). Updating the displays is optional.
+Same firmware functionality as 0.6.0: the release rebuilds the images with the version 0.6.1 and records the Waveshare ESP32-S3-ePaper-1.54 (V2) as run on the real board (`hardware: tested` in `index.json`). Updating the displays is optional.
 
 ### Firmware
 
