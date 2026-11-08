@@ -20,6 +20,7 @@ protocol as before; the displays keep working with the firmware they run.
 - **An own build that reports 200x200 is no longer taken for the e-paper.** Only the e-paper board keeps the black-and-white 200x200 type; any other board with that size gets a colour display of its own.
 - **E-paper board marked as tested:** the Waveshare ESP32-S3-ePaper-1.54 (V2) runs on the real board; the *untested board* note on its device card is gone. Contrast thresholds and ghosting are still being tuned.
 - **Use the released firmware** is the new name of *Use the built-in firmware* on the firmware page: it removes an upload, and the newest downloaded firmware applies again.
+- **Firmware page follows the check.** *Check now* no longer needs a manual reload: the page shows that the check runs and displays the result by itself when it is over, also for a check started by the daily schedule or by another window.
 
 ### Releases
 
