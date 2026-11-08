@@ -221,7 +221,7 @@ Everything the server keeps lives in the data directory, by default `vibedock-se
 | `firmware/` | Own firmware builds uploaded under **Devices → Firmware**, one folder per board (only when used), and in `firmware/releases/` the firmware downloaded from the sources in `firmware-sources.yaml` |
 | `firmware-sources.yaml` | Where the server downloads firmware from (optional, see "Firmware sources") |
 | `logs/` | `vibedock.log` and the daily request logs (kept 14 days) |
-| `device-logs/` | Per display the last starts and, from firmware 0.5.0, the measured values (`metrics.jsonl`, 30 days) |
+| `device-logs/` | Per display the last starts and, from firmware 0.5.0, the measured values (`metrics-YYYY-MM-DD.jsonl`, one file per day), kept 90 days unless changed under *Settings → Retention* |
 
 The directory contains **encrypted credentials and the private `.installation-id` needed to read them**: keep it private, never commit or publish it. Settings and sign-in caches remain readable JSON; only credential fields such as tokens, refresh tokens and API keys are encrypted. The portal password remains a BCrypt hash, without additional encryption. Include hidden files in a backup; existing plaintext credentials and the earlier whole-file encryption format are migrated automatically on startup. Password-protected data-source exports remain independent of that installation identity. It survives
 restarts, rebuilds and updates of the image.

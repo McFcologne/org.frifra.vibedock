@@ -26,22 +26,26 @@ class DeviceMetricsController {
     @GetMapping("/admin/clients/{identifier}/metrics/popup") String popup(@PathVariable String identifier,Model model) {
         long now=clock.millis();
         int period=metrics.samples(identifier,now-6*3_600_000L,now+1).size()>=POPUP_MIN_SAMPLES?6:24;
-        fill(identifier,period,model);
+        fill(identifier,period,0,model);
         return "device-metrics-popup :: div.metrics-popup";
     }
-    @GetMapping("/admin/clients/{identifier}/metrics") String page(@PathVariable String identifier,@RequestParam(defaultValue="24") int hours,Model model) {
-        fill(identifier,PERIODS.contains(hours)?hours:24,model);
+    @GetMapping("/admin/clients/{identifier}/metrics") String page(@PathVariable String identifier,@RequestParam(defaultValue="24") int hours,@RequestParam(defaultValue="0") int back,Model model) {
+        fill(identifier,PERIODS.contains(hours)?hours:24,Math.max(0,Math.min(back,100_000)),model);
         return "device-metrics";
     }
-    private void fill(String identifier,int period,Model model) {
+    private void fill(String identifier,int period,int back,Model model) {
         String name=identifier;
         try{name=registry.get(identifier).name();}catch(IllegalArgumentException notPaired){ /* samples of a display that is not paired any more */ }
-        long to=clock.millis(),from=to-period*3_600_000L;
+        long now=clock.millis(),span=period*3_600_000L,to=now-back*span,from=to-span;
+        long oldest=now-metrics.keepDays()*86_400_000L;
         var samples=metrics.samples(identifier,from,to+1);
         ZoneId zone=ZoneId.systemDefault();
         model.addAttribute("identifier",identifier);model.addAttribute("deviceName",name);
         model.addAttribute("periods",PERIODS);model.addAttribute("hours",period);
-        model.addAttribute("count",samples.size());model.addAttribute("interval",DeviceMetrics.INTERVAL_SECONDS/60);model.addAttribute("keepDays",DeviceMetrics.KEEP_DAYS);
+        model.addAttribute("count",samples.size());model.addAttribute("interval",DeviceMetrics.INTERVAL_SECONDS/60);model.addAttribute("keepDays",metrics.keepDays());
+        model.addAttribute("back",back);model.addAttribute("hasOlder",from>oldest);model.addAttribute("hasNewer",back>0);
+        var stamp=java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        model.addAttribute("range",stamp.format(Instant.ofEpochMilli(from).atZone(zone))+" – "+stamp.format(Instant.ofEpochMilli(to).atZone(zone)));
         model.addAttribute("memory",MetricsChart.svg(samples,from,to,List.of(
                 new MetricsChart.Series("Free",DeviceMetrics.Sample::freeBytes),new MetricsChart.Series("Lowest free",DeviceMetrics.Sample::lowestBytes),
                 new MetricsChart.Series("Largest block",DeviceMetrics.Sample::blockBytes)),1000,true,"kB",zone));

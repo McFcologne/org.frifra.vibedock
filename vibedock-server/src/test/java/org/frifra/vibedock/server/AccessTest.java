@@ -73,6 +73,20 @@ class AccessTest {
                 .andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("Hardware display colors")));
         clients.remove(id);
     }
+    @Test void retentionIsSavedOnTheSettingsPageAndRejectedOutsideItsRange() throws Exception {
+        var admin=user("admin").roles("ADMIN");
+        mvc.perform(post("/admin/server/retention").with(r->{r.setLocalPort(10001);return r;}).with(admin).param("metricsDays","120").param("logDays","60"))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/admin/server/retention").with(r->{r.setLocalPort(10001);return r;}).with(admin).with(csrf()).param("metricsDays","120").param("logDays","60"))
+                .andExpect(redirectedUrl("/admin/server#retention")).andExpect(flash().attributeExists("retentionMessage"));
+        Assertions.assertEquals(new SettingsStore.Retention(120,60),store.retention());
+        mvc.perform(post("/admin/server/retention").with(r->{r.setLocalPort(10001);return r;}).with(admin).with(csrf()).param("metricsDays","3").param("logDays","60"))
+                .andExpect(flash().attributeExists("retentionError"));
+        Assertions.assertEquals(new SettingsStore.Retention(120,60),store.retention());
+        mvc.perform(get("/admin/server").with(r->{r.setLocalPort(10001);return r;}).with(admin))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Retention")));
+        store.saveRetention(SettingsStore.Retention.DEFAULT);
+    }
     @Test void photosGetTheLargestPaletteWhateverTheSizeRuleSaysAndWebDisplaysStayFullColor() throws Exception {
         String key="f0".repeat(32),id="vibedock-photo-palette",path="/api/v1/clients/"+id+"/image";
         clients.paired(id,"Photo",key,"192.168.1.21",80);
@@ -658,8 +672,7 @@ class AccessTest {
         mvc.perform(post("/admin/clients/../logs").contentType("application/json").content(body).with(admin).with(csrf())
                 .with(r->{r.setLocalPort(10001);return r;})).andExpect(status().is4xxClientError());
         mvc.perform(get("/admin/troubleshooting").with(admin).with(r->{r.setLocalPort(10001);return r;}))
-                .andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("Read log over USB")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("1 of "+DeviceLogs.KEEP)));
+                .andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("Read log over USB")));
         mvc.perform(get("/admin/clients/"+id+"/logs").with(admin).with(r->{r.setLocalPort(10001);return r;}))
                 .andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("Wi-Fi Home: 192.168.1.20")));
         mvc.perform(get("/admin/clients/"+id+"/logs/"+name+".txt").with(admin).with(r->{r.setLocalPort(10001);return r;}))

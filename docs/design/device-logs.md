@@ -11,7 +11,7 @@ attach to a public ticket.
 
 - Every log read over USB on the firmware page (`VIBEDOCK-LOG`) is sent to the server and kept in
   `data/device-logs/<identifier>/<millis>-<usb|net>.json`: time it was read, source, firmware and board, the lines.
-- The last 10 logs per display are kept; each holds at most 500 lines, 400 characters per line and 64 kB.
+- The logs of the retention period (Settings, default 90 days, at most 200) are kept per display; each holds at most 500 lines, 400 characters per line and 64 kB.
   Control characters, bearer tokens, 64-digit hex values and web display links are removed on saving.
 - Logs of a display that is not paired are kept under its identifier as well.
 - Removing a display removes its logs.
@@ -85,11 +85,11 @@ Needs firmware newer than 0.1.1; displays with older firmware keep the USB way. 
   signal and drops, battery voltage, brightness and the seconds the display was active and dimmed. The version comes
   first and the order never changes; an empty field was not measured; units are fixed (memory in 100 bytes, time in
   100 ms, voltage in 10 mV, all hex).
-- The server (`DeviceMetrics`) keeps one sample per display every 5 minutes and with every new start, for 30 days, in
-  `data/device-logs/<identifier>/metrics.jsonl`, one JSON line each. A sample carries the lowest free memory of all pulls
-  since the sample before, so a dip between two samples is not lost. Unreadable lines and samples older than 30 days are
-  dropped when the file is rewritten.
-- *Devices › Logs › Metrics* (`/admin/clients/{id}/metrics?hours=6|24|72|168|720`) draws memory, Wi-Fi and battery
+- The server (`DeviceMetrics`) keeps one sample per display every 5 minutes and with every new start, for the retention period (Settings, default 90 days), in
+  `data/device-logs/<identifier>/metrics-YYYY-MM-DD.jsonl` (one file per UTC day; the earlier single `metrics.jsonl` is split on first use), one JSON line each. A sample carries the lowest free memory of all pulls
+  since the sample before, so a dip between two samples is not lost. Unreadable lines are skipped; day files older than the
+  retention period are deleted. `/admin/clients/{id}/metrics?hours=…&back=n` pages back by whole windows.
+- *Devices › Logs › Metrics* (`/admin/clients/{id}/metrics?hours=6|24|72|168|720`, at most 30 days per window) draws memory, Wi-Fi and battery
   curves as inline SVG (`MetricsChart`, a dashed line per restart) and a table of the newest samples.
   `GET /admin/metrics.csv` (`MetricsCsv`) exports them: comma, dot decimals, the unit in the column name, UTC and local
   time, firmware and reason of the start; filters `device`, `from`, `to`, `raw`. Text cells that could start a

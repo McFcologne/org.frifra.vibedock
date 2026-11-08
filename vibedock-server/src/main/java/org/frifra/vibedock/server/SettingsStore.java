@@ -57,6 +57,15 @@ public class SettingsStore {
                 throw new IllegalArgumentException("Update intervals must be "+PollPace.MIN_MINUTES+"–"+PollPace.MAX_MINUTES+" minutes, the shortest not above the longest");
         }
     }
+    /** How long the measured values and the logs read from displays are kept, in days (Settings page). */
+    public record Retention(int metricsDays,int logDays) {
+        public static final Retention DEFAULT=new Retention(90,90);
+        public static final int MIN_DAYS=7,MAX_DAYS=3650;
+        public Retention {
+            if(metricsDays<MIN_DAYS||metricsDays>MAX_DAYS||logDays<MIN_DAYS||logDays>MAX_DAYS)
+                throw new IllegalArgumentException("Retention must be "+MIN_DAYS+"–"+MAX_DAYS+" days");
+        }
+    }
     public record Settings(List<String> allowedIps,List<Account> accounts,List<Device> devices) {
         public Settings { allowedIps=List.copyOf(allowedIps); accounts=List.copyOf(accounts); devices=List.copyOf(devices); }
         /** The two default sources a new server starts with, ids "codex" and "claude". */
@@ -115,6 +124,18 @@ public class SettingsStore {
     }
     public synchronized void savePolling(UsagePolling next) throws IOException {
         writePrivate(pollingFile(),json.writeValueAsBytes(next));polling=next;
+    }
+    private Path retentionFile(){return directory.resolve("retention.json");}
+    private volatile Retention retention;
+    /** The retention of metrics and device logs; the default (90 days) until it is saved once. */
+    public Retention retention() {
+        var known=retention;if(known!=null)return known;
+        try{known=Files.exists(retentionFile())?json.readValue(retentionFile().toFile(),Retention.class):Retention.DEFAULT;}
+        catch(RuntimeException e){known=Retention.DEFAULT;}
+        return retention=known;
+    }
+    public synchronized void saveRetention(Retention next) throws IOException {
+        writePrivate(retentionFile(),json.writeValueAsBytes(next));retention=next;
     }
     /**
      * Gives sources of earlier versions (ids "codex", "claude" or derived from their name) a random id; their sign-in

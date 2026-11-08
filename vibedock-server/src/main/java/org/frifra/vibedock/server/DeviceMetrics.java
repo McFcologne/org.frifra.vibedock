@@ -9,7 +9,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.PosixFilePermissions;
-import java.time.Clock;
+import java.time.*;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
@@ -24,14 +25,16 @@ import java.util.regex.Pattern;
  * active and dimmed seconds are plain numbers. "lowest" is the lowest free heap since the display's last request.
  * <p>
  * One sample per display is kept every {@value #INTERVAL_SECONDS} s (and with every new start) in
- * data/device-logs/&lt;identifier&gt;/metrics.jsonl, one JSON line each, for {@value #KEEP_DAYS} days. A kept sample
+ * data/device-logs/&lt;identifier&gt;/metrics-YYYY-MM-DD.jsonl (one file per day, UTC), one JSON line each, for the days
+ * of the retention setting (Settings, default {@value #DEFAULT_KEEP_DAYS}); the administration shows at most 30 days at a
+ * time and pages back through the rest. A query reads only the day files it needs. A kept sample
  * carries the header of its pull as received and the lowest free heap of all pulls since the sample before, so a
  * dip between two samples is not lost. Everything else (curves, key figures, export) is derived from these lines.
  */
 @Component
 class DeviceMetrics {
     private static final Logger log=LoggerFactory.getLogger(DeviceMetrics.class);
-    static final int INTERVAL_SECONDS=300,KEEP_DAYS=30;
+    static final int INTERVAL_SECONDS=300,DEFAULT_KEEP_DAYS=90;
     static final String HEADER="X-VibeDock-Metrics";
     private static final Pattern IDENTIFIER=Pattern.compile("[A-Za-z0-9_.:-]{8,80}");
     private static final Pattern HEX=Pattern.compile("[0-9a-f]{1,6}"),SIGNED=Pattern.compile("-?[0-9a-f]{1,2}"),NUMBER=Pattern.compile("\\d{1,10}");
@@ -77,14 +80,22 @@ class DeviceMetrics {
     }
     private static Long number(String[] f,int index){String v=field(f,index);return NUMBER.matcher(v).matches()?Long.valueOf(v):null;}
 
-    private final Path root;private final ObjectMapper json;private final Clock clock;
+    private final Path root;private final ObjectMapper json;private final Clock clock;private final java.util.function.IntSupplier keepDays;
     /** Per display: the sample kept last (time, start) and the lowest free heap since then. */
     private record Window(long keptAt,String keptBoot,Integer lowest) {}
     private final Map<String,Window> windows=new ConcurrentHashMap<>();
     private final Map<String,Integer> appended=new ConcurrentHashMap<>();
-    DeviceMetrics(@Value("${vibedock.data-dir}") String dataDir,ObjectMapper json,Clock clock){
-        this.root=Path.of(dataDir).resolve("device-logs");this.json=json;this.clock=clock;
+    private final Set<String> migrated=ConcurrentHashMap.newKeySet();
+    @org.springframework.beans.factory.annotation.Autowired
+    DeviceMetrics(@Value("${vibedock.data-dir}") String dataDir,ObjectMapper json,Clock clock,SettingsStore settings){
+        this(dataDir,json,clock,()->settings.retention().metricsDays());
     }
+    DeviceMetrics(String dataDir,ObjectMapper json,Clock clock,java.util.function.IntSupplier keepDays){
+        this.root=Path.of(dataDir).resolve("device-logs");this.json=json;this.clock=clock;this.keepDays=keepDays;
+    }
+    DeviceMetrics(String dataDir,ObjectMapper json,Clock clock){this(dataDir,json,clock,()->DEFAULT_KEEP_DAYS);}
+    /** How many days of samples are kept. */
+    int keepDays(){return keepDays.getAsInt();}
 
     /**
      * Takes the header of a pull. It is kept when the last kept sample is {@value #INTERVAL_SECONDS} s old, the display
@@ -107,49 +118,83 @@ class DeviceMetrics {
     private static Integer min(Integer a,Integer b){return a==null?b:b==null?a:Integer.valueOf(Math.min(a,b));}
     private Window lastKept(String identifier){
         try{
-            var all=stored(identifier);
+            var all=stored(identifier,clock.millis()-2*86_400_000L,Long.MAX_VALUE);
             if(all.isEmpty())return new Window(0,null,null);
             var last=all.get(all.size()-1);
             return new Window(last.at(),last.boot(),null);
         }catch(IOException|RuntimeException e){return new Window(0,null,null);}
     }
-    private Path file(String identifier){return root.resolve(identifier).resolve(DeviceLogs.METRICS);}
+    private static final Pattern DAY_FILE=Pattern.compile("metrics-(\\d{4}-\\d{2}-\\d{2})\\.jsonl");
+    private Path dayFile(String identifier,long at){return root.resolve(identifier).resolve("metrics-"+LocalDate.ofInstant(Instant.ofEpochMilli(at),ZoneOffset.UTC)+".jsonl");}
     private void append(String identifier,Stored line) throws IOException {
-        Path file=file(identifier);Files.createDirectories(file.getParent());
+        migrate(identifier);
+        Path file=dayFile(identifier,line.at());Files.createDirectories(file.getParent());
         boolean created=!Files.exists(file);
         Files.writeString(file,json.writeValueAsString(line)+"\n",StandardCharsets.UTF_8,StandardOpenOption.CREATE,StandardOpenOption.APPEND);
         if(created)try{Files.setPosixFilePermissions(file,PosixFilePermissions.fromString("rw-------"));}catch(UnsupportedOperationException ignored){}
         int count=appended.merge(identifier,1,Integer::sum);
         if(count==1||count%500==0)prune(identifier);
     }
-    /** Drops the samples older than {@value #KEEP_DAYS} days. */
+    /** Deletes the day files older than the kept days: no rewriting. */
     private void prune(String identifier) throws IOException {
-        long limit=clock.millis()-KEEP_DAYS*86_400_000L;var all=stored(identifier);
-        var keep=all.stream().filter(s->s.at()>=limit).toList();
-        if(keep.size()==all.size())return;
-        Path file=file(identifier),temporary=Files.createTempFile(file.getParent(),"metrics-",".tmp");
-        try{
-            try{Files.setPosixFilePermissions(temporary,PosixFilePermissions.fromString("rw-------"));}catch(UnsupportedOperationException ignored){}
-            var text=new StringBuilder();for(var s:keep)text.append(json.writeValueAsString(s)).append('\n');
-            Files.writeString(temporary,text,StandardCharsets.UTF_8);
-            Files.move(temporary,file,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);
-        }finally{Files.deleteIfExists(temporary);}
+        LocalDate oldest=LocalDate.ofInstant(Instant.ofEpochMilli(clock.millis()),ZoneOffset.UTC).minusDays(keepDays());
+        for(var day:dayFiles(identifier))if(day.date().isBefore(oldest))Files.deleteIfExists(day.path());
     }
-    private synchronized List<Stored> stored(String identifier) throws IOException {
-        if(!IDENTIFIER.matcher(identifier).matches())return List.of();
-        Path file=file(identifier);if(!Files.isRegularFile(file))return List.of();
-        var result=new ArrayList<Stored>();
-        for(String line:Files.readAllLines(file,StandardCharsets.UTF_8)){
-            if(line.isBlank())continue;
-            try{result.add(json.readValue(line,Stored.class));}catch(RuntimeException e){log.debug("Skipped an unreadable metrics line of {}",identifier);}
+    private record Day(LocalDate date,Path path) {}
+    private List<Day> dayFiles(String identifier) throws IOException {
+        Path dir=root.resolve(identifier);var out=new ArrayList<Day>();
+        if(!Files.isDirectory(dir))return out;
+        try(var names=Files.list(dir)){
+            for(var path:names.toList()){
+                var m=DAY_FILE.matcher(path.getFileName().toString());
+                if(m.matches())try{out.add(new Day(LocalDate.parse(m.group(1)),path));}catch(DateTimeParseException ignored){}
+            }
         }
+        out.sort(Comparator.comparing(Day::date));
+        return out;
+    }
+    /** Files of the earlier format, one metrics.jsonl with every sample: split into day files once, then removed. */
+    private void migrate(String identifier) throws IOException {
+        if(!migrated.add(identifier))return;
+        Path legacy=root.resolve(identifier).resolve(DeviceLogs.METRICS);
+        if(!Files.isRegularFile(legacy))return;
+        var byDay=new TreeMap<LocalDate,StringBuilder>();
+        for(String line:Files.readAllLines(legacy,StandardCharsets.UTF_8)){
+            if(line.isBlank())continue;
+            try{var s=json.readValue(line,Stored.class);byDay.computeIfAbsent(LocalDate.ofInstant(Instant.ofEpochMilli(s.at()),ZoneOffset.UTC),d->new StringBuilder()).append(json.writeValueAsString(s)).append('\n');}
+            catch(RuntimeException e){log.debug("Skipped an unreadable metrics line of {}",identifier);}
+        }
+        for(var e:byDay.entrySet()){
+            Path file=root.resolve(identifier).resolve("metrics-"+e.getKey()+".jsonl");
+            boolean created=!Files.exists(file);
+            Files.writeString(file,e.getValue(),StandardCharsets.UTF_8,StandardOpenOption.CREATE,StandardOpenOption.APPEND);
+            if(created)try{Files.setPosixFilePermissions(file,PosixFilePermissions.fromString("rw-------"));}catch(UnsupportedOperationException ignored){}
+        }
+        Files.delete(legacy);
+        log.info("Metrics of {} split into {} day file(s)",identifier,byDay.size());
+    }
+    /** The kept lines of the days that overlap from (inclusive) to to (exclusive), oldest first. */
+    private synchronized List<Stored> stored(String identifier,long from,long to) throws IOException {
+        if(!IDENTIFIER.matcher(identifier).matches())return List.of();
+        migrate(identifier);
+        var first=LocalDate.ofInstant(Instant.ofEpochMilli(Math.max(0,from)),ZoneOffset.UTC);
+        var last=to==Long.MAX_VALUE?LocalDate.MAX:LocalDate.ofInstant(Instant.ofEpochMilli(Math.max(0,to-1)),ZoneOffset.UTC);
+        var result=new ArrayList<Stored>();
+        for(var day:dayFiles(identifier)){
+            if(day.date().isBefore(first)||day.date().isAfter(last))continue;
+            for(String line:Files.readAllLines(day.path(),StandardCharsets.UTF_8)){
+                if(line.isBlank())continue;
+                try{result.add(json.readValue(line,Stored.class));}catch(RuntimeException e){log.debug("Skipped an unreadable metrics line of {}",identifier);}
+            }
+        }
+        result.sort(Comparator.comparingLong(Stored::at));
         return result;
     }
     /** The kept samples of a display from from (inclusive) to to (exclusive) in epoch milliseconds, oldest first. */
     List<Sample> samples(String identifier,long from,long to){
         try{
             var result=new ArrayList<Sample>();
-            for(var s:stored(identifier)){
+            for(var s:stored(identifier,from,to)){
                 if(s.at()<from||s.at()>=to)continue;
                 var sample=parse(s.raw(),s.at(),s.boot());
                 if(sample!=null)result.add(s.lowest()==null?sample:sample.withLowest(s.lowest()));

@@ -188,7 +188,7 @@ Content-Type: text/plain; charset=utf-8
 
 | Answer | Meaning |
 | --- | --- |
-| **204** | saved as a log of the display with the source `net` (the last 10 per display are kept) |
+| **204** | saved as a log of the display with the source `net` (kept for the retention period, 90 days by default) |
 | **401** | unknown device or wrong key |
 | **409** | no open request with this id (wrong, used or expired) |
 | **413** | larger than 64 kB |
@@ -292,7 +292,7 @@ appended, and a receiver ignores trailing fields it does not know. An empty fiel
 | 14 | `dimS` | seconds since the start with the backlight dimmed (a display left alone), decimal |
 
 The server keeps one sample per display every 5 minutes, and one at every new start, in
-`device-logs/<id>/metrics.jsonl` for 30 days. A kept sample carries the header as received and the lowest free heap
+`device-logs/<id>/metrics-YYYY-MM-DD.jsonl` (one file per day) for the retention period, 90 days by default. A kept sample carries the header as received and the lowest free heap
 of all pulls since the sample before it, so a dip between two samples is not lost. *Devices → Logs → Metrics* shows
 curves (memory, Wi-Fi signal, battery voltage) and a table; the key figures of a log also count the samples in its time;
 the support file has them as `samples` (rows with named columns). `GET /admin/metrics.csv` exports them: comma as

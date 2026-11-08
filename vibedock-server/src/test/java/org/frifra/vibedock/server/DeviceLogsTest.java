@@ -18,14 +18,32 @@ class DeviceLogsTest {
             @Override public Instant instant(){return Instant.ofEpochMilli(now[0]+=1000);}
         };
     }
-    @Test void keepsTheLastTenLogsOfEachDeviceNewestFirst(@TempDir Path dir) throws Exception {
+    @Test void keepsTheLogsOfTheRetentionPeriodOfEachDeviceNewestFirst(@TempDir Path dir) throws Exception {
+        long[] now={1_700_000_000_000L};
+        var clock=new Clock(){
+            @Override public ZoneId getZone(){return ZoneOffset.UTC;}
+            @Override public Clock withZone(ZoneId zone){return this;}
+            @Override public Instant instant(){return Instant.ofEpochMilli(now[0]);}
+        };
+        var logs=new DeviceLogs(dir.toString(),json,clock,()->7);
+        for(int i=1;i<=3;i++){logs.save("vibedock-0a1b2c000001","usb","0.1.1","vibedock-m1",List.of("old "+i));now[0]+=1000;}
+        now[0]+=8*86_400_000L;
+        logs.save("vibedock-0a1b2c000001","usb","0.1.1","vibedock-m1",List.of("new"));
+        var left=logs.list("vibedock-0a1b2c000001");
+        assertEquals(1,left.size(),"the logs older than 7 days are gone");
+        assertEquals(List.of("new"),logs.read("vibedock-0a1b2c000001",left.getFirst().name()).orElseThrow().lines());
+        var wide=new DeviceLogs(dir.toString(),json,clock,()->3650);
+        for(int i=1;i<=DeviceLogs.MAX_KEPT+5;i++){now[0]+=1000;wide.save("vibedock-0a1b2c000003","usb",null,null,List.of("x"));}
+        assertEquals(DeviceLogs.MAX_KEPT,wide.count("vibedock-0a1b2c000003"));
+    }
+    @Test void keepsTheLastLogsOfEachDeviceNewestFirst(@TempDir Path dir) throws Exception {
         var logs=new DeviceLogs(dir.toString(),json,ticking());
         for(int i=1;i<=12;i++)logs.save("vibedock-0a1b2c000001","usb","0.1.1","vibedock-m1",List.of("line "+i));
         logs.save("vibedock-0a1b2c000002","usb","0.1.0",null,List.of("other"));
         var entries=logs.list("vibedock-0a1b2c000001");
-        assertEquals(DeviceLogs.KEEP,entries.size());
+        assertEquals(12,entries.size());
         assertEquals(List.of("line 12"),logs.read("vibedock-0a1b2c000001",entries.getFirst().name()).orElseThrow().lines());
-        assertEquals(List.of("line 3"),logs.read("vibedock-0a1b2c000001",entries.getLast().name()).orElseThrow().lines());
+        assertEquals(List.of("line 1"),logs.read("vibedock-0a1b2c000001",entries.getLast().name()).orElseThrow().lines());
         assertEquals("0.1.1",entries.getFirst().firmware());assertEquals("usb",entries.getFirst().source());
         assertEquals(1,logs.count("vibedock-0a1b2c000002"));
     }

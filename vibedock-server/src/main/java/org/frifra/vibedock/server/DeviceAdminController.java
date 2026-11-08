@@ -88,7 +88,7 @@ class DeviceAdminController {
     @GetMapping("/admin/troubleshooting") String troubleshooting(org.springframework.ui.Model model) throws IOException {
         var targets=new java.util.ArrayList<LogTarget>();
         for(var c:registry.views())if(c.web()==null)targets.add(target(c));
-        model.addAttribute("targets",targets);model.addAttribute("keep",DeviceLogs.KEEP);model.addAttribute("displays",registry.views());
+        model.addAttribute("targets",targets);model.addAttribute("keepDays",logs.days());model.addAttribute("displays",registry.views());
         // The board names for the port choice (serial-console.js), which shows each display by what it reports over USB.
         var boards=new java.util.ArrayList<java.util.Map<String,Object>>();
         for(var b:Board.INVENTORY)boards.add(java.util.Map.of("id",b.id(),"label",b.label(),"chip",b.chip()));
@@ -102,7 +102,7 @@ class DeviceAdminController {
         try{
             var entry=logs.save(identifier,"usb",upload.firmware(),upload.board(),upload.lines());
             log.info("Saved the USB log of {} ({} lines)",identifier,entry.lines());events.logSaved(identifier);
-            return org.springframework.http.ResponseEntity.ok(java.util.Map.of("name",entry.name(),"count",logs.count(identifier),"keep",DeviceLogs.KEEP));
+            return org.springframework.http.ResponseEntity.ok(java.util.Map.of("name",entry.name(),"count",logs.count(identifier),"keepDays",logs.days()));
         }catch(IllegalArgumentException e){return org.springframework.http.ResponseEntity.badRequest().body(java.util.Map.of("error",e.getMessage()));}
     }
     /**
@@ -198,7 +198,7 @@ class DeviceAdminController {
                     "reach",r.reach()==null?"":r.reach().name(),"nextPullAt",next==null?0L:next*1000,"lastPullAt",last==null?0L:last*1000,
                     "pollSeconds",registry.pollSeconds()));
         }
-        model.addAttribute("entries",entries);model.addAttribute("keep",DeviceLogs.KEEP);
+        model.addAttribute("entries",entries);model.addAttribute("keepDays",logs.days());
         return "device-logs";
     }
     @GetMapping(value="/admin/clients/{identifier}/logs/{name}.txt",produces="text/plain;charset=UTF-8") @ResponseBody
