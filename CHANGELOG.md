@@ -1,6 +1,6 @@
 # VibeDock release notes
 
-The release workflows publish the section of the tagged version above the list of commits that GitHub generates: `## Server 0.6.0` for the tag `server-v0.6.0`, `## Client 0.6.0` for `client-v0.6.0` (up to 0.5.1, one section `## 0.5.1` for the common tag `v0.5.1` or `0.5.1`).
+The release workflows publish the section of the tagged version above the list of commits that GitHub generates: `## Server 0.6.1` for the tag `server-v0.6.1`, `## Client 0.6.2` for `client-v0.6.2` (up to 0.5.1, one section `## 0.5.1` for the common tag `v0.5.1` or `0.5.1`).
 
 ## Server 0.6.0
 
@@ -25,6 +25,32 @@ protocol as before; the displays keep working with the firmware they run.
 ### Releases
 
 - **Server and firmware are released separately.** The server has its own tags (`server-vX.Y.Z`) and releases with the JAR and the Docker image; the firmware keeps its `client-v` releases. The *Latest* label on GitHub stays with the server. Until the first `server-v` tag existed, the plain tags (`v0.5.1`) gave the server's version. See `RELEASING.md`.
+
+## Server 0.6.1
+
+Updating many displays at once is gentler, firmware sources are edited on the page, and measured values are kept for 90 days and can be paged through. Update the server image. The measured values of earlier versions (`metrics.jsonl` per display) are split into day files at the first access; going back to an older server afterwards no longer shows them. Displays need no update.
+
+### Updates
+
+- **Updates of many displays run two at a time.** Updating many displays no longer sends every display to download at once: the server offers the update to two displays, and to the next one when a display has restarted, has reported a failure or has not fetched it within 150 seconds. Before, several VibeTV M1 downloaded together, one gave up (`download interrupted`) and then ignored every further offer until its next start.
+
+### Firmware
+
+- **Firmware sources are edited on the page.** *Devices → Firmware* shows every source as a card (repository as a link, trust, newest version, last check) instead of a table, and adds, switches off, removes and trusts sources without editing `firmware-sources.yaml` by hand. A new source is for USB only until it is trusted after a confirmation; the official source cannot be removed.
+
+### Metrics and logs
+
+- **Metrics are kept for 90 days and can be paged.** Measured values are stored per day. The metrics page still shows up to 30 days at a time and pages back with *Older* and *Newer*.
+- **Retention is adjustable.** *Settings → Retention* sets the days for metrics and for the logs read from displays (by age, at most 200 per display; before, the last 10). Default 90 days. The server log and the access log are kept 90 days as well (`LOG_MAX_DAYS`, at most 1 GB).
+- **Excel export.** The metrics page has an *Export* menu with CSV and Excel (.xlsx): one sheet per display with real dates and numbers, a filter and an *Info* sheet.
+
+## Client 0.6.2
+
+Fixes a display that ignored every further update after one failed download. Updating the displays is recommended for those that failed to update before; the others can stay on 0.6.1.
+
+### Firmware
+
+- **A failed update over Wi-Fi no longer blocks the next one.** A display that failed to download an update ignored every further offer of that version until its next start, so *Update* did nothing until it was unplugged. It now tries again when the offer comes more than a minute after the failure.
 
 ## Client 0.6.1
 
