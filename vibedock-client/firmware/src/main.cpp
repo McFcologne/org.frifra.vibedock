@@ -2156,12 +2156,12 @@ void powerPoll() {
     bool charging = strcmp(reading.chargeSignal, "active") == 0 || strcmp(reading.chargeSignal, "unstable") == 0;
     batteryLevel = reading.supported ? reading.estimatedPercent : -1;
     batteryMv = reading.supported && powerSource.battery ? reading.millivolts : 0;  // only reported while running on the battery
-    if (powerSource.update(client_policy::onBattery(battery::usbHost(), charging))) {
-      logEvent(powerSource.battery ? F("Power: battery") : F("Power: USB or charging"), true);
-      // The battery icon in the image appears or goes away with the next image, right away.
-      if (mode == Mode::Paired) pullSoon();
-    }
+    bool powerChanged = powerSource.update(client_policy::onBattery(battery::usbHost(), charging));
+    if (powerChanged) logEvent(powerSource.battery ? F("Power: battery") : F("Power: USB or charging"), true);
     setPowerSaving(powerSavingAllowed && powerSource.battery && mode == Mode::Paired);
+    // The battery icon in the image appears or goes away with the next image, right away. After the power saving state
+    // changed: the pull interval depends on it, and pullSoon() counts back from the interval that applies.
+    if (powerChanged && mode == Mode::Paired) pullSoon();
   }
 #if !defined(VIBEDOCK_EPAPER)  // no backlight to dim: the state would only show "dimmed"
   if (powerSaving && !dimmed && client_policy::dimDue(millis(), lastActivity)) {
