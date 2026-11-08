@@ -20,10 +20,19 @@ protocol as before; the displays keep working with the firmware they run.
 - **An own build that reports 200x200 is no longer taken for the e-paper.** Only the e-paper board keeps the black-and-white 200x200 type; any other board with that size gets a colour display of its own.
 - **E-paper board marked as tested:** the Waveshare ESP32-S3-ePaper-1.54 (V2) runs on the real board; the *untested board* note on its device card is gone. Contrast thresholds and ghosting are still being tuned.
 - **Use the released firmware** is the new name of *Use the built-in firmware* on the firmware page: it removes an upload, and the newest downloaded firmware applies again.
+- **Firmware page follows the check.** *Check now* no longer needs a manual reload: the page shows that the check runs and displays the result by itself when it is over, also for a check started by the daily schedule or by another window.
 
 ### Releases
 
 - **Server and firmware are released separately.** The server has its own tags (`server-vX.Y.Z`) and releases with the JAR and the Docker image; the firmware keeps its `client-v` releases. The *Latest* label on GitHub stays with the server. Until the first `server-v` tag existed, the plain tags (`v0.5.1`) gave the server's version. See `RELEASING.md`.
+
+## Client 0.6.1
+
+Same firmware functionality as 0.6.0: the release rebuilds the images with the version 0.6.1 and records the Waveshare ESP32-S3-ePaper-1.54 (V2) as run on the real board (`hardware: tested` in `index.json`). Updating the displays is optional.
+
+### Firmware
+
+- **E-paper board marked as tested.** The release manifest no longer calls the Waveshare e-paper 1.54 *prepared*.
 
 ## Client 0.6.0
 

@@ -1,1 +1,0 @@
-- **Firmware page follows the check.** *Check now* no longer needs a manual reload: the page shows that the check runs and displays the result by itself when it is over, also for a check started by the daily schedule or by another window.
