@@ -1,5 +1,6 @@
-# PlatformIO pre-script: compiles the firmware version from the Git tag into VIBEDOCK_VERSION, like the server's
-# scripts/version.sh ("0.2.0" on the tag 0.2.0 or v0.2.0, "0.2.0-3-g503ce5c" later, "-dirty" with uncommitted changes).
+# PlatformIO pre-script: compiles the firmware version from the Git tag into VIBEDOCK_VERSION ("0.6.0" on the tag
+# client-v0.6.0, "0.6.0-3-g503ce5c" later, "-dirty" with uncommitted changes). The client has its own tags; as long as
+# there is none, the plain version tags of the earlier common releases (0.5.1 or v0.5.1) apply.
 import os, subprocess
 Import("env")
 
@@ -7,10 +8,13 @@ def git(*args):
     return subprocess.run(["git", "-c", "safe.directory=*", *args], cwd=env.subst("$PROJECT_DIR"), capture_output=True, text=True)
 
 def describe():
-    out = git("describe", "--tags", "--match", "v[0-9]*", "--match", "[0-9]*")
+    out = git("describe", "--tags", "--match", "client-v[0-9]*")
+    if out.returncode != 0:
+        out = git("describe", "--tags", "--match", "v[0-9]*", "--match", "[0-9]*")
     if out.returncode == 0:
         version = out.stdout.strip()
-        version = version[1:] if version.startswith("v") else version
+        for prefix in ("client-v", "v"):
+            if version.startswith(prefix): version = version[len(prefix):]; break
     else:
         commit = git("rev-parse", "--short", "HEAD")
         if commit.returncode != 0:

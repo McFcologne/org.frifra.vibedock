@@ -21,8 +21,12 @@ import java.util.*;
  */
 @Service
 public class Firmware {
-    /** uploaded: an administrator's own build, at uploadedAt (epoch seconds). */
-    public record Info(Board board,String version,long size,String sha256,boolean uploaded,long uploadedAt) {
+    /**
+     * uploaded: an administrator's own build, at uploadedAt (epoch seconds). source: the id of the release source it
+     * was downloaded from, null for the built-in and the uploaded one. wifi: may be installed over Wi-Fi (not so for
+     * firmware of a source that is not trusted, which is for USB only).
+     */
+    public record Info(Board board,String version,long size,String sha256,boolean uploaded,long uploadedAt,String source,boolean wifi) {
         public String fileName(){return (board.id().startsWith("vibedock-")?"":"vibedock-")+board.id()+"-"+version+".bin";}
     }
     static final int MAX_SIZE=4*1024*1024;
@@ -34,6 +38,21 @@ public class Firmware {
         this.dir=Path.of(dir);this.uploads=dataDir==null||dataDir.isBlank()?null:Path.of(dataDir).resolve("firmware");
     }
 
+    private FirmwareReleases releases;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    void releases(FirmwareReleases releases){this.releases=releases;}
+    /** Files of the firmware that applies instead of the built-in one: an upload of the administrator, or the newer download. */
+    private record Layer(Path dir,boolean uploaded,String source,boolean trusted) {}
+    private Layer layer(Board board){
+        if(hasUpload(board))return new Layer(uploaded(board),true,null,true);
+        if(releases==null)return null;
+        var best=releases.best(board);
+        if(best.isEmpty())return null;
+        var builtIn=Files.isRegularFile(dir.resolve(board.id()).resolve("firmware.bin"))||board.equals(Board.M1)&&Files.isRegularFile(dir.resolve("vibedock-firmware.bin"))
+                ?versionIn(dir.resolve("version")):Optional.<String>empty();
+        return builtIn.isEmpty()||FirmwareVersion.newer(best.get().version(),builtIn.get())
+                ?new Layer(best.get().dir(),false,best.get().source(),best.get().trusted()):null;
+    }
     private Path uploaded(Board board){return uploads==null?null:uploads.resolve(board.id());}
     /** The uploaded build of a board, when it is complete: the app, and on ESP32 chips also the USB image. */
     private boolean hasUpload(Board board){
@@ -42,12 +61,14 @@ public class Firmware {
                 &&(board.esp8266()||Files.isRegularFile(u.resolve("flash.bin")));
     }
     private Path flash(Board board){
-        if(hasUpload(board))return uploaded(board).resolve(board.esp8266()?"firmware.bin":"flash.bin");
+        var layer=layer(board);
+        if(layer!=null)return layer.dir().resolve(board.esp8266()?"firmware.bin":"flash.bin");
         Path p=dir.resolve(board.id()).resolve("flash.bin");
         return Files.isRegularFile(p)||!board.equals(Board.M1)?p:dir.resolve("vibedock-firmware.bin");
     }
     private Path app(Board board){
-        if(hasUpload(board))return uploaded(board).resolve("firmware.bin");
+        var layer=layer(board);
+        if(layer!=null)return layer.dir().resolve("firmware.bin");
         Path p=dir.resolve(board.id()).resolve("firmware.bin");
         return Files.isRegularFile(p)||!board.equals(Board.M1)?p:dir.resolve("vibedock-firmware.bin");
     }
@@ -59,7 +80,8 @@ public class Firmware {
         }catch(IOException e){return Optional.empty();}
     }
     private Optional<String> version(Board board){
-        return hasUpload(board)?versionIn(uploaded(board).resolve("version")):versionIn(dir.resolve("version"));
+        var layer=layer(board);
+        return layer!=null?versionIn(layer.dir().resolve("version")):versionIn(dir.resolve("version"));
     }
     /** The firmware for a board, if this installation has one: the uploaded build, else the built-in one. */
     synchronized Optional<Info> info(Board board){
@@ -69,8 +91,10 @@ public class Firmware {
             var modified=Files.getLastModifiedTime(bin);String key=bin+"|"+modified+"|"+v.get();var info=cached.get(board.id());
             if(info==null||!key.equals(cachedFor.get(board.id()))){
                 byte[] bytes=Files.readAllBytes(bin);
+                var layer=layer(board);
                 info=new Info(board,v.get(),bytes.length,HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)),
-                        hasUpload(board),hasUpload(board)?modified.toInstant().getEpochSecond():0);
+                        hasUpload(board),hasUpload(board)?modified.toInstant().getEpochSecond():0,
+                        layer==null?null:layer.source(),layer==null||layer.trusted());
                 cached.put(board.id(),info);cachedFor.put(board.id(),key);
             }
             return Optional.of(info);
@@ -82,7 +106,7 @@ public class Firmware {
     List<Info> all(){return Board.INVENTORY.stream().map(this::info).flatMap(Optional::stream).toList();}
     /** The version per board id, for the pages that offer updates. */
     Map<String,String> versions(){
-        Map<String,String> out=new LinkedHashMap<>();for(var i:all())out.put(i.board().id(),i.version());return out;
+        Map<String,String> out=new LinkedHashMap<>();for(var i:all())if(i.wifi())out.put(i.board().id(),i.version());return out;
     }
     /** The image installed over USB at 0x0. */
     byte[] bytes(Board board) throws IOException {return Files.readAllBytes(flash(board));}
@@ -145,7 +169,7 @@ public class Firmware {
     record Signed(String version,String sha256,byte[] bytes,String md5) {}
     private final Map<String,Signed> signed=new HashMap<>();
     synchronized Optional<Signed> signed(Board board,OtaSigning signing) throws IOException {
-        var i=info(board);if(i.isEmpty())return Optional.empty();
+        var i=info(board);if(i.isEmpty()||!i.get().wifi())return Optional.empty();
         var s=signed.get(board.id());
         if(s==null||!s.version().equals(i.get().version())||!s.sha256().equals(i.get().sha256())){
             byte[] bytes=signing.signed(Files.readAllBytes(app(board)));

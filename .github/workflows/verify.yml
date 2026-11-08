@@ -34,6 +34,7 @@ jobs:
           "$RUNNER_TEMP/vibedock-palette-test"
           c++ -std=c++17 ../vibedock-client/tests/policy_test.cpp -o "$RUNNER_TEMP/vibedock-policy-test"
           "$RUNNER_TEMP/vibedock-policy-test"
+          python3 ../vibedock-client/tests/release_index_test.py
       - name: Server, inventory and browser tests
         run: ./scripts/verify.sh --with-deps
       - name: Preserve browser failure diagnostics

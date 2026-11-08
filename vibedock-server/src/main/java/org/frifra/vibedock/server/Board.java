@@ -51,7 +51,7 @@ public record Board(String id,String label,String chip,String display,String not
      * by its charging signal. Not the boards with a USB serial chip (LilyGO T-Display) or without battery.
      */
     static final Set<String> BATTERY_POWER_SAVING=Set.of("waveshare-s3-touch-lcd-154","waveshare-c6-touch-lcd-169",
-            "waveshare-s3-lcd-169","waveshare-s3-touch-lcd-147","lilygo-t-display-s3");
+            "waveshare-s3-lcd-169","waveshare-s3-touch-lcd-147","lilygo-t-display-s3","waveshare-s3-epaper-154");
     public boolean batteryPowerSaving(){return BATTERY_POWER_SAVING.contains(id);}
     /** The turns (clockwise degrees) the administration offers for this board. */
     public List<Integer> rotations(){return rotatable()?List.of(0,90,180,270):flippable()?List.of(0,180):List.of(0);}

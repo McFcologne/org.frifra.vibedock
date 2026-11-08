@@ -1,0 +1,80 @@
+name: Release VibeDock client
+# A client tag (client-v0.6.0), pushed or created with a release on GitHub, becomes a GitHub release with the firmware
+# of every board, independent of the server's releases: per board vibedock-<board>-<version>.bin (USB image),
+# .app.bin (update over Wi-Fi) and .manifest.json, and index.json, which names the client version, the protocol version
+# and the SHA-256 of every file. A server downloads the firmware from there (vibedock-client/scripts/release-index.py).
+# The job artifacts only carry these files to the release job and are deleted after a day.
+on:
+  push:
+    tags: ['client-v[0-9]*']
+permissions:
+  contents: write
+concurrency:
+  group: release-client-${{ github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: version
+        run: echo "version=${GITHUB_REF_NAME#client-v}" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Tests
+        working-directory: vibedock-client
+        run: |
+          python tests/release_index_test.py
+          c++ -std=c++17 tests/policy_test.cpp -o "$RUNNER_TEMP/vibedock-policy-test"
+          "$RUNNER_TEMP/vibedock-policy-test"
+      - name: Build the firmware and the release files
+        working-directory: vibedock-client
+        run: |
+          python -m pip install "platformio==6.2.0"
+          sh scripts/images.sh build
+          python scripts/release-index.py build assets "${{ steps.version.outputs.version }}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: client-release
+          retention-days: 1
+          path: vibedock-client/assets/
+          if-no-files-found: error
+
+  release:
+    needs: firmware
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: client-release
+          path: assets
+      - name: Create or complete the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          v="${{ needs.firmware.outputs.version }}"
+          # The version's section of CHANGELOG.md ("## Client X.Y.Z") goes above the commit list GitHub generates.
+          awk -v v="$v" '$0 ~ "^## Client v?" v "$" {on=1; next} /^## / {on=0} on' CHANGELOG.md > notes.md
+          # Created as a draft, completed file by file (with retries), then published (releases are immutable).
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            if [ -s notes.md ]; then set -- --notes-file notes.md; else set --; fi
+            gh release create "$TAG" --draft --title "VibeDock client $v" --generate-notes --verify-tag "$@"
+          fi
+          [ -f assets/index.json ] || { echo "Missing release file index.json"; exit 1; }
+          for file in assets/*; do
+            ok=
+            for attempt in 1 2 3; do
+              if gh release upload "$TAG" "$file" --clobber; then ok=1; break; fi
+              echo "Upload of $file failed (attempt $attempt)"; sleep 15
+            done
+            [ -n "$ok" ] || { echo "Could not upload $file"; exit 1; }
+          done
+          gh release edit "$TAG" --draft=false

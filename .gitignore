@@ -17,3 +17,7 @@ vibedock-client/firmware/src/idf_component.yml*
 
 # Data of local Docker test runs
 vibedock-server/docker.test-data/
+
+# Python bytecode
+__pycache__/
+*.pyc

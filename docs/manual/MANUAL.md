@@ -218,7 +218,8 @@ Everything the server keeps lives in the data directory, by default `vibedock-se
 | `clients.json` | Displays, their pairing keys and designs, the default design |
 | `auth/` | Sign-ins of the official clients, one folder per data source |
 | `ota-signing.key` | Key that signs firmware updates; displays accept updates only signed with it |
-| `firmware/` | Own firmware builds uploaded under **Devices → Firmware**, one folder per board (only when used) |
+| `firmware/` | Own firmware builds uploaded under **Devices → Firmware**, one folder per board (only when used), and in `firmware/releases/` the firmware downloaded from the sources in `firmware-sources.yaml` |
+| `firmware-sources.yaml` | Where the server downloads firmware from (optional, see "Firmware sources") |
 | `logs/` | `vibedock.log` and the daily request logs (kept 14 days) |
 | `device-logs/` | Per display the last starts and, from firmware 0.5.0, the measured values (`metrics.jsonl`, 30 days) |
 
@@ -1150,6 +1151,57 @@ display with your own build over USB or Wi-Fi from your checkout.
 **Use the built-in firmware** removes the upload; the firmware of the server's version applies again. Only upload
 firmware you built from these sources and trust: the displays install it.
 
+## Firmware sources
+
+The server downloads firmware from the releases of GitHub repositories, once after it starts and then every day, and
+keeps the newest two versions of each source in `firmware/releases/` of the data directory. Without a file it uses the
+official source (`McFcologne/org.frifra.vibedock`, tags `client-vX.Y.Z`). `firmware-sources.yaml` in the data directory
+adds or replaces sources; the order is the priority, and for each board the first source with matching firmware wins:
+
+```yaml
+sources:
+  - id: vibedock                      # a-z, 0-9 and -, names the cache folder
+    label: VibeDock (official)
+    repo: McFcologne/org.frifra.vibedock
+    tagPrefix: client-v               # releases whose tag starts so; the rest is the version
+    trusted: true
+  - id: alt-firmware
+    repo: someone/alt-firmware
+    tagPrefix: v
+    boards: [esp32-cyd]               # optional: only these boards
+    enabled: true                     # optional, default true
+```
+
+A source's release carries an `index.json` and the images as `vibedock-client/scripts/release-index.py` writes them.
+The server takes only releases whose index names the protocol version it speaks (`CLIENT-PROTOCOL.md`), checks every
+file against the SHA-256 and size of the index, and refuses an app that does not carry the board and version it is
+listed for. A source is `trusted: false` unless the file says `trusted: true`: its firmware can be flashed over USB
+from the browser, but is never offered for updates over Wi-Fi, because the server signs what it offers there. Set
+`trusted: true` only for firmware whose maker and code you trust; the displays install it. Downloaded firmware replaces
+the one built into the image only when its version is newer; an upload of your own always wins. The server asks
+`api.github.com` and downloads from GitHub's hosts only; `FIRMWARE_SYNC=false` turns the downloads off.
+
+**Devices → Firmware** shows the sources with their newest downloaded version, whether they are trusted, and the result of
+the last check (with the error, if there was one). **Check now** asks the sources right away, in the background; reload
+the page to see the result. The page says where the chosen board's firmware comes from (built into the image, your upload
+or a source). **Hold a version for this board** keeps one of the downloaded versions in place of the newest until **Use
+the newest again**; a held version is not deleted when newer ones arrive. A mistake in `firmware-sources.yaml` is shown
+there as well, and nothing is downloaded until it is fixed.
+
+## Requesting firmware for a new board
+
+A board that is not in the list gets its firmware on request. **Request firmware** on the firmware page asks for little:
+the board's name, a link to its product page (the display and the pins are looked up there), optionally the retailer
+link (where you bought it), a photo of the front, and what the board reports over USB. Connect the board and press
+**Read from the board**: the page reads chip, flash size and features with esptool (Chrome or Edge; the board is only
+read and restarted, nothing is written). Without a browser that can do this, paste the output of `esptool chip_id` and
+`flash_id` into the box.
+
+Nothing is sent from the page. **Create the package** downloads `firmware-request-<id>.zip` with `request.json`
+(the report) and `photo.jpg` (reduced to 1600 pixels). Pass the package on: the firmware is built from it and comes
+back as `firmware.bin`, `flash.bin` and `manifest.json`, its version the one of the server with `-dirty`. Upload the
+files under **Own firmware build**.
+
 # The display's own screens
 
 Until a display has its first image, and during updates, it draws its own screens: logo, version, the state and
@@ -1278,7 +1330,7 @@ Battery presence and operation without USB have not been established. No motion-
 ### Battery power saving (experimental)
 
 Displays with a battery connection have the switch **Battery power saving** on their device
-card: Waveshare 1.54, 1.47 and C6 1.69 (tested boards), Waveshare S3 1.69 and LilyGO T-Display-S3 (prepared). It is
+card: Waveshare 1.54, 1.47 and C6 1.69 (tested boards), Waveshare S3 1.69, LilyGO T-Display-S3 and the Waveshare e-paper 1.54 (prepared). It is
 off by default. Switched on, the display saves power while it runs on its battery, that is without a computer on its
 USB port (and on the 1.54 without charging):
 
@@ -1286,7 +1338,7 @@ USB port (and on the 1.54 without charging):
   drop packets; it stays off while the display pulls its picture (or loads an update), so transfers are not slowed;
 - the processor at 80 MHz instead of 240 (C6: 160) MHz;
 - the backlight dims to 10 % after a minute without touch or volume button. The next touch only wakes it; swipe again
-  for the gesture.
+  for the gesture. The e-paper has no backlight and keeps its picture without power, so only the first two apply.
 
 Plugging into a computer ends it within about ten seconds. A charger or power bank without data lines counts as
 battery operation, except on the 1.54 while it charges; that does no harm. The display's status page shows **Power

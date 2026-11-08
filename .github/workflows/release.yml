@@ -1,7 +1,7 @@
 name: Release VibeDock
 # A version tag (0.2.0 or v0.2.0), pushed or created with a release on GitHub, becomes a GitHub release with:
 #   vibedock-server-<version>.jar and the firmware of every board (vibedock-m1-<version>.bin,
-#   vibedock-<board>-<version>.bin). The job artifacts only carry these files to the release job and are deleted after
+#   vibedock-<board>-<version>.bin, with vibedock-<board>-<version>.manifest.json beside each). The job artifacts only carry these files to the release job and are deleted after
 #   a day. The Docker image is not a release file (releases up to 0.3.0 carried it as .tar.gz): it is pulled from a
 #   registry, or built locally with vibedock-server/scripts/image.sh for a machine without registry access.
 # The Docker image goes to the GitHub Container Registry: ghcr.io/<owner>/vibedock-server:<version> for amd64 and
@@ -161,12 +161,15 @@ jobs:
           python -m pip install "platformio==6.2.0"
           sh scripts/images.sh build
           for dir in build/*/; do board=$(basename "$dir"); case $board in vibedock-*) name=$board;; *) name=vibedock-$board;; esac
-            cp "$dir/flash.bin" "$name-${{ needs.version.outputs.version }}.bin"; done
+            cp "$dir/flash.bin" "$name-${{ needs.version.outputs.version }}.bin"
+            cp "$dir/manifest.json" "$name-${{ needs.version.outputs.version }}.manifest.json"; done
       - uses: actions/upload-artifact@v7
         with:
           name: firmware
           retention-days: 1
-          path: vibedock-client/vibedock-*.bin
+          path: |
+            vibedock-client/vibedock-*.bin
+            vibedock-client/vibedock-*.manifest.json
 
   release:
     # publish-image too: no release without its Docker tags.
@@ -198,7 +201,7 @@ jobs:
             if [ -s notes.md ]; then set -- --notes-file notes.md; else set --; fi
             gh release create "$TAG" --draft --title "VibeDock $v" --generate-notes --verify-tag "$@"
           fi
-          for file in assets/vibedock-server-"$v".jar assets/vibedock-*-"$v".bin; do
+          for file in assets/vibedock-server-"$v".jar assets/vibedock-*-"$v".bin assets/vibedock-*-"$v".manifest.json; do
             [ -f "$file" ] || { echo "Missing release file $file"; exit 1; }
             ok=
             for attempt in 1 2 3; do

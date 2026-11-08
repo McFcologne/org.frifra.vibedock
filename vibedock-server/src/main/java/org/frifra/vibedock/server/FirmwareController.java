@@ -26,6 +26,10 @@ class FirmwareController {
         this.firmware=firmware;this.registry=registry;this.pairing=pairing;this.addresses=addresses;this.zone=java.time.ZoneId.of(zone);
     }
 
+    private FirmwareReleases releases;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    void releases(FirmwareReleases releases){this.releases=releases;}
+
     /** A board for the page's selection: whether this installation has firmware for it. */
     record BoardOption(Board board,boolean available) {}
     @GetMapping("/admin/firmware") String page(@RequestParam(defaultValue="") String board,Model model,HttpServletRequest request){
@@ -43,12 +47,73 @@ class FirmwareController {
         model.addAttribute("uploadedAt",firmware.info(selected).filter(Firmware.Info::uploaded)
                 .map(i->java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").format(java.time.Instant.ofEpochSecond(i.uploadedAt()).atZone(zone))).orElse(null));
         model.addAttribute("anyFirmware",!firmware.all().isEmpty());
+        if(releases!=null){
+            model.addAttribute("sources",releases.status());
+            model.addAttribute("sourcesError",releases.configError());
+            model.addAttribute("checking",releases.running());
+            var candidates=releases.candidates(selected);
+            model.addAttribute("candidates",candidates);
+            var pin=releases.pinned(selected);
+            model.addAttribute("pin",pin.orElse(null));
+            model.addAttribute("pinMissing",pin.isPresent()&&candidates.stream().noneMatch(c->c.source().equals(pin.get().source())&&c.version().equals(pin.get().version())));
+            var labels=new HashMap<String,String>();
+            for(var st:releases.status())labels.put(st.source().id(),st.source().label());
+            model.addAttribute("sourceLabels",labels);
+            model.addAttribute("checkedAt",releases.status().stream().mapToLong(FirmwareReleases.Status::checkedAt).max().stream().boxed().findFirst()
+                    .filter(t->t>0).map(t->java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").format(java.time.Instant.ofEpochSecond(t).atZone(zone))).orElse(null));
+        }
         model.addAttribute("webFlasher",firmware.esptool().isPresent());
         // The devices of this board; web displays have no firmware.
         model.addAttribute("clients",registry.views().stream().filter(c->c.web()==null&&c.board().equals(selected)).toList());
         model.addAttribute("announced",addresses.announced(request));
         model.addAttribute("internalLoopback",addresses.internalIsLoopback(request));
         return "firmware";
+    }
+    /** Asks the firmware sources now, in the background; the page shows the result when reloaded. */
+    @PostMapping("/admin/firmware/sources/check") String check(@RequestParam(defaultValue="") String board){
+        if(releases!=null&&releases.checkInBackground())log.info("Firmware sources are checked on request");
+        return "redirect:/admin/firmware"+(Board.find(board).isPresent()?"?board="+board:"");
+    }
+    /** Holds a downloaded version for a board: "source|version" as the select sends it. */
+    @PostMapping("/admin/firmware/pin") String pin(@RequestParam String board,@RequestParam String version) throws IOException {
+        var target=Board.find(board).orElseThrow(()->new ResponseStatusException(HttpStatus.BAD_REQUEST));
+        int bar=version.indexOf('|');
+        if(releases==null||bar<1)throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        try{releases.pin(target,version.substring(0,bar),version.substring(bar+1));}
+        catch(IllegalArgumentException e){throw new ResponseStatusException(HttpStatus.BAD_REQUEST,e.getMessage());}
+        log.info("Firmware {} of source {} held for {}",version.substring(bar+1),version.substring(0,bar),target.id());
+        return "redirect:/admin/firmware?board="+target.id();
+    }
+    /** The newest version applies again. */
+    @PostMapping("/admin/firmware/unpin") String unpin(@RequestParam String board) throws IOException {
+        var target=Board.find(board).orElseThrow(()->new ResponseStatusException(HttpStatus.BAD_REQUEST));
+        if(releases!=null)releases.unpin(target);
+        return "redirect:/admin/firmware?board="+target.id();
+    }
+    /** The form to ask for firmware of a new board. */
+    @GetMapping("/admin/firmware/request") String requestPage(Model model){
+        model.addAttribute("chips",new TreeSet<>(Manifest.CHIPS));
+        model.addAttribute("webFlasher",firmware.esptool().isPresent());
+        return "firmware-request";
+    }
+    /** The answers of the form; the photo (optional) as base64, reduced here again whatever the browser made of it. */
+    record RequestForm(Map<String,String> answers,String photo) {}
+    /** The package for the answers: request.json (see FirmwareRequest) and photo.jpg. */
+    @PostMapping(value="/admin/firmware/request",consumes=MediaType.APPLICATION_JSON_VALUE) ResponseEntity<?> request(
+            @RequestBody RequestForm body,@ModelAttribute("appVersion") String version) throws IOException {
+        try{
+            byte[] photo=null;
+            if(body.photo()!=null&&!body.photo().isBlank()){
+                if(body.photo().length()>12_000_000)throw new IllegalArgumentException("The photo is too large");
+                byte[] raw;try{raw=Base64.getDecoder().decode(body.photo().trim());}catch(IllegalArgumentException e){throw new IllegalArgumentException("The photo is not readable");}
+                photo=PhotoLibrary.reduced(raw,1600);
+            }
+            var report=FirmwareRequest.report(body.answers(),version,java.time.Instant.now(),photo!=null);
+            var id=((Map<?,?>)report.get("board")).get("id");
+            return ResponseEntity.ok().contentType(MediaType.parseMediaType("application/zip")).header(HttpHeaders.CACHE_CONTROL,"no-store")
+                    .header(HttpHeaders.CONTENT_DISPOSITION,ContentDisposition.attachment().filename("firmware-request-"+id+".zip").build().toString())
+                    .body(FirmwareRequest.pack(report,photo));
+        }catch(IllegalArgumentException e){return ResponseEntity.badRequest().contentType(MediaType.APPLICATION_JSON).body(Map.of("error",e.getMessage()));}
     }
     @GetMapping("/admin/firmware/{file:.+\\.bin}") ResponseEntity<byte[]> download(@PathVariable String file) throws IOException {
         var info=firmware.all().stream().filter(i->i.fileName().equals(file)).findFirst().orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND));

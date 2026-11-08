@@ -89,9 +89,11 @@ uint32_t pullWaitMs = 0; bool pullPending = false;
 // The token the server announced for the picture on this display's page (X-VibeDock-Preview-Token, 32 hex digits): the
 // browser loads the picture from the server with it, the display does not relay it. Empty until the first answer.
 char previewToken[33] = "";
-uint32_t pullIntervalMs() { return pullWaitMs ? pullWaitMs : client_policy::clampPoll(pollSeconds) * 1000u; }
+uint32_t pullIntervalMs() {
+  return pullWaitMs ? client_policy::waitMsFor(pullWaitMs, powerSaving) : client_policy::pollSecondsFor(pollSeconds, powerSaving) * 1000u;
+}
 // Pull in the next loop (or after delayMs); an announced wait no longer applies.
-void pullSoon(uint32_t delayMs = 0) { pullWaitMs = 0; lastPull = millis() - client_policy::clampPoll(pollSeconds) * 1000u + delayMs; }
+void pullSoon(uint32_t delayMs = 0) { pullWaitMs = 0; lastPull = millis() - pullIntervalMs() + delayMs; }
 int lastStatus = 0;  // HTTP status of the last pull, negative for connection errors, 0 before the first pull
 
 String currentIp() {
@@ -1707,7 +1709,7 @@ void statusPage() {
     b += F("</dd><dt>Fallback poll interval</dt><dd>"); b += pollSeconds; b += F(" s</dd>");
     sendChunk();
     if (pullWaitMs) {
-      b += F("<dt>Next pull</dt><dd>in "); b += (pullWaitMs - min(pullWaitMs, uint32_t(millis() - lastPull)) + 999) / 1000; b += F(" s");
+      b += F("<dt>Next pull</dt><dd>in "); b += (pullIntervalMs() - min(pullIntervalMs(), uint32_t(millis() - lastPull)) + 999) / 1000; b += F(" s");
       b += pullPending ? F(" (new readings expected)") : F(" (as announced by the server)");
       b += F("</dd>"); sendChunk();
     }
@@ -1869,7 +1871,7 @@ void handlePullRequest() {
   }
   if (mode != Mode::Paired) { web.send(409, "text/plain", ""); return; }
   pullWaitMs = 0;  // the poll interval applies until the server answers again
-  uint32_t poll = client_policy::clampPoll(pollSeconds) * 1000u;
+  uint32_t poll = pullIntervalMs();
   if (lastPullRequest != 0 && !client_policy::pullRequestAllowed(millis(), lastPullRequest)) {
     // Too soon after the last one (e.g. a setting switched on and off again): pulled when the pause is over, not
     // only at the next poll. Still at most one pull per pause.
@@ -2154,16 +2156,18 @@ void powerPoll() {
     bool charging = strcmp(reading.chargeSignal, "active") == 0 || strcmp(reading.chargeSignal, "unstable") == 0;
     batteryLevel = reading.supported ? reading.estimatedPercent : -1;
     batteryMv = reading.supported && powerSource.battery ? reading.millivolts : 0;  // only reported while running on the battery
-    if (powerSource.update(client_policy::onBattery(battery::usbHost(), charging))) {
-      logEvent(powerSource.battery ? F("Power: battery") : F("Power: USB or charging"), true);
-      // The battery icon in the image appears or goes away with the next image, right away.
-      if (mode == Mode::Paired) pullSoon();
-    }
+    bool powerChanged = powerSource.update(client_policy::onBattery(battery::usbHost(), charging));
+    if (powerChanged) logEvent(powerSource.battery ? F("Power: battery") : F("Power: USB or charging"), true);
     setPowerSaving(powerSavingAllowed && powerSource.battery && mode == Mode::Paired);
+    // The battery icon in the image appears or goes away with the next image, right away. After the power saving state
+    // changed: the pull interval depends on it, and pullSoon() counts back from the interval that applies.
+    if (powerChanged && mode == Mode::Paired) pullSoon();
   }
+#if !defined(VIBEDOCK_EPAPER)  // no backlight to dim: the state would only show "dimmed"
   if (powerSaving && !dimmed && client_policy::dimDue(millis(), lastActivity)) {
     dimmed = true; metricDimmed(true); platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, client_policy::dimmedBrightness(brightness));
   }
+#endif
 #endif
 }
 
@@ -2284,10 +2288,10 @@ void loop() {
   if (WiFi.status() == WL_CONNECTED && !networkVerified) { networkVerified = true; saveConfig(); }
   if (mode == Mode::Paired) {
     if (client_policy::waited(millis(), lastPull, pullIntervalMs())) pull();
-    if (mode == Mode::Paired && haveImage && !staleScreen && client_policy::imageStale(millis(), lastImage, pollSeconds, pullWaitMs)) {
+    if (mode == Mode::Paired && haveImage && !staleScreen && client_policy::imageStale(millis(), lastImage, client_policy::pollSecondsFor(pollSeconds, powerSaving), client_policy::waitMsFor(pullWaitMs, powerSaving))) {
       staleScreen = true;
       if (WiFi.status() == WL_CONNECTED) message("Updates missing", Step::Server, true); else showWaiting();
     }
   }
-  yield();
+  if (powerSaving) delay(dimmed ? client_policy::powerSaveDimmedIdleMs : client_policy::powerSaveIdleMs); else yield();
 }
