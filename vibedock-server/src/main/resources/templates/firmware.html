@@ -51,9 +51,10 @@
   </th:block>
 </section>
 
-<section class="card firmware-sources" th:if="${sources != null}">
+<section class="card firmware-sources" th:if="${sources != null}" th:attr="data-sources-checking=${checking},data-sources-state=@{/admin/firmware/sources/state}">
   <div class="card-head"><h3 class="grow">Firmware sources</h3>
-    <form method="post" th:action="@{/admin/firmware/sources/check(board=${board.id})}"><button class="secondary" th:disabled="${checking}" th:text="${checking ? 'Checking …' : 'Check now'}">Check now</button></form></div>
+    <form method="post" data-sources-check th:action="@{/admin/firmware/sources/check(board=${board.id})}"><button class="secondary" th:disabled="${checking}" th:text="${checking ? 'Checking …' : 'Check now'}">Check now</button></form></div>
+  <p class="meta check-status" data-sources-status role="status" aria-live="polite" th:hidden="${!checking}"><span class="spinner" aria-hidden="true"></span>Checking the sources … this page shows the result by itself.</p>
   <p class="meta">The server downloads firmware from the releases of these repositories once after it starts and then every day.
     <span th:if="${checkedAt != null}">Last check: <span th:text="${checkedAt}"></span>.</span> The list is <code>firmware-sources.yaml</code> in the data directory, in order of priority.</p>
   <p class="notice error" th:if="${sourcesError != null}" th:text="${sourcesError + ' – no firmware is downloaded until this is fixed.'}"></p>
@@ -244,6 +245,7 @@
 <script src="../static/firmware-upload.js" th:src="@{/firmware-upload.js}"></script>
 <script src="../static/device-state.js" th:src="@{/device-state.js}"></script>
 </th:block>
+<script src="../static/firmware-sources.js" th:src="@{/firmware-sources.js}" th:if="${sources != null}"></script>
 </main>
 <footer th:replace="~{fragments :: footer}"></footer>
 </body></html>

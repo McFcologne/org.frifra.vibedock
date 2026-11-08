@@ -1183,8 +1183,8 @@ brings the first one; an upload of your own always wins over a downloaded versio
 `api.github.com` and downloads from GitHub's hosts only; `FIRMWARE_SYNC=false` turns the downloads off.
 
 **Devices → Firmware** shows the sources with their newest downloaded version, whether they are trusted, and the result of
-the last check (with the error, if there was one). **Check now** asks the sources right away, in the background; reload
-the page to see the result. The page says where the chosen board's firmware comes from (your upload or a source). **Hold a version for this board** keeps one of the downloaded versions in place of the newest until **Use
+the last check (with the error, if there was one). **Check now** asks the sources right away, in the background; the page
+shows that the check runs and displays the result by itself when it is over. The page says where the chosen board's firmware comes from (your upload or a source). **Hold a version for this board** keeps one of the downloaded versions in place of the newest until **Use
 the newest again**; a held version is not deleted when newer ones arrive. A mistake in `firmware-sources.yaml` is shown
 there as well, and nothing is downloaded until it is fixed.
 

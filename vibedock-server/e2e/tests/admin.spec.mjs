@@ -347,6 +347,25 @@ test('TLS pin status shows a known fingerprint and pairing can omit it',async ({
   expect(submitted.get('omitTlsPin')).toBe('on');
 });
 
+test('Check now follows the firmware check and shows its result without a reload by hand',async ({page,app}) => {
+  await page.goto(app.baseURL+'/admin/firmware');
+  let polls=0;
+  // The first two answers say that the check still runs; then the real answer comes.
+  await page.route('**/admin/firmware/sources/state',route => ++polls<=2 ? route.fulfill({json:{running:true}}) : route.fallback());
+  const section=page.locator('.firmware-sources'), status=section.locator('[data-sources-status]');
+  await expect(status).toBeHidden();
+  await section.getByRole('button',{name:'Check now'}).click();
+  await expect(status).toBeVisible();
+  await expect(section.getByRole('button',{name:'Checking …'})).toBeDisabled();
+  await page.evaluate(() => { window.__noReload = true; });
+  await expect.poll(() => polls, {timeout:30_000}).toBeGreaterThanOrEqual(3);
+  // the page reloads itself when the check is over: the marker is gone
+  await expect.poll(() => page.evaluate(() => window.__noReload === true).catch(() => false), {timeout:30_000}).toBe(false);
+  // The check may still run for a moment (it asks GitHub); the page waits for it again and ends with the button free.
+  await expect(section.getByRole('button',{name:'Check now'})).toBeEnabled({timeout:60_000});
+  await expect(status).toBeHidden();
+});
+
 test('troubleshooting loads and refreshes server logs only for an administrator',async ({page,app}) => {
   const denied=await fetch(app.baseURL+'/admin/server-log',{redirect:'manual'});
   expect(denied.status).toBe(401);
