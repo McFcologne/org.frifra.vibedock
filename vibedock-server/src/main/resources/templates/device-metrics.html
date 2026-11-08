@@ -8,7 +8,8 @@
   <p>What the display measured and sent with its pulls, one sample every <span th:text="${interval}">5</span> minutes, kept for
   <span th:text="${keepDays}">30</span> days. <code th:text="${identifier}"></code></p></div>
   <div class="heading-actions"><a class="button secondary" th:href="@{/admin/clients/{id}/logs(id=${identifier})}">Logs</a>
-    <a class="button secondary" th:href="@{/admin/metrics.csv(device=${identifier})}" title="All kept samples of this display as CSV">Export CSV</a></div></div>
+    <details class="metric-export"><summary class="button secondary" title="All kept samples of this display">Export ▾</summary>
+      <div class="metric-export-menu"><a th:href="@{/admin/metrics.csv(device=${identifier})}">CSV</a><a th:href="@{/admin/metrics.xlsx(device=${identifier})}">Excel (.xlsx)</a></div></details></div></div>
 <nav class="meta metric-periods" aria-label="Period">
   <a th:each="p:${periods}" th:href="@{/admin/clients/{id}/metrics(id=${identifier},hours=${p})}" th:class="${p == hours} ? 'current'"
      th:text="${p &lt; 24 ? p + ' h' : (p / 24) + ' d'}">24 h</a>

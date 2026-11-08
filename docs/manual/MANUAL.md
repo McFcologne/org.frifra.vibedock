@@ -1391,11 +1391,10 @@ Choose the period (6 hours, 1, 3, 7 or 30 days): the curves show the free memory
 block in one piece (a dashed line marks a restart), the Wi-Fi signal and, while the display runs on its battery, the
 battery voltage. Light grey areas marked *Offline* show where no sample arrived for more than 15 minutes (the display was off, asleep or not reachable), also up to now. Below them a scrollable table lists the newest samples with the free memory, the lowest and largest block, the
 memory after a TLS handshake and its stack, the time of the last picture, signal, Wi-Fi drops, battery voltage,
-brightness and how long the display was active and dimmed. A value that was not measured stays empty. **Export CSV**
-(or `/admin/metrics.csv`) hands the samples to a spreadsheet: comma as separator, dot as decimal mark, the unit in the
+brightness and how long the display was active and dimmed. A value that was not measured stays empty. **Export** offers CSV or Excel (.xlsx; `/admin/metrics.csv` and `/admin/metrics.xlsx`) and hands the samples to a spreadsheet. The Excel file has one sheet per display with real dates and numbers, a header row with filter, and a sheet *Info*. In CSV: comma as separator, dot as decimal mark, the unit in the
 column name, local and UTC time, firmware and the reason of the start, for all displays or one with `device`, and for a
 period with `from` and `to` (`yyyy-MM-dd` or an instant); `raw=true` adds the header as the display sent it. Text cells that start like a formula are
-saved with a leading apostrophe. The key figures of a log use the samples of its period as well, and the support file
+saved with a leading apostrophe in CSV; in Excel they stay plain text. The key figures of a log use the samples of its period as well, and the support file
 carries them as `samples`.
 
 The table also shows how fresh the **newest log** is: how long ago the server received it (server time; its lines can
