@@ -1,1 +1,0 @@
-- Server: measured values are kept per day and for 90 days by default; the metrics page still shows up to 30 days at a time and pages back with Older/Newer. Metrics and device logs have an adjustable retention under Settings → Retention; the server and access logs are kept 90 days (`LOG_MAX_DAYS`).
