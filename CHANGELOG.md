@@ -1,6 +1,6 @@
 # VibeDock release notes
 
-The release workflows publish the section of the tagged version above the list of commits that GitHub generates: `## Server 0.6.1` for the tag `server-v0.6.1`, `## Client 0.6.0` for `client-v0.6.0` (up to 0.5.1, one section `## 0.5.1` for the common tag `v0.5.1` or `0.5.1`).
+The release workflows publish the section of the tagged version above the list of commits that GitHub generates: `## Server 0.6.1` for the tag `server-v0.6.1`, `## Client 0.6.2` for `client-v0.6.2` (up to 0.5.1, one section `## 0.5.1` for the common tag `v0.5.1` or `0.5.1`).
 
 ## Server 0.6.0
 
