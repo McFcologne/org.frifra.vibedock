@@ -200,6 +200,12 @@ int main(){
     // An aborted image falls back to the poll interval; only a complete one keeps the announced wait.
     assert(waitAfterImage(true,600000)==600000&&waitAfterImage(false,600000)==0);
   }
+  // Saving power: poll interval and announced wait are at least a minute, otherwise unchanged.
+  assert(pollSecondsFor(30,false)==30);assert(pollSecondsFor(30,true)==60);assert(pollSecondsFor(10,true)==60);
+  assert(pollSecondsFor(60,true)==60);assert(pollSecondsFor(300,true)==300);assert(pollSecondsFor(99999,true)==3600);
+  assert(waitMsFor(0,true)==0);assert(waitMsFor(5000,false)==5000);assert(waitMsFor(5000,true)==60000);
+  assert(waitMsFor(60000,true)==60000);assert(waitMsFor(120000,true)==120000);
+  assert(!imageStale(179999,0,pollSecondsFor(30,true),0));assert(imageStale(180000,0,pollSecondsFor(30,true),0));
   assert(clampPoll(1)==10);assert(clampPoll(30)==30);assert(clampPoll(99999)==3600);
   assert(!pullDue(29999,0,30));assert(pullDue(30000,0,30));assert(pullDue(10000,0,5));
   assert(!imageStale(89999,0,30));assert(imageStale(90000,0,30));

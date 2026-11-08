@@ -33,10 +33,26 @@ struct PowerSource {
 constexpr uint32_t dimAfterMs = 60000;
 constexpr bool dimDue(uint32_t now, uint32_t lastActivity) { return now - lastActivity >= dimAfterMs; }
 
+// While saving power the main loop sleeps this long per round, so the processor idles between the ticks instead of
+// running without a pause: 10 ms (touch is read every 20 ms, so nothing is missed), 40 ms while the backlight is dimmed
+// and the loop only waits for the touch that wakes it.
+constexpr uint32_t powerSaveIdleMs = 10, powerSaveDimmedIdleMs = 40;
+
 constexpr uint32_t minPollSeconds = 10, maxPollSeconds = 3600, defaultPollSeconds = 30;
 constexpr uint8_t maxPairingAttempts = 5;
 constexpr uint32_t clampPoll(uint32_t seconds) {
   return seconds < minPollSeconds ? minPollSeconds : seconds > maxPollSeconds ? maxPollSeconds : seconds;
+}
+// While saving power every pull costs a Wi-Fi/TLS session of 50 to 80 mA, so neither the poll interval nor an announced
+// wait is shorter than a minute then. A display that must change at once is still reached: the server asks for an
+// immediate pull (POST /pull), which the display answers at any time.
+constexpr uint32_t batteryMinPollSeconds = 60;
+constexpr uint32_t pollSecondsFor(uint32_t seconds, bool powerSaving) {
+  return powerSaving && clampPoll(seconds) < batteryMinPollSeconds ? batteryMinPollSeconds : clampPoll(seconds);
+}
+// An announced wait in ms (0: none announced) raised to the same minimum while saving power.
+constexpr uint32_t waitMsFor(uint32_t ms, bool powerSaving) {
+  return powerSaving && ms != 0 && ms < batteryMinPollSeconds * 1000u ? batteryMinPollSeconds * 1000u : ms;
 }
 // A pull is due once the poll interval has passed; unsigned arithmetic survives millis() rollover.
 constexpr bool pullDue(uint32_t now, uint32_t lastPull, uint32_t pollSeconds) {
