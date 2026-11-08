@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Request firmware')}"></head>
+<body>
+<header th:replace="~{fragments :: appbar('devices')}"></header>
+<main>
+<div class="page-heading"><div><h2>Request firmware for a new board</h2><p>A link to the product page, what the board reports over USB and a photo are enough: the display and the pins are looked up
+  from there. You get a package with a report (<code>request.json</code>) and the photo as a download; nothing is sent from here.</p></div>
+  <a class="button secondary" th:href="@{/admin/firmware}">← Firmware</a></div>
+<form data-firmware-request th:attr="data-esptool=${webFlasher} ? @{/admin/firmware/esptool.js} : ''">
+<section class="card">
+  <div class="card-head"><h3 class="grow">The board</h3></div>
+  <div class="request-grid">
+    <label class="field">Name *<input type="text" name="board.label" placeholder="e.g. Waveshare ESP32-S3 Touch 2.1" autocomplete="off" required></label>
+    <label class="field wide">Product page *<input type="url" name="maker.productUrl" placeholder="https://" autocomplete="off" required></label>
+    <label class="field wide">Retailer link (where you bought it)<input type="url" name="maker.shopUrl" placeholder="https://" autocomplete="off"></label>
+    <label class="field wide">Photo of the board (the front, straight from above; JPEG, PNG, GIF or BMP)<input type="file" accept="image/*" data-request-photo></label>
+  </div>
+</section>
+<section class="card">
+  <div class="card-head"><h3 class="grow">What the board reports over USB</h3>
+    <button type="button" class="secondary" data-request-read th:if="${webFlasher}" hidden>Read from the board</button></div>
+  <p class="meta">Connect the board with a USB cable and press <em>Read from the board</em> (Chrome or Edge on this computer or over https). The board is only read and restarted, nothing is written.
+    Without that, copy the lines from <code>esptool chip_id</code> and <code>flash_id</code> into the box.</p>
+  <div class="request-grid">
+    <label class="field">Chip<select name="board.chip"><option value="">–</option><option th:each="c : ${chips}" th:value="${c}" th:text="${c}"></option></select></label>
+    <label class="field">Flash (MB)<input type="number" name="board.flashMb" min="1" max="64"></label>
+    <label class="field wide">Report<textarea name="board.usbReport" rows="4" maxlength="1000" data-request-usb></textarea></label>
+  </div>
+  <p class="meta" data-request-read-state aria-live="polite"></p>
+</section>
+<section class="card">
+  <div class="request-grid">
+    <label class="field wide">Notes<textarea name="notes" rows="3" maxlength="1000"></textarea></label>
+    <label class="field wide">Contact (how to reach you with the result)<input type="text" name="contact" maxlength="200" autocomplete="off"></label>
+  </div>
+  <p class="notice error" data-request-error hidden role="alert"></p>
+  <div class="flash-row"><button type="submit">Create the package</button><span class="meta" data-request-state aria-live="polite"></span></div>
+  <p class="meta">The package is named <code>firmware-request-&lt;id&gt;.zip</code>. The firmware comes back as <code>firmware.bin</code>, <code>flash.bin</code> and <code>manifest.json</code>,
+    its version the one of this server with <code>-dirty</code>.</p>
+</section>
+</form>
+<script type="module" src="../static/firmware-request.js" th:src="@{/firmware-request.js}"></script>
+</main>
+</body>
+</html>

@@ -50,6 +50,31 @@ class FirmwareController {
         model.addAttribute("internalLoopback",addresses.internalIsLoopback(request));
         return "firmware";
     }
+    /** The form to ask for firmware of a new board. */
+    @GetMapping("/admin/firmware/request") String requestPage(Model model){
+        model.addAttribute("chips",new TreeSet<>(Manifest.CHIPS));
+        model.addAttribute("webFlasher",firmware.esptool().isPresent());
+        return "firmware-request";
+    }
+    /** The answers of the form; the photo (optional) as base64, reduced here again whatever the browser made of it. */
+    record RequestForm(Map<String,String> answers,String photo) {}
+    /** The package for the answers: request.json (see FirmwareRequest) and photo.jpg. */
+    @PostMapping(value="/admin/firmware/request",consumes=MediaType.APPLICATION_JSON_VALUE) ResponseEntity<?> request(
+            @RequestBody RequestForm body,@ModelAttribute("appVersion") String version) throws IOException {
+        try{
+            byte[] photo=null;
+            if(body.photo()!=null&&!body.photo().isBlank()){
+                if(body.photo().length()>12_000_000)throw new IllegalArgumentException("The photo is too large");
+                byte[] raw;try{raw=Base64.getDecoder().decode(body.photo().trim());}catch(IllegalArgumentException e){throw new IllegalArgumentException("The photo is not readable");}
+                photo=PhotoLibrary.reduced(raw,1600);
+            }
+            var report=FirmwareRequest.report(body.answers(),version,java.time.Instant.now(),photo!=null);
+            var id=((Map<?,?>)report.get("board")).get("id");
+            return ResponseEntity.ok().contentType(MediaType.parseMediaType("application/zip")).header(HttpHeaders.CACHE_CONTROL,"no-store")
+                    .header(HttpHeaders.CONTENT_DISPOSITION,ContentDisposition.attachment().filename("firmware-request-"+id+".zip").build().toString())
+                    .body(FirmwareRequest.pack(report,photo));
+        }catch(IllegalArgumentException e){return ResponseEntity.badRequest().contentType(MediaType.APPLICATION_JSON).body(Map.of("error",e.getMessage()));}
+    }
     @GetMapping("/admin/firmware/{file:.+\\.bin}") ResponseEntity<byte[]> download(@PathVariable String file) throws IOException {
         var info=firmware.all().stream().filter(i->i.fileName().equals(file)).findFirst().orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND));
         return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM).header(HttpHeaders.CACHE_CONTROL,"no-store")
