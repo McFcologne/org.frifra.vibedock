@@ -342,6 +342,11 @@ The generated firmware is located at:
 firmware/.pio/build/vibedock-m1/firmware.bin
 ```
 
+Next to it `flash.bin` and `manifest.json` are written: the manifest says what the build is (board, display, capabilities,
+how it was built) and carries the SHA-256 of both images. `manifest.py` makes it from the `custom_*` keys of the
+environment in `platformio.ini` (see the head of the script); `python3 firmware/manifest.py --to-ini manifest.json`
+turns a manifest back into an environment, `--update` recalculates the checksum after a change by hand.
+
 This command compiles only. It does not upload firmware, open a device's serial port, or flash the device. Do not add an upload target without explicit approval to flash.
 
 ### Build with the shared IntelliJ run configuration
