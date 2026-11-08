@@ -2161,9 +2161,11 @@ void powerPoll() {
     }
     setPowerSaving(powerSavingAllowed && powerSource.battery && mode == Mode::Paired);
   }
+#if !defined(VIBEDOCK_EPAPER)  // no backlight to dim: the state would only show "dimmed"
   if (powerSaving && !dimmed && client_policy::dimDue(millis(), lastActivity)) {
     dimmed = true; metricDimmed(true); platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, client_policy::dimmedBrightness(brightness));
   }
+#endif
 #endif
 }
 
