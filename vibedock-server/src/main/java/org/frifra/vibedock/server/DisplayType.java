@@ -29,8 +29,8 @@ public record DisplayType(String id,String label,int width,int height,int corner
     public static final DisplayType FIT=new DisplayType("fit","Fit the browser · any size, sharp",360,640);
     /** What a web display can show: the device types and the browser's own size. */
     public static final List<DisplayType> WEB=java.util.stream.Stream.concat(INVENTORY.stream(),java.util.stream.Stream.of(FIT)).toList();
-    /** The type of an id; unknown or missing ids are the VibeTV M1. */
-    public static DisplayType of(String id){return WEB.stream().filter(t->t.id().equals(id)).findFirst().orElse(M1);}
+    /** The type of an id; a size an own build reported ("<width>x<height>") is kept, other unknown or missing ids are the VibeTV M1. */
+    public static DisplayType of(String id){return WEB.stream().filter(t->t.id().equals(id)).findFirst().orElseGet(()->id==null?M1:custom(id).orElse(M1));}
     /** Short side of a fitted image in its own pixels: the layout's bands keep a readable size on large screens. */
     static final int FIT_SHORT_SIDE=360;
     /**
@@ -53,10 +53,30 @@ public record DisplayType(String id,String label,int width,int height,int corner
         while(scale>1&&type.width*scale*type.height*scale>16_000_000)scale-=.25;
         return new Sized(type,Math.min(StatusImage.MAX_SCALE,scale));
     }
-    /** The type a device reports as "<width>x<height>", if it is in the inventory. */
+    /** The smallest and largest side of a size a device reports that is not in the inventory. */
+    static final int CUSTOM_MIN=64,CUSTOM_MAX=480;
+    /** The type a device reports as "<width>x<height>": one of the inventory, or a sane own size (square corners, colour). */
     public static Optional<DisplayType> reported(String size){
         if(size==null)return Optional.empty();
-        return INVENTORY.stream().filter(t->(t.width()+"x"+t.height()).equals(size.trim())).findFirst();
+        String key=size.trim();
+        var known=INVENTORY.stream().filter(t->(t.width()+"x"+t.height()).equals(key)).findFirst();
+        return known.isPresent()?known:custom(key);
+    }
+    /**
+     * The size a board reported. A black-and-white size of the inventory (the e-paper's 200x200) belongs to the board that
+     * has it: another board reporting the same size is a colour display of its own and gets a type without greyscale.
+     */
+    public static Optional<DisplayType> reported(String size,Board board){
+        var type=reported(size);
+        if(type.isPresent()&&type.get().grey()&&!type.get().id().equals(board.display()))return custom(size.trim());
+        return type;
+    }
+    private static Optional<DisplayType> custom(String key){
+        var m=java.util.regex.Pattern.compile("(\\d{2,3})x(\\d{2,3})").matcher(key);
+        if(!m.matches())return Optional.empty();
+        int w=Integer.parseInt(m.group(1)),h=Integer.parseInt(m.group(2));
+        if(w<CUSTOM_MIN||w>CUSTOM_MAX||h<CUSTOM_MIN||h>CUSTOM_MAX)return Optional.empty();
+        return Optional.of(new DisplayType(w+"x"+h,w+"×"+h+" · own build",w,h));
     }
     /** Height for usage bands above the weather/mood band (see {@link Layout#fit}). */
     public int bandRoom(){return height-Layout.CONTEXT_HEIGHT;}

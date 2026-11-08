@@ -168,7 +168,7 @@ class AccessTest {
         Assertions.assertTrue(output.getOut().contains("delta resumed, full=115200 bytes"));
         for(String mode:List.of("preview","wrong-size","unknown-base","unsupported")){
             var req=get(path).header("Authorization","Bearer "+key).header("If-None-Match",mode.equals("unknown-base")?"\"missing\"":tag)
-                    .header("X-VibeDock-Footer","server").header("X-VibeDock-Display",mode.equals("wrong-size")?"239x240":"240x240")
+                    .header("X-VibeDock-Footer","server").header("X-VibeDock-Display",mode.equals("wrong-size")?"9999x240":"240x240")
                     .header("X-VibeDock-Delta",mode.equals("unsupported")?"2":"1");
             if(mode.equals("preview"))req.header("X-VibeDock-Preview","1");
             mvc.perform(req.with(r->{r.setLocalPort(8080);r.setRemoteAddr("192.168.1.21");return r;}))
