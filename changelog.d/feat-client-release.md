@@ -1,0 +1,1 @@
+- **The firmware has its own releases.** A tag `client-vX.Y.Z` builds the firmware of every board and publishes it as a release with `index.json` (client version, protocol version, SHA-256 and size of every file), independent of the server's releases. The firmware version follows the client tags.
