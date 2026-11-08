@@ -246,10 +246,20 @@ public class FirmwareReleases {
         return bytes;
     }
     private void prune(FirmwareSources.Source source) throws IOException {
-        var all=versions(source.id());
-        Set<String> held=new HashSet<>();
-        synchronized(this){for(var pin:pins().values())if(pin.source().equals(source.id()))held.add(pin.version());}
-        for(int i=KEEP;i<all.size();i++)if(!held.contains(all.get(i)))deleteTree(root.resolve(source.id()).resolve(all.get(i)));
+        // Only versions with firmware on disk count towards KEEP: a new release that failed (its index.json is kept
+        // already) must not push out the last one that works. Versions without any firmware are removed.
+        Set<String> keep=new HashSet<>();
+        synchronized(this){for(var pin:pins().values())if(pin.source().equals(source.id()))keep.add(pin.version());}
+        int usable=0;
+        for(String version:versions(source.id())){
+            if(hasFirmware(source.id(),version)&&usable++<KEEP)keep.add(version);
+        }
+        for(String version:versions(source.id()))if(!keep.contains(version))deleteTree(root.resolve(source.id()).resolve(version));
+    }
+    private boolean hasFirmware(String sourceId,String version){
+        Path dir=root.resolve(sourceId).resolve(version);
+        for(var board:Board.INVENTORY)if(complete(dir.resolve(board.id()),board))return true;
+        return false;
     }
     private static void deleteTree(Path path) throws IOException {
         if(!Files.exists(path))return;

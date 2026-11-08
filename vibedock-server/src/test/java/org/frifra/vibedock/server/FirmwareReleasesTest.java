@@ -189,4 +189,15 @@ class FirmwareReleasesTest {
         for(int i=0;i<100&&releases.running();i++)Thread.sleep(50);
         assertFalse(releases.running());assertEquals("0.6.0",releases.best(CYD).orElseThrow().version());
     }
+
+    @Test void failedNewReleasesDoNotPushOutTheFirmwareThatWorks(@TempDir Path data) throws Exception {
+        var feed=new FakeFeed();var releases=service(data,feed);
+        feed.release("vibedock","0.5.0","2","","esp32-cyd");feed.release("vibedock","0.6.0","2","","esp32-cyd");releases.sync();
+        feed.release("vibedock","0.7.0","2","hash","esp32-cyd");feed.release("vibedock","0.8.0","2","hash","esp32-cyd");
+        releases.sync();releases.sync();
+        assertEquals("0.6.0",releases.best(CYD).orElseThrow().version());
+        assertTrue(Files.isDirectory(data.resolve("firmware/releases/vibedock/0.5.0/esp32-cyd")),"the second working version stays too");
+        assertFalse(Files.exists(data.resolve("firmware/releases/vibedock/0.7.0")),"nothing of a failed release stays");
+        assertFalse(Files.exists(data.resolve("firmware/releases/vibedock/0.8.0")));
+    }
 }
