@@ -18,6 +18,7 @@ protocol as before; the displays keep working with the firmware they run.
 - **Request firmware for a new board.** The firmware page has a short form: product page, retailer link, a photo and what the board reports over USB (read in the browser). It produces a package with a JSON report and the photo, to pass on for a build.
 - **Own builds are recognised and never get another board's firmware:** a display that reports a board ID this server does not know (a firmware built for an own board) keeps that ID (*Own build: <id>*) instead of counting as a VibeTV M1, and is never offered firmware, so it cannot receive the M1 image over Wi-Fi. Screen sizes between 64 and 480 pixels per side that a display reports are accepted as its display type; the design editor offers them.
 - **An own build that reports 200x200 is no longer taken for the e-paper.** Only the e-paper board keeps the black-and-white 200x200 type; any other board with that size gets a colour display of its own.
+- **E-paper board marked as tested:** the Waveshare ESP32-S3-ePaper-1.54 (V2) runs on the real board; the *untested board* note on its device card is gone. Contrast thresholds and ghosting are still being tuned.
 - **Use the released firmware** is the new name of *Use the built-in firmware* on the firmware page: it removes an upload, and the newest downloaded firmware applies again.
 
 ### Releases

@@ -93,7 +93,7 @@ partial ones and when much of the picture changed. A picture that did not change
 own screens (setup, pairing, messages) are drawn dark on light and without animation. The wiring is in `firmware/platformio.ini`
 and follows the [manufacturer's V2 example](https://github.com/waveshareteam/ESP32-S3-ePaper-1.54/tree/main/02_Example/ESP-IDF/V2/07_BATT_PWR_Test)
 (SPI on GPIO 10-13, RST 9, BUSY 8, panel supply GPIO 6). With `-D VIBEDOCK_EPAPER_PARTIAL=0` every refresh is a full one.
-Not yet run on hardware.
+Run on the real board (picture, partial and full refresh, battery voltage); contrast thresholds and ghosting are still being tuned.
 
 **Battery.** A 3.7 V lithium cell on the MX1.25 connector powers the board. The firmware holds the battery supply on
 (GPIO 17, as the manufacturer's example) and measures the voltage on GPIO 4 (ADC1 channel 3, divider of 2); the status
