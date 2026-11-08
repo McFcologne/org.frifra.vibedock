@@ -143,4 +143,50 @@ class FirmwareReleasesTest {
         assertTrue(firmware.signed(CYD,null).isEmpty());
         assertTrue(firmware.bytes(CYD).length>0,"still for flashing over USB");
     }
+
+    @Test void aHeldVersionStaysInPlaceOfTheNewestAndSurvivesPruningAndARestart(@TempDir Path data) throws Exception {
+        var feed=new FakeFeed();var releases=service(data,feed);
+        feed.release("vibedock","0.5.0","2","","esp32-cyd");feed.release("vibedock","0.6.0","2","","esp32-cyd");releases.sync();
+        releases.pin(CYD,"vibedock","0.5.0");
+        assertEquals("0.5.0",releases.best(CYD).orElseThrow().version());
+        feed.release("vibedock","0.7.0","2","","esp32-cyd");feed.release("vibedock","0.8.0","2","","esp32-cyd");releases.sync();
+        assertEquals("0.5.0",releases.best(CYD).orElseThrow().version(),"a new release does not replace the held one");
+        assertTrue(Files.isDirectory(data.resolve("firmware/releases/vibedock/0.5.0")),"the held version is not pruned");
+        assertFalse(Files.exists(data.resolve("firmware/releases/vibedock/0.6.0")));
+        assertEquals(List.of("0.8.0","0.7.0","0.5.0"),releases.candidates(CYD).stream().map(FirmwareReleases.Cached::version).toList());
+        assertEquals("0.5.0",service(data,feed).best(CYD).orElseThrow().version(),"the pin is read from the data directory again");
+        releases.unpin(CYD);
+        assertEquals("0.8.0",releases.best(CYD).orElseThrow().version());assertTrue(releases.pinned(CYD).isEmpty());
+        assertTrue(service(data,feed).pinned(CYD).isEmpty());
+    }
+    @Test void onlyAnAvailableVersionCanBeHeld(@TempDir Path data) throws Exception {
+        var feed=new FakeFeed();var releases=service(data,feed);
+        feed.release("vibedock","0.6.0","2","","esp32-cyd");releases.sync();
+        assertThrows(IllegalArgumentException.class,()->releases.pin(CYD,"vibedock","0.1.0"));
+        assertThrows(IllegalArgumentException.class,()->releases.pin(CYD,"other","0.6.0"));
+        assertThrows(IllegalArgumentException.class,()->releases.pin(M1,"vibedock","0.6.0"),"no firmware for this board");
+        assertTrue(releases.pinned(CYD).isEmpty());
+    }
+    @Test void aHeldVersionThatIsGoneFallsBackToTheNewest(@TempDir Path data) throws Exception {
+        var feed=new FakeFeed();var releases=service(data,feed);
+        feed.release("vibedock","0.5.0","2","","esp32-cyd");feed.release("vibedock","0.6.0","2","","esp32-cyd");releases.sync();
+        releases.pin(CYD,"vibedock","0.5.0");
+        try(var s=Files.walk(data.resolve("firmware/releases/vibedock/0.5.0"))){for(var p:s.sorted(Comparator.reverseOrder()).toList())Files.delete(p);}
+        assertEquals("0.6.0",releases.best(CYD).orElseThrow().version());assertTrue(releases.pinned(CYD).isPresent());
+    }
+    @Test void aRunningCheckDoesNotBlockTheAnswersForTheDevices(@TempDir Path data) throws Exception {
+        var gate=new java.util.concurrent.CountDownLatch(1);var inside=new java.util.concurrent.CountDownLatch(1);
+        var feed=new FakeFeed(){@Override public List<Release> releases(FirmwareSources.Source source) throws IOException {
+            inside.countDown();try{gate.await();}catch(InterruptedException e){throw new IOException("interrupted");}return super.releases(source);}};
+        feed.release("vibedock","0.6.0","2","","esp32-cyd");
+        var releases=service(data,feed);
+        assertTrue(releases.checkInBackground());
+        assertTrue(inside.await(5,java.util.concurrent.TimeUnit.SECONDS));
+        assertTrue(releases.running());assertFalse(releases.checkInBackground(),"one check at a time");
+        var answered=java.util.concurrent.CompletableFuture.supplyAsync(()->releases.best(CYD));
+        assertTrue(answered.get(5,java.util.concurrent.TimeUnit.SECONDS).isEmpty(),"answered while the check waits on the network");
+        gate.countDown();
+        for(int i=0;i<100&&releases.running();i++)Thread.sleep(50);
+        assertFalse(releases.running());assertEquals("0.6.0",releases.best(CYD).orElseThrow().version());
+    }
 }

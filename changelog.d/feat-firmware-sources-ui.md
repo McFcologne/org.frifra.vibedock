@@ -1,0 +1,1 @@
+- **Firmware sources in the administration.** *Devices → Firmware* lists the sources with their newest downloaded version, trust and the result of the last check, offers *Check now* and holds a downloaded version for a board until the newest applies again. A check no longer holds up the displays' pulls while it waits for the network.

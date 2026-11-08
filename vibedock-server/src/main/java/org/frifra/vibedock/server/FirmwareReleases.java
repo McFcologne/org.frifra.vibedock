@@ -57,7 +57,59 @@ public class FirmwareReleases {
     private final Map<String,Optional<Cached>> best=new HashMap<>();
     synchronized String configError(){sources();return configError;}
 
-    /** The firmware of a board from the first source (in order) that has complete files for it, newest version. */
+    /** A version held for a board: the newest one no longer takes its place. */
+    public record Pin(String source,String version) {}
+    private Path pinsFile(){return root.getParent().resolve("pins.json");}
+    private Map<String,Pin> pins=null;
+    private static final tools.jackson.databind.ObjectMapper JSON=JsonCompatibility.mapper();
+    private Map<String,Pin> pins(){
+        if(pins==null){
+            pins=new LinkedHashMap<>();
+            try{
+                if(Files.isRegularFile(pinsFile())){
+                    var node=JSON.readTree(Files.readAllBytes(pinsFile()));
+                    for(var e:node.properties())if(e.getValue().path("source").isString()&&e.getValue().path("version").isString())
+                        pins.put(e.getKey(),new Pin(e.getValue().path("source").asString(),e.getValue().path("version").asString()));
+                }
+            }catch(IOException|RuntimeException e){log.warn("pins.json is not readable: {}",e.toString());}
+        }
+        return pins;
+    }
+    private void savePins() throws IOException {
+        Files.createDirectories(pinsFile().getParent());
+        Path tmp=pinsFile().resolveSibling("pins.json.tmp");
+        Files.write(tmp,JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(pins()));
+        Files.move(tmp,pinsFile(),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);
+    }
+    /** The version held for a board, if any (also when it is no longer on disk). */
+    public synchronized Optional<Pin> pinned(Board board){return root==null?Optional.empty():Optional.ofNullable(pins().get(board.id()));}
+    /** Holds a version of a source for a board; only one that is on disk, from a source that is enabled and offers the board. */
+    public synchronized void pin(Board board,String source,String version) throws IOException {
+        if(root==null)throw new IllegalArgumentException("no data directory");
+        var chosen=candidates(board).stream().filter(c->c.source().equals(source)&&c.version().equals(version)).findFirst()
+                .orElseThrow(()->new IllegalArgumentException("that version is not available for this board"));
+        pins().put(board.id(),new Pin(chosen.source(),chosen.version()));savePins();best.clear();
+    }
+    /** The newest version applies again. */
+    public synchronized void unpin(Board board) throws IOException {
+        if(root==null||pins().remove(board.id())==null)return;
+        savePins();best.clear();
+    }
+    /** Every complete version on disk for a board, source by source in priority order, newest first. */
+    synchronized List<Cached> candidates(Board board){
+        var out=new ArrayList<Cached>();
+        if(root==null)return out;
+        for(var source:sources()){
+            if(!source.enabled()||!source.offers(board.id()))continue;
+            for(String version:versions(source.id())){
+                Path dir=root.resolve(source.id()).resolve(version).resolve(board.id());
+                if(complete(dir,board))out.add(new Cached(source.id(),version,dir,source.trusted()));
+            }
+        }
+        return out;
+    }
+
+    /** The firmware of a board: the version held for it, else from the first source (in order) with complete files, newest version. */
     synchronized Optional<Cached> best(Board board){
         if(root==null)return Optional.empty();
         var list=sources();
@@ -66,6 +118,11 @@ public class FirmwareReleases {
         var found=find(board,list);best.put(board.id(),found);return found;
     }
     private Optional<Cached> find(Board board,List<FirmwareSources.Source> list){
+        var pin=pins().get(board.id());
+        if(pin!=null){
+            var held=candidates(board).stream().filter(c->c.source().equals(pin.source())&&c.version().equals(pin.version())).findFirst();
+            if(held.isPresent())return held;
+        }
         for(var source:list){
             if(!source.enabled()||!source.offers(board.id()))continue;
             for(String version:versions(source.id())){
@@ -103,16 +160,31 @@ public class FirmwareReleases {
     void scheduled(){if(enabled)sync();}
 
     /** Asks every enabled source and fetches what is new; a source that fails does not stop the others. */
-    public synchronized void sync(){
+    public void sync(){
         if(root==null)return;
-        try{runSync();}finally{best.clear();}
+        synchronized(syncLock){
+            running=true;
+            try{runSync();}finally{running=false;synchronized(this){best.clear();}}
+        }
+    }
+    /** Held during a check, which takes a while on the network; the answers for the devices need only the monitor of this object. */
+    private final Object syncLock=new Object();
+    private volatile boolean running;
+    /** Whether a check is running right now. */
+    public boolean running(){return running;}
+    /** Starts a check in the background unless one is running; false when one was. */
+    public boolean checkInBackground(){
+        if(root==null||running)return false;
+        running=true;
+        var thread=new Thread(()->{try{sync();}catch(RuntimeException e){log.warn("Firmware check failed: {}",e.toString());}finally{running=false;}},"firmware-check");
+        thread.setDaemon(true);thread.start();return true;
     }
     private void runSync(){
         for(var source:sources()){
             if(!source.enabled())continue;
             String error=null;
             try{sync(source);}catch(IOException|RuntimeException e){error=e.getMessage()==null?e.toString():e.getMessage();log.warn("Firmware source {}: {}",source.id(),error);}
-            status.put(source.id(),new Status(source,null,Instant.now().getEpochSecond(),error));
+            synchronized(this){status.put(source.id(),new Status(source,null,Instant.now().getEpochSecond(),error));}
         }
     }
     private void sync(FirmwareSources.Source source) throws IOException {
@@ -175,7 +247,9 @@ public class FirmwareReleases {
     }
     private void prune(FirmwareSources.Source source) throws IOException {
         var all=versions(source.id());
-        for(int i=KEEP;i<all.size();i++)deleteTree(root.resolve(source.id()).resolve(all.get(i)));
+        Set<String> held=new HashSet<>();
+        synchronized(this){for(var pin:pins().values())if(pin.source().equals(source.id()))held.add(pin.version());}
+        for(int i=KEEP;i<all.size();i++)if(!held.contains(all.get(i)))deleteTree(root.resolve(source.id()).resolve(all.get(i)));
     }
     private static void deleteTree(Path path) throws IOException {
         if(!Files.exists(path))return;

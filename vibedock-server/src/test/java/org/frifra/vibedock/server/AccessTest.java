@@ -871,6 +871,22 @@ class AccessTest {
         Assertions.assertEquals(90,device.withRotation(90).degrees());Assertions.assertFalse(device.withRotation(90).flipped());
         Assertions.assertTrue(device.withRotation(180).flipped());
     }
+    @Test void theFirmwarePageShowsTheSourcesAndChecksOnRequestOnlyForTheAdministration() throws Exception {
+        var admin=user("admin").roles("ADMIN");
+        mvc.perform(get("/admin/firmware").with(admin).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Firmware sources")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("McFcologne/org.frifra.vibedock")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Check now")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Nothing has been downloaded for this board yet.")));
+        mvc.perform(post("/admin/firmware/sources/check").with(admin).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isForbidden());
+        mvc.perform(post("/admin/firmware/sources/check").with(admin).with(csrf()).with(r->{r.setLocalPort(8080);return r;})).andExpect(status().isNotFound());
+        mvc.perform(post("/admin/firmware/pin").with(admin).with(csrf()).with(r->{r.setLocalPort(10001);return r;}).param("board","esp32-cyd").param("version","vibedock|9.9.9"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/admin/firmware/pin").with(admin).with(csrf()).with(r->{r.setLocalPort(10001);return r;}).param("board","esp32-cyd").param("version","nonsense"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/admin/firmware/unpin").with(admin).with(csrf()).with(r->{r.setLocalPort(10001);return r;}).param("board","esp32-cyd"))
+                .andExpect(status().is3xxRedirection());
+    }
     @Test void firmwareIsOfferedForDownloadAndDevicesReportTheirVersion() throws Exception {
         String key="ab".repeat(32);
         for(var client:clients.views())clients.remove(client.identifier());
