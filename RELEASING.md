@@ -65,7 +65,7 @@ replace the secret.
 | Actions › General › Workflow permissions | read only (the release workflow asks for `contents: write` and `packages: write` itself) |
 | Actions › General › Fork pull requests | approval required for external contributors |
 | Rules › Ruleset `main` | default branch: no deletion, no force push, pull request required, check `server-and-browser`; bypass: repository admin |
-| Rules › Ruleset `release tags` | tags `v*`: only the repository admin creates, moves or deletes them |
+| Rules › Ruleset `release tags` | tags `v*` and `client-v*`: only the repository admin creates, moves or deletes them |
 | General › Release immutability | on: a published release can no longer be changed |
 | Advanced Security | dependency graph, Dependabot alerts and security updates, secret protection with push protection |
 
@@ -83,6 +83,24 @@ Because releases are immutable, a mistake is fixed with a new version (`vX.Y.Z+1
 
 **Image only, for an existing tag:** *Actions › Release VibeDock › Run workflow* with the tag (e.g. `v0.1.0`) builds
 and publishes that tag's image to the registries and leaves its release alone, for instance after a registry was added.
+
+## Client releases (firmware)
+
+The firmware has its own releases and versions, independent of the server's. A server downloads the firmware from there.
+
+1. Merge everything into `main`. Add a section `## Client X.Y.Z` to `CHANGELOG.md` (bullets of the firmware-related
+   files in `changelog.d/`, as for a server release).
+2. Tag and push: `git tag client-vX.Y.Z && git push origin client-vX.Y.Z`.
+3. Wait for *Release VibeDock client* (about 25 minutes). The release appears once all files are uploaded.
+
+The release carries, per board, `vibedock-<board>-<version>.bin` (USB image), `.app.bin` (update over Wi-Fi) and
+`.manifest.json`, and `index.json`: the client version, the protocol version the firmware speaks (the heading of
+[`CLIENT-PROTOCOL.md`](vibedock-server/CLIENT-PROTOCOL.md)) and the SHA-256 and size of every file. A server finds the
+release by its `client-v` tag and checks the files against `index.json` (`vibedock-client/scripts/release-index.py`).
+Change the protocol version in that heading when the wire format changes incompatibly; servers take only firmware whose
+protocol they understand. Until the first client tag exists, the firmware version is taken from the plain version tags.
+
+The ruleset `release tags` has to cover `client-v*` as well as `v*`.
 
 ## Using the published image
 

@@ -40,13 +40,52 @@
         <span class="badge ok" th:if="${!newer and client.firmware != firmware.version}" title="The device runs a newer build than this server offers; no downgrade is offered">Newer</span>
         <th:block th:if="${newer}">
           <span class="badge update" th:if="${client.updating}" th:text="${'Updating to ' + firmware.version + ' …'}">Updating</span>
-          <form class="inline-form" th:if="${client.ota and !client.updating}" th:action="@{/admin/clients/{id}/update(id=${client.identifier})}" method="post">
+          <form class="inline-form" th:if="${client.ota and !client.updating and firmware.wifi}" th:action="@{/admin/clients/{id}/update(id=${client.identifier})}" method="post">
             <input type="hidden" name="back" value="firmware"><button class="badge update" th:text="${'Update to ' + firmware.version + ' over Wi-Fi'}">Update</button></form>
           <span class="badge" th:if="${client.otaNeedsPairing and !client.updating}" title="Paired before this server sent its signing key: pair it again over USB below (Only pair) to update over Wi-Fi">Pair again for Wi-Fi updates</span>
-          <span class="badge" th:unless="${client.ota or client.otaNeedsPairing or client.updating}" title="This firmware cannot update over Wi-Fi: install it once over USB below">Install over USB</span>
+          <span class="badge" th:if="${!firmware.wifi and !client.updating}" title="This firmware comes from a source that is not trusted: install it over USB below">Install over USB</span>
+          <span class="badge" th:unless="${client.ota or client.otaNeedsPairing or client.updating or !firmware.wifi}" title="This firmware cannot update over Wi-Fi: install it once over USB below">Install over USB</span>
         </th:block></td></tr></tbody>
   </table>
   </th:block>
+</section>
+
+<section class="card firmware-sources" th:if="${sources != null}">
+  <div class="card-head"><h3 class="grow">Firmware sources</h3>
+    <form method="post" th:action="@{/admin/firmware/sources/check(board=${board.id})}"><button class="secondary" th:disabled="${checking}" th:text="${checking ? 'Checking …' : 'Check now'}">Check now</button></form></div>
+  <p class="meta">The server downloads firmware from the releases of these repositories once after it starts and then every day.
+    <span th:if="${checkedAt != null}">Last check: <span th:text="${checkedAt}"></span>.</span> The list is <code>firmware-sources.yaml</code> in the data directory, in order of priority.</p>
+  <p class="notice error" th:if="${sourcesError != null}" th:text="${sourcesError + ' – no firmware is downloaded until this is fixed.'}"></p>
+  <table class="firmware-devices" th:unless="${#lists.isEmpty(sources)}">
+    <thead><tr><th>Source</th><th>Newest downloaded</th><th>Updates over Wi-Fi</th><th>Last check</th></tr></thead>
+    <tbody><tr th:each="entry:${sources}">
+      <td><strong th:text="${entry.source.label}"></strong> <span class="badge" th:unless="${entry.source.enabled}">disabled</span><br>
+        <code th:text="${entry.source.repo + ' · ' + entry.source.tagPrefix + '…'}"></code></td>
+      <td th:text="${entry.latest != null ? entry.latest : '–'}"></td>
+      <td><span class="badge ok" th:if="${entry.source.trusted}">trusted</span>
+        <span class="badge update" th:unless="${entry.source.trusted}" title="Only for flashing over USB; set trusted: true in the file to offer it over Wi-Fi">USB only</span></td>
+      <td><span th:if="${entry.checkedAt == 0}">not yet</span><span class="notice error" th:if="${entry.error != null}" th:text="${entry.error}"></span>
+        <span class="badge ok" th:if="${entry.checkedAt != 0 and entry.error == null}">ok</span></td></tr></tbody>
+  </table>
+  <p th:if="${firmware != null}">This board runs <strong th:text="${firmware.version}"></strong> from
+    <th:block th:if="${firmware.uploaded}">your upload</th:block>
+    <th:block th:if="${!firmware.uploaded and firmware.source != null}"><strong th:text="${sourceLabels.get(firmware.source) ?: firmware.source}"></strong><span class="badge update" th:unless="${firmware.wifi}" title="This source is not trusted: no updates over Wi-Fi">USB only</span></th:block>
+    <th:block th:if="${!firmware.uploaded and firmware.source == null}">the image (built in)</th:block>.</p>
+  <form method="post" th:action="@{/admin/firmware/pin}" th:unless="${#lists.isEmpty(candidates)}">
+    <input type="hidden" name="board" th:value="${board.id}">
+    <label for="pin">Hold a version for this board</label>
+    <select id="pin" name="version">
+      <option th:each="c:${candidates}" th:value="${c.source + '|' + c.version}" th:selected="${pin != null and pin.source == c.source and pin.version == c.version}"
+              th:text="${c.version + ' · ' + (sourceLabels.get(c.source) ?: c.source)}"></option></select>
+    <button class="secondary">Hold</button>
+  </form>
+  <form method="post" th:action="@{/admin/firmware/unpin}" th:if="${pin != null}">
+    <input type="hidden" name="board" th:value="${board.id}">
+    <p><span class="badge update">Held</span> <strong th:text="${pin.version}"></strong> from <span th:text="${sourceLabels.get(pin.source) ?: pin.source}"></span>
+      <span th:if="${pinMissing}">– not on disk any more, the newest applies for now</span>
+      <button class="secondary">Use the newest again</button></p>
+  </form>
+  <p class="meta" th:if="${#lists.isEmpty(candidates)}">Nothing has been downloaded for this board yet.</p>
 </section>
 
 <section class="card own-firmware" data-own-firmware th:attr="data-board=${board.id},data-esp8266=${board.esp8266()}">
