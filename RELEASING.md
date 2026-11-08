@@ -10,10 +10,10 @@ are never written down here or anywhere in the repository.
 | What | Where |
 | --- | --- |
 | Source repository | <https://github.com/McFcologne/org.frifra.vibedock> (default branch `main`) |
-| Releases (JAR, Docker image files, firmware) | <https://github.com/McFcologne/org.frifra.vibedock/releases> |
+| Releases (server JAR; the firmware has releases of its own) | <https://github.com/McFcologne/org.frifra.vibedock/releases> |
 | Docker image on GitHub | `ghcr.io/mcfcologne/vibedock-server` – <https://github.com/McFcologne/org.frifra.vibedock/pkgs/container/vibedock-server> |
 | Docker image on Docker Hub | `mcfcologne/vibedock-server` – <https://hub.docker.com/r/mcfcologne/vibedock-server> |
-| Release notes | [`CHANGELOG.md`](CHANGELOG.md), the section `## <version>`; until the release, one file per pull request in [`changelog.d/`](changelog.d/README.md) |
+| Release notes | [`CHANGELOG.md`](CHANGELOG.md), the section `## Server <version>` or `## Client <version>` (`## <version>` up to 0.5.1); until the release, one file per pull request in [`changelog.d/`](changelog.d/README.md) |
 | Docker Hub description | [`docs/DOCKERHUB.md`](docs/DOCKERHUB.md), sent with every image publication |
 
 Both registries carry the same images: `<version>` and `latest` (only for a plain `x.y.z`) as one image for `amd64` and
@@ -22,29 +22,30 @@ Both registries carry the same images: `<version>` and `latest` (only for a plai
 ## How they are connected
 
 ```
-git tag vX.Y.Z  ──push──▶  GitHub Actions: Release VibeDock (.github/workflows/release.yml)
+git tag server-vX.Y.Z  ──push──▶  GitHub Actions: Release VibeDock server (.github/workflows/release.yml)
                               ├─ server    → vibedock-server-<version>.jar
                               ├─ image     → ghcr.io/…/vibedock-server:<version>-<arch> (pushed from the build,
                               │              no image file)
                               ├─ publish-image → ghcr.io/…:<version>, :latest
                               │                  and Docker Hub …:<version>, :latest and its description
                               │                  from docs/DOCKERHUB.md (with the secrets below)
-                              ├─ firmware  → vibedock-<board>-<version>.bin for every board
                               └─ release   → GitHub release (draft, files uploaded, then published)
 push to main / release/**, pull request  ──▶  GitHub Actions: Verify VibeDock (.github/workflows/verify.yml), check server-and-browser
 ```
 
-- The **version** comes from the Git tag (`vibedock-server/scripts/version.sh`); `v0.1.0` and `0.1.0` both work. The
-  server, its image and the firmware cannot be given a version by hand.
+- The **version** comes from the Git tag (`vibedock-server/scripts/version.sh`): `server-v0.6.0` gives 0.6.0. Until the
+  first `server-v` tag exists, the plain tags of the earlier common releases (`v0.5.1` or `0.5.1`) apply. The server and
+  its image cannot be given a version by hand; the firmware has its own tags (see *Client releases*).
 - The **ghcr.io package** is linked to the repository by the image labels and annotations
   `org.opencontainers.image.source`; it is public because the repository is, and lists the repository's README.
 - **Docker Hub** gets the images only when both repository secrets are set; without them the run publishes to ghcr.io
   and says so in its log.
-- **Release files** are only the server JAR and the firmware BINs; the release job downloads exactly these two
-  artifacts. The Docker image comes from the registries; releases up to 0.3.0 also carried it as
+- **Release files** are only the server JAR; the release job downloads exactly this artifact. The firmware is not part
+  of a server release (up to 0.5.1 it was). The Docker image comes from the registries; releases up to 0.3.0 also carried it as
   `vibedock-server-<version>-<arch>.tar.gz`, and those files stay as they are.
-- **Displays** get their firmware from the server they are paired with, not from GitHub: a new server image brings the
-  new firmware, and the administration offers it over Wi-Fi.
+- **Displays** get their firmware from the server they are paired with. The image carries no firmware: the server
+  downloads it from the client releases of the sources in `firmware-sources.yaml` (by default this repository's
+  `client-v` releases), a short while after its start and then daily, and the administration offers it over Wi-Fi.
 
 ## Secrets and tokens
 
@@ -65,7 +66,7 @@ replace the secret.
 | Actions › General › Workflow permissions | read only (the release workflow asks for `contents: write` and `packages: write` itself) |
 | Actions › General › Fork pull requests | approval required for external contributors |
 | Rules › Ruleset `main` | default branch: no deletion, no force push, pull request required, check `server-and-browser`; bypass: repository admin |
-| Rules › Ruleset `release tags` | tags `v*` and `client-v*`: only the repository admin creates, moves or deletes them |
+| Rules › Ruleset `release tags` | tags `server-v*`, `client-v*` and `v*`: only the repository admin creates, moves or deletes them |
 | General › Release immutability | on: a published release can no longer be changed |
 | Advanced Security | dependency graph, Dependabot alerts and security updates, secret protection with push protection |
 
@@ -73,15 +74,15 @@ A workflow that uses a new third-party action fails until that action is added t
 
 ## Making a release
 
-1. Merge everything into `main`. Then add a section `## X.Y.Z` to `CHANGELOG.md`: a short introduction (what changed,
+1. Merge everything into `main`. Then add a section `## Server X.Y.Z` to `CHANGELOG.md`: a short introduction (what changed,
    what to update), then the bullets of the files in `changelog.d/` (one file per merged pull request). Delete those
    files, except its README, and merge that change as well.
-2. Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`.
-3. Wait for *Release VibeDock* (about 15 minutes). The release appears once all files are uploaded.
+2. Tag and push: `git tag server-vX.Y.Z && git push origin server-vX.Y.Z`.
+3. Wait for *Release VibeDock server* (about 10 minutes). The release appears once the JAR is uploaded.
 
-Because releases are immutable, a mistake is fixed with a new version (`vX.Y.Z+1`), not by replacing files.
+Because releases are immutable, a mistake is fixed with a new version (`server-vX.Y.Z+1`), not by replacing files.
 
-**Image only, for an existing tag:** *Actions › Release VibeDock › Run workflow* with the tag (e.g. `v0.1.0`) builds
+**Image only, for an existing tag:** *Actions › Release VibeDock server › Run workflow* with the tag (e.g. `server-v0.6.0`) builds
 and publishes that tag's image to the registries and leaves its release alone, for instance after a registry was added.
 
 ## Client releases (firmware)
@@ -100,7 +101,11 @@ release by its `client-v` tag and checks the files against `index.json` (`vibedo
 Change the protocol version in that heading when the wire format changes incompatibly; servers take only firmware whose
 protocol they understand. Until the first client tag exists, the firmware version is taken from the plain version tags.
 
-The ruleset `release tags` has to cover `client-v*` as well as `v*`.
+The ruleset `release tags` has to cover `server-v*` and `client-v*` as well as `v*`.
+
+**Order for the first release after the split:** publish a client release (`client-v…`) first and check that it carries
+`index.json`, then publish the server release. A server whose image carries no firmware shows none until it has
+downloaded a client release; a server without network access gets its firmware by upload (*Devices → Firmware*).
 
 ## Using the published image
 

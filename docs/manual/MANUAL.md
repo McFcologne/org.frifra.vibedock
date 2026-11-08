@@ -256,8 +256,9 @@ git pull
 docker compose up -d --build
 ```
 
-`.env` and the data directory stay as they are. The new image brings the new firmware too: afterwards the displays
-show **Update to …** on the overview, the device cards and the firmware page (see [Updates over
+`.env` and the data directory stay as they are. The image carries no firmware: the server downloads new firmware from the
+client releases on its own, a short while after the start and then daily (see [Firmware sources](#firmware-sources); *Check now* on the
+firmware page does not wait for that). Afterwards the displays show **Update to …** on the overview, the device cards and the firmware page (see [Updates over
 Wi-Fi](#updates-over-wi-fi)).
 
 ## Ready-made image from the registry

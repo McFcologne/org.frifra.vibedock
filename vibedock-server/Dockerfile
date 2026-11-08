@@ -9,22 +9,6 @@ RUN apk add --no-cache git
 RUN --mount=type=bind,from=git,target=/repo.git --mount=type=bind,target=/w/vibedock-server \
     GIT_DIR=/repo.git GIT_WORK_TREE=/w sh /w/vibedock-server/scripts/version.sh > /version && cat /version
 
-# The display firmware from the same commit, offered for download and browser flashing in the administration. Without
-# the "git" context the image has no firmware.
-FROM --platform=$BUILDPLATFORM python:3.12-slim-bookworm AS firmware
-RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/* \
-    && git config --global safe.directory '*' && pip install --no-cache-dir "platformio==6.2.0"
-# PlatformIO keeps its toolchain in a build cache. A build cancelled during the download leaves a package without
-# its manifest there; the build then clears the cached packages and downloads them again once. VIBEDOCK_PRUNE drops
-# each board's build directory and the ESP-IDF installer copies (cache/tools, several GB) to keep the disk use down.
-RUN --mount=type=bind,from=git,target=/repo.git --mount=type=cache,id=vibedock-platformio,target=/root/.platformio,sharing=locked \
-    mkdir -p /out /w && if git --git-dir=/repo.git rev-parse -q --verify HEAD >/dev/null; then \
-      git --git-dir=/repo.git archive HEAD vibedock-client/firmware vibedock-client/scripts | tar -x -C /w \
-      && cd /w/vibedock-client/firmware && export GIT_DIR=/repo.git GIT_WORK_TREE=/w \
-      && export VIBEDOCK_PRUNE=1 && { sh ../scripts/images.sh /out || { rm -rf /root/.platformio/packages /root/.platformio/platforms /root/.platformio/.cache /root/.platformio/tools \
-             && sh ../scripts/images.sh /out; }; }; \
-    fi
-
 # The Twemoji graphics versioned in the repository (third-party/twemoji, graphics CC BY 4.0; origin and checksum in
 # its README.md), passed as the build context "twemoji" (compose.yaml, scripts/image.sh, the release workflow). The
 # same files serve the tests, the manual and the server. Without that context this stage stops the build.
@@ -68,8 +52,8 @@ RUN node /app/license-inventory.mjs
 
 # The user manual (docs/manual) as PDF, linked in the administration's footer: the screenshots are taken again from
 # these sources with the demo data (scripts/docs.sh), then pandoc makes the PDF, ending with the
-# licenses of the runtime stage's inventory. Like the firmware, the text comes
-# from the "git" context; without it the image has no manual. Built natively, also when building for another platform.
+# licenses of the runtime stage's inventory. The text comes from the "git" context; without it the image has no
+# manual. Built natively, also when building for another platform.
 FROM build AS manual-full
 RUN apt-get update && apt-get install -y --no-install-recommends git pandoc texlive-xetex texlive-latex-recommended \
       texlive-latex-extra texlive-fonts-recommended lmodern fonts-dejavu-core && rm -rf /var/lib/apt/lists/* \
@@ -97,8 +81,9 @@ FROM manual-${MANUAL} AS manual
 FROM runtime
 WORKDIR /app
 COPY --from=build --chown=10001:10001 /build/target/vibedock-server.jar /app/app.jar
-COPY --from=firmware /out /app/firmware
 COPY --from=manual /out /app/manual
+# No display firmware in the image: the server downloads it from the client releases (firmware-sources.yaml) into the
+# data directory. Only the browser flasher's library lives here.
 COPY --from=login-clients /usr/local/lib/node_modules/esptool-js/bundle.js /app/firmware/esptool.js
 COPY --chmod=755 docker-entrypoint.sh login-provider.sh /app/
 USER 10001:10001

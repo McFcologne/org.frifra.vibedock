@@ -59,8 +59,9 @@ Then `docker compose up -d` and open `http://<host>:10001/admin`. Update with
 ## Tags and platforms
 
 `latest` and `<version>` (e.g. `0.1.0`), each for `linux/amd64` and `linux/arm64`. The same image is published as
-`ghcr.io/mcfcologne/vibedock-server`. The image carries the display firmware of every supported board; the
-administration installs it over USB from Chrome or Edge and updates paired displays over Wi-Fi.
+`ghcr.io/mcfcologne/vibedock-server`. The image carries no display firmware: the server downloads the firmware of every
+supported board from the project's client releases, and the administration installs it over USB from Chrome or Edge and
+updates paired displays over Wi-Fi.
 
 ## More
 
