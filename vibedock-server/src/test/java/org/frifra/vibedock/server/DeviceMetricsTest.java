@@ -188,6 +188,13 @@ class DeviceMetricsTest {
         mvc.perform(admin(get("/admin/metrics.csv").param("device",id).param("from","2999-01-01"))).andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString(id))));
         mvc.perform(admin(get("/admin/metrics.csv").param("from","yesterday"))).andExpect(status().isBadRequest());
+        var book=mvc.perform(admin(get("/admin/metrics.xlsx").param("device",id))).andExpect(status().isOk())
+                .andExpect(header().string("Content-Type",MetricsXlsx.CONTENT_TYPE))
+                .andExpect(header().string("Content-Disposition",org.hamcrest.Matchers.allOf(org.hamcrest.Matchers.containsString("attachment"),org.hamcrest.Matchers.containsString(".xlsx"))))
+                .andReturn().getResponse().getContentAsByteArray();
+        assertEquals('P',book[0]);assertEquals('K',book[1]);
+        mvc.perform(admin(get("/admin/metrics.xlsx").param("from","yesterday"))).andExpect(status().isBadRequest());
+        mvc.perform(admin(get("/admin/clients/"+id+"/metrics"))).andExpect(content().string(org.hamcrest.Matchers.containsString("/admin/metrics.xlsx?device="+id)));
     }
     @Test void theChartMarksGapsWithoutSamplesAsOffline(){
         long t0=Instant.parse("2026-11-05T08:00:00Z").toEpochMilli(),step=DeviceMetrics.INTERVAL_SECONDS*1000L;

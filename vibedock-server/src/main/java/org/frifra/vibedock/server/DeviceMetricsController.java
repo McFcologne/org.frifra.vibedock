@@ -71,24 +71,42 @@ class DeviceMetricsController {
     @GetMapping(value="/admin/metrics.csv",produces="text/csv") ResponseEntity<byte[]> csv(@RequestParam(required=false) String device,
             @RequestParam(required=false) String from,@RequestParam(required=false) String to,@RequestParam(defaultValue="false") boolean raw) throws IOException {
         ZoneId zone=ZoneId.systemDefault();
-        long start=bound(from,zone,false),end=bound(to,zone,true);
+        var out=new StringBuilder(MetricsCsv.header(raw));
+        for(var sheet:export(device,bound(from,zone,false),bound(to,zone,true)))
+            for(var e:sheet.entries())MetricsCsv.row(out,sheet.device(),e.sample(),e.context(),zone,raw);
+        return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=\""+fileName(zone,"csv")+"\"")
+                .contentType(new MediaType("text","csv",StandardCharsets.UTF_8)).body(out.toString().getBytes(StandardCharsets.UTF_8));
+    }
+    /** The same samples as an Excel workbook (MetricsXlsx), one sheet per display; same parameters as the CSV. */
+    @GetMapping(value="/admin/metrics.xlsx",produces=MetricsXlsx.CONTENT_TYPE) ResponseEntity<byte[]> xlsx(@RequestParam(required=false) String device,
+            @RequestParam(required=false) String from,@RequestParam(required=false) String to,@RequestParam(defaultValue="false") boolean raw) throws IOException {
+        ZoneId zone=ZoneId.systemDefault();
+        String period=(from==null||from.isBlank()?"first kept sample":from)+" to "+(to==null||to.isBlank()?"now":to);
+        var out=new java.io.ByteArrayOutputStream();
+        MetricsXlsx.write(out,export(device,bound(from,zone,false),bound(to,zone,true)),zone,raw,period);
+        return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=\""+fileName(zone,"xlsx")+"\"")
+                .contentType(MediaType.parseMediaType(MetricsXlsx.CONTENT_TYPE)).body(out.toByteArray());
+    }
+    private String fileName(ZoneId zone,String extension){return "vibedock-metrics-"+LocalDate.now(clock.withZone(zone))+"."+extension;}
+    /** The samples of the chosen display (default: every paired display) with what the export adds to them. */
+    private List<MetricsXlsx.Sheet> export(String device,long start,long end) throws IOException {
         var ids=new ArrayList<String>();
         if(device!=null&&!device.isBlank())ids.add(device.trim());
         else for(var v:registry.views())if(v.web()==null)ids.add(v.identifier());
-        var out=new StringBuilder(MetricsCsv.header(raw));
+        var sheets=new ArrayList<MetricsXlsx.Sheet>();
         for(String id:ids){
             String name="",current="";
             try{var view=registry.get(id);name=view.name();current=view.firmware()==null?"":view.firmware();}catch(IllegalArgumentException notPaired){ /* kept samples of a removed display */ }
             var starts=new HashMap<String,DeviceDiagnostics.Start>();
             for(var s:diagnostics.starts(id))starts.put(s.bootId(),s);
+            var entries=new ArrayList<MetricsXlsx.Entry>();
             for(var s:metrics.samples(id,start,end)){
                 var begin=s.boot()==null?null:starts.get(s.boot());
-                MetricsCsv.row(out,id,s,new MetricsCsv.Context(name,begin!=null&&begin.firmware()!=null?begin.firmware():current,begin==null?"":begin.kind()),zone,raw);
+                entries.add(new MetricsXlsx.Entry(s,new MetricsCsv.Context(name,begin!=null&&begin.firmware()!=null?begin.firmware():current,begin==null?"":begin.kind())));
             }
+            sheets.add(new MetricsXlsx.Sheet(id,name,entries));
         }
-        String file="vibedock-metrics-"+LocalDate.now(clock.withZone(zone))+".csv";
-        return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=\""+file+"\"")
-                .contentType(new MediaType("text","csv",StandardCharsets.UTF_8)).body(out.toString().getBytes(StandardCharsets.UTF_8));
+        return sheets;
     }
     /** A period bound in epoch milliseconds; a missing one is open (0 or the end of time). */
     private static long bound(String text,ZoneId zone,boolean end){

@@ -91,7 +91,7 @@ Needs firmware newer than 0.1.1; displays with older firmware keep the USB way. 
   retention period are deleted. `/admin/clients/{id}/metrics?hours=…&back=n` pages back by whole windows.
 - *Devices › Logs › Metrics* (`/admin/clients/{id}/metrics?hours=6|24|72|168|720`, at most 30 days per window) draws memory, Wi-Fi and battery
   curves as inline SVG (`MetricsChart`, a dashed line per restart) and a table of the newest samples.
-  `GET /admin/metrics.csv` (`MetricsCsv`) exports them: comma, dot decimals, the unit in the column name, UTC and local
+  `GET /admin/metrics.xlsx` (`MetricsXlsx`, hand-written workbook, one sheet per display, real dates and numbers) and `GET /admin/metrics.csv` (`MetricsCsv`) export them (same parameters; the page offers both in an *Export* menu); the CSV has: comma, dot decimals, the unit in the column name, UTC and local
   time, firmware and reason of the start; filters `device`, `from`, `to`, `raw`. Text cells that could start a
   spreadsheet formula (`=`, `+`, `-`, `@`, tab, carriage return, also after leading white space) get a leading `'`.
 - The key figures of a log (`DeviceLogTimeline.figures`) count the samples of the log's period as well, and the support

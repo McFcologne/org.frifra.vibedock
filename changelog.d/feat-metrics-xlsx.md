@@ -1,0 +1,1 @@
+- Server: the metrics export is also offered as an Excel file (.xlsx) next to CSV: one sheet per display with real dates and numbers.
