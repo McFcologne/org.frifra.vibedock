@@ -994,7 +994,7 @@ class AccessTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.version").value("0.9.9-test")).andExpect(jsonPath("$.complete").value(true));
         mvc.perform(get("/admin/firmware").param("board","vibedock-m1").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("vibedock-m1-0.9.9-test.bin")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("Use the built-in firmware")));
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Use the released firmware")));
         mvc.perform(post("/admin/firmware/upload/remove").param("board","vibedock-m1").with(user("admin").roles("ADMIN")).with(csrf())
                 .with(r->{r.setLocalPort(10001);return r;})).andExpect(redirectedUrl("/admin/firmware?board=vibedock-m1"));
         mvc.perform(get("/admin/firmware").param("board","vibedock-m1").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;}))

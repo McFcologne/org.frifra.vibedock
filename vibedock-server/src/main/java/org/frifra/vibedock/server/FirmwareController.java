@@ -123,7 +123,7 @@ class FirmwareController {
     }
     /**
      * An own build of a board, sent as the file's bytes: firmware.bin (the app; on the ESP8266 all there is) or, for
-     * ESP32 chips, also flash.bin (the USB image) from .pio/build/<board>/. It replaces the built-in firmware of the
+     * ESP32 chips, also flash.bin (the USB image) from .pio/build/<board>/. It replaces the released firmware of the
      * board for USB and for updates over Wi-Fi (signed with this server's key) until it is removed.
      */
     @PostMapping(value="/admin/firmware/upload",consumes=MediaType.APPLICATION_OCTET_STREAM_VALUE,produces=MediaType.APPLICATION_JSON_VALUE)
@@ -140,7 +140,7 @@ class FirmwareController {
             return ResponseEntity.ok(Map.of("version",result.version(),"kind",result.kind().name().toLowerCase(Locale.ROOT),"complete",result.complete()));
         }catch(IllegalArgumentException e){return ResponseEntity.badRequest().body(Map.of("error",e.getMessage()));}
     }
-    /** Back to the built-in firmware of a board. */
+    /** Back to the released firmware of a board. */
     @PostMapping("/admin/firmware/upload/remove") String removeUpload(@RequestParam String board) throws IOException {
         var target=Board.find(board).orElseThrow(()->new ResponseStatusException(HttpStatus.BAD_REQUEST));
         firmware.removeUpload(target);log.info("Own firmware of {} removed",target.id());

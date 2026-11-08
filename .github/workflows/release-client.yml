@@ -66,7 +66,7 @@ jobs:
           # Created as a draft, completed file by file (with retries), then published (releases are immutable).
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             if [ -s notes.md ]; then set -- --notes-file notes.md; else set --; fi
-            gh release create "$TAG" --draft --title "VibeDock client $v" --generate-notes --verify-tag "$@"
+            gh release create "$TAG" --draft --title "VibeDock client $v" --generate-notes --verify-tag --latest=false "$@"
           fi
           [ -f assets/index.json ] || { echo "Missing release file index.json"; exit 1; }
           for file in assets/*; do
@@ -77,4 +77,5 @@ jobs:
             done
             [ -n "$ok" ] || { echo "Could not upload $file"; exit 1; }
           done
-          gh release edit "$TAG" --draft=false
+          # Never "Latest": that label stays with the server release (a running server finds the client releases itself).
+          gh release edit "$TAG" --draft=false --latest=false

@@ -1,6 +1,46 @@
 # VibeDock release notes
 
-The release workflow publishes the section of the tagged version (`## 0.1.0` for the tag `v0.1.0` or `0.1.0`) above the list of commits that GitHub generates.
+The release workflows publish the section of the tagged version above the list of commits that GitHub generates: `## Server 0.6.0` for the tag `server-v0.6.0`, `## Client 0.6.0` for `client-v0.6.0` (up to 0.5.1, one section `## 0.5.1` for the common tag `v0.5.1` or `0.5.1`).
+
+## Server 0.6.0
+
+The server no longer ships the display firmware: it downloads it from the client releases (tag `client-vX.Y.Z`, see
+*Client 0.6.0*), checks every file and offers it as before, over USB from the browser and over Wi-Fi. Server and
+firmware now have releases of their own, so a firmware fix no longer needs a new server image and the image builds much
+faster. Update the server image; a short while after its start it fetches the firmware (*Devices → Firmware*, *Check
+now* asks right away). A server without network access gets its firmware by upload. Firmware 0.6.0 speaks the same
+protocol as before; the displays keep working with the firmware they run.
+
+### Firmware
+
+- **Firmware comes from releases.** Once after it starts and then every day the server fetches the newest firmware from the GitHub releases of the sources in `firmware-sources.yaml` (the official source, `McFcologne/org.frifra.vibedock` with tags `client-v…`, needs no file; further repositories for alternative firmware can be added, in order of priority), checks every file against the SHA-256 and size of the release's `index.json` and the identity of the app, and keeps the newest two versions per source in the data directory. Firmware of a source that is not `trusted: true` is for USB flashing only, never for updates over Wi-Fi. `FIRMWARE_SYNC=false` turns the downloads off. The Docker image carries no firmware any more.
+- **Firmware sources in the administration.** *Devices → Firmware* lists the sources with their newest downloaded version, trust and the result of the last check, offers *Check now* and holds a downloaded version for a board until the newest applies again. A check no longer holds up the displays' pulls while it waits for the network.
+- **Request firmware for a new board.** The firmware page has a short form: product page, retailer link, a photo and what the board reports over USB (read in the browser). It produces a package with a JSON report and the photo, to pass on for a build.
+- **Own builds are recognised and never get another board's firmware:** a display that reports a board ID this server does not know (a firmware built for an own board) keeps that ID (*Own build: <id>*) instead of counting as a VibeTV M1, and is never offered firmware, so it cannot receive the M1 image over Wi-Fi. Screen sizes between 64 and 480 pixels per side that a display reports are accepted as its display type; the design editor offers them.
+- **An own build that reports 200x200 is no longer taken for the e-paper.** Only the e-paper board keeps the black-and-white 200x200 type; any other board with that size gets a colour display of its own.
+- **Use the released firmware** is the new name of *Use the built-in firmware* on the firmware page: it removes an upload, and the newest downloaded firmware applies again.
+
+### Releases
+
+- **Server and firmware are released separately.** The server has its own tags (`server-vX.Y.Z`) and releases with the JAR and the Docker image; the firmware keeps its `client-v` releases. The *Latest* label on GitHub stays with the server. Until the first `server-v` tag existed, the plain tags (`v0.5.1`) gave the server's version. See `RELEASING.md`.
+
+## Client 0.6.0
+
+The first firmware release of its own: a tag `client-vX.Y.Z` builds the firmware of every board and publishes it with an
+`index.json` that a server uses to download and check it. The firmware speaks the same protocol as 0.5.x. Update the
+displays over Wi-Fi from the administration (the server offers the firmware once it has downloaded this release); the
+e-paper board gets the battery changes below.
+
+### Displays
+
+- **The Waveshare e-paper 1.54 gets the Battery power saving switch** on its device card (Wi-Fi modem sleep and 80 MHz while it runs on its battery). It has no backlight, so nothing is dimmed, and the status page no longer says "backlight dimmed" for it.
+- **Battery power saving: the main loop sleeps** (10 ms per round, 40 ms while the backlight is dimmed), so the processor idles between the ticks instead of running without a pause. Touch is still read every 20 ms and wakes the display as before. Measured on batteries of 150 mAh, runs lasted 1.5 to 5.8 hours before this change; compare after installing it.
+- **Battery power saving: pulls at most once a minute.** While saving power, neither the poll interval nor a wait announced by the server is shorter than 60 s, which saves a Wi-Fi/TLS session every half minute. A display that has to change at once is still reached by the server's immediate pull request.
+
+### Build and releases
+
+- **The firmware has its own releases.** A tag `client-vX.Y.Z` builds the firmware of every board and publishes it as a release with `index.json` (client version, protocol version, SHA-256 and size of every file), independent of the server's releases. The firmware version follows the client tags.
+- **Every firmware build writes a manifest.** manifest.json beside firmware.bin and flash.bin says what the build is (board, chip, display, capabilities, how it was built) and holds the SHA-256 of both images and its own checksum. It is made from the custom_* keys of the environment in platformio.ini by manifest.py, the files of every client release carry it, and manifest.py --to-ini turns one back into an environment.
 
 ## 0.5.1
 

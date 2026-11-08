@@ -173,7 +173,7 @@ instead of aborting.
 ## Testing a build on the display
 
 **Devices → Firmware → Own firmware build** takes `firmware.bin` from `firmware/.pio/build/vibedock-m1/` and installs
-it over USB or, signed, over Wi-Fi, without a server rebuild. **Use the built-in firmware** goes back.
+it over USB or, signed, over Wi-Fi, without a server rebuild. **Use the released firmware** goes back.
 
 ## Testing on the computer
 
