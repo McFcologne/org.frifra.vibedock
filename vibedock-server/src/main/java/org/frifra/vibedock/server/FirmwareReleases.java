@@ -56,6 +56,12 @@ public class FirmwareReleases {
     /** Per board id, until something is fetched or the sources change: the answer of {@link #best}. */
     private final Map<String,Optional<Cached>> best=new HashMap<>();
     synchronized String configError(){sources();return configError;}
+    /** Replaces the list in {@code firmware-sources.yaml}; a file with a mistake is not touched. */
+    synchronized void saveSources(List<FirmwareSources.Source> list) throws IOException {
+        if(sourcesFile==null)throw new IOException("no data directory");
+        FirmwareSources.write(sourcesFile,list);
+        sources();
+    }
 
     /** A version held for a board: the newest one no longer takes its place. */
     public record Pin(String source,String version) {}

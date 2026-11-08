@@ -77,6 +77,66 @@ class FirmwareController {
         if(releases!=null&&releases.checkInBackground())log.info("Firmware sources are checked on request");
         return "redirect:/admin/firmware"+(Board.find(board).isPresent()?"?board="+board:"");
     }
+    /** The list of sources with one change applied; a mistake in the file stops every change. */
+    private void changeSources(String board,java.util.function.Function<List<FirmwareSources.Source>,List<FirmwareSources.Source>> change,
+                               org.springframework.web.servlet.mvc.support.RedirectAttributes flash){
+        try{
+            if(releases==null)throw new IllegalArgumentException("Firmware downloads are not available here");
+            if(releases.configError()!=null)throw new IllegalArgumentException("Fix firmware-sources.yaml first: "+releases.configError());
+            releases.saveSources(change.apply(releases.sources()));
+        }catch(IllegalArgumentException e){flash.addFlashAttribute("sourceError",e.getMessage());}
+        catch(IOException e){log.warn("firmware-sources.yaml could not be written: {}",e.getMessage());flash.addFlashAttribute("sourceError","The list could not be saved");}
+    }
+    private static String firmwareUrl(String board){return "redirect:/admin/firmware"+(Board.find(board).isPresent()?"?board="+board:"");}
+    /** Adds a source. It is for USB flashing only until the administrator trusts it, and says so on the page. */
+    @PostMapping("/admin/firmware/sources/add") String addSource(@RequestParam String repo,@RequestParam(defaultValue="") String tagPrefix,
+            @RequestParam(defaultValue="") String label,@RequestParam(defaultValue="") String board,org.springframework.web.servlet.mvc.support.RedirectAttributes flash){
+        changeSources(board,list->{
+            String r=repo.trim().replaceFirst("^https://github\\.com/","").replaceAll("/+$","");
+            var taken=list.stream().map(FirmwareSources.Source::id).toList();
+            var source=new FirmwareSources.Source(FirmwareSources.idFor(r.contains("/")?r:"x/"+r,taken),label.isBlank()?r:label.trim(),r,tagPrefix.trim(),false,true,Set.of());
+            if(list.stream().anyMatch(x->x.repo().equalsIgnoreCase(source.repo())&&x.tagPrefix().equals(source.tagPrefix())))
+                throw new IllegalArgumentException(source.repo()+" with this tag prefix is in the list already");
+            if(list.size()>=FirmwareSources.MAX_SOURCES)throw new IllegalArgumentException("At most "+FirmwareSources.MAX_SOURCES+" sources");
+            var out=new ArrayList<>(list);out.add(source);
+            log.info("Firmware source {} added (USB only)",source.id());
+            return out;
+        },flash);
+        return firmwareUrl(board);
+    }
+    /** Removes a source (not the official one: that one is switched off instead). The downloaded files are pruned with the next check. */
+    @PostMapping("/admin/firmware/sources/{id}/remove") String removeSource(@PathVariable String id,@RequestParam(defaultValue="") String board,
+            org.springframework.web.servlet.mvc.support.RedirectAttributes flash){
+        changeSources(board,list->{
+            if(id.equals(FirmwareSources.OFFICIAL.id()))throw new IllegalArgumentException("The official source cannot be removed, only switched off");
+            var out=list.stream().filter(x->!x.id().equals(id)).toList();
+            if(out.size()==list.size())throw new IllegalArgumentException("No such source");
+            log.info("Firmware source {} removed",id);
+            return out;
+        },flash);
+        return firmwareUrl(board);
+    }
+    /** Switches a source on or off. */
+    @PostMapping("/admin/firmware/sources/{id}/enabled") String enableSource(@PathVariable String id,@RequestParam boolean on,@RequestParam(defaultValue="") String board,
+            org.springframework.web.servlet.mvc.support.RedirectAttributes flash){
+        changeSources(board,list->replace(list,id,x->new FirmwareSources.Source(x.id(),x.label(),x.repo(),x.tagPrefix(),x.trusted(),on,x.boards())),flash);
+        return firmwareUrl(board);
+    }
+    /** Trusts a source (updates over Wi-Fi) only with the confirmation of the form, or takes the trust back. */
+    @PostMapping("/admin/firmware/sources/{id}/trusted") String trustSource(@PathVariable String id,@RequestParam boolean on,@RequestParam(defaultValue="") String confirm,
+            @RequestParam(defaultValue="") String board,org.springframework.web.servlet.mvc.support.RedirectAttributes flash){
+        changeSources(board,list->{
+            if(on&&!"yes".equals(confirm))throw new IllegalArgumentException("Confirm that you trust this source");
+            var out=replace(list,id,x->new FirmwareSources.Source(x.id(),x.label(),x.repo(),x.tagPrefix(),on,x.enabled(),x.boards()));
+            log.info("Firmware source {} {}",id,on?"trusted: displays may update from it over Wi-Fi":"set to USB only");
+            return out;
+        },flash);
+        return firmwareUrl(board);
+    }
+    private static List<FirmwareSources.Source> replace(List<FirmwareSources.Source> list,String id,java.util.function.UnaryOperator<FirmwareSources.Source> change){
+        if(list.stream().noneMatch(x->x.id().equals(id)))throw new IllegalArgumentException("No such source");
+        return list.stream().map(x->x.id().equals(id)?change.apply(x):x).toList();
+    }
     /** Holds a downloaded version for a board: "source|version" as the select sends it. */
     @PostMapping("/admin/firmware/pin") String pin(@RequestParam String board,@RequestParam String version) throws IOException {
         var target=Board.find(board).orElseThrow(()->new ResponseStatusException(HttpStatus.BAD_REQUEST));
