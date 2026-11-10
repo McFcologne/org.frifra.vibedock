@@ -1329,6 +1329,22 @@ presence stays **Unknown**. USB serial command `VIBEDOCK-BATTERY` returns the sa
 Tested on hardware: display colours, touch, audio, the short volume and swipe cues and the volume controls work.
 Battery presence and operation without USB have not been established. No motion-based rotation or microphone recording is implemented.
 
+### Battery level (learned)
+
+Displays that measure their battery voltage can show a percentage that the server learns from the display's own
+measurements. It is off for every display. Switch **Battery level (learned)** on the device card to use it.
+
+- A rise of the voltage is never taken for charging. Only a decline counts as a discharge, and only when it is confirmed:
+  the voltage reached the limit range (below 3520 mV), or the display failed there and started again after losing power.
+- Until the first confirmed discharge the card says *Learning*. Then it shows the percentage and *learned from this display*.
+  Nothing is taken from other displays, not even of the same board.
+- When a display stops reporting while its last value lies in the limit range, the card shows 0 % after 15 minutes. At a
+  higher voltage it only shows the last level and how long ago it was.
+- The metrics page draws a smoothed voltage next to the measured one, and the CSV and Excel exports have the columns
+  `battery_smoothed_mV`, `battery_slope_mV_per_h` and `battery_phase` (`flat` or `decline_candidate`).
+
+See [Design: battery level learned by the server](../design/battery-learning.md).
+
 ### Battery power saving (experimental)
 
 Displays with a battery connection have the switch **Battery power saving** on their device

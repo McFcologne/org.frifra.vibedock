@@ -2,7 +2,8 @@
 
 # Battery level learned by the server
 
-Status: design, nothing implemented yet.
+Status: implemented in server 0.6.2 (steps 1 to 4 below); taking over reference values (`seeded`) and the firmware
+point of the open list are not built yet.
 
 Goal: a battery percentage in the administration that is earned from the measurements of each display itself. The
 firmware only measures the cell voltage (`battery_mV` in the device metrics) and estimates a coarse step from a fixed
@@ -54,7 +55,7 @@ without losing data):
 - The value comes from the learned curve of this device and is marked `learned` (or `seeded`).
 - **Contact lost at a low level:** a device that stops contacting the server while its last value lies in the limit range
   shows 0 % once the loss is confirmed (no pull for about three expected intervals). If it comes back with a clearly
-  higher voltage, the 0 % was an empty cell that was charged; the value is corrected and the event stays in the log.
+  higher voltage, the 0 % was an empty cell that was charged; the value follows the new voltage on its own.
 - Contact lost at a higher level is shown as offline with the last value and its age, never as 0 %.
 - Later: the server draws the battery icon of the display; it can use this level instead of the firmware's step of 20 %.
 
@@ -72,9 +73,23 @@ Example: a 1.54-inch e-paper on firmware 0.6.2, one cell, capacity unknown. The 
 90 minutes (readings every 5 minutes), then the display failed and started again as `power-on` after the cell was
 charged. That decline is confirmed, the rise after it is not classified.
 
+## Values in the implementation
+
+- Smoothing: median of three readings, then the mean of the last three; reset at a new run and after a gap of more than 15 minutes.
+- Decline candidate: the smoothed voltage falls by at least 100 mV per hour over 30 minutes (at least three points); the
+  decline starts at the highest smoothed point in the 30 minutes before the first candidate and ends when the voltage
+  rises 30 mV above its lowest point, or with the run.
+- Limit range: a reading below 3520 mV (the lowest step of the firmware's base curve). Failure: the last reading of the run
+  is in the limit range and the next sample belongs to a start of kind `power-on` or `brownout`.
+- Percentage: the time since the start of the decline stands for the charge used (steady load): 100 % at the start, 0 %
+  at a failure, 10 % at the end of a discharge that only reached the limit range. The most recent discharge with a
+  failure is used, else the most recent one. The value comes from the latest smoothed voltage.
+- Contact lost: no sample for 15 minutes (three intervals). The learned discharges are kept for five minutes.
+- Switch per device: `battery-level.json` in the data directory; nothing else is stored.
+
 ## Open points
 
-- Noise limit, minimum length of a decline and gap limit are fixed with the first data.
-- How the upper anchor is refined when several confirmed discharges exist.
+- How the upper anchor is refined when several confirmed discharges exist; whether a load that changes (a display with a
+  backlight) needs more than the time axis.
 - Whether the firmware should report the last voltage in its next start line (`previousMillivolts`), which would confirm a
   failure without an own reading shortly before it.

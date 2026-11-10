@@ -46,7 +46,7 @@ class BatteryLevels {
             case "learned"->level.percent()+" % (learned from this display, "+level.millivolts()+" mV)";
             case "learning"->"Learning: the level appears after the first confirmed discharge down to the limit range.";
             case "external-power"->"On external power: no voltage while charging or on USB is used.";
-            case "offline"->"Last level "+level.percent()+" %, no contact for "+minutes(level.ageSeconds())+".";
+            case "offline"->level.percent()==null?"No measurement in the last 6 hours.":"Last level "+level.percent()+" %, no contact for "+minutes(level.ageSeconds())+".";
             case "contact-lost"->"0 %: no contact for "+minutes(level.ageSeconds())+" after the voltage fell into the limit range.";
             default->"";
         };

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.*;
 import java.time.*;
 import java.util.*;
+import org.frifra.vibedock.server.BatteryLevels.Level;
 import static org.junit.jupiter.api.Assertions.*;
 
 /** The learned battery level: off until switched on, only from the device's own confirmed discharge, 0 % after a confirmed contact loss. */
@@ -67,6 +68,12 @@ class BatteryLevelsTest {
         clock.now+=30*60_000L;
         var level=levels.level(ID);
         assertEquals("offline",level.state(),level.toString());assertNotEquals(0,level.percent());assertTrue(level.ageSeconds()>=900);
+    }
+    @Test void theTextsNameWhatIsKnown() {
+        assertEquals("",BatteryLevels.describe(Level.of("off")));
+        assertTrue(BatteryLevels.describe(Level.of("offline")).contains("No measurement"),"no percentage without a recent value");
+        assertTrue(BatteryLevels.describe(new Level("contact-lost",0,"learned",1200,3290)).startsWith("0 %"));
+        assertTrue(BatteryLevels.describe(new Level("learned",63,"learned",30,3800)).contains("learned from this display"));
     }
     @Test void theCurveOfOneDeviceFollowsItsOwnDischarge() throws Exception {
         var data=BatterySeriesTest.Fixture.load("epaper-154");
