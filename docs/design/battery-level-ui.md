@@ -26,9 +26,10 @@ copies a calibration from another display, including one with the same board mod
 
 ## Learning, established, confidence
 
-- **Learning:** the estimate is enabled, but no discharge is confirmed yet. No percentage.
-- **Established:** at least one discharge is confirmed (a decline that reached the limit range or ended in a failure,
-  see the learning design). From now on a percentage is shown.
+- **Learning:** the estimate is enabled, but no usable discharge exists yet. No percentage. A confirmed discharge that is
+  too short for the curve (step 3 below) does not end this state; the card then says "1 confirmed, none usable yet".
+- **Established:** at least one *usable* discharge exists: confirmed (a decline that reached the limit range or ended in
+  a failure, see the learning design) and spanning enough voltage for the curve. From now on a percentage is shown.
 - **Confidence** says how well the curve is founded, from the confirmed discharges it uses:
   **Low** when only discharges that reached the limit range exist, **Medium** with one discharge that ended in a failure,
   **High** with at least two that ended in a failure.
@@ -65,7 +66,7 @@ The mean is formed per voltage:
 | --- | --- | --- |
 | Board cannot measure a battery | No battery section at all. This is a hardware capability, not a warning. | None. |
 | Board can measure; estimate off | Compact **Battery estimate · Off** row with the sentence “Optional · learns only from this display’s metrics.” | **Enable battery estimate**. |
-| Enabled; no confirmed discharge | **Learning** badge, no percentage, and “No percentage yet · waiting for a confirmed discharge.” | View calibration details; disable if unwanted. |
+| Enabled; no usable discharge | **Learning** badge, no percentage, and “No percentage yet · waiting for a usable discharge.” | View calibration details; disable if unwanted. |
 | Enabled; established | Battery icon, percentage, **Established** badge, confidence, and a compact summary such as “learned from this display · 3 confirmed discharges.” | Expand calibration details. |
 | Established; current measurement is old | **Offline** badge, last percentage and age; never silently present it as current. | Open metrics or wait for the display. |
 | Established; contact was lost after a confirmed low voltage | **0 % · Contact lost** with a short explanation. | Open calibration details; it corrects itself after a later higher measurement. |
@@ -164,6 +165,9 @@ change for this concept:
    marked discharges; acknowledgement when enabling.
 5. **Display icon:** `X-VibeDock-Power` (`DevicePower`) keeps reporting what the firmware measures; the server draws
    `StatusImage.Battery` with the learned percentage when the level is established and current.
+
+The constants of the curve (minimum voltage span 0.3 V, 10 mV grid, weights 4, 3, 2, 1) are starting values; they are
+checked against the stored discharges of a real display before the release and may change with that.
 
 ## Related documentation
 
