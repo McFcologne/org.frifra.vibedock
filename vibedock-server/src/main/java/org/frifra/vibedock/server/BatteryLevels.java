@@ -40,6 +40,18 @@ class BatteryLevels {
         try{if(Files.isRegularFile(file))enabled.addAll(json.readValue(file.toFile(),new TypeReference<List<String>>(){}));}
         catch(RuntimeException e){log.warn("Unreadable {}: {}",file,e.toString());}
     }
+    /** The line under the switch on the device card; empty while the level is off. */
+    static String describe(Level level){
+        return switch(level.state()){
+            case "learned"->level.percent()+" % (learned from this display, "+level.millivolts()+" mV)";
+            case "learning"->"Learning: the level appears after the first confirmed discharge down to the limit range.";
+            case "external-power"->"On external power: no voltage while charging or on USB is used.";
+            case "offline"->"Last level "+level.percent()+" %, no contact for "+minutes(level.ageSeconds())+".";
+            case "contact-lost"->"0 %: no contact for "+minutes(level.ageSeconds())+" after the voltage fell into the limit range.";
+            default->"";
+        };
+    }
+    private static String minutes(long seconds){return seconds>=7200?seconds/3600+" h":seconds/60+" min";}
     boolean enabled(String identifier){return enabled.contains(identifier);}
     synchronized void enable(String identifier,boolean on) throws IOException {
         if(!(on?enabled.add(identifier):enabled.remove(identifier)))return;
