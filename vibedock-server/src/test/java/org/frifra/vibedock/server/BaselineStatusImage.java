@@ -280,7 +280,8 @@ public class BaselineStatusImage {
         if(p==null)p=new UsageService.Provider("unconfigured",null,null,null);
         int top=16;
         int left=scheme.style==BaselineScheme.Style.CONSOLE?2:4,right=scheme.style==BaselineScheme.Style.CONSOLE?w-2:scheme.style==BaselineScheme.Style.MAC?w-5:w-4;
-        int x=rightColumn?0:left,width=rightColumn?right-w/2:w/2-left;
+        int gap=scheme.style==BaselineScheme.Style.FLUENT||scheme.style==BaselineScheme.Style.MACOS?1:0;  // rounded corners need a visible joint
+        int x=rightColumn?gap:left,width=rightColumn?right-w/2-gap:w/2-left-gap;
         int shift=scheme.windowed()||scheme.style==BaselineScheme.Style.CONSOLE?x+width/2-w/4:0;
         switch(scheme.style){
             case MAC -> macWindow(g,scheme,title,null,22,x,width,height-(bottom?8:4),icon);

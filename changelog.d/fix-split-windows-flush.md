@@ -1,1 +1,1 @@
-- Split bands: the two half-width windows now touch in the middle and their outer edges line up with the full-width window.
+- Split bands: the two half-width windows now sit next to each other and their outer edges line up with the full-width window. Windows with rounded corners (Windows 11, macOS) keep a 2 px joint.

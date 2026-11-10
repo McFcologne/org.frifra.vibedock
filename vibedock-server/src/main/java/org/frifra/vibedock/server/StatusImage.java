@@ -372,7 +372,8 @@ public class StatusImage {
         int top=16;
         // The two windows touch in the middle; the outer edges are those of the full-width window.
         int left=scheme.style==Scheme.Style.CONSOLE?2:4,right=scheme.style==Scheme.Style.CONSOLE?w-2:scheme.style==Scheme.Style.MAC?w-5:w-4;
-        int x=rightColumn?0:left,width=rightColumn?right-w/2:w/2-left;
+        int gap=scheme.style==Scheme.Style.FLUENT||scheme.style==Scheme.Style.MACOS?1:0;  // rounded corners need a visible joint
+        int x=rightColumn?gap:left,width=rightColumn?right-w/2-gap:w/2-left-gap;
         // The content stays centred in its window.
         int shift=scheme.windowed()||scheme.style==Scheme.Style.CONSOLE?x+width/2-w/4:0;
         switch(scheme.style){
