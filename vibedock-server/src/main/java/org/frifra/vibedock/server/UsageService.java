@@ -47,6 +47,10 @@ public class UsageService {
     private final DeviceSender devices;
     private final Clock clock;
     private volatile Map<String,Provider> readings=Map.of();
+    /** How long the displays keep a source's last good reading while a poll gives no usable answer. */
+    static final long CACHE_SECONDS=30*60L;
+    /** The last reading with figures of each source (ok or partial), kept across waiting, errors and sign-in changes. */
+    private final Map<String,Provider> lastGood=new ConcurrentHashMap<>();
     private volatile SettingsStore.Settings collectedFor;
     private final Map<String,PollPace> pace=new ConcurrentHashMap<>();
     /** Sources asked in the running collection whose readings are not published yet (displays then wait for them). */
@@ -77,17 +81,32 @@ public class UsageService {
     public UsageService(SettingsStore settings,ProviderClient client,DeviceSender devices,Clock clock) {
         this.settings=settings; this.client=client; this.devices=devices; this.clock=clock;
     }
-    public Snapshot snapshot() {
+    /** The true state of every source (administration, support file). */
+    public Snapshot snapshot() { return snapshot(false); }
+    /**
+     * What the displays get: a source that waits, is unavailable, failed or went stale keeps its last reading with
+     * figures (and its observation time) for CACHE_SECONDS. Sign-in problems, rate limits and pauses are shown as they are.
+     */
+    public Snapshot displayed() { return snapshot(true); }
+    private static boolean transientState(String status){
+        return switch(status){case "waiting","unavailable","upstream_error","invalid_response","stale"->true;default->false;};
+    }
+    private Snapshot snapshot(boolean cached) {
         Map<String,Provider> view=new LinkedHashMap<>();Map<String,String> labels=new LinkedHashMap<>(); long now=clock.instant().getEpochSecond();
         var s=settings.effective();
         for (var account:s.accounts()) {
             String name=account.id();var credential=account.manual();labels.put(name,account.label());
             Provider p=account.suspended() ? new Provider("suspended",null,null,null)
                     : credential.token().isBlank()&&!demo ? new Provider("unconfigured",null,null,null)
-                    : s.equals(collectedFor) ? readings.getOrDefault(name,new Provider("waiting",null,null,null))
+                    : collected(account) ? readings.getOrDefault(name,new Provider("waiting",null,null,null))
                     : new Provider("waiting",null,null,null);
             if (p.observedAt()!=null && now-p.observedAt()>staleAfter(name) && (p.status().equals("ok") || p.status().equals("partial")))
                 p=new Provider("stale",p.observedAt(),null,null);
+            var good=cached&&transientState(p.status())?lastGood.get(name):null;
+            if (good!=null && now-good.observedAt()<=CACHE_SECONDS) {
+                var five=current(good.fiveHour(),now);var week=current(good.week(),now);
+                if (five!=null||week!=null) p=new Provider(good.status(),good.observedAt(),five,week);
+            }
             view.put(name,p.withPeriod(period(account.type(),p)));
         }
         return new Snapshot(1,now,Collections.unmodifiableMap(view),Collections.unmodifiableMap(labels));
@@ -171,7 +190,8 @@ public class UsageService {
             var polling=settings.polling();
             var p=pace.computeIfAbsent(name,k->new PollPace(polling));p.configure(polling);
             long now=clock.instant().getEpochSecond();int before=p.minutes();
-            if (!p.due(now,manual)) {
+            // A sign-in that changed since the last collection is asked at once (not only when its pace says so).
+            if (!p.due(now,manual||!collected(account))) {
                 next.put(name,p.limited()?rateLimited(last,now):last!=null?last:new Provider("waiting",null,null,null));
                 continue;
             }
@@ -182,7 +202,8 @@ public class UsageService {
                 String status=r.fiveHour()==null && r.week()==null ? "unavailable"
                         : !single && (r.fiveHour()==null || r.week()==null) ? "partial":"ok";
                 p.success(now);report(account,status,"");interval(account,before,p,"no HTTP 429 for a while, trying a shorter one");
-                next.put(name,new Provider(status,clock.instant().getEpochSecond(),r.fiveHour(),r.week()));
+                var fresh=new Provider(status,clock.instant().getEpochSecond(),r.fiveHour(),r.week());
+                next.put(name,fresh);if(!status.equals("unavailable"))lastGood.put(name,fresh);
             } catch (ProviderClient.Failure e) {
                 if (e.status.equals("rate_limited")) { p.rateLimited(now,e.retryAt); next.put(name,rateLimited(last,now)); }
                 report(account,e.status,e.detail+(e.status.equals("rate_limited")?", next try in "+p.waitMinutes(now)+" min":""));
@@ -193,10 +214,11 @@ public class UsageService {
             catch (Exception e) { p.failed(now); report(account,"upstream_error",e.toString()); reasons.put(name,"no answer from the provider"); next.put(name,new Provider("upstream_error",previous,null,null)); }
         }
         pace.keySet().retainAll(configuration.accounts().stream().map(SettingsStore.Account::id).toList());
+        lastGood.keySet().retainAll(configuration.accounts().stream().map(SettingsStore.Account::id).toList());
         if (!configuration.equals(settings.effective())) return;
         readings=Map.copyOf(next);
         collectedFor=configuration;
-        devices.send(configuration.devices(),snapshot());
+        devices.send(configuration.devices(),displayed());
     }
     /**
      * Sources were paused, resumed, renamed or reordered: every source keeps its values, their time and its polling
@@ -211,11 +233,35 @@ public class UsageService {
             else if (last!=null && last.status().equals("suspended")) next.remove(account.id());
         }
         readings=Map.copyOf(next);collectedFor=configuration;
-        devices.send(configuration.devices(),snapshot());
+        devices.send(configuration.devices(),displayed());
         pollNow();
     }
     /** Changed sources are polled again at once; each keeps the interval it learned (unless it waits for a 429). */
     public synchronized void configurationChanged() { readings=Map.of(); collectedFor=null; pace.values().forEach(PollPace::restart); pollNow(); }
+    /**
+     * Whether the last collection used this source as it is now (same type and sign-in). A sign-in that changed (a
+     * renewed token, another account) makes only this source wait for a new reading; the others keep theirs.
+     * Before, any change of any sign-in file showed every source as waiting ("not ready" on the displays) until the
+     * next full minute.
+     */
+    private volatile long lastSignInCollection;
+    private boolean collected(SettingsStore.Account account) {
+        var last=collectedFor;if(last==null)return false;
+        var before=last.account(account.id());
+        return before.isPresent()&&before.get().type().equals(account.type())&&before.get().manual().equals(account.manual());
+    }
+    /** Looks every few seconds whether a sign-in changed and collects at once, so a renewed token costs seconds, not a minute. */
+    @Scheduled(fixedDelay=5000,initialDelay=30000)
+    void watchSignIns() {
+        if (!polling||collectedFor==null) return;
+        long now=clock.instant().getEpochSecond();
+        if (now-lastSignInCollection<30) return; // never more often than every 30 s, whatever the files do
+        var changed=settings.effective().accounts().stream().filter(a->!a.suspended()&&!(a.manual().token().isBlank()&&!demo)&&!collected(a)).map(SettingsStore.Account::label).toList();
+        if (changed.isEmpty()) return;
+        lastSignInCollection=now;
+        log.info("Sign-in of {} changed; collecting at once",String.join(", ",changed));
+        collect(false);
+    }
     /** Tests: every source starts without a learned interval or back-off. */
     synchronized void forgetPacing() { pace.clear(); }
     /** New update interval settings: every source keeps its interval within the new bounds. */

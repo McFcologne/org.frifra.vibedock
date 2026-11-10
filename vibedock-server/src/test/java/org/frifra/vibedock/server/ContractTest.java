@@ -117,4 +117,47 @@ class ContractTest {
         assertEquals("waiting",service.snapshot().providers().get("codex").status());
         assertNull(service.snapshot().providers().get("codex").fiveHour());
     }
+    @Test void aChangedSignInOnlyMakesItsOwnSourceWaitAndIsCollectedAtOnce(@TempDir Path dir) throws Exception {
+        var settings=new SettingsStore(dir.toString(),json);
+        settings.save(new SettingsStore.Settings(List.of(),new SettingsStore.Credential("first",""),new SettingsStore.Credential("claude-token",""),List.of()));
+        var client=mock(ProviderClient.class);var clock=mock(java.time.Clock.class);
+        Instant start=Instant.parse("2026-10-13T20:00:00Z");when(clock.instant()).thenReturn(start);
+        when(client.fetch(any(),any())).thenReturn(new ProviderClient.Reading(new ProviderClient.Window(20,1900000000),new ProviderClient.Window(30,1900000000)));
+        var service=new UsageService(settings,client,mock(DeviceSender.class),clock);
+        service.refresh();
+        assertEquals("ok",service.snapshot().providers().get("codex").status());assertEquals("ok",service.snapshot().providers().get("claude").status());
+        settings.save(new SettingsStore.Settings(List.of(),new SettingsStore.Credential("second",""),settings.get().claude(),List.of()));
+        assertEquals("waiting",service.snapshot().providers().get("codex").status());
+        assertEquals("ok",service.snapshot().providers().get("claude").status(),"another source keeps its reading");
+        // The sign-in watch collects at once, although the source is not due yet.
+        when(clock.instant()).thenReturn(start.plusSeconds(40));
+        service.watchSignIns();
+        verify(client).fetch("codex",new SettingsStore.Credential("second",""));
+        assertEquals("ok",service.snapshot().providers().get("codex").status());
+        verify(client,times(1)).fetch(eq("claude"),any());
+    }
+    @Test void displaysKeepTheLastReadingForThirtyMinutesButAdministrationShowsTheTruth(@TempDir Path dir) throws Exception {
+        var settings=new SettingsStore(dir.toString(),json);
+        settings.save(new SettingsStore.Settings(List.of(),new SettingsStore.Credential("token",""),new SettingsStore.Credential("",""),List.of()));
+        var client=mock(ProviderClient.class);var clock=mock(java.time.Clock.class);
+        Instant start=Instant.parse("2026-10-13T20:00:00Z");when(clock.instant()).thenReturn(start);
+        when(client.fetch(any(),any())).thenReturn(new ProviderClient.Reading(new ProviderClient.Window(20,1900000000),new ProviderClient.Window(30,1900000000)));
+        var service=new UsageService(settings,client,mock(DeviceSender.class),clock);
+        service.refresh();
+        long observed=start.getEpochSecond();
+        // A provider error after ten minutes: the displays keep the reading and its time, the administration shows the error.
+        doThrow(new ProviderClient.Failure("upstream_error",0,"HTTP 500")).when(client).fetch(any(),any());
+        when(clock.instant()).thenReturn(start.plusSeconds(600));service.refresh();
+        assertEquals("upstream_error",service.snapshot().providers().get("codex").status());
+        var shown=service.displayed().providers().get("codex");
+        assertEquals("ok",shown.status());assertEquals(20.0,shown.fiveHour().usedPercent());assertEquals(observed,shown.observedAt());
+        // A lost sign-in is never covered.
+        doThrow(new ProviderClient.Failure("authentication_required")).when(client).fetch(any(),any());
+        when(clock.instant()).thenReturn(start.plusSeconds(660));service.refresh();
+        assertEquals("authentication_required",service.displayed().providers().get("codex").status());
+        // After thirty minutes without a reading the displays show the real state.
+        doThrow(new ProviderClient.Failure("upstream_error",0,"HTTP 500")).when(client).fetch(any(),any());
+        when(clock.instant()).thenReturn(start.plusSeconds(1801));service.refresh();
+        assertEquals("upstream_error",service.displayed().providers().get("codex").status());
+    }
 }
