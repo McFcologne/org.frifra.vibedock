@@ -125,7 +125,7 @@
             <span>Battery power saving</span></label></form>
         <form th:if="${client.board.batteryPowerSaving()}" class="power-saving" th:action="@{/admin/clients/{id}/battery-level(id=${client.identifier})}" method="post">
           <label class="switch" title="Shows a battery percentage learned from this display's own measurements: only after a discharge down to the limit range that ended in a failure or reached it. Nothing is taken from other displays.">
-            <input type="checkbox" name="enabled" value="true" th:checked="${batteryOn.contains(client.identifier)}" data-power-saving>
+            <input type="checkbox" name="enabled" value="true" th:checked="${batteryOn.contains(client.identifier)}" data-battery-level>
             <span>Battery level (learned)</span></label>
           <p class="meta" th:if="${batteryText[client.identifier] != null and !batteryText[client.identifier].isEmpty()}" th:text="${batteryText[client.identifier]}"></p></form></div>
       <p class="notice error" th:if="${failedClient == client.identifier}" th:text="${failedClientMessage}"></p>

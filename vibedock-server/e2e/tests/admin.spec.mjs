@@ -142,6 +142,14 @@ test('battery power saving is a switch only on boards with a battery',async ({pa
   await page.reload();await expect(toggle).toBeChecked();
   await toggle.uncheck();await expect(toggle).toBeEnabled();
   await page.reload();await expect(toggle).not.toBeChecked();
+  // The learned battery level is a switch of its own, saved the same way.
+  const level=desk.getByRole('checkbox',{name:/Battery level/});
+  await expect(level).not.toBeChecked();
+  const levelSaved=page.waitForResponse(r=>r.url().endsWith('/battery-level')&&r.request().method()==='POST');
+  await level.check();expect((await (await levelSaved).json()).enabled).toBe(true);
+  await page.reload();await expect(level).toBeChecked();
+  await level.uncheck();await expect(level).toBeEnabled();
+  await page.reload();await expect(level).not.toBeChecked();
 });
 
 test('support file is created with a key shown once and opens again with it',async ({page,app}) => {
