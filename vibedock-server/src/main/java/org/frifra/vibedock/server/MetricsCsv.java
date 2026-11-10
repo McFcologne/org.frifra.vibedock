@@ -12,10 +12,16 @@ import java.util.*;
  */
 final class MetricsCsv {
     private MetricsCsv(){}
-    /** What the export adds to a sample: the display's name and the firmware and start reason of its start. */
-    record Context(String name,String firmware,String reason) {}
+    /**
+     * What the export adds to a sample: the display's name and the firmware and start reason of its start, and the
+     * smoothed battery voltage of the sample (null without one).
+     */
+    record Context(String name,String firmware,String reason,BatterySeries.Point battery) {
+        Context(String name,String firmware,String reason){this(name,firmware,reason,null);}
+    }
     static final List<String> COLUMNS=List.of("time_utc","time_local","device","name","firmware","restart_reason","boot","uptime_s","free_kB","lowest_free_kB",
-            "largest_block_kB","free_after_tls_kB","tls_stack_kB","picture_s","wifi_rssi_dBm","wifi_drops","battery_mV","brightness_pct","active_s","dimmed_s");
+            "largest_block_kB","free_after_tls_kB","tls_stack_kB","picture_s","wifi_rssi_dBm","wifi_drops","battery_mV","brightness_pct","active_s","dimmed_s",
+            "battery_smoothed_mV","battery_slope_mV_per_h","battery_phase");
     static String header(boolean raw){return String.join(",",COLUMNS)+(raw?",raw":"")+"\r\n";}
     static void row(StringBuilder out,String device,DeviceMetrics.Sample s,Context context,ZoneId zone,boolean raw){
         var at=Instant.ofEpochMilli(s.at());
@@ -27,6 +33,10 @@ final class MetricsCsv {
         cells.add(tenths(s.afterTlsBytes(),1000));cells.add(tenths(s.tlsStackBytes(),1000));cells.add(tenths(s.pictureMs(),1000));
         cells.add(text(s.rssi()));cells.add(text(s.drops()));cells.add(text(s.millivolts()));cells.add(text(s.brightness()));
         cells.add(text(s.activeSeconds()));cells.add(text(s.dimmedSeconds()));
+        var b=context.battery();
+        cells.add(b==null||b.smoothed()==null?"":String.format(Locale.ROOT,"%.0f",b.smoothed()));
+        cells.add(b==null||b.slope()==null?"":String.format(Locale.ROOT,"%.0f",b.slope()));
+        cells.add(b==null||b.smoothed()==null?"":b.phase());
         if(raw)cells.add(cell(s.raw()));
         out.append(String.join(",",cells)).append("\r\n");
     }

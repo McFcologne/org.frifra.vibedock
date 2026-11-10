@@ -141,9 +141,9 @@ class DeviceMetricsTest {
         MetricsCsv.row(out,"vibedock-0a1b2c000030",s,new MetricsCsv.Context("=Kitchen, shelf","0.4.3","power-on"),ZoneId.of("Europe/Berlin"),true);
         MetricsCsv.row(out,"vibedock-0a1b2c000030",DeviceMetrics.parse("1;5;;;;;;;;0;;;0;0",1_000,null),new MetricsCsv.Context("","",""),ZoneOffset.UTC,true);
         var lines=out.toString().split("\r\n");
-        assertEquals("time_utc,time_local,device,name,firmware,restart_reason,boot,uptime_s,free_kB,lowest_free_kB,largest_block_kB,free_after_tls_kB,tls_stack_kB,picture_s,wifi_rssi_dBm,wifi_drops,battery_mV,brightness_pct,active_s,dimmed_s,raw",lines[0]);
-        assertEquals("2026-11-05T16:38:07Z,2026-11-05T17:38:07+01:00,vibedock-0a1b2c000030,\"'=Kitchen, shelf\",0.4.3,power-on,0000beef,3600,23.5,22.9,16.5,11.8,1.4,1.4,-58,3,3940,60,3000,600,"+FULL,lines[1]);
-        assertEquals("1970-01-01T00:00:01Z,1970-01-01T00:00:01Z,vibedock-0a1b2c000030,,,,,5,,,,,,,,0,,,0,0,1;5;;;;;;;;0;;;0;0",lines[2]);
+        assertEquals("time_utc,time_local,device,name,firmware,restart_reason,boot,uptime_s,free_kB,lowest_free_kB,largest_block_kB,free_after_tls_kB,tls_stack_kB,picture_s,wifi_rssi_dBm,wifi_drops,battery_mV,brightness_pct,active_s,dimmed_s,battery_smoothed_mV,battery_slope_mV_per_h,battery_phase,raw",lines[0]);
+        assertEquals("2026-11-05T16:38:07Z,2026-11-05T17:38:07+01:00,vibedock-0a1b2c000030,\"'=Kitchen, shelf\",0.4.3,power-on,0000beef,3600,23.5,22.9,16.5,11.8,1.4,1.4,-58,3,3940,60,3000,600,,,,"+FULL,lines[1]);
+        assertEquals("1970-01-01T00:00:01Z,1970-01-01T00:00:01Z,vibedock-0a1b2c000030,,,,,5,,,,,,,,0,,,0,0,,,,1;5;;;;;;;;0;;;0;0",lines[2]);
         assertFalse(MetricsCsv.header(false).contains("raw"));
     }
     @Test void textCellsNeverStartAFormulaButNumbersStayNumbers(){

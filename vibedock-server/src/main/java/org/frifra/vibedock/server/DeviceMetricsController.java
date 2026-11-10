@@ -50,7 +50,10 @@ class DeviceMetricsController {
                 new MetricsChart.Series("Free",DeviceMetrics.Sample::freeBytes),new MetricsChart.Series("Lowest free",DeviceMetrics.Sample::lowestBytes),
                 new MetricsChart.Series("Largest block",DeviceMetrics.Sample::blockBytes)),1000,true,"kB",zone));
         model.addAttribute("wifi",MetricsChart.svg(samples,from,to,List.of(new MetricsChart.Series("Signal",DeviceMetrics.Sample::rssi)),1,false,"dBm",zone));
-        model.addAttribute("battery",MetricsChart.svg(samples,from,to,List.of(new MetricsChart.Series("Voltage",DeviceMetrics.Sample::millivolts)),1,false,"mV",zone));
+        var smoothed=new HashMap<Long,Double>();
+        for(var p:BatterySeries.of(samples))if(p.smoothed()!=null)smoothed.put(p.at(),p.smoothed());
+        model.addAttribute("battery",MetricsChart.svg(samples,from,to,List.of(new MetricsChart.Series("Voltage",DeviceMetrics.Sample::millivolts),
+                new MetricsChart.Series("Smoothed",sample->smoothed.get(sample.at()))),1,false,"mV",zone));
         var newest=new ArrayList<>(samples);Collections.reverse(newest);
         var rows=new ArrayList<List<String>>();
         for(var s:newest.subList(0,Math.min(TABLE_ROWS,newest.size()))){
@@ -100,9 +103,11 @@ class DeviceMetricsController {
             var starts=new HashMap<String,DeviceDiagnostics.Start>();
             for(var s:diagnostics.starts(id))starts.put(s.bootId(),s);
             var entries=new ArrayList<MetricsXlsx.Entry>();
-            for(var s:metrics.samples(id,start,end)){
+            var kept=metrics.samples(id,start,end);var smoothed=BatterySeries.of(kept);
+            for(int i=0;i<kept.size();i++){
+                var s=kept.get(i);
                 var begin=s.boot()==null?null:starts.get(s.boot());
-                entries.add(new MetricsXlsx.Entry(s,new MetricsCsv.Context(name,begin!=null&&begin.firmware()!=null?begin.firmware():current,begin==null?"":begin.kind())));
+                entries.add(new MetricsXlsx.Entry(s,new MetricsCsv.Context(name,begin!=null&&begin.firmware()!=null?begin.firmware():current,begin==null?"":begin.kind(),smoothed.get(i))));
             }
             sheets.add(new MetricsXlsx.Sheet(id,name,entries));
         }

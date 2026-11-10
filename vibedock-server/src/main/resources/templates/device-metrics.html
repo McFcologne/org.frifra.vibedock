@@ -29,9 +29,10 @@
   <div th:utext="${wifi}"></div>
 </section>
 <section class="card" th:if="${!battery.isEmpty()}">
-  <div class="card-head"><h3 class="grow">Battery voltage</h3></div>
+  <div class="card-head"><h3 class="grow">Battery voltage</h3>
+    <span class="metric-legend"><i class="c0"></i>Measured <i class="c1"></i>Smoothed</span></div>
   <div th:utext="${battery}"></div>
-  <p class="meta">Only while the display runs on its battery.</p>
+  <p class="meta">Only while the display runs on its battery. Smoothed: median of three readings, then the mean of three; it starts anew with every start and after a gap of 15 minutes.</p>
 </section>
 <p class="meta" th:if="${count > 0}">Grey areas marked Offline: no sample arrived (display off, asleep or not reachable).</p></th:block>
 <section class="card" th:if="${count > 0}">

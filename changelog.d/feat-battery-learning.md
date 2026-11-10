@@ -1,0 +1,1 @@
+- **Smoothed battery voltage.** The metrics page draws a smoothed line next to the measured battery voltage, and the CSV and Excel exports gain the columns `battery_smoothed_mV`, `battery_slope_mV_per_h` and `battery_phase` (`flat` or `decline_candidate`, never "charging"). The stored values do not change.
