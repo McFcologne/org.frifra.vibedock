@@ -84,7 +84,7 @@ public class UsageService {
             String name=account.id();var credential=account.manual();labels.put(name,account.label());
             Provider p=account.suspended() ? new Provider("suspended",null,null,null)
                     : credential.token().isBlank()&&!demo ? new Provider("unconfigured",null,null,null)
-                    : s.equals(collectedFor) ? readings.getOrDefault(name,new Provider("waiting",null,null,null))
+                    : collected(account) ? readings.getOrDefault(name,new Provider("waiting",null,null,null))
                     : new Provider("waiting",null,null,null);
             if (p.observedAt()!=null && now-p.observedAt()>staleAfter(name) && (p.status().equals("ok") || p.status().equals("partial")))
                 p=new Provider("stale",p.observedAt(),null,null);
@@ -171,7 +171,8 @@ public class UsageService {
             var polling=settings.polling();
             var p=pace.computeIfAbsent(name,k->new PollPace(polling));p.configure(polling);
             long now=clock.instant().getEpochSecond();int before=p.minutes();
-            if (!p.due(now,manual)) {
+            // A sign-in that changed since the last collection is asked at once (not only when its pace says so).
+            if (!p.due(now,manual||!collected(account))) {
                 next.put(name,p.limited()?rateLimited(last,now):last!=null?last:new Provider("waiting",null,null,null));
                 continue;
             }
@@ -216,6 +217,30 @@ public class UsageService {
     }
     /** Changed sources are polled again at once; each keeps the interval it learned (unless it waits for a 429). */
     public synchronized void configurationChanged() { readings=Map.of(); collectedFor=null; pace.values().forEach(PollPace::restart); pollNow(); }
+    /**
+     * Whether the last collection used this source as it is now (same type and sign-in). A sign-in that changed (a
+     * renewed token, another account) makes only this source wait for a new reading; the others keep theirs.
+     * Before, any change of any sign-in file showed every source as waiting ("not ready" on the displays) until the
+     * next full minute.
+     */
+    private volatile long lastSignInCollection;
+    private boolean collected(SettingsStore.Account account) {
+        var last=collectedFor;if(last==null)return false;
+        var before=last.account(account.id());
+        return before.isPresent()&&before.get().type().equals(account.type())&&before.get().manual().equals(account.manual());
+    }
+    /** Looks every few seconds whether a sign-in changed and collects at once, so a renewed token costs seconds, not a minute. */
+    @Scheduled(fixedDelay=5000,initialDelay=30000)
+    void watchSignIns() {
+        if (!polling||collectedFor==null) return;
+        long now=clock.instant().getEpochSecond();
+        if (now-lastSignInCollection<30) return; // never more often than every 30 s, whatever the files do
+        var changed=settings.effective().accounts().stream().filter(a->!a.suspended()&&!(a.manual().token().isBlank()&&!demo)&&!collected(a)).map(SettingsStore.Account::label).toList();
+        if (changed.isEmpty()) return;
+        lastSignInCollection=now;
+        log.info("Sign-in of {} changed; collecting at once",String.join(", ",changed));
+        collect(false);
+    }
     /** Tests: every source starts without a learned interval or back-off. */
     synchronized void forgetPacing() { pace.clear(); }
     /** New update interval settings: every source keeps its interval within the new bounds. */

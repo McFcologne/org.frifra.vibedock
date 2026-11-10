@@ -117,4 +117,23 @@ class ContractTest {
         assertEquals("waiting",service.snapshot().providers().get("codex").status());
         assertNull(service.snapshot().providers().get("codex").fiveHour());
     }
+    @Test void aChangedSignInOnlyMakesItsOwnSourceWaitAndIsCollectedAtOnce(@TempDir Path dir) throws Exception {
+        var settings=new SettingsStore(dir.toString(),json);
+        settings.save(new SettingsStore.Settings(List.of(),new SettingsStore.Credential("first",""),new SettingsStore.Credential("claude-token",""),List.of()));
+        var client=mock(ProviderClient.class);var clock=mock(java.time.Clock.class);
+        Instant start=Instant.parse("2026-10-13T20:00:00Z");when(clock.instant()).thenReturn(start);
+        when(client.fetch(any(),any())).thenReturn(new ProviderClient.Reading(new ProviderClient.Window(20,1900000000),new ProviderClient.Window(30,1900000000)));
+        var service=new UsageService(settings,client,mock(DeviceSender.class),clock);
+        service.refresh();
+        assertEquals("ok",service.snapshot().providers().get("codex").status());assertEquals("ok",service.snapshot().providers().get("claude").status());
+        settings.save(new SettingsStore.Settings(List.of(),new SettingsStore.Credential("second",""),settings.get().claude(),List.of()));
+        assertEquals("waiting",service.snapshot().providers().get("codex").status());
+        assertEquals("ok",service.snapshot().providers().get("claude").status(),"another source keeps its reading");
+        // The sign-in watch collects at once, although the source is not due yet.
+        when(clock.instant()).thenReturn(start.plusSeconds(40));
+        service.watchSignIns();
+        verify(client).fetch("codex",new SettingsStore.Credential("second",""));
+        assertEquals("ok",service.snapshot().providers().get("codex").status());
+        verify(client,times(1)).fetch(eq("claude"),any());
+    }
 }

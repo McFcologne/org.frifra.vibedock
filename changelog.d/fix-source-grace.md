@@ -1,0 +1,1 @@
+- **A renewed sign-in no longer shows every source as "not ready".** When the sign-in file of one source changed (a renewed token), the displays showed all sources as *not ready* with empty bars until the next full minute. Now only that source waits, and the server asks it again within seconds. The log says `Sign-in of … changed; collecting at once`.
