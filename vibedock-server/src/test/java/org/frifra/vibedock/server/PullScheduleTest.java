@@ -77,4 +77,33 @@ class PullScheduleTest {
         assertEquals("58; state=current",new PullSchedule.Next(58,false).header());
         assertEquals("3; state=pending",new PullSchedule.Next(3,true).header());
     }
+    @Test void aDisplayOnItsBatteryWithPowerSavingWaitsAtLeastFiveMinutes(@TempDir Path dir) throws Exception {
+        var clock=mock(Clock.class);Instant start=Instant.parse("2026-10-13T20:00:00Z");when(clock.instant()).thenReturn(start);
+        var registry=new ClientRegistry(dir.toString(),json,clock);
+        String id="vibedock-battery";
+        registry.paired(id,"Shelf","ab".repeat(32),"192.168.1.10",80,"waveshare-s3-touch-lcd-154");
+        var usage=mock(UsageService.class);when(usage.schedule(any())).thenReturn(new UsageService.Schedule(start.getEpochSecond()+60,false));
+        var poke=mock(DevicePoke.class);when(poke.reachedWithin(any(),anyLong())).thenReturn(true);
+        var power=new DevicePower();
+        var designs=mock(DesignService.class);when(designs.nextPhotoBoundary(any())).thenReturn(null);
+        var schedule=new PullSchedule(usage,designs,registry,poke,clock,power);
+        // The reading can change in a minute: that is when a display on USB pulls.
+        assertEquals(60,schedule.next(id,DisplayType.M1,false).seconds());
+        // Power saving on, but on USB (no battery reported): unchanged.
+        registry.setPowerSaving(id,true);
+        assertEquals(60,schedule.next(id,DisplayType.M1,false).seconds());
+        // On its battery: not more often than every five minutes.
+        power.report(id,"battery;level=60");
+        assertEquals(PullSchedule.BATTERY_SECONDS,schedule.next(id,DisplayType.M1,false).seconds());
+        // A longer wait of the sources stays as it is.
+        when(usage.schedule(any())).thenReturn(new UsageService.Schedule(start.getEpochSecond()+500,false));
+        assertEquals(500,schedule.next(id,DisplayType.M1,false).seconds());
+        // Without power saving a display on its battery keeps pulling when the picture can change.
+        registry.setPowerSaving(id,false);
+        when(usage.schedule(any())).thenReturn(new UsageService.Schedule(start.getEpochSecond()+60,false));
+        assertEquals(60,schedule.next(id,DisplayType.M1,false).seconds());
+        // Back on USB.
+        registry.setPowerSaving(id,true);power.report(id,null);
+        assertEquals(60,schedule.next(id,DisplayType.M1,false).seconds());
+    }
 }

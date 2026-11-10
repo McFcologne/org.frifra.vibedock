@@ -1,0 +1,1 @@
+- **Displays on their battery pull less often.** A display with battery power saving that runs on its battery now waits at least five minutes between pulls (before: as often as its picture can change, usually every minute). A change of the design reaches it with the next pull, within five minutes.

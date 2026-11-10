@@ -12,24 +12,27 @@ import java.util.concurrent.ConcurrentHashMap;
  * be done, and less often while it is not (2, 5, 10, 30 s), so a slow provider cannot make it pull every second.
  * An upper limit keeps the display in touch: displays that took an immediate pull (POST /pull) within a day see design
  * changes at once and may wait up to ten minutes, the others two.
+ * A display with battery power saving that runs on its battery waits at least five minutes between pulls: a reading
+ * that can change every minute is not worth a Wi-Fi transfer every minute from a cell (design changes arrive with the
+ * next pull, so within five minutes at most).
  */
 @Component
 class PullSchedule {
-    static final int MIN_SECONDS=2, REACHABLE_SECONDS=600, UNREACHABLE_SECONDS=120;
+    static final int MIN_SECONDS=2, REACHABLE_SECONDS=600, UNREACHABLE_SECONDS=120, BATTERY_SECONDS=300;
     static final int[] PENDING_STEPS={2,5,10,30};
     static final long REACHED_WITHIN=24*3600;
     record Next(int seconds,boolean pending) {
         String header(){return seconds+"; state="+(pending?"pending":"current");}
     }
     private final UsageService usage;private final DesignService designs;private final ClientRegistry registry;private final DevicePoke poke;
-    private final java.time.Clock clock;
+    private final java.time.Clock clock;private final DevicePower power;
     private final Map<String,Integer> pendingInRow=new ConcurrentHashMap<>();
     /** Spreads the pulls of several displays over a few seconds; replaceable for tests. */
     PullSpread spread=new PullSpread(new Random());
     /** A display that pulled within this many seconds counts for the spread. */
     static final long ACTIVE_WITHIN=900;
-    PullSchedule(UsageService usage,DesignService designs,ClientRegistry registry,DevicePoke poke,java.time.Clock clock){
-        this.usage=usage;this.designs=designs;this.registry=registry;this.poke=poke;this.clock=clock;
+    PullSchedule(UsageService usage,DesignService designs,ClientRegistry registry,DevicePoke poke,java.time.Clock clock,DevicePower power){
+        this.usage=usage;this.designs=designs;this.registry=registry;this.poke=poke;this.clock=clock;this.power=power;
     }
     /** preview: the status page's copy; it neither counts as waiting nor changes the display's schedule. */
     Next next(String device,DisplayType display,boolean preview){
@@ -51,6 +54,8 @@ class PullSchedule {
         Long boundary=designs.nextPhotoBoundary(design);if(boundary!=null)at=Math.min(at,boundary+1);
         long wait=at==Long.MAX_VALUE?limit:at-now;
         int seconds=(int)Math.max(MIN_SECONDS,Math.min(limit,wait));
+        // On its battery with power saving: at least five minutes, whatever the usual limit for this display is.
+        if(savingBattery(device)){seconds=Math.max(seconds,BATTERY_SECONDS);limit=Math.max(limit,BATTERY_SECONDS+PullSpread.MAX_OFFSET);}
         return current(device,preview?seconds:spread.announce(device,seconds,limit,pulling(now)),preview);
     }
     /** How many paired displays pull right now (the status page's copies and web displays do not count). */
@@ -62,6 +67,11 @@ class PullSchedule {
     private Next current(String device,int seconds,boolean preview){
         if(!preview)pendingInRow.remove(device);
         return new Next(seconds,false);
+    }
+    /** Battery power saving is on and the display reported that it runs on its battery. */
+    private boolean savingBattery(String device){
+        try{return registry.get(device).powerSaving()&&power.battery(device)!=null;}
+        catch(IllegalArgumentException e){return false;}
     }
     private int limit(String device){
         try{return poke.reachedWithin(registry.address(device),REACHED_WITHIN)?REACHABLE_SECONDS:UNREACHABLE_SECONDS;}
