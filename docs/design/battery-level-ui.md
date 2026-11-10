@@ -41,6 +41,24 @@ four confirmed discharges**, the newest weighing most (weights 4, 3, 2, 1, newes
 they have). Older discharges are not used. The card says how many discharges the curve rests on ("learned from this
 display · 3 confirmed discharges"), never more than were used.
 
+Discharges last differently long and cover different voltage ranges, so they are never averaged point by point in time.
+The mean is formed per voltage:
+
+1. **One curve per discharge.** Each confirmed discharge becomes a curve from smoothed voltage to percent (100 % at its
+   start, 0 % at a failure, 10 % at the end of a discharge that only reached the limit range, as in the learning design).
+   The curve is made monotone: going down in voltage, the percentage never rises.
+2. **A common voltage grid.** Every curve is interpolated linearly at the same voltages (steps of 10 mV).
+3. **Only matching curves.** A discharge is used only if its smoothed voltage range spans at least 0.3 V; a shorter one
+   is skipped and not counted in "confirmed discharges" on the card. The window of four is filled from the remaining
+   confirmed discharges, newest first.
+4. **Weighted mean per voltage.** At each grid voltage the mean uses only the curves that cover this voltage; their weights
+   are renormalised among themselves. A curve is never extrapolated.
+5. **Outside all curves.** Above the highest covered voltage the result is 100 %. Below the lowest covered voltage it is
+   0 % if one of the used discharges ended in a failure, otherwise it stays at the lowest value of the mean (the limit
+   range is not proof of an empty cell).
+6. **Result.** The mean is made monotone once more and is read by interpolating on the grid; a voltage is mapped to a
+   percentage only through this curve.
+
 ## Card states
 
 | Hardware and estimate state | Device-card presentation | User action |
