@@ -82,7 +82,7 @@ class BatteryLevels {
         for(int i=points.size()-1;i>=0;i--)if(points.get(i).smoothed()!=null){last=points.get(i);break;}
         if(last==null)return Level.of(newest.millivolts()==null?"external-power":"learning");
         if(now-newest.at()>CONTACT_LOST_MILLIS){
-            if(last.raw()!=null&&last.raw()<DischargeDetector.LIMIT_MV)return new Level("contact-lost",0,BatteryCurve.LEARNED,age,last.raw());
+            if(last.smoothed()<DischargeDetector.LIMIT_MV)return new Level("contact-lost",0,BatteryCurve.LEARNED,age,last.raw());
             return new Level("offline",curve.percent(last.smoothed()),BatteryCurve.LEARNED,age,last.raw());
         }
         if(newest.millivolts()==null)return Level.of("external-power");

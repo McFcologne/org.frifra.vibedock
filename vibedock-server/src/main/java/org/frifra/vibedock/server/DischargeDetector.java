@@ -9,8 +9,8 @@ import java.util.function.Function;
  * <ul>
  * <li>a decline starts with the first measurable fall (phase decline_candidate) and goes on until the voltage rises
  * measurably above its lowest point, or the run ends;</li>
- * <li>it is confirmed when it reaches the limit range (a reading below {@value #LIMIT_MV} mV), or when the run ends in a failure:
- * the last reading lies in the limit range and the next sample belongs to a start after power was lost
+ * <li>it is confirmed when it reaches the limit range (the smoothed voltage below {@value #LIMIT_MV} mV), or when the run ends in a failure:
+ * the last smoothed value lies in the limit range and the next sample belongs to a start after power was lost
  * ("power-on" or "brownout") of the display;</li>
  * <li>a decline that ends before is dropped: it teaches nothing and is not called charging.</li>
  * </ul>
@@ -68,10 +68,11 @@ final class DischargeDetector {
     /** The decline from start to low ended by a rise, or (runEnded) with the run at index b. */
     private static void close(List<DeviceMetrics.Sample> samples,List<BatterySeries.Point> points,int start,int low,boolean runEnded,int b,Function<String,String> startKind,List<Discharge> found){
         int end=runEnded?b:low;
-        int lowest=Integer.MAX_VALUE;
-        for(int i=start;i<=end;i++)if(points.get(i).raw()!=null)lowest=Math.min(lowest,points.get(i).raw());
+        // The smoothed voltage decides, not a single raw reading: a dip under load or over a bad connection is no empty cell.
+        double lowest=Double.MAX_VALUE;
+        for(int i=start;i<=end;i++)lowest=Math.min(lowest,points.get(i).smoothed());
         boolean limit=lowest<LIMIT_MV;
-        boolean failure=runEnded&&points.get(b).raw()!=null&&points.get(b).raw()<LIMIT_MV&&failureFollows(samples,points,b,startKind);
+        boolean failure=runEnded&&points.get(b).smoothed()<LIMIT_MV&&failureFollows(samples,points,b,startKind);
         if(!limit&&!failure)return;
         found.add(new Discharge(points.get(start).boot(),points.get(start).at(),points.get(start).smoothed(),points.get(end).at(),points.get(end).smoothed(),
                 failure?FAILURE:LIMIT,List.copyOf(points.subList(start,end+1))));

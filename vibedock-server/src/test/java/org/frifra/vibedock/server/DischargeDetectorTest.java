@@ -44,6 +44,11 @@ class DischargeDetectorTest {
         var found=DischargeDetector.find(followedByStart(run,120,3730),k->"update");
         assertEquals(DischargeDetector.LIMIT,found.get(0).endedBy(),"but is no failure after an update");
     }
+    @Test void aSingleRawDipUnderTheLimitDoesNotConfirmADischarge() {
+        // A decline to 3600 mV with one raw reading at 3300 (load or a bad connection): the smoothed voltage stays above the limit.
+        var run=BatterySeriesTest.run("aaaa1111",0,3970,4170,4100,4060,3990,3900,3820,3760,3700,3660,3300,3640,3620);
+        assertTrue(DischargeDetector.find(followedByStart(run,100,3730),POWER_ON::get).isEmpty());
+    }
     @Test void aRiseAloneTeachesNothing() {
         assertTrue(DischargeDetector.find(BatterySeriesTest.run("aaaa1111",0,3730,3830,3910,4040,4190,4100,4070),k->null).isEmpty());
     }

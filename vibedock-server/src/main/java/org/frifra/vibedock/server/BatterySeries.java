@@ -7,7 +7,8 @@ import java.util.*;
  * docs/design/battery-learning.md). Per run (boot id) and without gaps of more than {@value #GAP_MINUTES} minutes: the
  * median of three readings against outliers (the radio pulls the voltage down for a moment), then the mean of the last
  * three medians. The first reading of a run does not count (the board has just started, the value is not settled).
- * The slope is the fall or rise over the last {@value #SLOPE_MINUTES} minutes in mV per hour; the phase is neutral:
+ * The slope is the fall or rise over the last {@value #SLOPE_MINUTES} minutes in mV per hour, given only once the readings
+ * cover these minutes; the phase is neutral:
  * {@code decline_candidate} for a fall beyond the noise, otherwise {@code flat}. A rise is never called charging.
  */
 final class BatterySeries {
@@ -39,7 +40,8 @@ final class BatterySeries {
             int index=smooth.size()-1,j=index;
             while(j>0&&times.get(index)-times.get(j)<SLOPE_MINUTES*60_000L)j--;
             Double slope=null;
-            if(index-j+1>=MIN_POINTS&&times.get(index)>times.get(j))
+            // Only once the readings really cover the window: a short fall of ten minutes is no decline.
+            if(index-j+1>=MIN_POINTS&&times.get(index)-times.get(j)>=SLOPE_MINUTES*60_000L)
                 slope=(smooth.get(index)-smooth.get(j))/((times.get(index)-times.get(j))/3_600_000.0);
             points.add(new Point(s.at(),s.boot(),mv,smooth.get(index),slope,slope!=null&&slope<=-DECLINE_MV_PER_HOUR?CANDIDATE:FLAT));
         }

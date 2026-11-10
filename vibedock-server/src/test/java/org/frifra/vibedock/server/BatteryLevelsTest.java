@@ -69,6 +69,18 @@ class BatteryLevelsTest {
         var level=levels.level(ID);
         assertEquals("offline",level.state(),level.toString());assertNotEquals(0,level.percent());assertTrue(level.ageSeconds()>=900);
     }
+    @Test void aSingleRawDipBeforeSilenceIsNotAnEmptyCell(@TempDir Path dir) throws Exception {
+        var clock=new MutableClock(Instant.parse("2026-11-10T16:00:00Z").toEpochMilli());
+        var metrics=new DeviceMetrics(dir.toString(),JSON,clock);
+        var levels=new BatteryLevels(dir.toString(),JSON,metrics,new DeviceDiagnostics(dir.toString(),JSON,clock),clock);levels.enable(ID,true);
+        pulls(clock,metrics,"aaaa1111",3970);pulls(clock,metrics,"aaaa1111",FALL);
+        clock.now+=40*60_000L;
+        pulls(clock,metrics,"bbbb2222",3730,3830,3910,4040);
+        pulls(clock,metrics,"cccc3333",4040,4040,4040,4040,3300); // one dip under load, then silence
+        clock.now+=20*60_000L;
+        var level=levels.level(ID);
+        assertEquals("offline",level.state(),level.toString());assertNotEquals(0,level.percent(),"the smoothed voltage is still high");
+    }
     @Test void theTextsNameWhatIsKnown() {
         assertEquals("",BatteryLevels.describe(Level.of("off")));
         assertTrue(BatteryLevels.describe(Level.of("offline")).contains("No measurement"),"no percentage without a recent value");

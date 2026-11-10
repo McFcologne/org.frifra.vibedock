@@ -26,13 +26,20 @@ class BatterySeriesTest {
         assertTrue(points.get(3).smoothed()>4000,"and barely moves the mean: "+points.get(3).smoothed());
     }
     @Test void aFallBeyondTheNoiseIsADeclineCandidateAndARiseIsOnlyFlat() {
-        var falling=BatterySeries.of(run("aaaa1111",0,4170,4100,4060,3940,3870,3810,3750));
+        var falling=BatterySeries.of(run("aaaa1111",0,3970,4170,4100,4060,3940,3870,3810,3750,3690));
         assertEquals(BatterySeries.CANDIDATE,falling.get(falling.size()-1).phase());
         assertTrue(falling.get(falling.size()-1).slope()<-100);
         var rising=BatterySeries.of(run("bbbb2222",0,3730,3830,3910,4040,4190,4100));
         for(var p:rising)assertNotEquals(BatterySeries.CANDIDATE,p.phase(),"a rise is never called anything but flat");
         var steady=BatterySeries.of(run("cccc3333",0,4050,4050,4040,4040,4040,4040,4040));
         for(var p:steady)assertEquals(BatterySeries.FLAT,p.phase());
+    }
+    @Test void aShortFallIsNoDeclineUntilTheReadingsCoverThirtyMinutes() {
+        // 200 mV in ten minutes, then steady: the slope needs a window of 30 minutes, so nothing is a candidate yet.
+        var points=BatterySeries.of(run("aaaa1111",0,4170,4170,4170,4100,3970,3970));
+        for(var p:points){assertEquals(BatterySeries.FLAT,p.phase());assertNull(p.slope(),"no slope before the readings cover the window: "+p);}
+        var longer=BatterySeries.of(run("aaaa1111",0,4170,4170,4170,4100,3970,3970,3970,3970,3970));
+        assertNotNull(longer.get(longer.size()-1).slope(),"with 30 minutes of readings the slope exists");
     }
     @Test void aNewRunAndAGapStartTheSmoothingAnew() {
         var samples=new ArrayList<>(run("aaaa1111",0,4000,4000,4000,4000));

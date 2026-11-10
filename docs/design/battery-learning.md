@@ -76,11 +76,12 @@ charged. That decline is confirmed, the rise after it is not classified.
 ## Values in the implementation
 
 - Smoothing: median of three readings, then the mean of the last three; reset at a new run and after a gap of more than 15 minutes.
-- Decline candidate: the smoothed voltage falls by at least 100 mV per hour over 30 minutes (at least three points); the
+- Decline candidate: the smoothed voltage falls by at least 100 mV per hour over a window that really covers 30 minutes (a shorter fall is no decline); the
   decline starts at the highest smoothed point in the 30 minutes before the first candidate and ends when the voltage
   rises 30 mV above its lowest point, or with the run.
-- Limit range: a reading below 3520 mV (the lowest step of the firmware's base curve). Failure: the last reading of the run
-  is in the limit range and the next sample belongs to a start of kind `power-on` or `brownout`.
+- Limit range: the smoothed voltage below 3520 mV (the lowest step of the firmware's base curve); a single raw dip never
+  counts. Failure: the last smoothed value of the run is in the limit range and the next sample belongs to a start of
+  kind `power-on` or `brownout`.
 - Percentage: the time since the start of the decline stands for the charge used (steady load): 100 % at the start, 0 %
   at a failure, 10 % at the end of a discharge that only reached the limit range. The most recent discharge with a
   failure is used, else the most recent one. The value comes from the latest smoothed voltage.
