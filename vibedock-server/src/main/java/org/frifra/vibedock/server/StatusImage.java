@@ -175,7 +175,7 @@ public class StatusImage {
             try{
                 panel.translate(column*(w/2),y);panel.clipRect(0,0,w/2,height);
                 compact(panel,scheme,snapshot.label(sources.get(column)),snapshot.providers().get(sources.get(column)),height,bottom,
-                        column==sources.size()-1?icon:null);
+                        column==sources.size()-1?icon:null,column>0);
             }finally{panel.dispose();}
         }
     }
@@ -365,23 +365,30 @@ public class StatusImage {
         try{g.drawImage(icon.getScaledInstance(width,height,java.awt.Image.SCALE_AREA_AVERAGING),0,0,null);}finally{g.dispose();}return image;
     }
     /** Half-width provider: the theme's own window or heading at half width; compact text, nothing scaled. */
-    private void compact(Graphics2D g,Scheme scheme,String title,UsageService.Provider p,int height,boolean bottom,Battery icon){
+    private void compact(Graphics2D g,Scheme scheme,String title,UsageService.Provider p,int height,boolean bottom,Battery icon,boolean rightColumn){
         title=ThemeArtwork.title(scheme,title);
         ThemeArtwork.band(g,scheme,0,0,w/2,height);
         if(p==null)p=new UsageService.Provider("unconfigured",null,null,null);
         int top=16;
+        // The two windows touch in the middle; the outer edges are those of the full-width window.
+        int left=scheme.style==Scheme.Style.CONSOLE?2:4,right=scheme.style==Scheme.Style.CONSOLE?w-2:scheme.style==Scheme.Style.MAC?w-5:w-4;
+        int gap=scheme.style==Scheme.Style.FLUENT||scheme.style==Scheme.Style.MACOS?1:0;  // rounded corners need a visible joint
+        int x=rightColumn?gap:left,width=rightColumn?right-w/2-gap:w/2-left-gap;
+        // The content stays centred in its window.
+        int shift=scheme.windowed()||scheme.style==Scheme.Style.CONSOLE?x+width/2-w/4:0;
         switch(scheme.style){
-            case MAC -> macWindow(g,scheme,title,null,22,2,w/2-6,height-(bottom?8:4),icon);
-            case WINDOWS -> windowsWindow(g,scheme,title,null,22,2,w/2-4,height-(bottom?6:3),icon);
-            case FLUENT -> fluentWindow(g,scheme,title,null,22,2,w/2-4,height-(bottom?6:3),icon);
-            case MACOS -> macosWindow(g,scheme,title,null,22,2,w/2-4,height-(bottom?6:3),icon);
-            case CONSOLE -> console(g,scheme,title,null,22,2,w/2-4,height-(bottom?6:3),icon);
+            case MAC -> macWindow(g,scheme,title,null,22,x,width,height-(bottom?8:4),icon);
+            case WINDOWS -> windowsWindow(g,scheme,title,null,22,x,width,height-(bottom?6:3),icon);
+            case FLUENT -> fluentWindow(g,scheme,title,null,22,x,width,height-(bottom?6:3),icon);
+            case MACOS -> macosWindow(g,scheme,title,null,22,x,width,height-(bottom?6:3),icon);
+            case CONSOLE -> console(g,scheme,title,null,22,x,width,height-(bottom?6:3),icon);
             default -> {
                 int reserve=icon==null?0:BATTERY_ROOM+ThemeArtwork.cornerRoom(scheme);
                 if(!ThemeArtwork.heading(g,scheme,title,6,top,w/2-12-reserve,10))text(g,scheme,(scheme.style==Scheme.Style.TERMINAL?"> ":"")+title,6,top,10,scheme.title,true);
                 if(icon!=null)batteryIcon(g,icon,w/2-6-ThemeArtwork.cornerRoom(scheme),top-4,scheme.title,scheme.warning);
             }
         }
+        g.translate(shift,0);
         if(!p.status().equals("ok")){
             String status=p.status().equals("rate_limited")?"Limited":DeviceSender.statusLabel(p.status());
             int y=scheme.windowed()||scheme.style==Scheme.Style.CONSOLE?top+14:top+10;
