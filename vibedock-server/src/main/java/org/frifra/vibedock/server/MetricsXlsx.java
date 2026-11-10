@@ -112,6 +112,12 @@ final class MetricsXlsx {
                 boolean tenth=i>=1&&i<=6;
                 b.append(number(column(7+i),r,values[i].doubleValue(),tenth?S_TENTH:0));
             }
+            var battery=ctx.battery();
+            if(battery!=null&&battery.smoothed()!=null){
+                b.append(number(column(7+values.length),r,Math.round(battery.smoothed()),0));
+                if(battery.slope()!=null)b.append(number(column(8+values.length),r,Math.round(battery.slope()),0));
+                b.append(text(column(9+values.length),r,battery.phase(),0));
+            }
             if(raw)b.append(text(column(width-1),r,s.raw(),0));
             b.append("</row>");r++;
         }

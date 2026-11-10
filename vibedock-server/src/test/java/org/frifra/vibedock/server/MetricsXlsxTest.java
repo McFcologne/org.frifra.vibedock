@@ -38,9 +38,9 @@ class MetricsXlsxTest {
         assertTrue(sheet.contains("<c r=\"D2\" t=\"inlineStr\"><is><t xml:space=\"preserve\">=1+1</t></is></c>"),"a name that looks like a formula stays text");
         assertTrue(sheet.contains("<c r=\"I2\" s=\"3\"><v>23.5</v></c>"),"free memory in kB as a number");
         assertTrue(sheet.contains("<c r=\"H2\"><v>3600</v></c>"),"uptime as a number");
-        assertTrue(sheet.contains("<autoFilter ref=\"A1:U2\"/>")&&sheet.contains("state=\"frozen\""));
+        assertTrue(sheet.contains("<autoFilter ref=\"A1:X2\"/>")&&sheet.contains("state=\"frozen\""));
         assertTrue(sheet.contains(">raw</t>")&&sheet.contains(FULL));
-        assertTrue(files.get("xl/worksheets/sheet3.xml").contains("<autoFilter ref=\"A1:U1\"/>"),"an empty sheet keeps its header");
+        assertTrue(files.get("xl/worksheets/sheet3.xml").contains("<autoFilter ref=\"A1:X1\"/>"),"an empty sheet keeps its header");
     }
     @Test void anUnmeasuredValueIsAnEmptyCell() throws Exception {
         var s=DeviceMetrics.parse("1;5;;;;;;;;0;;;0;0",1_000,null);

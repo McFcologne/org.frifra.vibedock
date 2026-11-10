@@ -34,6 +34,7 @@ class Controllers {
         this.storage=storage;this.firmware=firmware;this.info=info;this.admin=admin;this.dataDir=dataDir;this.logDir=logDir;
     }
     @org.springframework.beans.factory.annotation.Autowired private DesignService designs;
+    @org.springframework.beans.factory.annotation.Autowired(required=false) private BatteryLevels batteryLevels;
     @org.springframework.beans.factory.annotation.Autowired private ImageColorSettings imageColors;
     @org.springframework.beans.factory.annotation.Autowired(required=false) private DeviceDiagnostics diagnostics;
     @org.springframework.beans.factory.annotation.Value("${vibedock.admin-auth:password}") private String auth;
@@ -138,6 +139,13 @@ class Controllers {
     }
     @GetMapping("/admin/devices") String devices(Model model,HttpServletRequest request) {
         model.addAttribute("clients",clients.views());
+        var batteryOn=new HashSet<String>();var batteryText=new HashMap<String,String>();
+        if(batteryLevels!=null)for(var view:clients.views())if(view.web()==null&&view.board().batteryPowerSaving()){
+            var level=batteryLevels.level(view.identifier());
+            if(batteryLevels.enabled(view.identifier()))batteryOn.add(view.identifier());
+            batteryText.put(view.identifier(),BatteryLevels.describe(level));
+        }
+        model.addAttribute("batteryOn",batteryOn);model.addAttribute("batteryText",batteryText);
         model.addAttribute("networks",networks());
         // The preview's link changes with the design and with the photo a slideshow shows now, so the card follows it.
         var previews=new java.util.HashMap<String,String>();

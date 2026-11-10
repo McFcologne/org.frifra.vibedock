@@ -43,9 +43,9 @@
     try { sessionStorage.setItem('vibedock-scroll', JSON.stringify({ path: location.pathname, y: window.scrollY, at: Date.now() })); } catch (e) { /* storage blocked */ }
   });
   // Device switches save in place, without reloading the page: the external address of web displays (swaps the
-  // links) and the experimental battery power saving.
+  // links), the experimental battery power saving and the learned battery level.
   document.addEventListener('change', async event => {
-    const box = event.target.closest('[data-web-external],[data-power-saving]'); if (!box) return;
+    const box = event.target.closest('[data-web-external],[data-power-saving],[data-battery-level]'); if (!box) return;
     const form = box.form, card = form.closest('.client-card'), body = new URLSearchParams(new FormData(form));
     if (!box.checked) body.set(box.name, 'false');
     const token = document.querySelector('meta[name="csrf-token"]').content, header = document.querySelector('meta[name="csrf-header"]').content;
@@ -54,7 +54,7 @@
       const response = await fetch(form.action, { method: 'POST', body, headers: { Accept: 'application/json', [header]: token } });
       if (!response.ok) throw new Error(String(response.status));
       const answer = await response.json();
-      if (box.matches('[data-power-saving]')) box.checked = answer.enabled;
+      if (box.matches('[data-power-saving],[data-battery-level]')) box.checked = answer.enabled;
       else card.querySelectorAll('.web-link').forEach((row, i) => { const url = i === 0 ? answer.page : answer.image;
         row.querySelector('code').textContent = url; row.querySelector('[data-copy]').dataset.copy = url; const open = row.querySelector('a'); if (open) open.href = url; });
     } catch { box.checked = !box.checked; }

@@ -831,6 +831,25 @@ class AccessTest {
         mvc.perform(post("/admin/clients/missing/power-saving").param("enabled","true").header("Accept","application/json")
                 .with(user("admin").roles("ADMIN")).with(csrf()).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isBadRequest());
     }
+    @Test void theLearnedBatteryLevelIsOffUntilSwitchedOnPerDisplayAndOnlyForBoardsThatMeasure() throws Exception {
+        String key="ef".repeat(32),id="vibedock-level",admin="/admin/clients/"+id+"/battery-level";
+        clients.paired(id,"Kitchen",key,"192.168.1.36",80,"waveshare-s3-epaper-154");
+        var toggle=(java.util.function.Function<String,org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder>)enabled->post(admin).param("enabled",enabled)
+                .header("Accept","application/json").with(user("admin").roles("ADMIN")).with(csrf()).with(r->{r.setLocalPort(10001);return r;});
+        var page=get("/admin/devices").with(user("admin").roles("ADMIN")).with(r->{r.setLocalPort(10001);return r;});
+        try{
+            String off=mvc.perform(page).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+            Assertions.assertTrue(off.contains("Battery level (learned)")&&!off.contains("Learning: the level appears"),"off by default, no status line");
+            mvc.perform(toggle.apply("true")).andExpect(status().isOk()).andExpect(jsonPath("$.enabled").value(true));
+            String on=mvc.perform(page).andReturn().getResponse().getContentAsString();
+            Assertions.assertTrue(on.contains("Learning: the level appears after the first confirmed discharge"),"switched on but nothing learned yet");
+            mvc.perform(toggle.apply("false")).andExpect(status().isOk()).andExpect(jsonPath("$.enabled").value(false));
+            clients.setBoard(id,"lilygo-t-display");
+            mvc.perform(toggle.apply("true")).andExpect(status().isBadRequest());
+        }finally{clients.remove(id);}
+        mvc.perform(post("/admin/clients/missing/battery-level").param("enabled","true").header("Accept","application/json")
+                .with(user("admin").roles("ADMIN")).with(csrf()).with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isBadRequest());
+    }
     @Test void squarePanelsTurnInQuarterStepsAndOlderFilesStayFlipped() throws Exception {
         String key="ef".repeat(32),id="vibedock-turn",image="/api/v1/clients/"+id+"/image",flip="/admin/clients/"+id+"/flip";
         clients.paired(id,"Desk",key,"192.168.1.34",80,"waveshare-s3-touch-lcd-154");

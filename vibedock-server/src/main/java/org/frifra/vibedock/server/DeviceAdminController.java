@@ -319,6 +319,20 @@ class DeviceAdminController {
             return org.springframework.http.ResponseEntity.ok(java.util.Map.of("enabled",registry.get(identifier).powerSaving()));}
         catch(IllegalArgumentException e){return org.springframework.http.ResponseEntity.badRequest().body(java.util.Map.of("error",e.getMessage()));}
     }
+    @org.springframework.beans.factory.annotation.Autowired(required=false) private BatteryLevels batteryLevels;
+    /**
+     * Switches the learned battery level of a device on or off (off by default, see docs/design/battery-learning.md). Only
+     * displays that measure their battery have it.
+     */
+    @PostMapping(value="/admin/clients/{identifier}/battery-level",produces="application/json") @ResponseBody org.springframework.http.ResponseEntity<java.util.Map<String,Object>> batteryLevel(
+            @PathVariable String identifier,@RequestParam(defaultValue="false") boolean enabled) throws IOException {
+        try{
+            var device=registry.get(identifier);
+            if(batteryLevels==null||device.web()!=null||!device.board().batteryPowerSaving())throw new IllegalArgumentException("This display does not measure its battery");
+            batteryLevels.enable(identifier,enabled);
+            return org.springframework.http.ResponseEntity.ok(java.util.Map.of("enabled",batteryLevels.enabled(identifier)));}
+        catch(IllegalArgumentException e){return org.springframework.http.ResponseEntity.badRequest().body(java.util.Map.of("error",e.getMessage()));}
+    }
     record Order(List<String> ids) {}
     /** Order of the device cards after dragging one by its grip. */
     @PostMapping(value="/admin/clients/order",produces="application/json") @ResponseBody java.util.Map<String,Object> order(@RequestBody Order order) throws IOException {
