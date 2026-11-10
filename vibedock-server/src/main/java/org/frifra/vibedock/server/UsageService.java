@@ -47,6 +47,10 @@ public class UsageService {
     private final DeviceSender devices;
     private final Clock clock;
     private volatile Map<String,Provider> readings=Map.of();
+    /** How long the displays keep a source's last good reading while a poll gives no usable answer. */
+    static final long CACHE_SECONDS=30*60L;
+    /** The last reading with figures of each source (ok or partial), kept across waiting, errors and sign-in changes. */
+    private final Map<String,Provider> lastGood=new ConcurrentHashMap<>();
     private volatile SettingsStore.Settings collectedFor;
     private final Map<String,PollPace> pace=new ConcurrentHashMap<>();
     /** Sources asked in the running collection whose readings are not published yet (displays then wait for them). */
@@ -77,7 +81,17 @@ public class UsageService {
     public UsageService(SettingsStore settings,ProviderClient client,DeviceSender devices,Clock clock) {
         this.settings=settings; this.client=client; this.devices=devices; this.clock=clock;
     }
-    public Snapshot snapshot() {
+    /** The true state of every source (administration, support file). */
+    public Snapshot snapshot() { return snapshot(false); }
+    /**
+     * What the displays get: a source that waits, is unavailable, failed or went stale keeps its last reading with
+     * figures (and its observation time) for CACHE_SECONDS. Sign-in problems, rate limits and pauses are shown as they are.
+     */
+    public Snapshot displayed() { return snapshot(true); }
+    private static boolean transientState(String status){
+        return switch(status){case "waiting","unavailable","upstream_error","invalid_response","stale"->true;default->false;};
+    }
+    private Snapshot snapshot(boolean cached) {
         Map<String,Provider> view=new LinkedHashMap<>();Map<String,String> labels=new LinkedHashMap<>(); long now=clock.instant().getEpochSecond();
         var s=settings.effective();
         for (var account:s.accounts()) {
@@ -88,6 +102,11 @@ public class UsageService {
                     : new Provider("waiting",null,null,null);
             if (p.observedAt()!=null && now-p.observedAt()>staleAfter(name) && (p.status().equals("ok") || p.status().equals("partial")))
                 p=new Provider("stale",p.observedAt(),null,null);
+            var good=cached&&transientState(p.status())?lastGood.get(name):null;
+            if (good!=null && now-good.observedAt()<=CACHE_SECONDS) {
+                var five=current(good.fiveHour(),now);var week=current(good.week(),now);
+                if (five!=null||week!=null) p=new Provider(good.status(),good.observedAt(),five,week);
+            }
             view.put(name,p.withPeriod(period(account.type(),p)));
         }
         return new Snapshot(1,now,Collections.unmodifiableMap(view),Collections.unmodifiableMap(labels));
@@ -183,7 +202,8 @@ public class UsageService {
                 String status=r.fiveHour()==null && r.week()==null ? "unavailable"
                         : !single && (r.fiveHour()==null || r.week()==null) ? "partial":"ok";
                 p.success(now);report(account,status,"");interval(account,before,p,"no HTTP 429 for a while, trying a shorter one");
-                next.put(name,new Provider(status,clock.instant().getEpochSecond(),r.fiveHour(),r.week()));
+                var fresh=new Provider(status,clock.instant().getEpochSecond(),r.fiveHour(),r.week());
+                next.put(name,fresh);if(!status.equals("unavailable"))lastGood.put(name,fresh);
             } catch (ProviderClient.Failure e) {
                 if (e.status.equals("rate_limited")) { p.rateLimited(now,e.retryAt); next.put(name,rateLimited(last,now)); }
                 report(account,e.status,e.detail+(e.status.equals("rate_limited")?", next try in "+p.waitMinutes(now)+" min":""));
@@ -194,10 +214,11 @@ public class UsageService {
             catch (Exception e) { p.failed(now); report(account,"upstream_error",e.toString()); reasons.put(name,"no answer from the provider"); next.put(name,new Provider("upstream_error",previous,null,null)); }
         }
         pace.keySet().retainAll(configuration.accounts().stream().map(SettingsStore.Account::id).toList());
+        lastGood.keySet().retainAll(configuration.accounts().stream().map(SettingsStore.Account::id).toList());
         if (!configuration.equals(settings.effective())) return;
         readings=Map.copyOf(next);
         collectedFor=configuration;
-        devices.send(configuration.devices(),snapshot());
+        devices.send(configuration.devices(),displayed());
     }
     /**
      * Sources were paused, resumed, renamed or reordered: every source keeps its values, their time and its polling
@@ -212,7 +233,7 @@ public class UsageService {
             else if (last!=null && last.status().equals("suspended")) next.remove(account.id());
         }
         readings=Map.copyOf(next);collectedFor=configuration;
-        devices.send(configuration.devices(),snapshot());
+        devices.send(configuration.devices(),displayed());
         pollNow();
     }
     /** Changed sources are polled again at once; each keeps the interval it learned (unless it waits for a 429). */

@@ -46,7 +46,7 @@ class ThemeIconsTest {
         assertFalse(ThemeIcons.available(new Design.Icon("theme-catalog","missing","theme"),Scheme.MIDNIGHT));
     }
     @Test void missingReferencesFallBackWithoutLosingTheStoredChoice(@TempDir Path dir) throws Exception {
-        var usage=mock(UsageService.class);when(usage.snapshot()).thenReturn(LayoutTest.snapshot(0));
+        var usage=mock(UsageService.class);when(usage.snapshot()).thenReturn(LayoutTest.snapshot(0));when(usage.displayed()).thenReturn(LayoutTest.snapshot(0));
         var weather=mock(WeatherService.class);when(weather.current(any())).thenReturn(Optional.empty());
         var service=new DesignService(usage,new StatusImage("Europe/Berlin"),new Twemoji(Twemoji.locate(null).toString()),weather,
                 new PhotoLibrary(dir.toString()),Clock.systemUTC());

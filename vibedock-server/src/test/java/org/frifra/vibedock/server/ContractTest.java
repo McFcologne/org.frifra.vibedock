@@ -136,4 +136,28 @@ class ContractTest {
         assertEquals("ok",service.snapshot().providers().get("codex").status());
         verify(client,times(1)).fetch(eq("claude"),any());
     }
+    @Test void displaysKeepTheLastReadingForThirtyMinutesButAdministrationShowsTheTruth(@TempDir Path dir) throws Exception {
+        var settings=new SettingsStore(dir.toString(),json);
+        settings.save(new SettingsStore.Settings(List.of(),new SettingsStore.Credential("token",""),new SettingsStore.Credential("",""),List.of()));
+        var client=mock(ProviderClient.class);var clock=mock(java.time.Clock.class);
+        Instant start=Instant.parse("2026-10-13T20:00:00Z");when(clock.instant()).thenReturn(start);
+        when(client.fetch(any(),any())).thenReturn(new ProviderClient.Reading(new ProviderClient.Window(20,1900000000),new ProviderClient.Window(30,1900000000)));
+        var service=new UsageService(settings,client,mock(DeviceSender.class),clock);
+        service.refresh();
+        long observed=start.getEpochSecond();
+        // A provider error after ten minutes: the displays keep the reading and its time, the administration shows the error.
+        doThrow(new ProviderClient.Failure("upstream_error",0,"HTTP 500")).when(client).fetch(any(),any());
+        when(clock.instant()).thenReturn(start.plusSeconds(600));service.refresh();
+        assertEquals("upstream_error",service.snapshot().providers().get("codex").status());
+        var shown=service.displayed().providers().get("codex");
+        assertEquals("ok",shown.status());assertEquals(20.0,shown.fiveHour().usedPercent());assertEquals(observed,shown.observedAt());
+        // A lost sign-in is never covered.
+        doThrow(new ProviderClient.Failure("authentication_required")).when(client).fetch(any(),any());
+        when(clock.instant()).thenReturn(start.plusSeconds(660));service.refresh();
+        assertEquals("authentication_required",service.displayed().providers().get("codex").status());
+        // After thirty minutes without a reading the displays show the real state.
+        doThrow(new ProviderClient.Failure("upstream_error",0,"HTTP 500")).when(client).fetch(any(),any());
+        when(clock.instant()).thenReturn(start.plusSeconds(1801));service.refresh();
+        assertEquals("upstream_error",service.displayed().providers().get("codex").status());
+    }
 }

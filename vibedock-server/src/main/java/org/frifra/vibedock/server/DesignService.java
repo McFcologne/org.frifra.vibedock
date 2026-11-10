@@ -112,7 +112,7 @@ class DesignService {
         skipped.merge(display,step,Integer::sum);return true;
     }
     /** Sound metadata stays available during a slideshow, for the sources configured on this display. */
-    String quotaHeader(Design design,DisplayType display){return QuotaHeader.create(usage.snapshot(),design.layout().fit(display));}
+    String quotaHeader(Design design,DisplayType display){return QuotaHeader.create(usage.displayed(),design.layout().fit(display));}
     /** The poll interval while a slideshow runs: one pull per photo, but not slower than the server's interval. */
     int pollSeconds(Design design,int server){return pollSeconds(design,server,null);}
     int pollSeconds(Design design,int server,String display){
@@ -143,7 +143,7 @@ class DesignService {
         var look=new StatusImage.Look(icon.orElse(null),scheme,
                 current.flatMap(c->twemoji.image(WeatherService.emoji(c.code(),c.day()),(int)Math.round(24*scale))).orElse(null),
                 current.map(c->WeatherService.temperature(c.temperature())).orElse(null),design.layout(),battery);
-        return renderer.render(usage.snapshot(),ip,look,type,scale);
+        return renderer.render(usage.displayed(),ip,look,type,scale);
     }
     /**
      * What a device actually shows: firmware that draws the IP corner itself (rows 220-239) needs the weather/mood
