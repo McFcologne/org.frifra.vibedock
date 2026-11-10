@@ -129,7 +129,7 @@ public class BaselineStatusImage {
             try{
                 panel.translate(column*(w/2),y);panel.clipRect(0,0,w/2,height);
                 compact(panel,scheme,snapshot.label(sources.get(column)),snapshot.providers().get(sources.get(column)),height,bottom,
-                        column==sources.size()-1?icon:null);
+                        column==sources.size()-1?icon:null,column>0);
             }finally{panel.dispose();}
         }
     }
@@ -274,23 +274,27 @@ public class BaselineStatusImage {
         try{g.drawImage(icon.getScaledInstance(width,height,java.awt.Image.SCALE_AREA_AVERAGING),0,0,null);}finally{g.dispose();}return image;
     }
     /** Half-width provider: the theme's own window or heading at half width; compact text, nothing scaled. */
-    private void compact(Graphics2D g,BaselineScheme scheme,String title,UsageService.Provider p,int height,boolean bottom,Battery icon){
+    private void compact(Graphics2D g,BaselineScheme scheme,String title,UsageService.Provider p,int height,boolean bottom,Battery icon,boolean rightColumn){
         title=BaselineThemeArtwork.title(scheme,title);
         BaselineThemeArtwork.band(g,scheme,0,0,w/2,height);
         if(p==null)p=new UsageService.Provider("unconfigured",null,null,null);
         int top=16;
+        int left=scheme.style==BaselineScheme.Style.CONSOLE?2:4,right=scheme.style==BaselineScheme.Style.CONSOLE?w-2:scheme.style==BaselineScheme.Style.MAC?w-5:w-4;
+        int x=rightColumn?0:left,width=rightColumn?right-w/2:w/2-left;
+        int shift=scheme.windowed()||scheme.style==BaselineScheme.Style.CONSOLE?x+width/2-w/4:0;
         switch(scheme.style){
-            case MAC -> macWindow(g,scheme,title,null,22,2,w/2-6,height-(bottom?8:4),icon);
-            case WINDOWS -> windowsWindow(g,scheme,title,null,22,2,w/2-4,height-(bottom?6:3),icon);
-            case FLUENT -> fluentWindow(g,scheme,title,null,22,2,w/2-4,height-(bottom?6:3),icon);
-            case MACOS -> macosWindow(g,scheme,title,null,22,2,w/2-4,height-(bottom?6:3),icon);
-            case CONSOLE -> console(g,scheme,title,null,22,2,w/2-4,height-(bottom?6:3),icon);
+            case MAC -> macWindow(g,scheme,title,null,22,x,width,height-(bottom?8:4),icon);
+            case WINDOWS -> windowsWindow(g,scheme,title,null,22,x,width,height-(bottom?6:3),icon);
+            case FLUENT -> fluentWindow(g,scheme,title,null,22,x,width,height-(bottom?6:3),icon);
+            case MACOS -> macosWindow(g,scheme,title,null,22,x,width,height-(bottom?6:3),icon);
+            case CONSOLE -> console(g,scheme,title,null,22,x,width,height-(bottom?6:3),icon);
             default -> {
                 int reserve=icon==null?0:BATTERY_ROOM+BaselineThemeArtwork.cornerRoom(scheme);
                 if(!BaselineThemeArtwork.heading(g,scheme,title,6,top,w/2-12-reserve,10))text(g,scheme,(scheme.style==BaselineScheme.Style.TERMINAL?"> ":"")+title,6,top,10,scheme.title,true);
                 if(icon!=null)batteryIcon(g,icon,w/2-6-BaselineThemeArtwork.cornerRoom(scheme),top-4,scheme.title,scheme.warning);
             }
         }
+        g.translate(shift,0);
         if(!p.status().equals("ok")){
             String status=p.status().equals("rate_limited")?"Limited":DeviceSender.statusLabel(p.status());
             int y=scheme.windowed()||scheme.style==BaselineScheme.Style.CONSOLE?top+14:top+10;

@@ -1,0 +1,1 @@
+- Split bands: the two half-width windows now touch in the middle and their outer edges line up with the full-width window.
