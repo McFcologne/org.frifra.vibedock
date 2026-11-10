@@ -8,8 +8,10 @@
 namespace client_policy {
 // Coarse voltage-only estimate for a single Li-ion cell, following the Waveshare 1.54-inch example.
 // This is not a fuel gauge or battery-presence detector; a charger without a cell can also show a voltage.
+// A cell that sags to 2.5-3.0 V (empty, or loaded by the radio) is empty, not unknown: 0. Below that, or above a full
+// cell, the reading is no cell at all (open ADC, charger only) and stays unknown.
 constexpr int batteryEstimate(uint32_t millivolts) {
-  return millivolts < 3000 || millivolts > 4350 ? -1 :
+  return millivolts < 2500 || millivolts > 4350 ? -1 : millivolts < 3000 ? 0 :
       millivolts < 3520 ? 1 : millivolts < 3640 ? 20 : millivolts < 3760 ? 40 :
       millivolts < 3880 ? 60 : millivolts < 4000 ? 80 : 100;
 }

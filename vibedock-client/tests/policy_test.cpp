@@ -162,12 +162,13 @@ int main(){
     assert(wrap.update(false,0xfffffff0u)==0); assert(wrap.update(false,5000)==-1);
   }
   // A disconnected/invalid ADC must never become a plausible percentage. Estimates are bounded and monotonic.
-  assert(batteryEstimate(0) == -1); assert(batteryEstimate(2999) == -1);
+  assert(batteryEstimate(0) == -1); assert(batteryEstimate(2499) == -1);
+  assert(batteryEstimate(2500) == 0); assert(batteryEstimate(2999) == 0);  // an empty cell is empty, not unknown
   assert(batteryEstimate(4351) == -1); assert(batteryEstimate(0xffffffffu) == -1);
   assert(batteryEstimate(3300) == 1); assert(batteryEstimate(3700) == 40); assert(batteryEstimate(4200) == 100);
-  for (uint32_t mv = 3000; mv <= 4350; ++mv) {
+  for (uint32_t mv = 2500; mv <= 4350; ++mv) {
     assert(batteryEstimate(mv) >= 0 && batteryEstimate(mv) <= 100);
-    if (mv > 3000) assert(batteryEstimate(mv) >= batteryEstimate(mv - 1));
+    if (mv > 2500) assert(batteryEstimate(mv) >= batteryEstimate(mv - 1));
   }
   const uint32_t beforeWrapPower=std::numeric_limits<uint32_t>::max()-1000;
   // Battery power saving: battery only without USB host and without charging; a change needs two readings in a row.
