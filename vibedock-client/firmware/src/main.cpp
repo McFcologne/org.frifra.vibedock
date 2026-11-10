@@ -26,6 +26,7 @@
 #include <qrcode.h>
 #if defined(ESP32)
 #include <esp_heap_caps.h>
+#include <esp_sleep.h>
 #endif
 
 #ifndef VIBEDOCK_VERSION
@@ -73,6 +74,8 @@ bool applyOrientation(uint8_t next);
 bool powerSavingAllowed = false, powerSaving = false, dimmed = false;
 client_policy::PowerSource powerSource;
 uint32_t lastActivity = 0, lastPowerCheck = 0;
+bool sleepAnnounced = false;  // the last answer allowed sleeping until the next pull (X-VibeDock-Sleep: 1), e-paper only
+uint32_t wokeAt = 0;  // millis() when the last sleep between pulls ended
 int batteryLevel = -1;  // the estimate of the last power check (1.54 and C6 1.69, steps of 20 %), -1 unknown
 client_policy::ToneSettings toneSettings;  // colour correction of the panel, set on the status page
 client_policy::Tone panelTone;
@@ -1248,7 +1251,7 @@ int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
       , "X-VibeDock-Quota"
 #endif
 #ifdef VIBEDOCK_BATTERY
-      , "X-VibeDock-Power-Saving"
+      , "X-VibeDock-Power-Saving", "X-VibeDock-Sleep"
 #endif
   };
   r.http.collectHeaders(wanted, sizeof(wanted)/sizeof(wanted[0]));
@@ -1559,6 +1562,8 @@ void pull() {
       logEvent(allowed ? F("Battery power saving allowed (experimental)") : F("Battery power saving switched off"), true);
     }
   }
+  // Sleep until the next pull: the server allows it for this answer only (nothing is offered or requested meanwhile).
+  sleepAnnounced = (code == 200 || code == 304) && http.header("X-VibeDock-Sleep") == "1" && offered.isEmpty();
 #endif
   client_policy::ImageSize size;
   if (code == 200) {
@@ -2322,6 +2327,31 @@ bool applyOrientation(uint8_t next) {
   return false;
 }
 
+#if defined(VIBEDOCK_EPAPER) && defined(VIBEDOCK_BATTERY)
+// Between two pulls on battery the e-paper display sleeps (light sleep: memory, picture and clock stay, radio and processor
+// stop). It wakes for the next pull, connects again and pulls; the rules are client_policy::sleepAllowed.
+void sleepBetweenPulls() {
+  if (mode != Mode::Paired) return;
+  uint32_t interval = pullIntervalMs(), since = millis() - lastPull;
+  if (since >= interval) return;
+  uint32_t remaining = interval - since;
+  if (!client_policy::sleepAllowed(powerSaving, powerSource.battery, sleepAnnounced, lastStatus, millis(), millis() - wokeAt, remaining, panel.pending())) return;
+  if (logDirty) saveLog();
+  if (configDirty) { configDirty = false; saveConfig(); }
+  WiFi.disconnect(true); WiFi.mode(WIFI_OFF);  // the radio must be off for a light sleep
+  uint32_t before = millis();
+  esp_sleep_enable_timer_wakeup(uint64_t(remaining) * 1000ull);
+  esp_light_sleep_start();
+  uint32_t advanced = millis() - before;
+  lastPull -= client_policy::missedSleepMs(remaining, advanced);  // millis() stood still: the pull is due now
+  wokeAt = millis();
+  WiFi.mode(WIFI_STA); WiFi.setSleep(true); WiFi.begin(ssid.c_str(), password.c_str());
+  uint32_t began = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - began < 15000) delay(50);
+  lastReconnect = millis(); lastPowerCheck = millis() - client_policy::powerCheckMs;  // the battery is read again at once
+}
+#endif
+
 void loop() {
 #if defined(VIBEDOCK_EPAPER)
   panel.service();  // sends the frame once it has been quiet
@@ -2378,5 +2408,8 @@ void loop() {
       if (WiFi.status() == WL_CONNECTED) message("Updates missing", Step::Server, true); else showWaiting();
     }
   }
+#if defined(VIBEDOCK_EPAPER) && defined(VIBEDOCK_BATTERY)
+  sleepBetweenPulls();
+#endif
   if (powerSaving) delay(dimmed ? client_policy::powerSaveDimmedIdleMs : client_policy::powerSaveIdleMs); else yield();
 }

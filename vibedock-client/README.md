@@ -98,7 +98,7 @@ Run on the real board (picture, partial and full refresh, battery voltage); cont
 **Battery.** A 3.7 V lithium cell on the MX1.25 connector powers the board. The firmware holds the battery supply on
 (GPIO 17, as the manufacturer's example) and measures the voltage on GPIO 4 (ADC1 channel 3, divider of 2); the status
 page, `VIBEDOCK-BATTERY` and the metrics report it. The board has no known charging signal, and the power-saving mode of the
-LCD boards (which dims the backlight) does not apply. The PWR button is not used yet.
+LCD boards (which dims the backlight) does not apply. With battery power saving on the display sleeps between two pulls (at least five minutes apart) when the server allows it (`X-VibeDock-Sleep`, see CLIENT-PROTOCOL 3g); it wakes for the next pull and connects again. The PWR button is not used yet.
 
 ### Battery readings on the Waveshare ESP32-S3-Touch-LCD-1.54
 

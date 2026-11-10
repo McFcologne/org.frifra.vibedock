@@ -56,6 +56,22 @@ constexpr uint32_t pollSecondsFor(uint32_t seconds, bool powerSaving) {
 constexpr uint32_t waitMsFor(uint32_t ms, bool powerSaving) {
   return powerSaving && ms != 0 && ms < batteryMinPollSeconds * 1000u ? batteryMinPollSeconds * 1000u : ms;
 }
+// Sleep between two pulls (e-paper on its battery): light sleep keeps the memory and the picture, only the radio and the
+// processor stop, and millis() goes on. The server allows it (X-VibeDock-Sleep: 1) only while nothing waits for the
+// display (no update offered, no log requested); the display never sleeps on USB or while charging, in the first
+// minute and a half after a start (flashing, pairing, setup), until the second power check after a wake has confirmed
+// the battery, when the last pull did not end well or when the next pull is less than two minutes away.
+constexpr uint32_t sleepMinMs = 120000, sleepStartGraceMs = 90000, sleepWakeGraceMs = 6000;
+constexpr bool sleepAllowed(bool saving, bool onBattery, bool serverAllows, int lastStatus, uint32_t uptimeMs,
+                            uint32_t sinceWakeMs, uint32_t remainingMs, bool panelBusy) {
+  return saving && onBattery && serverAllows && (lastStatus == 200 || lastStatus == 304) && uptimeMs >= sleepStartGraceMs
+      && sinceWakeMs >= sleepWakeGraceMs && remainingMs >= sleepMinMs && !panelBusy;
+}
+// A sleep is the time to the next pull; millis() that did not go on during it (a platform without that) is made up
+// for by moving the last pull back, so the next pull is not postponed by another whole wait.
+constexpr uint32_t missedSleepMs(uint32_t sleptMs, uint32_t advancedMs) {
+  return advancedMs + 1000u < sleptMs ? sleptMs - advancedMs : 0;
+}
 // A pull is due once the poll interval has passed; unsigned arithmetic survives millis() rollover.
 constexpr bool pullDue(uint32_t now, uint32_t lastPull, uint32_t pollSeconds) {
   return uint32_t(now - lastPull) >= clampPoll(pollSeconds) * 1000u;
