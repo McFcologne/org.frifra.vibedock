@@ -97,7 +97,8 @@
            title="The display's own status page (colour calibration, image) in this network"><strong th:text="${client.ip}"></strong></a></p>
       <p th:replace="~{fragments :: networkLine(${networks.get(client.identifier)})}"></p>
       <p class="meta device-identifier"><th:block th:text="${client.identifier + ' · ' + client.board.label}"></th:block>
-        <span th:unless="${client.board.tested}" class="badge update" title="The firmware for this board builds, but it has never run on the real board">untested board</span></p>
+        <span th:unless="${client.board.tested}" class="badge update" title="The firmware for this board builds, but it has never run on the real board">untested board</span>
+        <button type="button" class="doom-link" th:if="${client.board.id == 'rpi-pico2w-lcd-13'}" data-doom>can it play doom?</button></p>
       <div class="meta firmware-line" data-live="firmware" th:with="firmwareVersion=${firmwareVersions.get(client.board.id)}"><span>Firmware <strong th:text="${client.firmware != null ? client.firmware : 'unknown'}"></strong></span>
         <th:block th:if="${T(org.frifra.vibedock.server.FirmwareVersion).offered(firmwareVersion, client.firmware)}">
           <span class="badge update" th:if="${client.updating}" th:text="${'Updating to ' + firmwareVersion + ' …'}">Updating</span>
@@ -151,6 +152,19 @@
   <div data-metrics-body></div>
 </dialog>
 <script src="../static/metrics-popup.js" th:src="@{/metrics-popup.js}"></script>
+<dialog class="source-dialog doom-dialog" id="doom-dialog" aria-labelledby="doom-title" th:if="${!#lists.isEmpty(clients.?[board.id == 'rpi-pico2w-lcd-13'])}">
+  <div class="dialog-head"><h3 class="grow" id="doom-title">Can it play Doom?</h3><button type="button" class="secondary dialog-close" data-doom-close aria-label="Close">×</button></div>
+  <p>It can. The Pico 2 W with the Pico-LCD-1.3 runs the shareware episode of <em>Doom</em> (episode 1, <em>Knee-Deep in the Dead</em>) from a firmware of its own, with the joystick and the four keys.</p>
+  <p class="meta"><strong>Joystick</strong> move and turn · <strong>A</strong> fire · <strong>X</strong> use (doors, switches) · <strong>B</strong> run · <strong>Y</strong> menu · <strong>press</strong> confirm. No sound: the board has no speaker.</p>
+  <ol class="doom-steps">
+    <li>Hold <strong>BOOTSEL</strong> while you plug the board into USB: it shows up as a drive.</li>
+    <li>Copy the Doom firmware onto that drive. The board restarts into DOS and Doom.</li>
+    <li>To get VibeDock back, install the VibeDock firmware again on the <a th:href="@{/admin/firmware(board='rpi-pico2w-lcd-13')}">Firmware</a> page. If the board no longer pairs, pair it again.</li>
+  </ol>
+  <div class="form-actions"><a class="button" href="https://github.com/McFcologne/org.frifra.vibedock/releases/download/doom-pico/vibedock-doom-pico2w-lcd-13.uf2" download rel="noopener noreferrer">Download the Doom firmware (UF2, 4 MB)</a></div>
+  <p class="meta">Based on <a href="https://github.com/kilograham/rp2040-doom" target="_blank" rel="noopener noreferrer">RP2040 Doom</a> (GPL v2) with the Pico-LCD port of <a href="https://github.com/opensensor/rp2040-doom-PicoLCD" target="_blank" rel="noopener noreferrer">opensensor</a>, ported to the RP2350. It contains the shareware episode, which may be passed on freely. The source of this firmware is on the <a href="https://github.com/McFcologne/org.frifra.vibedock/releases/tag/doom-pico" target="_blank" rel="noopener noreferrer">release page</a>. <em>Doom</em> is a trademark of id Software; this is an unofficial fun build, use it at your own risk.</p>
+</dialog>
+<script src="../static/doom-popup.js" th:src="@{/doom-popup.js}" th:if="${!#lists.isEmpty(clients.?[board.id == 'rpi-pico2w-lcd-13'])}"></script>
 <script src="../static/admin-login.js" th:src="@{/admin-login.js}"></script>
 <script type="module" src="../static/usb-pair-dialog.js" th:src="@{/usb-pair-dialog.js}"></script>
 </body></html>

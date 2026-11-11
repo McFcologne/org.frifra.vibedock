@@ -597,3 +597,5 @@ body:has(.app-footer){display:flex;flex-direction:column}body:has(.app-footer)>m
 .source-trust summary,.source-add summary{cursor:pointer;font-size:13px;color:var(--muted)}.source-trust form,.source-add form{margin-top:10px;display:grid;gap:10px}
 .source-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}.source-form label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:4px}.source-form input{width:100%;box-sizing:border-box}
 .source-add{margin-top:14px}.source-add form button,.source-trust form button{justify-self:start}
+.doom-link{display:inline;margin:0 0 0 8px;padding:0;border:0;background:none;color:var(--muted);font-size:11px;font-weight:400;text-decoration:underline dotted;cursor:pointer}.doom-link:hover{color:var(--accent)}
+.doom-dialog .doom-steps{margin:10px 0 14px;padding-left:20px;display:grid;gap:6px}.doom-dialog .form-actions{margin:14px 0}.doom-dialog .button{display:inline-block}

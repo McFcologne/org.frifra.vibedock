@@ -1,0 +1,1 @@
+- **Can it play Doom?** The device card of the Raspberry Pi Pico 2 W with the Pico-LCD-1.3 has a small "can it play doom?" link. It opens a dialog with the controls, the steps to install a Doom firmware on the board (shareware episode, no sound) and a download link to it. The firmware itself is not part of the repository or the server; it lives on a release of its own.
