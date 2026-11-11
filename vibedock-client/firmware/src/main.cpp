@@ -2259,7 +2259,9 @@ void showStatus() {
   panel.drawString(servers[serverIndex].substring(0, 26), 16, 138, 2);
   statusUntil = millis() + client_policy::padStatusMs;
 }
+uint32_t lastRefreshKey = 0, refreshDue = 0;  // key A: the last press, and when its fetch is due
 void keyPoll() {
+  if (refreshDue && int32_t(millis() - refreshDue) >= 0) { refreshDue = 0; statusUntil = 0; etag = ""; pullSoon(); }
   if (statusUntil && int32_t(millis() - statusUntil) >= 0) {
     statusUntil = 0;
     if (!redrawFromShadow()) { etag = ""; pullSoon(); }
@@ -2277,7 +2279,19 @@ void keyPoll() {
     auto key = client_policy::turnedKey(raw, (turns + VIBEDOCK_KEYS_TURN) % 4);
     auto action = client_policy::padAction(key);
     switch (action) {
-      case client_policy::PadAction::RefreshNow: if (mode == Mode::Paired) { statusUntil = 0; etag = ""; pullSoon(); } break;
+      case client_policy::PadAction::RefreshNow:
+        if (mode != Mode::Paired) break;
+        if (lastRefreshKey && millis() - lastRefreshKey < 500) {  // pressed twice: slideshow on or off
+          lastRefreshKey = 0; refreshDue = 0; pendingGesture = "photos-toggle"; statusUntil = 0; pullSoon();
+          logEvent(F("Key: photos-toggle"), true);
+        } else {
+          // The picture comes so fast that the key would seem to do nothing: the mark stays a moment before it is fetched
+          // and is overwritten by the new picture. A second press meanwhile makes it the slideshow toggle.
+          lastRefreshKey = millis(); refreshDue = lastRefreshKey + 500; if (!refreshDue) refreshDue = 1;
+          panel.fillRoundRect(150, 6, 84, 24, 6, TFT_BLACK); panel.drawRoundRect(150, 6, 84, 24, 6, MUTED);
+          panel.setTextColor(TFT_WHITE, TFT_BLACK); panel.drawString(F("Loading"), 160, 10, 2);
+        }
+        break;
       case client_policy::PadAction::BrightnessCycle: brightness = client_policy::cycleBrightness(brightness); platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness); saveLater(); break;
       case client_policy::PadAction::BrightnessUp: brightness = client_policy::nextBrightness(brightness, true); platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness); saveLater(); break;
       case client_policy::PadAction::BrightnessDown: brightness = client_policy::nextBrightness(brightness, false); platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness); saveLater(); break;
