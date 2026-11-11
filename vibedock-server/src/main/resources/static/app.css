@@ -174,6 +174,8 @@ button:disabled{opacity:.55;cursor:default}
 .device-front.case-pico13{position:relative;width:max-content;margin:0 auto;padding:calc(var(--s)*.506) 0 calc(var(--s)*.39);border-radius:calc(var(--s)*.04);
   background:linear-gradient(180deg,#173f78,#12346a);box-shadow:inset 0 0 0 max(1px,calc(var(--s)*.006)) #0c2250,0 calc(var(--s)*.04) calc(var(--s)*.1) rgba(10,20,40,.3)}
 .case-pico13 .device-glass{padding:calc(var(--s)*.05) calc(var(--s)*.05) calc(var(--s)*.2);background:#08090a}
+/* The case is not square: the black frame turns with the board, only the picture stays upright. */
+.case-pico13 .device-glass{--glass-turn:0deg}.case-pico13 .device-screen{transform:rotate(var(--turn,0deg))}
 /* The joystick: a tan square on its corner with the black cap; the keys: white housings with tan caps. */
 .device-front.case-pico13::before{content:"";position:absolute;left:calc(50% - var(--s)*.12);top:calc(var(--s)*.098);width:calc(var(--s)*.24);height:calc(var(--s)*.24);
   transform:rotate(45deg);border-radius:calc(var(--s)*.03);background:radial-gradient(circle,#111214 0 calc(var(--s)*.06),#d9c89c calc(var(--s)*.065));
