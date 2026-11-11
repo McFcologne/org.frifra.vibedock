@@ -44,8 +44,8 @@ public record Board(String id,String label,String chip,String display,String not
     public boolean esp8266(){return chip.equals("ESP8266");}
     /** Raspberry Pi RP2350 (Pico 2 W): installed by copying a .uf2 file, not with esptool; no updates over Wi-Fi yet. */
     public boolean rp2350(){return chip.equals("RP2350");}
-    /** The picture can be turned by 180 degrees in the administration; the VibeTV M1's case decides how it stands. */
-    public boolean flippable(){return !id.equals(M1.id())&&!custom();}
+    /** The picture can be turned; the VibeTV M1's case decides how it stands. Unknown boards too: a client that sends a turn gesture knows what it does. */
+    public boolean flippable(){return !id.equals(M1.id());}
     /** Square panels can also stand turned by 90 degrees; on the others the picture would not fit. */
     public boolean rotatable(){return flippable()&&displayType().width()==displayType().height();}
     /**
