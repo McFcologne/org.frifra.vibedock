@@ -2277,7 +2277,7 @@ void keyPoll() {
     auto key = client_policy::turnedKey(raw, (turns + VIBEDOCK_KEYS_TURN) % 4);
     auto action = client_policy::padAction(key);
     switch (action) {
-      case client_policy::PadAction::RefreshNow: if (mode == Mode::Paired) { statusUntil = 0; pullSoon(); } break;
+      case client_policy::PadAction::RefreshNow: if (mode == Mode::Paired) { statusUntil = 0; etag = ""; pullSoon(); } break;
       case client_policy::PadAction::BrightnessCycle: brightness = client_policy::cycleBrightness(brightness); platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness); saveLater(); break;
       case client_policy::PadAction::BrightnessUp: brightness = client_policy::nextBrightness(brightness, true); platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness); saveLater(); break;
       case client_policy::PadAction::BrightnessDown: brightness = client_policy::nextBrightness(brightness, false); platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness); saveLater(); break;
