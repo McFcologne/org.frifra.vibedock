@@ -1,1 +1,0 @@
-- **An empty battery no longer shows as "unknown".** A cell that sags below 3.0 V (empty, or loaded by the radio) was reported without a level, so the display drew three dots in the battery icon right before it went dark. Readings from 2.5 to 3.0 V now count as 0 % and show the empty icon; only readings outside that range (no cell, open input) stay unknown.

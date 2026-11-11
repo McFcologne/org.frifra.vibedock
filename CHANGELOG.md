@@ -44,6 +44,29 @@ Updating many displays at once is gentler, firmware sources are edited on the pa
 - **Retention is adjustable.** *Settings → Retention* sets the days for metrics and for the logs read from displays (by age, at most 200 per display; before, the last 10). Default 90 days. The server log and the access log are kept 90 days as well (`LOG_MAX_DAYS`, at most 1 GB).
 - **Excel export.** The metrics page has an *Export* menu with CSV and Excel (.xlsx): one sheet per display with real dates and numbers, a filter and an *Info* sheet.
 
+## Server 0.6.2
+
+Displays keep their last reading when a sign-in is renewed, the battery voltage is smoothed on the metrics page, and a display that measures its battery can show a percentage learned from its own measurements (experimental, off by default). Update the server image; nothing has to be changed. The battery level stays off until it is switched on per display on its card.
+
+### Sources and displays
+
+- **A renewed sign-in no longer shows every source as "not ready".** When the sign-in file of one source changed (a renewed token), the displays showed all sources as *not ready* with empty bars until the next full minute. Now only that source waits, and the server asks it again within seconds. The log says `Sign-in of … changed; collecting at once`.
+- **The displays keep the last reading for 30 minutes.** While a source waits, is unavailable or the provider answers with an error, the displays keep showing its last reading (with its original time) for up to 30 minutes instead of "not ready" or an error. A lost sign-in, a rate limit and a paused source are shown at once; the administration and the support file always show the real state.
+- **Split bands line up.** The two half-width windows of a split band now sit next to each other, and their outer edges line up with the full-width window. Windows with rounded corners (Windows 11, macOS) keep a 2 px joint.
+
+### Metrics and battery
+
+- **Smoothed battery voltage.** The metrics page draws a smoothed line next to the measured battery voltage, and the CSV and Excel exports gain the columns `battery_smoothed_mV`, `battery_slope_mV_per_h` and `battery_phase` (`flat` or `decline_candidate`, never "charging"). The stored values do not change.
+- **Battery level learned by the server (experimental, off by default).** Displays that measure their battery have the switch *Battery level (learned)* on their card. The server learns a percentage from the display's own measurements: only a discharge that reaches the limit range or ends in a failure counts, a rising voltage is never taken for charging, and nothing is taken from other displays. Until the first confirmed discharge the card says *Learning*; a display that goes silent in the limit range shows 0 % after 15 minutes. See `docs/design/battery-learning.md`.
+
+## Client 0.6.3
+
+Fixes the battery icon of a display whose cell sags below 3.0 V: it showed three dots right before it went dark and now shows the empty icon. Updating is recommended for displays on a battery; the others can stay on 0.6.2.
+
+### Battery
+
+- **An empty battery no longer shows as "unknown".** A cell that sags below 3.0 V (empty, or loaded by the radio) was reported without a level, so the display drew three dots in the battery icon right before it went dark. Readings from 2.5 to 3.0 V now count as 0 % and show the empty icon; only readings outside that range (no cell, open input) stay unknown.
+
 ## Client 0.6.2
 
 Fixes a display that ignored every further update after one failed download. Updating the displays is recommended for those that failed to update before; the others can stay on 0.6.1.
