@@ -1064,6 +1064,7 @@ firmware card decides which image is shown, downloaded and installed:
 | Waveshare ESP32-C6-Touch-LCD-1.69 | ESP32-C6 | 1.69" ST7789V2 240×280 | tested |
 | Waveshare ESP32-S3-ePaper-1.54 (V2) | ESP32-S3 | 1.54" e-paper 200×200, black and white, no touch | tested |
 | ESP32-C3 with ST7789 240×240 | ESP32-C3 | e.g. C3 SuperMini | prepared |
+| Raspberry Pi Pico 2 W with Waveshare Pico-LCD-1.3 | RP2350 | 1.3" ST7789 240×240, installed with a .uf2 file, no updates over Wi-Fi yet | prepared |
 
 *Tested*: runs on real hardware (installation over USB, pairing, images; on the Waveshare boards also touch). *Prepared*: builds, with the settings the tested boards called for, but has not run on hardware yet.
 

@@ -131,7 +131,14 @@
   <p class="meta" th:if="${#lists.isEmpty(candidates)}">Nothing has been downloaded for this board yet.</p>
 </section>
 
-<section class="card own-firmware" data-own-firmware th:attr="data-board=${board.id},data-esp8266=${board.esp8266()}">
+<section class="card" th:if="${board.rp2350()}">
+  <div class="card-head"><h3 class="grow">Install with a .uf2 file</h3></div>
+  <p>The Raspberry Pi Pico 2 W is not flashed with esptool. Build the firmware with <code>pio run -e rpi-pico2w-lcd-13</code>, hold <strong>BOOTSEL</strong>
+    while connecting the board by USB and copy <code>vibedock-client/firmware/.pio/build/rpi-pico2w-lcd-13/firmware.uf2</code> onto the <code>RPI-RP2</code> drive.
+    The board restarts and shows its setup page. This board is prepared, not tested on hardware, and takes no updates over Wi-Fi yet.</p>
+</section>
+
+<section class="card own-firmware" th:unless="${board.rp2350()}" data-own-firmware th:attr="data-board=${board.id},data-esp8266=${board.esp8266()}">
   <div class="card-head"><h3 class="grow">Own firmware build</h3>
     <form th:if="${uploadedAt != null}" method="post" th:action="@{/admin/firmware/upload/remove(board=${board.id})}"
           data-confirm="Remove the uploaded build? The released firmware applies again."><button class="secondary">Use the released firmware</button></form></div>

@@ -67,6 +67,24 @@ void storeDiag(const client_policy::DiagRecord &r) {
   ESP.rtcUserMemoryWrite(DIAG_SLOT, reinterpret_cast<uint32_t *>(const_cast<client_policy::DiagRecord *>(&r)), sizeof(r));
 }
 }  // namespace platform
+#elif defined(ARDUINO_ARCH_RP2040)
+// Pico: no crash record (a fault ends in a watchdog restart); the diagnosis record lives in RAM that a watchdog or
+// program restart does not clear (SDK section .uninitialized_data) and that the checksum rejects after power on.
+#include <hardware/watchdog.h>
+namespace {
+client_policy::DiagRecord diagKeep __attribute__((section(".uninitialized_data.vibedock_diag")));
+}
+namespace platform {
+String lastCrash() { return String(); }
+String crashHeader() { return String(); }
+void crashBegin() {}
+uint32_t resetCode() { return watchdog_caused_reboot() ? 1 : 0; }
+client_policy::ResetKind resetKind() {
+  return watchdog_caused_reboot() ? client_policy::ResetKind::Software : client_policy::ResetKind::PowerOn;
+}
+bool loadDiag(client_policy::DiagRecord &r) { r = diagKeep; return true; }
+void storeDiag(const client_policy::DiagRecord &r) { diagKeep = r; }
+}  // namespace platform
 #else
 #include <esp_attr.h>
 #include <esp_system.h>

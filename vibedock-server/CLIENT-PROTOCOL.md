@@ -353,6 +353,7 @@ One firmware source builds for several boards (PlatformIO environments in `vibed
 | `waveshare-c6-touch-lcd-169` | Waveshare ESP32-C6-Touch-LCD-1.69 (ST7789V2, CST816 touch; Arduino core 3) | ESP32-C6 | 240×280 | tested |
 | `waveshare-s3-epaper-154` | Waveshare ESP32-S3-ePaper-1.54 V2 (1.54" e-paper, SSD1681, black and white, no touch; battery connector) | ESP32-S3 | 200×200 | prepared |
 | `esp32-c3-st7789` | ESP32-C3 with a 1.3" ST7789 (SCL 4, SDA 6, DC 2, RES 3, BLK 10) | ESP32-C3 | 240×240 | prepared |
+| `rpi-pico2w-lcd-13` | Raspberry Pi Pico 2 W with Waveshare Pico-LCD-1.3 (ST7789 on SPI1: DIN 11, CLK 10, CS 9, DC 8, RST 12, BL 13; keys and joystick unused) | RP2350 | 240×240 | prepared |
 
 Each build yields `flash.bin`, written at `0x0` over USB (on ESP32 chips bootloader, partition table and app merged), and `firmware.bin`, the app for updates over Wi-Fi. The update format is the same on all chips (step 3a); on ESP32 chips the firmware checks the signature with mbedTLS itself before it activates the new app. https on ESP32 chips always uses the full check against the root from pairing (no SHA-1 fingerprint). The device's own screens are laid out for 240×240 and scaled to fit other panels; server images arrive in the panel's resolution.
 
