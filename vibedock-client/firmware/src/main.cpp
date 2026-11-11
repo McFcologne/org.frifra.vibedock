@@ -2240,6 +2240,9 @@ void touchPoll() {
 #endif
 
 #if VIBEDOCK_KEYS
+#ifndef VIBEDOCK_KEYS_TURN
+#define VIBEDOCK_KEYS_TURN 0  // quarter turns: how the board's joystick stands against the picture at turn 0
+#endif
 // The keys act like the swipes (see client_policy::padAction). The status of the display covers the picture for a few
 // seconds; afterwards the picture is fetched again.
 uint32_t statusUntil = 0;
@@ -2260,20 +2263,33 @@ void keyPoll() {
     statusUntil = 0;
     if (!redrawFromShadow()) { etag = ""; pullSoon(); }
   }
-  auto key = keys::poll(millis());
-  if (key == client_policy::PadKey::Count) return;
-  if (powerWake()) return;  // the key that wakes a dimmed backlight does nothing else
-  switch (client_policy::padAction(key)) {
-    case client_policy::PadAction::RefreshNow: if (mode == Mode::Paired) { statusUntil = 0; logEvent(F("Key: refresh now"), true); pullSoon(); } break;
-    case client_policy::PadAction::BrightnessCycle: brightness = client_policy::cycleBrightness(brightness); platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness); saveLater(); break;
-    case client_policy::PadAction::BrightnessUp: brightness = client_policy::nextBrightness(brightness, true); platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness); saveLater(); break;
-    case client_policy::PadAction::BrightnessDown: brightness = client_policy::nextBrightness(brightness, false); platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness); saveLater(); break;
-    case client_policy::PadAction::SchemePrevious: case client_policy::PadAction::SchemeNext:
-      if (mode != Mode::Paired) break;
-      pendingGesture = client_policy::padAction(key) == client_policy::PadAction::SchemeNext ? "scheme-next" : "scheme-previous";
-      logEvent(String(F("Key: ")) + pendingGesture, true); statusUntil = 0; pullSoon(); break;
-    case client_policy::PadAction::Status: showStatus(); break;
-    default: break;
+  uint16_t pressed = keys::poll(millis());
+  if (!pressed) return;
+  bool wokeBacklight = powerWake();  // the key that wakes a dimmed backlight does nothing else
+  // The middle press of the joystick wins over the directions it touches on the way.
+  if (pressed & (1u << uint8_t(client_policy::PadKey::Press))) pressed = 1u << uint8_t(client_policy::PadKey::Press);
+  for (uint8_t k = 0; k < uint8_t(client_policy::PadKey::Count); k++) {
+    if (!(pressed & (1u << k))) continue;
+    auto raw = static_cast<client_policy::PadKey>(k);
+    logEvent(String(F("Key: ")) + client_policy::padName(raw), true);
+    if (wokeBacklight) continue;
+    auto key = client_policy::turnedKey(raw, (turns + VIBEDOCK_KEYS_TURN) % 4);
+    auto action = client_policy::padAction(key);
+    switch (action) {
+      case client_policy::PadAction::RefreshNow: if (mode == Mode::Paired) { statusUntil = 0; pullSoon(); } break;
+      case client_policy::PadAction::BrightnessCycle: brightness = client_policy::cycleBrightness(brightness); platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness); saveLater(); break;
+      case client_policy::PadAction::BrightnessUp: brightness = client_policy::nextBrightness(brightness, true); platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness); saveLater(); break;
+      case client_policy::PadAction::BrightnessDown: brightness = client_policy::nextBrightness(brightness, false); platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness); saveLater(); break;
+      case client_policy::PadAction::SchemePrevious: case client_policy::PadAction::SchemeNext:
+        if (mode != Mode::Paired) break;
+        pendingGesture = action == client_policy::PadAction::SchemeNext ? "scheme-next" : "scheme-previous";
+        logEvent(String(F("Key: ")) + pendingGesture, true); statusUntil = 0; pullSoon(); break;
+      case client_policy::PadAction::Rotate:
+        if (mode != Mode::Paired) break;
+        pendingGesture = "turn-clockwise"; logEvent(F("Key: turn-clockwise"), true); statusUntil = 0; pullSoon(); break;
+      case client_policy::PadAction::Status: showStatus(); break;
+      default: break;
+    }
   }
 }
 #endif

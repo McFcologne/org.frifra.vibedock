@@ -41,13 +41,14 @@ constexpr Pin pins[] = {
 };
 constexpr size_t count = sizeof(pins) / sizeof(pins[0]);
 inline void begin() { for (const auto &k : pins) pinMode(k.pin, INPUT_PULLUP); }
-// The key pressed since the last call (the first one if several), PadKey::Count when none.
-inline client_policy::PadKey poll(uint32_t now) {
+// The keys pressed since the last call as a bit set (bit = PadKey value): pressing the middle of the joystick often
+// touches a direction as well, so none is dropped when two come together.
+inline uint16_t poll(uint32_t now) {
   static client_policy::PadDebounce state[count];
-  auto found = client_policy::PadKey::Count;
+  uint16_t pressed = 0;
   for (size_t i = 0; i < count; i++)
-    if (state[i].pressed(digitalRead(pins[i].pin) == LOW, now) && found == client_policy::PadKey::Count) found = pins[i].key;
-  return found;
+    if (state[i].pressed(digitalRead(pins[i].pin) == LOW, now)) pressed |= uint16_t(1u << uint8_t(pins[i].key));
+  return pressed;
 }
 }
 #endif
