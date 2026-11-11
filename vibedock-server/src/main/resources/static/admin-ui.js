@@ -87,15 +87,19 @@
     if (!device || !glass || target === before) return;
     glass.style.setProperty('--glass-turn', before + 'deg'); device.style.setProperty('--turn', target + 'deg'); fitTurn(device);
     clearTimeout(glass.turnTimer); glass.querySelector('.turn-old')?.remove();
+    // An enlarged preview is a copy: copied again once the turn has settled, whether the picture changed or not.
+    const settled = () => document.dispatchEvent(new CustomEvent('vibedock:turn-settled'));
     glass.turnTimer = setTimeout(() => {
       const image = glass.querySelector('img:not(.turn-old)'), screen = image?.closest('.device-screen');
+      let animated = false;
       if (image && screen && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
         const old = image.cloneNode(); old.className = 'turn-old'; old.removeAttribute('data-client-preview'); old.alt = '';
         old.style.transform = `rotate(${before - target}deg)`; screen.prepend(old);
-        image.addEventListener('animationend', () => old.remove(), { once: true });
-        screen.classList.remove('drawing'); void screen.offsetWidth; screen.classList.add('drawing');
+        image.addEventListener('animationend', () => { old.remove(); settled(); }, { once: true });
+        screen.classList.remove('drawing'); void screen.offsetWidth; screen.classList.add('drawing'); animated = true;
       }
       glass.style.setProperty('--glass-turn', target + 'deg');
+      if (!animated) settled();
     }, 350);
   };
   // Turned on the display itself (a circle on a touch display): the card follows like after a click (device-state.js).
@@ -182,6 +186,7 @@
   };
   const follow = () => { if (lightbox && lightbox.open && shown && shown.isConnected) lightbox.replaceChildren(enlarged(shown)); };
   document.addEventListener('vibedock:devices-refreshed', follow);
+  document.addEventListener('vibedock:turn-settled', follow);
   // A new image is set only after it loaded (device-state.js): then copy again, also when the refresh came first.
   document.addEventListener('vibedock:preview-drawn', event => { if (shown && shown.contains(event.detail)) follow(); });
   for (const device of document.querySelectorAll('.device')) {
