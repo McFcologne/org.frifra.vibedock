@@ -2261,10 +2261,10 @@ void showStatus() {
 }
 uint32_t lastRefreshKey = 0, refreshDue = 0;  // key A: the last press, and when its fetch is due
 void keyPoll() {
-  if (refreshDue && int32_t(millis() - refreshDue) >= 0) { refreshDue = 0; statusUntil = 0; etag = ""; pullSoon(); }
+  if (refreshDue && int32_t(millis() - refreshDue) >= 0) { refreshDue = 0; statusUntil = 0; forgetRows(); etag = ""; pullSoon(); }
   if (statusUntil && int32_t(millis() - statusUntil) >= 0) {
     statusUntil = 0;
-    if (!redrawFromShadow()) { etag = ""; pullSoon(); }
+    if (!redrawFromShadow()) { forgetRows(); etag = ""; pullSoon(); }
   }
   uint16_t pressed = keys::poll(millis());
   if (!pressed) return;
