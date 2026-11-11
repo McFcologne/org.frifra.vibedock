@@ -1281,7 +1281,15 @@ int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
     r.http.addHeader("Content-Type", "text/plain; charset=utf-8");
     r.http.addHeader("X-VibeDock-Log-Request", uploadRequest);
     uploadFile->seek(0);  // again from the start when a second TLS attempt follows
+#if defined(VIBEDOCK_PICO)
+    // The Pico's HTTPClient ended the streamed upload with "send payload failed"; the log is a few kB, the heap is large.
+    size_t length = uploadFile->size();
+    std::unique_ptr<uint8_t[]> body(new (std::nothrow) uint8_t[length ? length : 1]);
+    if (!body || uploadFile->read(body.get(), length) != length) return HTTPC_ERROR_SEND_PAYLOAD_FAILED;
+    return r.http.sendRequest("POST", body.get(), length);
+#else
     return r.http.sendRequest("POST", uploadFile, uploadFile->size());
+#endif
   }
 #ifdef VIBEDOCK_AUDIO_ES8311
   if (conditional && audio::available()) r.http.addHeader("X-VibeDock-Audio", "1");
