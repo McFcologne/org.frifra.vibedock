@@ -2248,15 +2248,16 @@ void touchPoll() {
 uint32_t statusUntil = 0;
 void showStatus() {
   if (mode != Mode::Paired || !haveImage) return;
-  display.fillRect(8, 40, 224, 150, TFT_BLACK); display.drawRect(8, 40, 224, 150, MUTED);
-  display.setTextColor(TFT_WHITE, TFT_BLACK);
-  display.drawString(String(F("VibeDock " VIBEDOCK_VERSION)), 16, 48, 2);
-  display.setTextColor(MUTED, TFT_BLACK);
-  display.drawString(String(F(VIBEDOCK_BOARD)), 16, 70, 2);
-  display.drawString(String(F("IP ")) + currentIp(), 16, 92, 2);
-  display.drawString(WiFi.SSID().substring(0, 14) + " " + String(WiFi.RSSI()) + F(" dBm"), 16, 114, 2);
-  showWrapped(servers[serverIndex], 138, 2, MUTED, 2);
-  present(); statusUntil = millis() + client_policy::padStatusMs;
+  // Straight onto the panel: present() draws nothing while a picture of the server is on it.
+  panel.fillRect(8, 40, 224, 150, TFT_BLACK); panel.drawRect(8, 40, 224, 150, MUTED);
+  panel.setTextColor(TFT_WHITE, TFT_BLACK);
+  panel.drawString(String(F("VibeDock " VIBEDOCK_VERSION)), 16, 48, 2);
+  panel.setTextColor(MUTED, TFT_BLACK);
+  panel.drawString(String(F(VIBEDOCK_BOARD)), 16, 70, 2);
+  panel.drawString(String(F("IP ")) + currentIp(), 16, 92, 2);
+  panel.drawString(WiFi.SSID().substring(0, 14) + " " + String(WiFi.RSSI()) + F(" dBm"), 16, 114, 2);
+  panel.drawString(servers[serverIndex].substring(0, 26), 16, 138, 2);
+  statusUntil = millis() + client_policy::padStatusMs;
 }
 void keyPoll() {
   if (statusUntil && int32_t(millis() - statusUntil) >= 0) {
