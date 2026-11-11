@@ -169,6 +169,19 @@ button:disabled{opacity:.55;cursor:default}
   background:repeating-linear-gradient(90deg,#d7b04a 0 calc(var(--s)*.05),transparent calc(var(--s)*.05) calc(var(--s)*.109)) 50% calc(var(--s)*.12)/calc(var(--s)*.76) calc(var(--s)*.07) no-repeat,
     linear-gradient(180deg,#2a5db0,#1f4c96);box-shadow:inset 0 0 0 max(1px,calc(var(--s)*.006)) #173a74,0 calc(var(--s)*.04) calc(var(--s)*.1) rgba(10,20,40,.3)}
 .case-c3 .device-glass{padding:calc(var(--s)*.03);background:#0a0a0b}
+/* Raspberry Pi Pico with the Waveshare Pico-LCD-1.3 (measured on a photo; --s is the screen width): a blue board, the
+   joystick above the square screen and the four keys A, B, X, Y below (upright, 0°). */
+.device-front.case-pico13{position:relative;padding:calc(var(--s)*.526) 0 calc(var(--s)*.39);border-radius:calc(var(--s)*.04);
+  background:linear-gradient(180deg,#1f4aa8,#173d8c);box-shadow:inset 0 0 0 max(1px,calc(var(--s)*.006)) #102b66,0 calc(var(--s)*.04) calc(var(--s)*.1) rgba(10,20,40,.3)}
+.case-pico13 .device-glass{padding:calc(var(--s)*.03) calc(var(--s)*.05) calc(var(--s)*.2);background:#08090a}
+/* The joystick: a tan square on its corner with the black cap; the keys: white housings with tan caps. */
+.device-front.case-pico13::before{content:"";position:absolute;left:calc(50% - var(--s)*.12);top:calc(var(--s)*.098);width:calc(var(--s)*.24);height:calc(var(--s)*.24);
+  transform:rotate(45deg);border-radius:calc(var(--s)*.03);background:radial-gradient(circle,#111214 0 calc(var(--s)*.06),#d9c89c calc(var(--s)*.065));
+  box-shadow:0 0 0 max(1px,calc(var(--s)*.008)) #9a8c68,0 calc(var(--s)*.01) calc(var(--s)*.02) rgba(0,0,0,.35)}
+.device-front.case-pico13::after{content:"";position:absolute;left:calc(var(--s)*.0765);width:calc(var(--s)*.928);bottom:calc(var(--s)*.131);height:calc(var(--s)*.19);
+  background:radial-gradient(ellipse calc(var(--s)*.055) calc(var(--s)*.08) at 50% 50%,#d9c89c 0 88%,#9a8c68 94%,transparent 100%),
+    linear-gradient(90deg,transparent calc(50% - var(--s)*.078),#f4f4f2 calc(50% - var(--s)*.078) calc(50% + var(--s)*.078),transparent calc(50% + var(--s)*.078));
+  background-size:calc(var(--s)*.232) 100%;background-repeat:repeat-x}
 .device img{display:block;width:var(--s);height:calc(var(--s) * var(--ratio,1));background:#000}
 .device[role=button]{cursor:zoom-in;border-radius:calc(var(--s)*.11)}.device[role=button]:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
 .device-lightbox{border:0;padding:0;background:transparent;overflow:visible;max-width:none;max-height:none;cursor:zoom-out}
