@@ -136,6 +136,11 @@ class DeviceApiController {
         firmware.info(registry.get(identifier).board()).filter(Firmware.Info::wifi).filter(i->registry.offerUpdate(identifier,i.version())).ifPresent(i->headers.set("X-VibeDock-Update",i.version()));
         // A log requested in the administration: the display uploads it after this pull (POST .../log).
         logs.pendingRequest(identifier).ifPresent(id->headers.set("X-VibeDock-Send-Log",id));
+        // E-paper on its battery with power saving may sleep until the next pull, unless something waits for it: an update
+        // or a requested log needs the display awake right after this pull. A display cannot be reached while it sleeps.
+        if(!previewPull&&registry.get(identifier).board().sleepsBetweenPulls()&&registry.get(identifier).powerSaving()&&power.battery(identifier)!=null
+                &&!headers.containsHeader("X-VibeDock-Update")&&!headers.containsHeader("X-VibeDock-Send-Log"))
+            headers.set("X-VibeDock-Sleep","1");
         // After a full certificate check the device learns the current fingerprint for its simple check. The device
         // accepts it only over such a verified connection, so it cannot be injected over plain http.
         if("full".equals(request.getHeader("X-VibeDock-Tls-Check"))&&addresses.external().startsWith("https://")){

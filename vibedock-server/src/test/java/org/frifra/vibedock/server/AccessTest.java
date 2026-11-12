@@ -788,6 +788,28 @@ class AccessTest {
             clients.setFlipped(id,true);Assertions.assertFalse(clients.get(id).flipped());
         }finally{clients.remove(id);}
     }
+    @Test void anEpaperDisplayOnItsBatteryMaySleepUntilItsNextPullUnlessSomethingWaitsForIt() throws Exception {
+        String key="ef".repeat(32),id="vibedock-sleep",image="/api/v1/clients/"+id+"/image",admin="/admin/clients/"+id+"/power-saving";
+        clients.paired(id,"Shelf",key,"192.168.1.36",80,"waveshare-s3-epaper-154");
+        try{
+            java.util.function.Function<String,org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder> pull=power->{
+                var r=get(image).header("Authorization","Bearer "+key).with(x->{x.setLocalPort(8080);return x;});
+                return power==null?r:r.header("X-VibeDock-Power",power);};
+            // Power saving off: never.
+            mvc.perform(pull.apply("battery")).andExpect(header().doesNotExist("X-VibeDock-Sleep"));
+            mvc.perform(post(admin).param("enabled","true").header("Accept","application/json").with(user("admin").roles("ADMIN")).with(csrf())
+                    .with(r->{r.setLocalPort(10001);return r;})).andExpect(status().isOk());
+            // On USB (no battery reported): no. On its battery: yes.
+            mvc.perform(pull.apply(null)).andExpect(header().doesNotExist("X-VibeDock-Sleep"));
+            mvc.perform(pull.apply("battery")).andExpect(header().string("X-VibeDock-Sleep","1"));
+            // The status page's copy never counts.
+            mvc.perform(pull.apply("battery").header("X-VibeDock-Preview","1")).andExpect(header().doesNotExist("X-VibeDock-Sleep"));
+            // A board with a backlight does not sleep: its picture would go dark.
+            clients.setBoard(id,"waveshare-s3-touch-lcd-154");
+            clients.setPowerSaving(id,true);
+            mvc.perform(pull.apply("battery")).andExpect(header().doesNotExist("X-VibeDock-Sleep"));
+        }finally{clients.remove(id);}
+    }
     @Test void batteryPowerSavingIsAnExperimentalSwitchOfTheBoardsWithABattery() throws Exception {
         String key="ef".repeat(32),id="vibedock-power",image="/api/v1/clients/"+id+"/image",admin="/admin/clients/"+id+"/power-saving";
         clients.paired(id,"Kitchen",key,"192.168.1.35",80,"waveshare-s3-touch-lcd-154");

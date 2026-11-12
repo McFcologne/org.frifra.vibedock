@@ -333,6 +333,16 @@ as does `off`. A charger without data lines counts as battery operation. The sta
 On its battery such a display also sends `X-VibeDock-Power: battery` with its pulls, on the 1.54 and the C6 1.69
 with its level (`battery;level=60`, the voltage estimate in steps of 20), whether power saving is on or not; on USB it
 sends nothing.
+
+**Sleep between pulls (e-paper, `Board.sleepsBetweenPulls`).** The picture of an e-paper panel stays without power, so
+the server answers `X-VibeDock-Sleep: 1` to such a display while power saving is on and the display reports `X-VibeDock-Power:
+battery`, unless the same answer offers an update (`X-VibeDock-Update`) or asks for a log (`X-VibeDock-Send-Log`): those
+need the display awake. The answer is valid for the next wait only. The display then sleeps (light sleep: memory, picture and
+clock stay, radio and processor stop) until the announced `X-VibeDock-Next-Pull` and connects again to pull. It never sleeps
+on USB or while charging, in the first 90 s after a start, within 6 s after a wake (two power checks), after a pull that did
+not end with 200 or 304, or when the next pull is less than two minutes away. A sleeping display cannot be reached: a pull
+requested by the server (`POST /pull`), the log and a restart wait for the next wake. A display on its battery with power
+saving waits at least five minutes between pulls (`PullSchedule.BATTERY_SECONDS`), whatever its picture could change to.
 The server then draws a battery icon at the top right of the first usage band (left of a status, in the title bar of
 window themes), filled to the level, red below 20 %; without a level it shows three dots (unknown) instead of an empty battery. It keeps the report in memory until the next pull, so the
 preview on the device card shows the same. The display pulls right away when its power source changes.

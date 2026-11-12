@@ -162,6 +162,20 @@ int main(){
     assert(wrap.update(false,0xfffffff0u)==0); assert(wrap.update(false,5000)==-1);
   }
   // A disconnected/invalid ADC must never become a plausible percentage. Estimates are bounded and monotonic.
+  // Sleep between pulls: only on battery with the server's permission, after a good pull, not at the start, not shortly.
+  assert(sleepAllowed(true, true, true, 200, 120000, 10000, 300000, false));
+  assert(sleepAllowed(true, true, true, 304, 120000, 10000, 120000, false));
+  assert(!sleepAllowed(false, true, true, 200, 120000, 10000, 300000, false));   // power saving off
+  assert(!sleepAllowed(true, false, true, 200, 120000, 10000, 300000, false));   // USB or charging
+  assert(!sleepAllowed(true, true, false, 200, 120000, 10000, 300000, false));   // the server did not allow it
+  assert(!sleepAllowed(true, true, true, -1, 120000, 10000, 300000, false));     // the pull failed
+  assert(!sleepAllowed(true, true, true, 401, 120000, 10000, 300000, false));
+  assert(!sleepAllowed(true, true, true, 200, 89999, 10000, 300000, false));     // first minute and a half
+  assert(!sleepAllowed(true, true, true, 200, 120000, 5999, 300000, false));     // the battery is checked twice after a wake
+  assert(!sleepAllowed(true, true, true, 200, 120000, 10000, 119999, false));    // the next pull is close
+  assert(!sleepAllowed(true, true, true, 200, 120000, 10000, 300000, true));     // the panel is still refreshing
+  assert(missedSleepMs(300000, 300000) == 0 && missedSleepMs(300000, 299500) == 0);  // millis() went on
+  assert(missedSleepMs(300000, 0) == 300000 && missedSleepMs(300000, 1000) == 299000);  // it did not
   assert(batteryEstimate(0) == -1); assert(batteryEstimate(2499) == -1);
   assert(batteryEstimate(2500) == 0); assert(batteryEstimate(2999) == 0);  // an empty cell is empty, not unknown
   assert(batteryEstimate(4351) == -1); assert(batteryEstimate(0xffffffffu) == -1);
