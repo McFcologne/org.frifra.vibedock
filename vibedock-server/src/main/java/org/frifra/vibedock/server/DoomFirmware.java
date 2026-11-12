@@ -31,6 +31,9 @@ class DoomFirmware {
     static final int WAD_ADDRESS=0x10041000;
     static final int MAX_DOWNLOAD=8*1024*1024,MAX_WAD=6*1024*1024,MAX_WHX=2*1024*1024+512*1024;
     static final String CODE="/doom/doom-pico2w-lcd-13-code.uf2";
+    /** Where a running build is: fetch, convert, pack; empty when none runs. The dialog shows it. */
+    private volatile String stage="";
+    String stage(){return stage;}
     private final URI wadUrl;private final String wadSha1;private final Path whdGen,dir;private final boolean custom;
     private final HttpClient http=HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).connectTimeout(Duration.ofSeconds(10)).build();
 
@@ -66,20 +69,24 @@ class DoomFirmware {
         Files.createDirectories(dir);
         var work=Files.createTempDirectory(dir,"build-");
         try{
+            stage="fetch";
             log.info("Doom: fetching the shareware WAD from {}",wadUrl.getHost());
             var wad=wad(download());
             var wadFile=work.resolve("DOOM1.WAD");Files.write(wadFile,wad);
             var whxFile=work.resolve("doom1.whx");
             log.info("Doom: converting the WAD");
+            stage="convert";
             convert(wadFile,whxFile);
             var whx=Files.readAllBytes(whxFile);
             if(whx.length<1024||whx.length>MAX_WHX||!"IWHX".equals(new String(whx,0,4,StandardCharsets.ISO_8859_1)))throw new IOException("The converter produced no usable data.");
+            stage="pack";
             var tmp=Files.createTempFile(dir,"doom-",".part");
             Files.write(tmp,merge(code(),whx));
             Files.move(tmp,target,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);
             log.info("Doom: firmware ready ({} KB)",Files.size(target)/1024);
             return target;
         }finally{
+            stage="";
             try(var s=Files.walk(work)){s.sorted(Comparator.reverseOrder()).forEach(p->p.toFile().delete());}catch(IOException ignored){}
         }
     }

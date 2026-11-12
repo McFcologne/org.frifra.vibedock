@@ -20,6 +20,10 @@ class DoomController {
         return Map.of("available",p.available(),"url",p.wadUrl(),"host",p.host(),"sha1",p.wadSha1(),"cached",p.cached());
     }
 
+    /** Which step of a running build is on: the dialog polls it during the download. */
+    @GetMapping(value="/admin/doom/state",produces=MediaType.APPLICATION_JSON_VALUE) @ResponseBody
+    Map<String,Object> state(){return Map.of("stage",doom.stage());}
+
     /** Builds the firmware (download and conversion on the first call) and sends it as a UF2 file. */
     @GetMapping("/admin/doom/firmware.uf2")
     ResponseEntity<?> firmware(){

@@ -43,4 +43,7 @@ class DoomEasterEggTest {
                 .andExpect(jsonPath("$.host").value("www.gamers.org"))
                 .andExpect(jsonPath("$.sha1").value("5b2e249b9c5133ec987b3ea77596381dc0d6bc1d"));
     }
+    @Test void theStateIsEmptyWhenNothingRuns() throws Exception {
+        mvc.perform(admin(get("/admin/doom/state"))).andExpect(status().isOk()).andExpect(jsonPath("$.stage").value(""));
+    }
 }
