@@ -27,7 +27,7 @@ public record Board(String id,String label,String chip,String display,String not
     private static final java.util.regex.Pattern ID=java.util.regex.Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,39}");
     /**
      * The board of an id; missing ids are the VibeTV M1. An id that is not in the inventory (a firmware built for an own
-     * board) is a custom board: it keeps its id, has no firmware here, so no update is ever offered, and cannot be turned.
+     * board) is a custom board: it keeps its id and has no firmware here, so no update is ever offered.
      */
     public static Board of(String id){
         if(id==null)return M1;
