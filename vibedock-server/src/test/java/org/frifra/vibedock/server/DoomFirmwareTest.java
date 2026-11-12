@@ -35,7 +35,7 @@ class DoomFirmwareTest {
         code.write(block(0xa000,0x10ffff00,0,2,0xe48bff57L));
         for(int i=0;i<3;i++)code.write(block(0x2000,0x10000000+i*256,i,3,0xe48bff59L));
         var whx=new byte[600];whx[0]='I';whx[1]='W';whx[2]='H';whx[3]='X';
-        var merged=DoomFirmware.merge(code.toByteArray(),whx);
+        var merged=DoomFirmware.merge(code.toByteArray(),whx,null);
         assertEquals((4+3)*512,merged.length);
         assertArrayEquals(java.util.Arrays.copyOfRange(code.toByteArray(),0,512),java.util.Arrays.copyOfRange(merged,0,512));
         var b=ByteBuffer.wrap(merged).order(ByteOrder.LITTLE_ENDIAN);
@@ -49,11 +49,11 @@ class DoomFirmwareTest {
     @Test void theProgramInTheServerIsAUf2()throws Exception{
         try(var in=DoomFirmware.class.getResourceAsStream(DoomFirmware.CODE)){
             var code=in.readAllBytes();
-            var merged=DoomFirmware.merge(code,new byte[256*10]);
+            var merged=DoomFirmware.merge(code,new byte[256*10],null);
             assertEquals(code.length+10*512,merged.length);
         }
     }
-    @Test void aNonUf2IsRefused(){assertThrows(IOException.class,()->DoomFirmware.merge(new byte[1024],new byte[10]));}
+    @Test void aNonUf2IsRefused(){assertThrows(IOException.class,()->DoomFirmware.merge(new byte[1024],new byte[10],null));}
 
     @Test void findsTheWadInTheFileInAZipAndInTheInstaller(@TempDir Path data)throws Exception{
         var s=service("https://example.invalid/x.zip","/nonexistent",data);
@@ -85,25 +85,24 @@ class DoomFirmwareTest {
         try{
             var s=service("http://127.0.0.1:"+http.getAddress().getPort()+"/doom.zip",tool.toString(),data);
             assertTrue(s.plan().available());assertFalse(s.plan().cached());
-            var file=s.firmware();
-            var uf2=Files.readAllBytes(file);
+            var uf2=s.firmware(null);
             assertEquals(0,uf2.length%512);
             var b=ByteBuffer.wrap(uf2).order(ByteOrder.LITTLE_ENDIAN);
             int last=uf2.length/512-1;
             assertEquals(DoomFirmware.WAD_ADDRESS+((3004+255)/256-1)*256,b.getInt(last*512+12));
             assertEquals('I',uf2[(uf2.length/512-(3004+255)/256)*512+32]);
             assertTrue(s.plan().cached());
-            assertEquals(file,s.firmware());assertEquals(1,calls[0]);
+            assertArrayEquals(uf2,s.firmware(null));assertEquals(1,calls[0]);
         }finally{http.stop(0);}
     }
     @Test void anUnreachableSourceIsExplained(@TempDir Path data)throws Exception{
         var tool=data.resolve("whd_gen");Files.writeString(tool,"#!/bin/sh\nexit 1\n");tool.toFile().setExecutable(true);
-        var e=assertThrows(IOException.class,()->service("http://127.0.0.1:9/doom.zip",tool.toString(),data).firmware());
+        var e=assertThrows(IOException.class,()->service("http://127.0.0.1:9/doom.zip",tool.toString(),data).firmware(null));
         assertTrue(e.getMessage().contains("internet access"),e.getMessage());
     }
     @Test void withoutTheConverterTheFirmwareIsNotAvailable(@TempDir Path data)throws Exception{
         var s=service("https://example.invalid/x","/nonexistent",data);
-        assertFalse(s.plan().available());assertThrows(IOException.class,s::firmware);
+        assertFalse(s.plan().available());assertThrows(IOException.class,()->s.firmware(null));
     }
 
     private static HttpServer server(int status,byte[] body,int[] calls)throws IOException{
@@ -121,7 +120,7 @@ class DoomFirmwareTest {
             var urls="http://127.0.0.1:"+first.getAddress().getPort()+"/a.zip,http://127.0.0.1:"+second.getAddress().getPort()+"/b.zip";
             var s=service(urls,tool(data).toString(),data);
             assertEquals(2,s.plan().sources().size());
-            s.firmware();
+            s.firmware(null);
             assertEquals(1,bad[0]);assertEquals(1,good[0]);assertEquals("127.0.0.1",s.source());
         }finally{first.stop(0);second.stop(0);}
     }
@@ -133,16 +132,29 @@ class DoomFirmwareTest {
             Files.createDirectories(data.resolve("doom"));
             Files.writeString(data.resolve("doom/sources.txt"),"# my mirror\nhttp://127.0.0.1:"+http.getAddress().getPort()+"/m.zip\n");
             assertTrue(s.plan().fromFile());assertEquals("127.0.0.1",s.plan().sources().get(0).getHost());
-            s.firmware();assertEquals(1,calls[0]);
+            s.firmware(null);assertEquals(1,calls[0]);
         }finally{http.stop(0);}
     }
     @Test void whenNoSourceWorksEveryReasonIsListed(@TempDir Path data)throws Exception{
         int[] calls={0};var a=server(404,null,calls);var b=server(200,new byte[]{1,2,3},calls);
         try{
             var urls="http://127.0.0.1:"+a.getAddress().getPort()+"/a,http://127.0.0.1:"+b.getAddress().getPort()+"/b";
-            var e=assertThrows(IOException.class,()->service(urls,tool(data).toString(),data).firmware());
+            var e=assertThrows(IOException.class,()->service(urls,tool(data).toString(),data).firmware(null));
             assertTrue(e.getMessage().contains("answered 404"),e.getMessage());assertTrue(e.getMessage().contains("not found")||e.getMessage().contains("DOOM1.WAD was not found"),e.getMessage());
             assertTrue(e.getMessage().contains("sources.txt"));
         }finally{a.stop(0);b.stop(0);}
+    }
+
+    @Test void theAddressGoesIntoABlockBeforeTheGameData()throws Exception{
+        var code=new ByteArrayOutputStream();
+        code.write(block(0xa000,0x10ffff00,0,2,0xe48bff57L));
+        for(int i=0;i<2;i++)code.write(block(0x2000,0x10000000+i*256,i,2,0xe48bff59L));
+        var merged=DoomFirmware.merge(code.toByteArray(),new byte[300],"192.168.123.10:10001");
+        assertEquals((3+1+2)*512,merged.length);
+        var b=ByteBuffer.wrap(merged).order(ByteOrder.LITTLE_ENDIAN);
+        assertEquals(DoomFirmware.INFO_ADDRESS,b.getInt(3*512+12));
+        assertEquals("VDIP192.168.123.10:10001",new String(merged,3*512+32,24,java.nio.charset.StandardCharsets.US_ASCII));
+        assertEquals(DoomFirmware.WAD_ADDRESS,b.getInt(4*512+12));
+        for(int i=1;i<6;i++){assertEquals(i-1,b.getInt(i*512+20));assertEquals(5,b.getInt(i*512+24));}
     }
 }
