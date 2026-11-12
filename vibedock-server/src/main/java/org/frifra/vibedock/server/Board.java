@@ -64,9 +64,9 @@ public record Board(String id,String label,String chip,String display,String not
      */
     /** For the administration: tested on hardware or only prepared. */
     public String hardware(){return tested?"tested on hardware":"prepared, not tested on hardware";}
-    public double drawSeconds(){return esp8266()?1.2:.5;}
+    public double drawSeconds(){return rp2350()?.15:esp8266()?1.2:.5;}  // the Pico pushes a whole picture in about 50 ms (PIO SPI at 20 MHz)
     /** The case the administration draws around the preview (CSS class), null for the default light one. */
     public String previewCase(){
-        return switch(id){case "waveshare-s3-touch-lcd-147"->"case-147";case "waveshare-c6-touch-lcd-169"->"case-c6";case "waveshare-s3-touch-lcd-154"->"case-154";case "waveshare-s3-epaper-154"->"case-epaper";case "esp32-cyd"->"case-cyd";case "lilygo-t-display"->"case-tdisplay";case "lilygo-t-display-s3"->"case-tdisplay-s3";case "waveshare-s3-lcd-169"->"case-s3-169";case "esp32-c3-st7789"->"case-c3";default->null;};
+        return switch(id){case "waveshare-s3-touch-lcd-147"->"case-147";case "waveshare-c6-touch-lcd-169"->"case-c6";case "waveshare-s3-touch-lcd-154"->"case-154";case "waveshare-s3-epaper-154"->"case-epaper";case "esp32-cyd"->"case-cyd";case "lilygo-t-display"->"case-tdisplay";case "lilygo-t-display-s3"->"case-tdisplay-s3";case "waveshare-s3-lcd-169"->"case-s3-169";case "esp32-c3-st7789"->"case-c3";case "rpi-pico2w-lcd-13"->"case-pico13";default->null;};
     }
 }
