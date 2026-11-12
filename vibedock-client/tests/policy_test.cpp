@@ -265,4 +265,25 @@ int main(){
   DiagRecord badPhase=r;badPhase.phase=99;badPhase.check=diagCheck(badPhase);assert(!diagValid(badPhase));
   static_assert(sizeof(DiagRecord)%4==0,"RTC memory is written in 4-byte words");
   assert(clampGamma(10)==50);assert(clampGamma(999)==350);assert(clampGain(0)==40);assert(clampGain(200)==100);
+  // keys: what each does, brightness round and back, debounce once per press
+  assert(padAction(PadKey::A)==PadAction::RefreshNow&&padAction(PadKey::B)==PadAction::BrightnessCycle);
+  assert(padAction(PadKey::Left)==PadAction::SchemePrevious&&padAction(PadKey::X)==PadAction::SchemeNext);
+  assert(padAction(PadKey::Right)==PadAction::SchemeNext&&padAction(PadKey::Y)==PadAction::Rotate);
+  assert(padAction(PadKey::Up)==PadAction::BrightnessUp&&padAction(PadKey::Down)==PadAction::BrightnessDown&&padAction(PadKey::Press)==PadAction::Status);
+  assert(padAction(PadKey::Count)==PadAction::None);
+  assert(cycleBrightness(100)==minBrightness&&cycleBrightness(minBrightness)>minBrightness);
+  { uint8_t b=100;for(int i=0;i<40&&!(b==100&&i>0);i++)b=cycleBrightness(b);assert(b==100);}  // the steps lead back to the top
+  { PadDebounce d;
+    assert(!d.pressed(false,0));
+    assert(!d.pressed(true,100));assert(!d.pressed(true,120));   // not yet stable
+    assert(d.pressed(true,131));assert(!d.pressed(true,500));    // fires once while held
+    assert(!d.pressed(false,600));assert(!d.pressed(false,700)); // release does not fire
+    assert(!d.pressed(true,800));assert(!d.pressed(false,810));assert(!d.pressed(true,820));assert(!d.pressed(true,840)); // bounce restarts the time
+    assert(d.pressed(true,851)); }
+  // joystick directions follow the turn of the picture like the swipes
+  assert(turnedKey(PadKey::Right,0)==PadKey::Right&&turnedKey(PadKey::Right,1)==PadKey::Up);
+  assert(turnedKey(PadKey::Up,1)==PadKey::Left&&turnedKey(PadKey::Left,1)==PadKey::Down&&turnedKey(PadKey::Down,1)==PadKey::Right);
+  assert(turnedKey(PadKey::Right,2)==PadKey::Left&&turnedKey(PadKey::Right,3)==PadKey::Down&&turnedKey(PadKey::Right,4)==PadKey::Right);
+  assert(turnedKey(PadKey::A,1)==PadKey::A&&turnedKey(PadKey::Press,3)==PadKey::Press);
+  { int dx=1,dy=0; turnSwipe(dx,dy,1); assert(dx==0&&dy==-1); }  // the same as the swipe: right becomes up
 }

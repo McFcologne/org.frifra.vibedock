@@ -271,6 +271,54 @@ struct TouchPath {
 constexpr uint8_t minBrightness = 10, brightnessStep = 15;
 constexpr uint8_t clampBrightness(long v) { return v < minBrightness ? minBrightness : v > 100 ? 100 : uint8_t(v); }
 constexpr uint8_t nextBrightness(uint8_t percent, bool up) { return clampBrightness(long(percent) + (up ? brightnessStep : -long(brightnessStep))); }
+// ---- keys: boards with buttons and a joystick (keys.h, VIBEDOCK_KEY_*) ----
+enum class PadKey : uint8_t { A, B, X, Y, Up, Down, Left, Right, Press, Count };
+enum class PadAction : uint8_t { None, RefreshNow, BrightnessCycle, BrightnessUp, BrightnessDown, SchemePrevious, SchemeNext, Rotate, Status };
+// What each key does: A pulls at once, B steps the brightness round, X switches the colour scheme forward and Y turns the
+// picture clockwise; the joystick left and right switch the scheme back and forward like the swipes, up and down change
+// the brightness, pressing it shows the status.
+constexpr PadAction padAction(PadKey key) {
+  switch (key) {
+    case PadKey::A: return PadAction::RefreshNow;
+    case PadKey::B: return PadAction::BrightnessCycle;
+    case PadKey::Left: return PadAction::SchemePrevious;
+    case PadKey::X: case PadKey::Right: return PadAction::SchemeNext;
+    case PadKey::Y: return PadAction::Rotate;
+    case PadKey::Up: return PadAction::BrightnessUp;
+    case PadKey::Down: return PadAction::BrightnessDown;
+    case PadKey::Press: return PadAction::Status;
+    default: return PadAction::None;
+  }
+}
+// The joystick directions belong to the board, the picture turns (Rotate image): a push is what the picture shows, with
+// the same turning as the swipes of the touch boards (turnSwipe). baseTurns is how the board stands against the
+// picture at turn 0 (VIBEDOCK_KEYS_TURN). The other keys keep their meaning.
+constexpr PadKey turnedKey(PadKey key, uint8_t turns) {
+  int dx = key == PadKey::Left ? -1 : key == PadKey::Right ? 1 : 0, dy = key == PadKey::Up ? -1 : key == PadKey::Down ? 1 : 0;
+  if (!dx && !dy) return key;
+  for (uint8_t i = 0; i < turns % 4; i++) { int x = dx; dx = dy; dy = -x; }
+  return dx < 0 ? PadKey::Left : dx > 0 ? PadKey::Right : dy < 0 ? PadKey::Up : PadKey::Down;
+}
+constexpr const char *padName(PadKey key) {
+  switch (key) {
+    case PadKey::A: return "A"; case PadKey::B: return "B"; case PadKey::X: return "X"; case PadKey::Y: return "Y";
+    case PadKey::Up: return "joystick up"; case PadKey::Down: return "joystick down";
+    case PadKey::Left: return "joystick left"; case PadKey::Right: return "joystick right"; case PadKey::Press: return "joystick press";
+    default: return "?";
+  }
+}
+// One step up, and from the top back to the lowest step.
+constexpr uint8_t cycleBrightness(uint8_t percent) { return percent >= 100 ? minBrightness : nextBrightness(percent, true); }
+// A key counts as pressed once it has read pressed for padDebounceMs without a break; once per press.
+constexpr uint32_t padDebounceMs = 30, padStatusMs = 6000;
+struct PadDebounce {
+  bool stable = false, last = false; uint32_t since = 0;
+  bool pressed(bool raw, uint32_t now) {
+    if (raw != last) { last = raw; since = now; return false; }
+    if (raw != stable && now - since >= padDebounceMs) { stable = raw; return raw; }
+    return false;
+  }
+};
 // Dimmed while saving power: the lowest step, or lower than that never.
 constexpr uint8_t dimmedBrightness(uint8_t percent) { return percent < minBrightness ? percent : minBrightness; }
 // ---- diagnosis: why the display started, and the last state of the run before (kept across a reset) ----

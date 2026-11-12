@@ -16,6 +16,7 @@
 #include "touch.h"
 #include "battery.h"
 #include "audio.h"
+#include "keys.h"
 #ifdef VIBEDOCK_AUDIO_ES8311
 #include "volume_overlay.h"
 #endif
@@ -2090,6 +2091,9 @@ void setup() {
   BOOT_TRACE("touch");
   touch::begin();
 #endif
+#if VIBEDOCK_KEYS
+  keys::begin();
+#endif
   battery::begin();
   BOOT_TRACE("wifi");
   WiFi.persistent(false); WiFi.mode(WIFI_STA);
@@ -2235,6 +2239,76 @@ void touchPoll() {
 }
 #endif
 
+#if VIBEDOCK_KEYS
+#ifndef VIBEDOCK_KEYS_TURN
+#define VIBEDOCK_KEYS_TURN 0  // quarter turns: how the board's joystick stands against the picture at turn 0
+#endif
+// The keys act like the swipes (see client_policy::padAction). The status of the display covers the picture for a few
+// seconds; afterwards the picture is fetched again.
+uint32_t statusUntil = 0;
+void showStatus() {
+  if (mode != Mode::Paired || !haveImage) return;
+  // Straight onto the panel: present() draws nothing while a picture of the server is on it.
+  panel.fillRect(8, 40, 224, 150, TFT_BLACK); panel.drawRect(8, 40, 224, 150, MUTED);
+  panel.setTextColor(TFT_WHITE, TFT_BLACK);
+  panel.drawString(String(F("VibeDock " VIBEDOCK_VERSION)), 16, 48, 2);
+  panel.setTextColor(MUTED, TFT_BLACK);
+  panel.drawString(String(F(VIBEDOCK_BOARD)), 16, 70, 2);
+  panel.drawString(String(F("IP ")) + currentIp(), 16, 92, 2);
+  panel.drawString(WiFi.SSID().substring(0, 14) + " " + String(WiFi.RSSI()) + F(" dBm"), 16, 114, 2);
+  panel.drawString(servers[serverIndex].substring(0, 26), 16, 138, 2);
+  statusUntil = millis() + client_policy::padStatusMs;
+}
+uint32_t lastRefreshKey = 0, refreshDue = 0;  // key A: the last press, and when its fetch is due
+void keyPoll() {
+  if (refreshDue && int32_t(millis() - refreshDue) >= 0) { refreshDue = 0; statusUntil = 0; forgetRows(); etag = ""; pullSoon(); }
+  if (statusUntil && int32_t(millis() - statusUntil) >= 0) {
+    statusUntil = 0;
+    if (!redrawFromShadow()) { forgetRows(); etag = ""; pullSoon(); }
+  }
+  uint16_t pressed = keys::poll(millis());
+  if (!pressed) return;
+  bool wokeBacklight = powerWake();  // the key that wakes a dimmed backlight does nothing else
+  // The middle press of the joystick wins over the directions it touches on the way.
+  if (pressed & (1u << uint8_t(client_policy::PadKey::Press))) pressed = 1u << uint8_t(client_policy::PadKey::Press);
+  for (uint8_t k = 0; k < uint8_t(client_policy::PadKey::Count); k++) {
+    if (!(pressed & (1u << k))) continue;
+    auto raw = static_cast<client_policy::PadKey>(k);
+    logEvent(String(F("Key: ")) + client_policy::padName(raw), true);
+    if (wokeBacklight) continue;
+    auto key = client_policy::turnedKey(raw, (turns + VIBEDOCK_KEYS_TURN) % 4);
+    auto action = client_policy::padAction(key);
+    switch (action) {
+      case client_policy::PadAction::RefreshNow:
+        if (mode != Mode::Paired) break;
+        if (lastRefreshKey && millis() - lastRefreshKey < 500) {  // pressed twice: slideshow on or off
+          lastRefreshKey = 0; refreshDue = 0; pendingGesture = "photos-toggle"; statusUntil = 0; pullSoon();
+          logEvent(F("Key: photos-toggle"), true);
+        } else {
+          // The picture comes so fast that the key would seem to do nothing: the mark stays a moment before it is fetched
+          // and is overwritten by the new picture. A second press meanwhile makes it the slideshow toggle.
+          lastRefreshKey = millis(); refreshDue = lastRefreshKey + 500; if (!refreshDue) refreshDue = 1;
+          panel.fillRoundRect(150, 6, 84, 24, 6, TFT_BLACK); panel.drawRoundRect(150, 6, 84, 24, 6, MUTED);
+          panel.setTextColor(TFT_WHITE, TFT_BLACK); panel.drawString(F("Loading"), 160, 10, 2);
+        }
+        break;
+      case client_policy::PadAction::BrightnessCycle: brightness = client_policy::cycleBrightness(brightness); platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness); saveLater(); break;
+      case client_policy::PadAction::BrightnessUp: brightness = client_policy::nextBrightness(brightness, true); platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness); saveLater(); break;
+      case client_policy::PadAction::BrightnessDown: brightness = client_policy::nextBrightness(brightness, false); platform::backlight(TFT_BL, TFT_BACKLIGHT_ON == HIGH, brightness); saveLater(); break;
+      case client_policy::PadAction::SchemePrevious: case client_policy::PadAction::SchemeNext:
+        if (mode != Mode::Paired) break;
+        pendingGesture = action == client_policy::PadAction::SchemeNext ? "scheme-next" : "scheme-previous";
+        logEvent(String(F("Key: ")) + pendingGesture, true); statusUntil = 0; pullSoon(); break;
+      case client_policy::PadAction::Rotate:
+        if (mode != Mode::Paired) break;
+        pendingGesture = "turn-clockwise"; logEvent(F("Key: turn-clockwise"), true); statusUntil = 0; pullSoon(); break;
+      case client_policy::PadAction::Status: showStatus(); break;
+      default: break;
+    }
+  }
+}
+#endif
+
 // Turns the picture clockwise in quarter turns (Flip image or Rotate image in the administration). The server's
 // picture does not depend on the turn: with a copy of it the display draws it again itself and keeps its ETag, so
 // only the normal changes follow; without one the next pull draws every row.
@@ -2263,6 +2337,9 @@ void loop() {
 #endif
 #if VIBEDOCK_TOUCH
   touchPoll();
+#endif
+#if VIBEDOCK_KEYS
+  keyPoll();
 #endif
   if (logDirty && millis() - logSavedAt >= 60000) saveLog();
   static bool clockLogged = false;
