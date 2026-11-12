@@ -7,7 +7,7 @@ repository or of a release.
 
 * `doom-pico2w-lcd-13-code.uf2`: the program only (RP2350, flash 0x10000000..0x10037000), built from the Doom port named
   below with the build flags `VIBEDOCK_DOS_BOOT`, `VIBEDOCK_NO_SOUND`, `VIBEDOCK_STATIC_ZONE`. The matching source (GPL v2)
-  is the `doom-pico` release of this repository (asset `vibedock-doom-pico2w-lcd-13-source.zip`, with `VIBEDOCK-PORT.md`: the
+  is the `doom-pico-2` release of this repository (asset `vibedock-doom-pico2w-lcd-13-source.zip`, with `VIBEDOCK-PORT.md`: the
   tools, versions and the exact commands of the build). SHA-256 of the program:
   `b2311c79743d52332abe27c889a1045ecf8e53f4a4f919da7c3805fe5717941d`; the build from that source reproduces it byte for byte.
 * `whd-gen/`: the WAD converter from the same source (`src/whd_gen` of [RP2040 Doom](https://github.com/kilograham/rp2040-doom),
