@@ -6,28 +6,44 @@
   const dialog = document.getElementById('doom-dialog');
   const status = dialog.querySelector('[data-doom-status]');
   const button = dialog.querySelector('[data-doom-download]');
-  const progress = dialog.querySelector('[data-doom-progress]');
+  const term = dialog.querySelector('[data-doom-progress]');
+  const fill = term.querySelector('.bar i');
+  const percent = term.querySelector('.bar span');
   const steps = ['fetch', 'convert', 'pack', 'done'];
+  // Where the bar should be while a step runs; it eases towards that and creeps on, so it never stands still.
+  const goal = { fetch: 38, convert: 78, pack: 96, done: 100 };
+  let shown = 0, target = 0, frame = 0;
+  const draw = () => {
+    shown += (target - shown) * 0.05 + (target < 100 && target > 0 ? 0.03 : 0);
+    if (target === 100 && target - shown < 0.3) shown = 100;
+    fill.style.width = shown + '%'; percent.textContent = Math.round(shown) + '%';
+    frame = shown < 100 && target > 0 ? requestAnimationFrame(draw) : 0;
+  };
   const text = (selector, value) => { dialog.querySelector(selector).textContent = value; };
-  // Marks the steps before the current one as done and the current one as active.
-  const show = stage => {
+  // Marks the steps before the current one as done and the current one as active; '' hides the block.
+  const show = (stage, failed) => {
     const at = steps.indexOf(stage);
-    progress.hidden = at < 0;
-    for (const item of progress.children) {
-      const i = steps.indexOf(item.dataset.stage);
-      item.className = i < at || stage === 'done' ? 'done' : i === at ? 'active' : '';
+    term.classList.toggle('idle', at < 0 && !failed);
+    term.classList.toggle('finished', stage === 'done'); term.classList.toggle('failed', !!failed);
+    for (const row of term.querySelectorAll('.row')) {
+      const i = steps.indexOf(row.dataset.stage);
+      row.className = 'row' + (failed ? '' : i < at || stage === 'done' ? ' done' : i === at ? ' active' : '');
     }
+    if (failed) { target = shown; return; }
+    if (at < 0) { shown = target = 0; fill.style.width = '0'; percent.textContent = '0%'; return; }
+    target = Math.max(target, goal[stage]);
+    if (!frame) frame = requestAnimationFrame(draw);
   };
   async function loadPlan() {
     try {
       const plan = await (await fetch(dialog.dataset.plan, { headers: { Accept: 'application/json' } })).json();
-      text('[data-doom-host]', plan.host); text('[data-doom-url]', plan.url); text('[data-doom-sha]', plan.sha1);
+      text('[data-doom-host]', plan.host); text('[data-doom-host2]', plan.host); text('[data-doom-url]', plan.url); text('[data-doom-sha]', plan.sha1);
       button.disabled = !plan.available;
       status.textContent = plan.available ? '' : 'This installation cannot build the firmware (the converter is missing).';
     } catch (error) { status.textContent = 'The plan could not be loaded.'; }
   }
   button.addEventListener('click', async () => {
-    button.disabled = true; status.textContent = ''; show('fetch');
+    button.disabled = true; status.textContent = ''; shown = target = 0; show('fetch');
     // The server knows which step it is on; ask for it while the request runs (a cached firmware answers at once).
     const poll = setInterval(async () => {
       try { const { stage } = await (await fetch(dialog.dataset.state)).json(); if (stage) show(stage); } catch (error) { /* the next poll tries again */ }
@@ -41,7 +57,7 @@
       document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 10000);
       show('done');
       status.textContent = 'Saved (' + (blob.size / 1048576).toFixed(1) + ' MB). Next: BOOTSEL, plug in, copy the file onto the drive.';
-    } catch (error) { show(''); status.textContent = 'Failed: ' + error.message; }
+    } catch (error) { show(term.classList.contains('idle') ? '' : 'fetch', true); status.textContent = 'Failed: ' + error.message; }
     clearInterval(poll); button.disabled = false;
   });
   for (const link of document.querySelectorAll('[data-doom]')) link.addEventListener('click', () => { dialog.showModal(); loadPlan(); });

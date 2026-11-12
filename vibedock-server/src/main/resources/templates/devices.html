@@ -167,9 +167,14 @@
     <li>Back to VibeDock: install its firmware again on the <a th:href="@{/admin/firmware(board='rpi-pico2w-lcd-13')}">Firmware</a> page; pair again if needed.</li>
   </ol>
   <p class="meta"><strong>Joystick</strong> move, turn · <strong>A</strong> fire · <strong>X</strong> use · <strong>B</strong> run · <strong>Y</strong> menu · <strong>press</strong> confirm · no sound</p>
-  <div class="form-actions"><button type="button" class="button" data-doom-download>Fetch, pack and download</button>
-    <ol class="doom-progress" data-doom-progress hidden><li data-stage="fetch">Fetching the WAD</li><li data-stage="convert">Converting</li><li data-stage="pack">Packing</li><li data-stage="done">Ready</li></ol>
-    <span class="meta" data-doom-status role="status"></span></div>
+  <div class="form-actions doom-run"><div class="doom-go"><button type="button" class="button" data-doom-download>Fetch, pack and download</button></div>
+  <div class="doom-term idle" data-doom-progress aria-hidden="true">
+    <div class="row" data-stage="fetch"><span>FETCH&nbsp; DOOM1.WAD from <span data-doom-host2></span></span><span class="fill"></span><b></b></div>
+    <div class="row" data-stage="convert"><span>CONVERT&nbsp; WAD to WHX (whd_gen)</span><span class="fill"></span><b></b></div>
+    <div class="row" data-stage="pack"><span>PACK&nbsp; program + game data to UF2</span><span class="fill"></span><b></b></div>
+    <div class="bar"><div class="track"><i></i></div><span>0%</span></div>
+  </div></div>
+  <p class="meta doom-status" data-doom-status role="status"></p>
   <details class="doom-details"><summary>Source, checksum and license</summary>
     <p class="meta">Fetched from <span data-doom-url>…</span>, SHA-1 <code data-doom-sha>…</code>. Nothing of the game data is stored in the VibeDock repository, the image or a release.</p>
     <p class="meta">Based on <a href="https://github.com/kilograham/rp2040-doom" target="_blank" rel="noopener noreferrer">RP2040 Doom</a> (GPL v2) with the Pico-LCD port of <a href="https://github.com/opensensor/rp2040-doom-PicoLCD" target="_blank" rel="noopener noreferrer">opensensor</a>, ported to the RP2350; the source of the program is on the <a href="https://github.com/McFcologne/org.frifra.vibedock/releases/tag/doom-pico" target="_blank" rel="noopener noreferrer">release page</a>. The shareware license does not allow changed versions of the game data, which is why the conversion happens here, on your server, and nothing converted is passed on. <em>Doom</em> is a trademark of id Software; this is an unofficial fun build, use it at your own risk.</p></details>
