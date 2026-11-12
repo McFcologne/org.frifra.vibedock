@@ -26,12 +26,9 @@ class DoomController {
 
     /** Builds the firmware (download and conversion on the first call) and sends it as a UF2 file. */
     @GetMapping("/admin/doom/firmware.uf2")
-    ResponseEntity<?> firmware(jakarta.servlet.http.HttpServletRequest request){
+    ResponseEntity<?> firmware(){
         try{
-            // The address the administrator uses for this server (without the scheme and a default port), for the way back on the screen.
-            int port=request.getServerPort();
-            var address=request.getServerName()+(port==80||port==443?"":":"+port);
-            var data=doom.firmware(address);
+            var data=doom.firmware();
             return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM).contentLength(data.length)
                     .header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=\"vibedock-doom-pico2w-lcd-13.uf2\"")
                     .header(HttpHeaders.CACHE_CONTROL,"no-store")

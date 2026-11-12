@@ -81,14 +81,11 @@ class DoomFirmware {
         return dir.resolve("doom1-"+wadSha1.substring(0,8)+".whx");
     }
 
-    /**
-     * The finished firmware for a download: the converted WAD comes from the cache (built now when it is not there yet: a download and
-     * a conversion of a few seconds), the address is written into the firmware for its screen.
-     */
-    byte[] firmware(String address) throws IOException {
+    /** The finished firmware: the converted WAD comes from the cache (built now when it is not there yet: a download and a conversion of a few seconds). */
+    byte[] firmware() throws IOException {
         var whx=Files.readAllBytes(whx());
         stage="pack";
-        try{return merge(code(),whx,address);}finally{stage="";}
+        try{return merge(code(),whx);}finally{stage="";}
     }
 
     private synchronized Path whx() throws IOException {
@@ -191,9 +188,7 @@ class DoomFirmware {
      * Appends the converted WAD to the program as UF2 data blocks. The leading block of the RP2350 image (family
      * "absolute") stays as it is; the blocks of the data family are numbered again over the program and the WAD.
      */
-    /** Where the firmware reads the address of this server from (XIP flash); the screen shows it below the picture. */
-    static final int INFO_ADDRESS=0x10040F00;
-    static byte[] merge(byte[] code,byte[] whx,String address) throws IOException {
+    static byte[] merge(byte[] code,byte[] whx) throws IOException {
         if(code==null||code.length%512!=0||code.length<1024)throw new IOException("The Doom program is not a UF2 file.");
         int blocks=code.length/512,codeData=0;long family=0;
         for(int i=0;i<blocks;i++){
@@ -205,21 +200,13 @@ class DoomFirmware {
             if(fam!=family)throw new IOException("The Doom program mixes UF2 families.");
             codeData++;
         }
-        boolean info=address!=null&&!address.isBlank();
-        int wadBlocks=(whx.length+255)/256,first=codeData+(info?1:0),total=first+wadBlocks;
-        var out=ByteBuffer.allocate((blocks+(info?1:0)+wadBlocks)*512).order(ByteOrder.LITTLE_ENDIAN);
+        int wadBlocks=(whx.length+255)/256,first=codeData,total=first+wadBlocks;
+        var out=ByteBuffer.allocate((blocks+wadBlocks)*512).order(ByteOrder.LITTLE_ENDIAN);
         out.put(code,0,512);
         for(int i=1;i<blocks;i++){
             int at=out.position();
             out.put(code,i*512,512);
             out.putInt(at+20,i-1).putInt(at+24,total);
-        }
-        if(info){
-            int at=out.position();
-            out.putInt(0x0A324655).putInt(0x9E5D5157).putInt(0x2000).putInt(INFO_ADDRESS).putInt(256).putInt(codeData).putInt(total).putInt((int)family);
-            var text=("VDIP"+address.replaceAll("[^ -~]","").trim()).getBytes(StandardCharsets.US_ASCII);
-            out.put(text,0,Math.min(text.length,24));
-            out.position(at+508);out.putInt(0x0AB16F30);
         }
         for(int k=0;k<wadBlocks;k++){
             int at=out.position();
