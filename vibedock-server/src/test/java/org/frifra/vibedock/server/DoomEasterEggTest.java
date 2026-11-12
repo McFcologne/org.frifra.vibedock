@@ -13,7 +13,7 @@ import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-/** The "can it play doom?" link and its dialog appear for the Pico-LCD-1.3 only. */
+/** The "can it play doom?" link and its dialog appear for the Pico-LCD-1.3 only; the plan endpoint names the source. */
 @SpringBootTest(properties={"vibedock.admin-auth=none","vibedock.admin-password=","vibedock.polling=false"})
 @AutoConfigureMockMvc
 class DoomEasterEggTest {
@@ -32,7 +32,15 @@ class DoomEasterEggTest {
         mvc.perform(admin(get("/admin/devices"))).andExpect(status().isOk())
                 .andExpect(content().string(containsString("data-doom>can it play doom?</button>")))
                 .andExpect(content().string(containsString("id=\"doom-dialog\"")))
-                .andExpect(content().string(containsString("releases/download/doom-pico/vibedock-doom-pico2w-lcd-13.uf2")))
+                .andExpect(content().string(containsString("data-plan=\"/admin/doom/plan\"")))
+                .andExpect(content().string(containsString("Where it comes from")))
+                .andExpect(content().string(containsString("What gets packed")))
+                .andExpect(content().string(containsString("What to do")))
                 .andExpect(content().string(containsString("doom-popup.js")));
+    }
+    @Test void thePlanNamesTheSource() throws Exception {
+        mvc.perform(admin(get("/admin/doom/plan"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.host").value("www.gamers.org"))
+                .andExpect(jsonPath("$.sha1").value("5b2e249b9c5133ec987b3ea77596381dc0d6bc1d"));
     }
 }
