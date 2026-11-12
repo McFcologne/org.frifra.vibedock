@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
 public record Manifest(int schema,String id,String label,String chip,String version,String hardware,Binaries firmware,
                        Screen display,Capabilities capabilities,Case boardCase,Build build) {
     public static final int SCHEMA=1,MAX_BYTES=16*1024,DISPLAY_MIN=64,DISPLAY_MAX=480;
-    public static final Set<String> CHIPS=Set.of("ESP8266","ESP32","ESP32-S2","ESP32-S3","ESP32-C3","ESP32-C6","ESP32-H2");
+    public static final Set<String> CHIPS=Set.of("ESP8266","ESP32","ESP32-S2","ESP32-S3","ESP32-C3","ESP32-C6","ESP32-H2","RP2350");
     private static final Pattern ID=Pattern.compile("[a-z0-9-]{1,40}"),VERSION=Pattern.compile("[0-9A-Za-z.+-]{1,40}"),
             HEX=Pattern.compile("[0-9a-f]{64}"),COLOUR=Pattern.compile("#[0-9a-fA-F]{6}");
     private static final tools.jackson.databind.ObjectMapper JSON=JsonCompatibility.mapper();

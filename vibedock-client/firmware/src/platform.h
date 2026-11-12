@@ -25,6 +25,24 @@ extern "C" {
 }
 using VibeWebServer = ESP8266WebServer;
 #define VIBEDOCK_CHIP "ESP8266"
+#elif defined(ARDUINO_ARCH_RP2040)
+// Raspberry Pi Pico (W) on the Arduino-Pico core: the ESP8266 network classes (BearSSL with TLS 1.2, the signed
+// Updater), no TLS 1.3 stack of our own. The Pico family is called VIBEDOCK_PICO below.
+#define VIBEDOCK_PICO 1
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <WebServer.h>
+#include <WiFiClientSecure.h>
+#include <Updater.h>
+#include <vector>
+#include <libb64/cdecode.h>
+#include <hardware/watchdog.h>
+using VibeWebServer = WebServer;
+#if defined(PICO_RP2350)
+#define VIBEDOCK_CHIP "RP2350"
+#else
+#define VIBEDOCK_CHIP "RP2040"
+#endif
 #else
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -54,11 +72,28 @@ using VibeWebServer = WebServer;
 #endif
 #endif
 
+#if defined(VIBEDOCK_PICO)
+// The ESP names main.cpp uses for the chip and Wi-Fi, on the Arduino-Pico core.
+inline struct PicoEsp {
+  uint32_t getFreeHeap() { return rp2040.getFreeHeap(); }
+  uint32_t getMaxFreeBlockSize() { return rp2040.getFreeHeap(); }  // the allocator does not report the largest block
+  uint32_t getMaxAllocHeap() { return rp2040.getFreeHeap(); }
+  void restart() { rp2040.reboot(); }
+} ESP;
+#endif
+
+#if defined(ESP8266) || defined(VIBEDOCK_PICO)
+#define VIBEDOCK_BEARSSL 1  // BearSSL classes (X509List, PublicKey, SigningVerifier) and the signing Updater
+#endif
+
 namespace platform {
 
 inline bool randomBytes(uint8_t *out, size_t length) {
 #if defined(ESP8266)
   return os_get_random(out, length) == 0;
+#elif defined(VIBEDOCK_PICO)
+  for (size_t i = 0; i < length; i += 4) { uint32_t word = rp2040.hwrand32(); memcpy(out + i, &word, std::min<size_t>(4, length - i)); }
+  return true;
 #else
   esp_fill_random(out, length);  // hardware RNG; seeded by the radio once Wi-Fi runs
   return true;
@@ -68,6 +103,8 @@ inline bool randomBytes(uint8_t *out, size_t length) {
 inline bool powerCycleStart() {
 #if defined(ESP8266)
   return client_policy::countsAsPowerCycle(ESP.getResetInfoPtr()->reason);
+#elif defined(VIBEDOCK_PICO)
+  return !watchdog_caused_reboot();  // power on and the reset pin; a restart by the program is the watchdog
 #else
   auto reason = esp_reset_reason();
   return reason == ESP_RST_POWERON || reason == ESP_RST_EXT;
@@ -88,7 +125,7 @@ bool loadDiag(client_policy::DiagRecord &record);
 void storeDiag(const client_policy::DiagRecord &record);
 // The lowest free heap since the start, where the platform keeps it (0: unknown).
 inline uint32_t minFreeHeap() {
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(VIBEDOCK_PICO)
   return 0;
 #else
   return ESP.getMinFreeHeap();
@@ -98,6 +135,10 @@ inline String resetReason() {
 #if defined(ESP8266)
   String crash = lastCrash();
   return crash.isEmpty() ? ESP.getResetReason() : ESP.getResetReason() + ": " + crash;
+#elif defined(VIBEDOCK_PICO)
+  String crash = lastCrash();
+  String reason = watchdog_caused_reboot() ? "Watchdog or restart" : "Power on or reset";
+  return crash.isEmpty() ? reason : reason + ": " + crash;
 #else
   switch (esp_reset_reason()) {
     case ESP_RST_POWERON: return "Power on";
@@ -115,12 +156,64 @@ inline String resetReason() {
 inline void eraseWifi() {
 #if defined(ESP8266)
   WiFi.persistent(true); WiFi.disconnect(true); WiFi.persistent(false); ESP.eraseConfig();
+#elif defined(VIBEDOCK_PICO)
+  WiFi.disconnect(true);  // the Pico keeps no credentials of its own
 #else
   WiFi.disconnect(true, true);
 #endif
 }
-inline bool openNetwork(int index) {
+// Wi-Fi calls the cores name differently: the Pico has no auto reconnect, no sleep mode setter and starts blocking
+// unless told otherwise.
+inline int scanNetworks() {
+#if defined(VIBEDOCK_PICO)
+  return WiFi.scanNetworks();
+#else
+  return WiFi.scanNetworks(false, false);
+#endif
+}
+inline bool autoReconnect() {
+#if defined(VIBEDOCK_PICO)
+  return true;
+#else
+  return WiFi.getAutoReconnect();
+#endif
+}
+inline void setAutoReconnect(bool on) {
+#if defined(VIBEDOCK_PICO)
+  (void)on;
+#else
+  WiFi.setAutoReconnect(on);
+#endif
+}
+inline String &wifiSsid() { static String v; return v; }
+inline String &wifiPassword() { static String v; return v; }
+inline void wifiBegin(const String &ssid, const String &password) {
+  wifiSsid() = ssid; wifiPassword() = password;
+#if defined(VIBEDOCK_PICO)
+  WiFi.beginNoBlock(ssid.c_str(), password.c_str());
+#else
+  WiFi.begin(ssid.c_str(), password.c_str());
+#endif
+}
+inline void wifiReconnect() {
+#if defined(VIBEDOCK_PICO)
+  if (wifiSsid().length()) WiFi.beginNoBlock(wifiSsid().c_str(), wifiPassword().c_str());
+#else
+  WiFi.reconnect();
+#endif
+}
+inline void wifiNoSleep() {
 #if defined(ESP8266)
+  WiFi.setSleepMode(WIFI_NONE_SLEEP);
+#elif defined(VIBEDOCK_PICO)
+  WiFi.noLowPowerMode();
+#else
+  WiFi.setSleep(false);
+#endif
+}
+inline wl_status_t wifiStatus() { return static_cast<wl_status_t>(WiFi.status()); }
+inline bool openNetwork(int index) {
+#if defined(ESP8266) || defined(VIBEDOCK_PICO)
   return WiFi.encryptionType(index) == ENC_TYPE_NONE;
 #else
   return WiFi.encryptionType(index) == WIFI_AUTH_OPEN;
@@ -145,6 +238,8 @@ inline void onTlsWait(void (*wait)()) {
 inline String freeHeap() {
 #if defined(ESP8266)
   return tls13::heapText();
+#elif defined(VIBEDOCK_PICO)
+  return String(rp2040.getFreeHeap());
 #else
   return String(ESP.getFreeHeap());
 #endif
@@ -158,8 +253,8 @@ inline void backlight(uint8_t pin, bool activeHigh, uint8_t percent) {
 #endif
   if (percent > 100) percent = 100;
   uint32_t duty = uint32_t(percent) * 255 / 100; if (!activeHigh) duty = 255 - duty;
-#if defined(ESP8266)
-  // The ESP8266 core stops its PWM waveform in digitalWrite itself.
+#if defined(ESP8266) || defined(VIBEDOCK_PICO)
+  // The ESP8266 core stops its PWM waveform in digitalWrite itself; the Pico's PWM slice keeps the pin until it is set again.
   if (percent >= 100) { pinMode(pin, OUTPUT); digitalWrite(pin, activeHigh ? HIGH : LOW); return; }
   analogWriteRange(255); analogWrite(pin, duty);
 #elif ESP_ARDUINO_VERSION_MAJOR >= 3
@@ -177,27 +272,29 @@ inline void backlight(uint8_t pin, bool activeHigh, uint8_t percent) {
 inline bool mountStorage() {
 #if defined(ESP8266)
   return LittleFS.begin();
+#elif defined(VIBEDOCK_PICO)
+  return LittleFS.begin();  // formats an empty flash area on the first start after flashing (auto format is the default)
 #else
   return LittleFS.begin(true);  // formats an empty partition on the first start after flashing
 #endif
 }
 // Chunked HTML answers (the ESP32 web server has no chunkedResponseModeStart).
 inline void chunkedStart(VibeWebServer &web, const char *type) {
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(VIBEDOCK_PICO)
   web.chunkedResponseModeStart(200, type);
 #else
   web.setContentLength(CONTENT_LENGTH_UNKNOWN); web.send(200, type, "");
 #endif
 }
 inline void chunkedEnd(VibeWebServer &web) {
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(VIBEDOCK_PICO)
   web.chunkedResponseFinalize();
 #else
   web.sendContent("");
 #endif
 }
 inline size_t base64Decode(const String &encoded, uint8_t *out, size_t capacity) {
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(VIBEDOCK_PICO)
   (void)capacity;
   return base64_decode_chars(encoded.c_str(), encoded.length(), (char *)out);
 #else
@@ -245,6 +342,47 @@ inline String tlsError(WiFiClient *client, bool legacy = false) {
   if (!legacy) return tls13::lastError();
   char text[96] = ""; int code = static_cast<BearSSL::WiFiClientSecure *>(client)->getLastSSLError(text, sizeof(text));
   return code ? "TLS 1.2 " + String(code) + " " + text : String();
+}
+#elif defined(VIBEDOCK_PICO)
+// BearSSL with TLS 1.2 (the core has no TLS 1.3): the full check against the root from pairing (chain, host name
+// and validity at the current time), or the simple check by the SHA-1 of the server certificate.
+inline std::unique_ptr<BearSSL::X509List> &anchorList() { static std::unique_ptr<BearSSL::X509List> list; return list; }
+inline bool singleCertificate(const uint8_t *der, size_t length) { return BearSSL::X509List(der, length).getCount() == 1; }
+inline bool setAnchor(const uint8_t *der, size_t length) {
+  std::unique_ptr<BearSSL::X509List> list(new BearSSL::X509List(der, length));
+  if (list->getCount() != 1) return false;
+  anchorList() = std::move(list);
+  return true;
+}
+inline bool hasAnchor() { return bool(anchorList()); }
+inline void clearAnchor() { anchorList().reset(); }
+// How the last connection was checked, for the log; empty until a handshake succeeded.
+inline String &tlsMode() { static String mode; return mode; }
+class PicoClient : public BearSSL::WiFiClientSecure {
+ public:
+  PicoClient() { tlsMode() = ""; setBufferSizes(4096, 1024); }
+  int connect(IPAddress ip, uint16_t port) override { return done(BearSSL::WiFiClientSecure::connect(ip, port)); }
+  int connect(const char *host, uint16_t port) override { return done(BearSSL::WiFiClientSecure::connect(host, port)); }
+  int connect(const String &host, uint16_t port) override { return done(BearSSL::WiFiClientSecure::connect(host.c_str(), port)); }
+  const char *mode = "TLS full check";
+ private:
+  int done(int connected) { if (connected) tlsMode() = mode; return connected; }
+};
+inline WiFiClient *pinnedClient(const uint8_t fingerprint[20]) {
+  auto *tls = new PicoClient(); tls->mode = "TLS pinned"; tls->setFingerprint(fingerprint); return tls;
+}
+// The core does not hand out the certificate it verified: the display does not pin itself, every connection is checked in full.
+inline String verifiedFingerprint(WiFiClient *client) { (void)client; return String(); }
+inline WiFiClient *verifiedClient() {
+  auto *tls = new PicoClient(); tls->setTrustAnchors(anchorList().get()); tls->setX509Time(time(nullptr)); return tls;
+}
+inline WiFiClient *legacyClient() { return nullptr; }
+inline bool versionRefused() { return false; }
+inline String tlsSummary() { return tlsMode(); }
+inline String tlsTraffic() { return String(); }
+inline String tlsError(WiFiClient *client, bool legacy = false) {
+  (void)legacy; char text[96] = ""; int code = static_cast<BearSSL::WiFiClientSecure *>(client)->getLastSSLError(text, sizeof(text));
+  return code ? "TLS " + String(code) + " " + text : String();
 }
 #else
 inline String &anchorPem() { static String pem; return pem; }
@@ -322,7 +460,7 @@ inline String tlsError(WiFiClient *client, bool legacy = false) {
 #endif
 
 // ---- updates over Wi-Fi: firmware || RSA-2048 signature (SHA-256, PKCS#1 v1.5) || signature length (le32) ----
-#if defined(ESP8266)
+#if defined(VIBEDOCK_BEARSSL)
 inline std::unique_ptr<BearSSL::PublicKey> &otaKey() { static std::unique_ptr<BearSSL::PublicKey> key; return key; }
 inline bool setOtaKey(const String &pem) {
   std::unique_ptr<BearSSL::PublicKey> key(new BearSSL::PublicKey(pem.c_str()));
@@ -358,16 +496,28 @@ struct UpdateReserve {
 struct UpdateReserve {};
 #endif
 
+inline String updateError() {
+#if defined(ESP8266)
+  return Update.getErrorString();
+#elif defined(VIBEDOCK_PICO)
+  return "error " + String(Update.getError());
+#else
+  return Update.errorString();
+#endif
+}
+
 // Writes the signed firmware from the stream next to the running one and switches over only if the signature of the
 // paired server and the MD5 (x-MD5, over the whole body) match. false with the reason otherwise.
 inline bool installSigned(WiFiClient *stream, size_t size, const String &md5, String &error,
                           const std::function<void(size_t, size_t)> &progress) {
   uint8_t buffer[1024]; size_t done = 0; uint32_t lastData = millis(), lastDrawn = 0;
-#if defined(ESP8266)
+#if defined(VIBEDOCK_BEARSSL)
   BearSSL::HashSHA256 hash; BearSSL::SigningVerifier verifier(otaKey().get());
   Update.installSignature(&hash, &verifier);
+#if defined(ESP8266)
   updateBlock().reset();  // right before the updater asks for it
-  if (!Update.begin(size)) { error = "no space: " + Update.getErrorString(); return false; }
+#endif
+  if (!Update.begin(size)) { error = "no space: " + updateError(); return false; }
   if (md5.length() == 32) Update.setMD5(md5.c_str());
   while (done < size && millis() - lastData < 15000) {
     size_t available = stream->available();
@@ -378,8 +528,8 @@ inline bool installSigned(WiFiClient *stream, size_t size, const String &md5, St
     if (millis() - lastDrawn > 250) { progress(done, size); lastDrawn = millis(); }
     yield();
   }
-  if (done != size) { Update.end(false); error = Update.hasError() ? Update.getErrorString() : String("download interrupted"); return false; }
-  if (!Update.end()) { error = Update.getErrorString(); return false; }  // signature, MD5 or image check failed
+  if (done != size) { Update.end(false); error = Update.hasError() ? updateError() : String("download interrupted"); return false; }
+  if (!Update.end()) { error = updateError(); return false; }  // signature, MD5 or image check failed
   return true;
 #else
   constexpr size_t tail = 256 + 4;

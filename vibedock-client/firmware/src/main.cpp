@@ -677,7 +677,7 @@ String html(const String &value) {
 // for the whole run, so building a page neither needs a large block later nor leaves holes behind. Every piece is
 // sent at once and the buffer is reused.
 String pageChunk;
-void sendChunk() { web.sendContent(pageChunk); pageChunk.clear(); }
+void sendChunk() { web.sendContent(pageChunk); pageChunk = ""; }
 // Large pieces from flash go out in slices. A single write of a few kB was taken only in part (the TCP send buffer
 // was full), and the server did not notice: the next chunk header then stood inside the data and showed up as text
 // ("ea", "47e") in the browser, with the style sheet or the logo cut off. Different on every load.
@@ -818,16 +818,16 @@ WifiNetwork networks[12]; uint8_t networkCount = 0;
 // Scans once, keeps the strongest entry per name and sorts by signal.
 void scanWifi() {
   networkCount = 0;
-  int found = WiFi.scanNetworks(false, false);
+  int found = platform::scanNetworks();
   if (found < 0) {
     // The ESP32 refuses to scan while the station keeps trying a saved network that is out of reach (e.g. at another
     // place, for USB pairing there): stop the attempts for the scan, then try that network again.
-    bool reconnect = WiFi.getAutoReconnect();
-    WiFi.setAutoReconnect(false); WiFi.disconnect(); delay(100);
-    found = WiFi.scanNetworks(false, false);
+    bool reconnect = platform::autoReconnect();
+    platform::setAutoReconnect(false); WiFi.disconnect(); delay(100);
+    found = platform::scanNetworks();
     logEvent(String(F("Wi-Fi scan while connecting: ")) + (found < 0 ? String(F("failed")) : String(found) + F(" networks")));
-    WiFi.setAutoReconnect(reconnect);
-    if (reconnect && !ssid.isEmpty()) WiFi.begin(ssid.c_str(), password.c_str());
+    platform::setAutoReconnect(reconnect);
+    if (reconnect && !ssid.isEmpty()) platform::wifiBegin(ssid, password);
   }
   for (int i = 0; i < found; i++) {
     String name = WiFi.SSID(i); int32_t rssi = WiFi.RSSI(i);
@@ -855,7 +855,7 @@ String shortProblem(wl_status_t status) {
 // The saved network is not there (e.g. a phone hotspot that is switched off): wait for it instead of opening the
 // setup; the loop keeps reconnecting and the screen switches back as soon as the network returns.
 void showWaiting() {
-  message(shortProblem(WiFi.status()), Step::WiFi, true);
+  message(shortProblem(platform::wifiStatus()), Step::WiFi, true);
   showDetail(String(F("Waiting for ")) + ssid);
   display.setTextColor(MUTED, TFT_BLACK);
   display.drawCentreString("Trying again every 15 s", 120, 164, 1);
@@ -908,7 +908,7 @@ void showSetupCode(const String &name, const String &secret) {
     display.drawCentreString("Scan to set up Wi-Fi", 120, 5, 2);
   } else {
     display.setTextColor(TFT_ORANGE, TFT_BLACK);
-    display.drawCentreString(shortProblem(WiFi.status()) + F(" - see page"), 120, 5, 2);
+    display.drawCentreString(shortProblem(platform::wifiStatus()) + F(" - see page"), 120, 5, 2);
     display.setTextColor(TFT_WHITE, TFT_BLACK);
   }
   display.fillRect(left, top, size, size, TFT_WHITE);
@@ -1281,7 +1281,15 @@ int sendImageRequest(ImageRequest &r, const String &url, bool conditional) {
     r.http.addHeader("Content-Type", "text/plain; charset=utf-8");
     r.http.addHeader("X-VibeDock-Log-Request", uploadRequest);
     uploadFile->seek(0);  // again from the start when a second TLS attempt follows
+#if defined(VIBEDOCK_PICO)
+    // The Pico's HTTPClient ended the streamed upload with "send payload failed"; the log is a few kB, the heap is large.
+    size_t length = uploadFile->size();
+    std::unique_ptr<uint8_t[]> body(new (std::nothrow) uint8_t[length ? length : 1]);
+    if (!body || uploadFile->read(body.get(), length) != length) return HTTPC_ERROR_SEND_PAYLOAD_FAILED;
+    return r.http.sendRequest("POST", body.get(), length);
+#else
     return r.http.sendRequest("POST", uploadFile, uploadFile->size());
+#endif
   }
 #ifdef VIBEDOCK_AUDIO_ES8311
   if (conditional && audio::available()) r.http.addHeader("X-VibeDock-Audio", "1");
@@ -1699,7 +1707,7 @@ void statusPage() {
   pageStart(html(deviceName));
   String css, state = statusLine(css);
   // In small pieces through pageChunk (see colourCard): one String for the card was cut off in the middle of a word.
-  String &b = pageChunk; b.clear();
+  String &b = pageChunk; b = "";
   b += F("<section class=\"card\"><h2>Status</h2><p class=\"state "); b += css; b += F("\">"); b += state;
   b += F("</p><dl><dt>IP address</dt><dd>"); b += currentIp();
   b += F("</dd><dt>Wi-Fi</dt><dd>"); b += html(WiFi.SSID()); b += " ("; b += WiFi.RSSI(); b += F(" dBm)</dd>");
@@ -1772,7 +1780,7 @@ uint32_t largestFreeBlock() {
 // so the display can be compared with the server preview right away; the BMP above stays uncorrected.
 void slider(const char *name, const __FlashStringHelper *label, int value, int low, int high, int step, bool gamma) {
   // Text in flash (F): on the ESP8266 plain literals take RAM the TLS handshake needs. Sent in two pieces.
-  String &s = pageChunk; s.clear();
+  String &s = pageChunk; s = "";
   s += F("<label class=\"f\" for=\""); s += name; s += F("\">"); s += label; s += F(" <b>");
   s += gamma ? String(value / 100.0, 2) : String(value) + F(" %");
   s += F("</b></label><input type=\"range\" id=\""); s += name; s += F("\" name=\""); s += name;
@@ -1790,7 +1798,7 @@ void slider(const char *name, const __FlashStringHelper *label, int value, int l
 void colourCard() {
   using namespace client_policy;
   uint16_t w = lastImageSize.width ? lastImageSize.width : 240, h = lastImageSize.height ? lastImageSize.height : 240;
-  String &card = pageChunk; card.clear();
+  String &card = pageChunk; card = "";
   card += F("<form action=\"/colours\" method=\"post\"><section class=\"card\"><h2>Display colours</h2>"
       "<div style=\"display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start\"><figure style=\"margin:0;flex:none\"><img class=\"screen\"");
   // Without a token (no answer from the server yet) there is no picture: the page says so below.
@@ -2029,7 +2037,10 @@ void setup() {
   platform::crashBegin();  // the crash of the run before, and from now on the panic handler
   diagBegin();  // first: anything before would overwrite the state of the run before
   pageChunk.reserve(512);  // before the heap fragments: web pages are built in this one buffer
-  Serial.setRxBufferSize(1024); Serial.begin(115200);  // the flasher sends in paced chunks
+  #if !defined(VIBEDOCK_PICO)
+  Serial.setRxBufferSize(1024);
+#endif
+  Serial.begin(115200);  // the flasher sends in paced chunks
 #if defined(ESP32) && ARDUINO_USB_CDC_ON_BOOT
   Serial.setTxTimeoutMs(0); // an attached Mac must never hold the network startup waiting for USB reads
 #endif
@@ -2084,11 +2095,7 @@ void setup() {
   WiFi.persistent(false); WiFi.mode(WIFI_STA);
   // No modem sleep: with it the access point holds incoming packets until the next beacon, and phone hotspots drop
   // them. Over TLS 1.3 the M1 needs whole 16 kB records through a 2 kB TCP window; with sleep the answers stalled.
-#if defined(ESP8266)
-  WiFi.setSleepMode(WIFI_NONE_SLEEP);
-#else
-  WiFi.setSleep(false);
-#endif
+  platform::wifiNoSleep();
   message("Starting network", Step::WiFi);
   BOOT_TRACE("first screen drawn");
   // The start with its boot id, kind and the run before first, then the platform's reset text (it may be long).
@@ -2108,12 +2115,12 @@ void setup() {
   handleQuickBoots();
   if (ssid.isEmpty() || setupRequested) { startPortal(); return; }
   diagPhase(Phase::WiFi);
-  WiFi.setAutoReconnect(true); WiFi.begin(ssid.c_str(), password.c_str()); uint32_t began = millis();
+  platform::setAutoReconnect(true); platform::wifiBegin(ssid, password); uint32_t began = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - began < 20000) { footer(); settleQuickBoot(); serialPoll(); delay(250); }
   bool online = WiFi.status() == WL_CONNECTED;
-  if (!online) wifiProblem = connectionProblem(WiFi.status());
+  if (!online) wifiProblem = connectionProblem(platform::wifiStatus());
   logEvent(online ? String(F("Wi-Fi ")) + ssid + ": " + WiFi.localIP().toString() + ", " + String(WiFi.RSSI()) + F(" dBm, heap ") + platform::freeHeap() : String(F("Wi-Fi: ")) + wifiProblem);
-  if (!online && !networkVerified) { WiFi.setAutoReconnect(false); WiFi.disconnect(); startPortal(); return; }
+  if (!online && !networkVerified) { platform::setAutoReconnect(false); WiFi.disconnect(); startPortal(); return; }
   if (online && !networkVerified) { networkVerified = true; saveConfig(); }
   configTime(0, 0, "pool.ntp.org", "time.cloudflare.com");  // UTC; only needed to check https certificates
   shownIp = currentIp(); startPairingServer(); lastReconnect = millis(); diagPhase(Phase::Idle);
@@ -2285,7 +2292,7 @@ void loop() {
   static bool wasOnline = false; bool online = WiFi.status() == WL_CONNECTED;
   if (wasOnline && !online && diag.drops < 255) { diag.drops++; diagWrite(); }
   wasOnline = online;
-  if (!online && millis() - lastReconnect >= 15000) { lastReconnect = millis(); WiFi.reconnect(); }
+  if (!online && millis() - lastReconnect >= 15000) { lastReconnect = millis(); platform::wifiReconnect(); }
   if (WiFi.status() == WL_CONNECTED && !networkVerified) { networkVerified = true; saveConfig(); }
   if (mode == Mode::Paired) {
     if (client_policy::waited(millis(), lastPull, pullIntervalMs())) pull();

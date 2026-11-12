@@ -35,6 +35,11 @@ def merge(source, target, env):
     if env.subst("$PIOPLATFORM") == "espressif8266":
         shutil.copyfile(app, out)
         return
+    if env.subst("$PIOPLATFORM") == "raspberrypi":
+        # Pico (RP2350): the update over Wi-Fi takes the app image; the first installation is the .uf2 the build leaves
+        # next to it (drag it onto the RPI-RP2 drive while holding BOOTSEL). flash.bin is the app again, as on the ESP8266.
+        shutil.copyfile(app, out)
+        return
     # PlatformIO 8 uses the prebuilt esptool 5 executable; pioarduino still supplies the Python package.
     platform = env.PioPlatform()
     binary_package = platform.get_package_dir("tool-esptool") if "tool-esptool" in platform.packages else None

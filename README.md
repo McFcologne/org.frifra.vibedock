@@ -171,7 +171,7 @@ replaces the seller's firmware after you have saved a full backup of your own de
 where to get one is in the [manual](docs/manual/MANUAL.md#getting-a-display).
 
 The same sources also build for several ESP32 boards with a display (Cheap Yellow Display, LilyGO T-Display and
-T-Display-S3, Waveshare ESP32-S3-LCD-1.69, ESP32-S3-Touch-LCD-1.47, ESP32-S3-Touch-LCD-1.54 and ESP32-C6-Touch-LCD-1.69, ESP32-S3-ePaper-1.54 V2, ESP32-C3 with ST7789). Tested on hardware are the Waveshare ESP32-S3-Touch-LCD-1.47, ESP32-S3-Touch-LCD-1.54, ESP32-C6-Touch-LCD-1.69 and ESP32-S3-ePaper-1.54 V2; the others are prepared (they build, their settings follow what the tested boards showed, but none has run on hardware yet);
+T-Display-S3, Waveshare ESP32-S3-LCD-1.69, ESP32-S3-Touch-LCD-1.47, ESP32-S3-Touch-LCD-1.54 and ESP32-C6-Touch-LCD-1.69, ESP32-S3-ePaper-1.54 V2, ESP32-C3 with ST7789) and for the Raspberry Pi Pico 2 W with a Waveshare Pico-LCD-1.3 (prepared). Tested on hardware are the Waveshare ESP32-S3-Touch-LCD-1.47, ESP32-S3-Touch-LCD-1.54, ESP32-C6-Touch-LCD-1.69 and ESP32-S3-ePaper-1.54 V2; the others are prepared (they build, their settings follow what the tested boards showed, but none has run on hardware yet);
 see the [client README](vibedock-client/README.md).
 
 ## Client firmware and local device page

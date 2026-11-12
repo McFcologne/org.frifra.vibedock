@@ -87,7 +87,7 @@ to 160.06 ms for all three short cues. Confirmed on the device: the short cues a
 | VibeTV M1 | tested | Unchanged in use on the owner's displays (see 0.1.0). |
 | Waveshare ESP32-S3-Touch-LCD-1.47 | tested | Installed with `flash.sh` (chip detection, board choice), paired over USB, images in the 172×320 type, swipes left/right switch the scheme on the server and in the administration at once, swipes up/down the brightness. |
 | Waveshare ESP32-C6-Touch-LCD-1.69 | tested | Installed with `flash.sh`, paired over USB (once needed a restart by hand), images in the 240×280 type with its rounded corners. |
-| Cheap Yellow Display, LilyGO T-Display, LilyGO T-Display-S3, Waveshare ESP32-S3-LCD-1.69, ESP32-C3 with ST7789 | prepared | Build only; not run on hardware. |
+| Cheap Yellow Display, LilyGO T-Display, LilyGO T-Display-S3, Waveshare ESP32-S3-LCD-1.69, ESP32-C3 with ST7789, Raspberry Pi Pico 2 W with Pico-LCD-1.3 | prepared | Build only; not run on hardware. |
 
 What the tested boards showed, and what the prepared ones take over:
 

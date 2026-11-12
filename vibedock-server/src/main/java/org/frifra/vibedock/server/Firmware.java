@@ -121,6 +121,7 @@ public class Firmware {
      */
     synchronized Uploaded upload(Board board,byte[] bytes) throws IOException {
         if(uploads==null)throw new IllegalStateException("no data directory");
+        if(board.rp2350())throw new IllegalArgumentException("This board is installed with a .uf2 file; the server does not offer updates over Wi-Fi for it yet");
         if(bytes.length<1024||bytes.length>MAX_SIZE)throw new IllegalArgumentException("not a firmware file (size)");
         // The ESP32 USB image: partition table at 0x8000, bootloader at 0x0 (or 0x1000 on the classic ESP32).
         boolean usb=!board.esp8266()&&bytes.length>0x8002&&(bytes[0x8000]&0xff)==0xAA&&(bytes[0x8001]&0xff)==0x50;

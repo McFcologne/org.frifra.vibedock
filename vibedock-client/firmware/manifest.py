@@ -23,7 +23,7 @@ import configparser, hashlib, json, os, re, sys
 from decimal import Decimal
 
 SCHEMA = 1
-CHIPS = {"ESP8266", "ESP32", "ESP32-S2", "ESP32-S3", "ESP32-C3", "ESP32-C6", "ESP32-H2"}
+CHIPS = {"ESP8266", "ESP32", "ESP32-S2", "ESP32-S3", "ESP32-C3", "ESP32-C6", "ESP32-H2", "RP2350"}
 FLAG = re.compile(r"-D [A-Z][A-Z0-9_]{0,63}(=[A-Za-z0-9_.+-]{0,60})?$")
 LIBRARY = re.compile(r"[A-Za-z0-9_.-]{1,50}(/[A-Za-z0-9_.-]{1,50})?@[0-9][0-9A-Za-z.+-]{0,20}$")
 MAX_FLAGS, MAX_LIBRARIES = 80, 20
