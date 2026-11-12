@@ -1,7 +1,7 @@
 # Doom for the Pico 2 W with the Pico-LCD-1.3
 
 The administration builds the Doom firmware for the Pico-LCD-1.3 (board `rpi-pico2w-lcd-13`) when it is downloaded: it
-fetches the shareware `DOOM1.WAD` from the source named in the download dialog, converts it with `whd_gen` and appends
+fetches the shareware `DOOM1.WAD` from the first reachable source of the list shown in the download dialog (`vibedock.doom.wad-urls`; a file `doom/sources.txt` in the data directory, one address per line, replaces the list on the fly), converts it with `whd_gen` and appends
 the result to the program in `src/main/resources/doom/doom-pico2w-lcd-13-code.uf2`. No WAD data is part of this
 repository or of a release.
 

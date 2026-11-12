@@ -21,7 +21,7 @@ import java.util.zip.ZipInputStream;
 /**
  * The Doom firmware of the Pico-LCD-1.3, put together here when it is downloaded: the program (resource
  * {@code doom/doom-pico2w-lcd-13-code.uf2}) plus the shareware {@code DOOM1.WAD}, which this server fetches from
- * {@code vibedock.doom.wad-url}, checks against its SHA-1 and converts with {@code whd_gen} (see doom/README.md). No WAD data
+ * the first of its sources ({@code vibedock.doom.wad-urls}, or {@code doom/sources.txt} in the data directory, read on every call) that has it, checks against its SHA-1 and converts with {@code whd_gen} (see doom/README.md). No WAD data
  * is part of the repository or of a release. The result is kept in the data directory ({@code doom/}).
  */
 @Service
@@ -34,23 +34,43 @@ class DoomFirmware {
     /** Where a running build is: fetch, convert, pack; empty when none runs. The dialog shows it. */
     private volatile String stage="";
     String stage(){return stage;}
-    private final URI wadUrl;private final String wadSha1;private final Path whdGen,dir;private final boolean custom;
+    private final List<URI> configured;private final String wadSha1;private final Path whdGen,dir;
+    /** The host the current or last build fetched from; the dialog shows it. */
+    private volatile String source="";
+    String source(){return source;}
     private final HttpClient http=HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).connectTimeout(Duration.ofSeconds(10)).build();
 
     /** What the dialog tells before the download: where the WAD comes from and what is packed. */
-    record Plan(boolean available,String wadUrl,String host,String wadSha1,boolean cached) {}
+    record Plan(boolean available,List<URI> sources,String wadSha1,boolean cached,boolean fromFile) {}
 
-    DoomFirmware(@Value("${vibedock.doom.wad-url:https://www.gamers.org/pub/idgames/idstuff/doom/doom19s.zip}") String wadUrl,
+    DoomFirmware(@Value("${vibedock.doom.wad-urls:https://www.gamers.org/pub/idgames/idstuff/doom/doom19s.zip,https://youfailit.net/pub/idgames/idstuff/doom/doom19s.zip}") String wadUrls,
                  @Value("${vibedock.doom.wad-sha1:5b2e249b9c5133ec987b3ea77596381dc0d6bc1d}") String wadSha1,
                  @Value("${vibedock.doom.whd-gen:/app/doom/whd_gen}") String whdGen,
                  @Value("${vibedock.data-dir:}") String dataDir){
-        this.wadUrl=URI.create(wadUrl);this.wadSha1=wadSha1.toLowerCase(Locale.ROOT);this.whdGen=Path.of(whdGen);
+        this.configured=parse(List.of(wadUrls.split("[,\\s]+")));this.wadSha1=wadSha1.toLowerCase(Locale.ROOT);this.whdGen=Path.of(whdGen);
         this.dir=dataDir==null||dataDir.isBlank()?null:Path.of(dataDir).resolve("doom");
-        this.custom=!"https".equals(this.wadUrl.getScheme());
     }
 
     Plan plan(){
-        return new Plan(Files.isExecutable(whdGen)&&dir!=null&&code()!=null,wadUrl.toString(),wadUrl.getHost(),wadSha1,dir!=null&&Files.isRegularFile(cacheFile()));
+        var file=fileSources();
+        return new Plan(Files.isExecutable(whdGen)&&dir!=null&&code()!=null,file.isEmpty()?configured:file,wadSha1,dir!=null&&Files.isRegularFile(cacheFile()),!file.isEmpty());
+    }
+
+    private static List<URI> parse(List<String> urls){
+        var out=new ArrayList<URI>();
+        for(var u:urls){
+            if(u.isBlank()||u.startsWith("#"))continue;
+            try{var uri=URI.create(u.trim());if(uri.getHost()!=null&&uri.getUserInfo()==null&&("https".equals(uri.getScheme())||"http".equals(uri.getScheme())))out.add(uri);}catch(IllegalArgumentException ignored){}
+        }
+        return List.copyOf(out);
+    }
+    /**
+     * Addresses an administrator put into {@code <data>/doom/sources.txt} (one per line, # for comments): read on every call,
+     * so a mirror can be replaced without a restart. They take the place of the configured ones.
+     */
+    private List<URI> fileSources(){
+        if(dir==null)return List.of();
+        try{return Files.isRegularFile(dir.resolve("sources.txt"))?parse(Files.readAllLines(dir.resolve("sources.txt"))):List.of();}catch(IOException e){return List.of();}
     }
 
     private static byte[] code(){
@@ -70,8 +90,7 @@ class DoomFirmware {
         var work=Files.createTempDirectory(dir,"build-");
         try{
             stage="fetch";
-            log.info("Doom: fetching the shareware WAD from {}",wadUrl.getHost());
-            var wad=wad(download());
+            var wad=fetchWad();
             var wadFile=work.resolve("DOOM1.WAD");Files.write(wadFile,wad);
             var whxFile=work.resolve("doom1.whx");
             log.info("Doom: converting the WAD");
@@ -91,11 +110,24 @@ class DoomFirmware {
         }
     }
 
-    private byte[] download() throws IOException {
-        if(!custom&&(wadUrl.getUserInfo()!=null))throw new IOException("address not allowed");
+    /** The WAD from the first source that has it: an unreachable one, a wrong answer or other content moves on to the next. */
+    private byte[] fetchWad() throws IOException {
+        var sources=plan().sources();
+        if(sources.isEmpty())throw new IOException("No source for the WAD is set (vibedock.doom.wad-urls, or doom/sources.txt in the data directory).");
+        var problems=new ArrayList<String>();
+        for(var uri:sources){
+            source=uri.getHost();
+            log.info("Doom: fetching the shareware WAD from {}",uri.getHost());
+            try{return wad(download(uri));}
+            catch(IOException e){log.warn("Doom: {}: {}",uri.getHost(),e.getMessage());problems.add(uri.getHost()+": "+e.getMessage());}
+        }
+        throw new IOException("No source could be used. "+String.join(" ",problems)+" Try again later or put another address into doom/sources.txt in the data directory.");
+    }
+
+    private byte[] download(URI uri) throws IOException {
         try{
-            var response=http.send(HttpRequest.newBuilder(wadUrl).timeout(Duration.ofSeconds(120)).header("User-Agent","vibedock-server").build(),HttpResponse.BodyHandlers.ofInputStream());
-            if(response.statusCode()!=200)throw new IOException(wadUrl.getHost()+" answered "+response.statusCode()+".");
+            var response=http.send(HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(120)).header("User-Agent","vibedock-server").build(),HttpResponse.BodyHandlers.ofInputStream());
+            if(response.statusCode()!=200)throw new IOException("answered "+response.statusCode()+".");
             try(var in=response.body()){
                 var data=in.readNBytes(MAX_DOWNLOAD+1);
                 if(data.length>MAX_DOWNLOAD)throw new IOException("The download is larger than expected.");
@@ -103,8 +135,9 @@ class DoomFirmware {
             }
         }catch(InterruptedException e){Thread.currentThread().interrupt();throw new IOException("interrupted");}
         catch(IOException e){
-            if(e.getMessage()!=null&&(e.getMessage().startsWith("The ")||e.getMessage().contains(" answered ")))throw e;
-            throw new IOException("Could not reach "+wadUrl.getHost()+": this server needs internet access for the download. ("+e.getClass().getSimpleName()+")");
+            var m=e.getMessage();
+            if(m!=null&&(m.startsWith("The ")||m.startsWith("answered ")))throw e;
+            throw new IOException("not reachable ("+e.getClass().getSimpleName()+": this server needs internet access for the download).");
         }
     }
 

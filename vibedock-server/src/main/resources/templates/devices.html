@@ -176,7 +176,7 @@
   </div></div>
   <p class="meta doom-status" data-doom-status role="status"></p>
   <details class="doom-details"><summary>Source, checksum and license</summary>
-    <p class="meta">Fetched from <span data-doom-url>…</span>, SHA-1 <code data-doom-sha>…</code>. Nothing of the game data is stored in the VibeDock repository, the image or a release.</p>
+    <p class="meta">Sources, tried in this order: <span data-doom-url>…</span>. SHA-1 <code data-doom-sha>…</code>. Another address (a mirror) can be put into <code>doom/sources.txt</code> in the data directory, one per line; it is used from the next download on. Nothing of the game data is stored in the VibeDock repository, the image or a release.</p>
     <p class="meta">Based on <a href="https://github.com/kilograham/rp2040-doom" target="_blank" rel="noopener noreferrer">RP2040 Doom</a> (GPL v2) with the Pico-LCD port of <a href="https://github.com/opensensor/rp2040-doom-PicoLCD" target="_blank" rel="noopener noreferrer">opensensor</a>, ported to the RP2350; the source of the program is on the <a href="https://github.com/McFcologne/org.frifra.vibedock/releases/tag/doom-pico" target="_blank" rel="noopener noreferrer">release page</a>. The shareware license does not allow changed versions of the game data, which is why the conversion happens here, on your server, and nothing converted is passed on. <em>Doom</em> is a trademark of id Software; this is an unofficial fun build, use it at your own risk.</p></details>
 </dialog>
 <script src="../static/doom-popup.js" th:src="@{/doom-popup.js}" th:if="${!#lists.isEmpty(clients.?[board.id == 'rpi-pico2w-lcd-13'])}"></script>

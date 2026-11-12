@@ -37,16 +37,18 @@
   async function loadPlan() {
     try {
       const plan = await (await fetch(dialog.dataset.plan, { headers: { Accept: 'application/json' } })).json();
-      text('[data-doom-host]', plan.host); text('[data-doom-host2]', plan.host); text('[data-doom-url]', plan.url); text('[data-doom-sha]', plan.sha1);
-      button.disabled = !plan.available;
-      status.textContent = plan.available ? '' : 'This installation cannot build the firmware (the converter is missing).';
+      const hosts = [...new Set(plan.sources.map(source => source.host))];
+      text('[data-doom-host]', hosts.length ? hosts.join(' (or ') + (hosts.length > 1 ? ')'.repeat(hosts.length - 1) : '') : 'no source set');
+      text('[data-doom-host2]', hosts[0] || '?'); text('[data-doom-url]', plan.sources.map(source => source.url).join(' · ') || 'none'); text('[data-doom-sha]', plan.sha1);
+      button.disabled = !plan.available || !hosts.length;
+      status.textContent = !plan.available ? 'This installation cannot build the firmware (the converter is missing).' : !hosts.length ? 'No source for the game data is set.' : '';
     } catch (error) { status.textContent = 'The plan could not be loaded.'; }
   }
   button.addEventListener('click', async () => {
     button.disabled = true; status.textContent = ''; shown = target = 0; show('fetch');
     // The server knows which step it is on; ask for it while the request runs (a cached firmware answers at once).
     const poll = setInterval(async () => {
-      try { const { stage } = await (await fetch(dialog.dataset.state)).json(); if (stage) show(stage); } catch (error) { /* the next poll tries again */ }
+      try { const { stage, source } = await (await fetch(dialog.dataset.state)).json(); if (source) text('[data-doom-host2]', source); if (stage) show(stage); } catch (error) { /* the next poll tries again */ }
     }, 400);
     try {
       const response = await fetch(dialog.dataset.firmware);

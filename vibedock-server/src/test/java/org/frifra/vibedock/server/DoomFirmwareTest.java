@@ -105,4 +105,44 @@ class DoomFirmwareTest {
         var s=service("https://example.invalid/x","/nonexistent",data);
         assertFalse(s.plan().available());assertThrows(IOException.class,s::firmware);
     }
+
+    private static HttpServer server(int status,byte[] body,int[] calls)throws IOException{
+        var http=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
+        http.createContext("/",x->{calls[0]++;if(status!=200){x.sendResponseHeaders(status,-1);x.close();return;}x.sendResponseHeaders(200,body.length);x.getResponseBody().write(body);x.close();});
+        http.start();return http;
+    }
+    private static Path tool(Path data)throws IOException{
+        var tool=data.resolve("whd_gen");Files.writeString(tool,"#!/bin/sh\nprintf 'IWHX' > \"$2\"\nhead -c 3000 \"$1\" >> \"$2\"\n");tool.toFile().setExecutable(true);return tool;
+    }
+    @Test void aMirrorTakesOverWhenTheFirstSourceFails(@TempDir Path data)throws Exception{
+        int[] bad={0},good={0};
+        var first=server(404,null,bad);var second=server(200,zip("DOOM1.WAD",WAD),good);
+        try{
+            var urls="http://127.0.0.1:"+first.getAddress().getPort()+"/a.zip,http://127.0.0.1:"+second.getAddress().getPort()+"/b.zip";
+            var s=service(urls,tool(data).toString(),data);
+            assertEquals(2,s.plan().sources().size());
+            s.firmware();
+            assertEquals(1,bad[0]);assertEquals(1,good[0]);assertEquals("127.0.0.1",s.source());
+        }finally{first.stop(0);second.stop(0);}
+    }
+    @Test void aFileOfAddressesReplacesTheListOnTheFly(@TempDir Path data)throws Exception{
+        int[] calls={0};var http=server(200,zip("DOOM1.WAD",WAD),calls);
+        try{
+            var s=service("https://example.invalid/x.zip",tool(data).toString(),data);
+            assertEquals("example.invalid",s.plan().sources().get(0).getHost());assertFalse(s.plan().fromFile());
+            Files.createDirectories(data.resolve("doom"));
+            Files.writeString(data.resolve("doom/sources.txt"),"# my mirror\nhttp://127.0.0.1:"+http.getAddress().getPort()+"/m.zip\n");
+            assertTrue(s.plan().fromFile());assertEquals("127.0.0.1",s.plan().sources().get(0).getHost());
+            s.firmware();assertEquals(1,calls[0]);
+        }finally{http.stop(0);}
+    }
+    @Test void whenNoSourceWorksEveryReasonIsListed(@TempDir Path data)throws Exception{
+        int[] calls={0};var a=server(404,null,calls);var b=server(200,new byte[]{1,2,3},calls);
+        try{
+            var urls="http://127.0.0.1:"+a.getAddress().getPort()+"/a,http://127.0.0.1:"+b.getAddress().getPort()+"/b";
+            var e=assertThrows(IOException.class,()->service(urls,tool(data).toString(),data).firmware());
+            assertTrue(e.getMessage().contains("answered 404"),e.getMessage());assertTrue(e.getMessage().contains("not found")||e.getMessage().contains("DOOM1.WAD was not found"),e.getMessage());
+            assertTrue(e.getMessage().contains("sources.txt"));
+        }finally{a.stop(0);b.stop(0);}
+    }
 }
