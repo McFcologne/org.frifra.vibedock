@@ -97,7 +97,8 @@
            title="The display's own status page (colour calibration, image) in this network"><strong th:text="${client.ip}"></strong></a></p>
       <p th:replace="~{fragments :: networkLine(${networks.get(client.identifier)})}"></p>
       <p class="meta device-identifier"><th:block th:text="${client.identifier + ' · ' + client.board.label}"></th:block>
-        <span th:unless="${client.board.tested}" class="badge update" title="The firmware for this board builds, but it has never run on the real board">untested board</span></p>
+        <span th:unless="${client.board.tested}" class="badge update" title="The firmware for this board builds, but it has never run on the real board">untested board</span>
+        <button type="button" class="doom-link" th:if="${client.board.id == 'rpi-pico2w-lcd-13'}" data-doom>can it play doom?</button></p>
       <div class="meta firmware-line" data-live="firmware" th:with="firmwareVersion=${firmwareVersions.get(client.board.id)}"><span>Firmware <strong th:text="${client.firmware != null ? client.firmware : 'unknown'}"></strong></span>
         <th:block th:if="${T(org.frifra.vibedock.server.FirmwareVersion).offered(firmwareVersion, client.firmware)}">
           <span class="badge update" th:if="${client.updating}" th:text="${'Updating to ' + firmwareVersion + ' …'}">Updating</span>
@@ -151,6 +152,34 @@
   <div data-metrics-body></div>
 </dialog>
 <script src="../static/metrics-popup.js" th:src="@{/metrics-popup.js}"></script>
+<dialog class="source-dialog doom-dialog" id="doom-dialog" aria-labelledby="doom-title" th:if="${!#lists.isEmpty(clients.?[board.id == 'rpi-pico2w-lcd-13'])}" th:attr="data-plan=@{/admin/doom/plan},data-firmware=@{/admin/doom/firmware.uf2},data-state=@{/admin/doom/state}">
+  <div class="dialog-head"><h3 class="grow" id="doom-title">Can it play Doom?</h3><button type="button" class="secondary dialog-close" data-doom-close aria-label="Close">×</button></div>
+  <p class="meta">Yes: the shareware episode (<em>Knee-Deep in the Dead</em>), from a firmware that this server puts together when you download it.</p>
+  <div class="doom-cols">
+    <div><h4>Where it comes from</h4><p class="meta">Program: part of this server (Doom engine, GPL v2). Game data: the shareware <code>DOOM1.WAD</code>, fetched from <strong data-doom-host>…</strong> and checked by its SHA-1.</p></div>
+    <div><h4>What gets packed</h4><p class="meta">The WAD is converted (<code>whd_gen</code>) and appended to the program: one UF2 file of about 4 MB, kept for the next download.</p></div>
+  </div>
+  <h4>What to do</h4>
+  <ol class="doom-steps">
+    <li>Download with the button below (a few seconds the first time).</li>
+    <li>Hold <strong>BOOTSEL</strong> while plugging the board into USB: it shows up as a drive.</li>
+    <li>Copy the file onto the drive. The board restarts into DOS and Doom.</li>
+    <li>Back to VibeDock: install its firmware again on the <a th:href="@{/admin/firmware(board='rpi-pico2w-lcd-13')}">Firmware</a> page; pair again if needed.</li>
+  </ol>
+  <p class="meta"><strong>Joystick</strong> move, turn · <strong>A</strong> fire · <strong>X</strong> use · <strong>B</strong> run · <strong>Y</strong> menu · <strong>press</strong> confirm · no sound</p>
+  <div class="form-actions doom-run"><div class="doom-go"><button type="button" class="button" data-doom-download autofocus>Fetch, pack and download</button></div>
+  <div class="doom-term idle" data-doom-progress aria-hidden="true">
+    <div class="row" data-stage="fetch"><span>FETCH&nbsp; DOOM1.WAD from <span data-doom-host2></span></span><span class="fill"></span><b></b></div>
+    <div class="row" data-stage="convert"><span>CONVERT&nbsp; WAD to WHX (whd_gen)</span><span class="fill"></span><b></b></div>
+    <div class="row" data-stage="pack"><span>PACK&nbsp; program + game data to UF2</span><span class="fill"></span><b></b></div>
+    <div class="bar"><div class="track"><i></i></div><span>0%</span></div>
+  </div></div>
+  <p class="meta doom-status" data-doom-status role="status"></p>
+  <details class="doom-details"><summary>Source, checksum and license</summary>
+    <p class="meta">Sources, tried in this order: <span data-doom-url>…</span>. SHA-1 <code data-doom-sha>…</code>. Another address (a mirror) can be put into <code>doom/sources.txt</code> in the data directory, one per line; it is used from the next download on. Nothing of the game data is stored in the VibeDock repository, the image or a release.</p>
+    <p class="meta">Based on <a href="https://github.com/kilograham/rp2040-doom" target="_blank" rel="noopener noreferrer">RP2040 Doom</a> (GPL v2) with the Pico-LCD port of <a href="https://github.com/opensensor/rp2040-doom-PicoLCD" target="_blank" rel="noopener noreferrer">opensensor</a>, ported to the RP2350; the source of the program is on the <a href="https://github.com/McFcologne/org.frifra.vibedock/releases/tag/doom-pico-2" target="_blank" rel="noopener noreferrer">release page</a>. The shareware license does not allow changed versions of the game data, which is why the conversion happens here, on your server, and nothing converted is passed on. <em>Doom</em> is a trademark of id Software; this is an unofficial fun build, use it at your own risk.</p></details>
+</dialog>
+<script src="../static/doom-popup.js" th:src="@{/doom-popup.js}" th:if="${!#lists.isEmpty(clients.?[board.id == 'rpi-pico2w-lcd-13'])}"></script>
 <script src="../static/admin-login.js" th:src="@{/admin-login.js}"></script>
 <script type="module" src="../static/usb-pair-dialog.js" th:src="@{/usb-pair-dialog.js}"></script>
 </body></html>

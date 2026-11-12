@@ -30,6 +30,13 @@ COPY src ./src
 COPY --from=version /version /version
 RUN mvn -B verify -Drevision="$(cat /version)"
 
+# The converter of the Doom firmware's game data (doom/README.md), built for the target platform and linked so that it runs in
+# the runtime image.
+FROM gcc:14-bookworm AS whd-gen
+WORKDIR /w
+COPY doom/whd-gen ./
+RUN make
+
 FROM --platform=$BUILDPLATFORM node:22-bookworm-slim AS node
 
 FROM node:22-bookworm-slim AS login-clients
@@ -85,6 +92,7 @@ COPY --from=manual /out /app/manual
 # No display firmware in the image: the server downloads it from the client releases (firmware-sources.yaml) into the
 # data directory. Only the browser flasher's library lives here.
 COPY --from=login-clients /usr/local/lib/node_modules/esptool-js/bundle.js /app/firmware/esptool.js
+COPY --from=whd-gen --chmod=755 /w/whd_gen /app/doom/whd_gen
 COPY --chmod=755 docker-entrypoint.sh login-provider.sh /app/
 USER 10001:10001
 ENV DATA_DIR=/data ADMIN_BIND_ADDRESS=0.0.0.0 HOME=/dev/shm/vibedock-home CODEX_HOME=/dev/shm/vibedock-home/codex CLAUDE_CONFIG_DIR=/dev/shm/vibedock-home/claude
