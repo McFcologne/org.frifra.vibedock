@@ -29,7 +29,7 @@ class BoardTest {
     @Test void aBoardThatIsNotInTheInventoryIsAnOwnBuildAndGetsNoFirmware(@org.junit.jupiter.api.io.TempDir Path dir) throws Exception {
         var own=Board.of("my-own-board");
         Assertions.assertTrue(own.custom());Assertions.assertEquals("my-own-board",own.id());Assertions.assertNotEquals(Board.M1,own);
-        Assertions.assertFalse(own.flippable());Assertions.assertEquals(List.of(0),own.rotations());Assertions.assertFalse(own.esp8266());
+        Assertions.assertTrue(own.flippable());Assertions.assertFalse(Board.M1.flippable());Assertions.assertFalse(own.esp8266());
         Assertions.assertFalse(Board.M1.custom());Assertions.assertFalse(Board.of("esp32-cyd").custom());
         Assertions.assertEquals(Board.M1,Board.of(null));Assertions.assertEquals(Board.M1,Board.of("../etc/passwd"));Assertions.assertEquals(Board.M1,Board.of(""));
         Assertions.assertTrue(Board.reportable("my-own-board"));Assertions.assertFalse(Board.reportable("a/b"));Assertions.assertFalse(Board.reportable(null));
